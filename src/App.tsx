@@ -10,6 +10,8 @@ import CategoriesPage from '@/pages/CategoriesPage'
 import BudgetsPage from '@/pages/BudgetsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import AccountTransactionsPage from '@/pages/AccountTransactionsPage'
+import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage'
+import DataDeletionPage from '@/pages/DataDeletionPage'
 
 type RouteMetaEntry = {
   test: (pathname: string) => boolean
@@ -57,6 +59,16 @@ const routeMeta: RouteMetaEntry[] = [
     test: (pathname) => pathname === '/login',
     title: 'Login',
     description: 'Sign in to access your personal wallet dashboard securely.',
+  },
+  {
+    test: (pathname) => pathname === '/privacy',
+    title: 'Privacy Policy',
+    description: 'Learn how Ledger collects, uses, and protects your personal and financial data.',
+  },
+  {
+    test: (pathname) => pathname === '/data-deletion',
+    title: 'Data Deletion Instructions',
+    description: 'Request permanent deletion of your Ledger account and all associated personal data.',
   },
 ]
 
@@ -171,6 +183,8 @@ export default function App() {
         <RouteMeta />
         <Routes>
           <Route path="/login" element={<LoginPageWrapper />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/data-deletion" element={<DataDeletionPage />} />
           <Route path="/*" element={<ProtectedRoutes />} />
         </Routes>
       </AuthProvider>

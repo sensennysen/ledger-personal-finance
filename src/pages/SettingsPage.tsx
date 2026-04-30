@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Tag, Sun, Moon } from 'lucide-react'
+import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
@@ -190,6 +190,36 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3">
               <Tag className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">Categories</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+        </CardContent>
+      </Card>
+
+      {/* Legal */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Legal</CardTitle>
+          <CardDescription>Review policies and terms</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Link
+            to="/privacy"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Privacy Policy</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/data-deletion"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors rounded-b-lg"
+          >
+            <div className="flex items-center gap-3">
+              <Trash2 className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Data Deletion Instructions</span>
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </Link>

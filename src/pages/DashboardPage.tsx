@@ -18,7 +18,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useBudgets } from '@/hooks/useBudgets'
-import { formatCurrency, getCurrencySymbol, getLast12Months, getLast8Weeks, getLast8Quarters, getMonthRange, groupExpensesByCategory, cn } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol, getLast8Quarters, getCurrentWeekDays, getCurrentMonthDays, getLast5Years, getMonthRange, groupExpensesByCategory, cn } from '@/lib/utils'
 import { BUDGET_WARNING_THRESHOLD } from '@/constants/accounts'
 import { EMERALD, CORAL, GOLD } from '@/constants/colors'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -134,7 +134,7 @@ export default function DashboardPage() {
   const { transactions, loading: txLoading } = useTransactions()
   const { categories } = useCategories()
   const { budgets } = useBudgets()
-  const [chartPeriod, setChartPeriod] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly')
+  const [chartPeriod, setChartPeriod] = useState<'week' | 'month' | 'quarterly' | 'yearly'>('month')
   const [detailView, setDetailView] = useState<'balance' | 'income' | 'expenses' | 'categories' | null>(null)
 
   const { start: monthStart, end: monthEnd } = getMonthRange()
@@ -151,9 +151,10 @@ export default function DashboardPage() {
   // ---- Cash flow chart data ----
   const cashFlowData = useMemo(() => {
     const periods =
-      chartPeriod === 'weekly' ? getLast8Weeks()
+      chartPeriod === 'week' ? getCurrentWeekDays()
+      : chartPeriod === 'month' ? getCurrentMonthDays()
       : chartPeriod === 'quarterly' ? getLast8Quarters()
-      : getLast12Months()
+      : getLast5Years()
     return periods.map(({ label, start, end }) => {
       const periodTx = transactions.filter((t) => t.date >= start && t.date <= end)
       return {
@@ -257,11 +258,12 @@ export default function DashboardPage() {
               <p className="font-semibold text-[15px]">Cash Flow</p>
               <p className="text-[12px] text-muted-foreground mt-0.5">Income vs expenses over time</p>
             </div>
-            <Tabs value={chartPeriod} onValueChange={(v) => setChartPeriod(v as 'weekly' | 'monthly' | 'quarterly')}>
+            <Tabs value={chartPeriod} onValueChange={(v) => setChartPeriod(v as 'week' | 'month' | 'quarterly' | 'yearly')}>
               <TabsList className="h-8">
-                <TabsTrigger value="weekly" className="text-xs px-3">Weekly</TabsTrigger>
-                <TabsTrigger value="monthly" className="text-xs px-3">Monthly</TabsTrigger>
+                <TabsTrigger value="week" className="text-xs px-3">This Week</TabsTrigger>
+                <TabsTrigger value="month" className="text-xs px-3">This Month</TabsTrigger>
                 <TabsTrigger value="quarterly" className="text-xs px-3">Quarterly</TabsTrigger>
+                <TabsTrigger value="yearly" className="text-xs px-3">Yearly</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -283,7 +285,7 @@ export default function DashboardPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} interval={chartPeriod === 'month' ? 4 : 'preserveStartEnd'} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
                   formatter={(value) => formatCurrency(value as number, currency)}

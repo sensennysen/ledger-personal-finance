@@ -107,6 +107,45 @@ export function getLast8Quarters(): Array<{ label: string; start: string; end: s
   return quarters
 }
 
+export function getCurrentWeekDays(): Array<{ label: string; start: string; end: string }> {
+  const now = new Date()
+  const mondayOffset = (now.getDay() + 6) % 7
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - mondayOffset)
+  monday.setHours(0, 0, 0, 0)
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  return dayNames.map((label, i) => {
+    const day = new Date(monday)
+    day.setDate(monday.getDate() + i)
+    const dateStr = day.toISOString().split('T')[0]
+    return { label, start: dateStr, end: dateStr }
+  })
+}
+
+export function getCurrentMonthDays(): Array<{ label: string; start: string; end: string }> {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const days = []
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d)
+    const dateStr = date.toISOString().split('T')[0]
+    days.push({ label: String(d), start: dateStr, end: dateStr })
+  }
+  return days
+}
+
+export function getLast5Years(): Array<{ label: string; start: string; end: string }> {
+  const currentYear = new Date().getFullYear()
+  const years = []
+  for (let i = 4; i >= 0; i--) {
+    const y = currentYear - i
+    years.push({ label: String(y), start: `${y}-01-01`, end: `${y}-12-31` })
+  }
+  return years
+}
+
 export function groupExpensesByCategory(
   transactions: Transaction[],
   categories: Category[],

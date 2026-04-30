@@ -22,7 +22,7 @@ export default function BottomNav() {
         className="absolute top-0 left-0 right-0 h-px"
         style={{ background: 'linear-gradient(90deg, transparent, oklch(0.700 0.115 72 / 0.3), transparent)' }}
       />
-      <div className="flex items-center justify-around h-15 px-2">
+      <div className="flex items-center h-15">
         {navItems.map(({ to, label, icon: Icon, exact }) => {
           const active = exact ? location.pathname === to : location.pathname.startsWith(to)
           return (
@@ -31,7 +31,7 @@ export default function BottomNav() {
               to={to}
               end={exact}
               className={cn(
-                'flex flex-col items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-medium tracking-wide transition-all duration-200',
+                'flex flex-1 flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-medium tracking-wide transition-all duration-200 min-w-0',
                 active
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'

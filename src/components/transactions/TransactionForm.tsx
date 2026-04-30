@@ -116,11 +116,13 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
     if (pendingFile && user) {
       if (!navigator.onLine) {
-        // Store the file in IndexedDB; the sync worker will upload it later
+        // Definitely offline — store the file locally and let the sync queue upload it later
         const tempId = crypto.randomUUID()
         await storePendingReceipt(tempId, pendingFile)
         values.receipt_url = `${PENDING_RECEIPT_PREFIX}${tempId}`
       } else {
+        // Try to upload; if it fails for any reason (network hiccup, captive portal, etc.)
+        // fall back to the same offline path so the transaction still saves with the image.
         setUploading(true)
         const ext = pendingFile.name.split('.').pop() ?? 'jpg'
         const path = `${user.id}/${Date.now()}.${ext}`
@@ -129,11 +131,13 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           .upload(path, pendingFile)
         setUploading(false)
         if (error) {
-          setUploadError('Failed to upload receipt. Please try again.')
-          return
+          const tempId = crypto.randomUUID()
+          await storePendingReceipt(tempId, pendingFile)
+          values.receipt_url = `${PENDING_RECEIPT_PREFIX}${tempId}`
+        } else {
+          const { data } = supabase.storage.from('receipts').getPublicUrl(path)
+          values.receipt_url = data.publicUrl
         }
-        const { data } = supabase.storage.from('receipts').getPublicUrl(path)
-        values.receipt_url = data.publicUrl
       }
     }
     await onSubmit(values)

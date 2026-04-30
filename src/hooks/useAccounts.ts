@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { readCache, writeCache } from '@/lib/dataCache'
+import { registerAccountsListener } from '@/lib/cacheEvents'
 import type { Account } from '@/types'
 
 export function useAccounts() {
@@ -41,6 +42,15 @@ export function useAccounts() {
   }, [user])
 
   useEffect(() => { fetch() }, [fetch])
+
+  // Re-read cache when an offline transaction mutation updates account balances
+  const reloadFromCache = useCallback(() => {
+    if (!user) return
+    const cached = readCache<Account[]>(`${user.id}:accounts`)
+    if (cached) setAccounts(cached)
+  }, [user])
+
+  useEffect(() => registerAccountsListener(reloadFromCache), [reloadFromCache])
 
   const createAccount = async (values: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return { error: 'Not authenticated' }

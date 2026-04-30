@@ -1,26 +1,42 @@
 import { useState, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Plus, Search, Trash2, Pencil, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RepeatIcon } from 'lucide-react'
-import { useTransactions } from '@/hooks/useTransactions'
+import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RepeatIcon, Search, Pencil, Trash2, Plus, CreditCard, Wallet, PiggyBank, Banknote, TrendingUp, Landmark, CircleDollarSign } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
-import { useCategories } from '@/hooks/useCategories'
-import { CURRENCIES } from '@/types'
+import { useTransactions } from '@/hooks/useTransactions'
+import { useAuth } from '@/contexts/AuthContext'
+import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import type { Transaction } from '@/types'
+
+// Reuse form from TransactionsPage via dynamic import pattern — inline the form here
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { useCategories } from '@/hooks/useCategories'
+import { CURRENCIES } from '@/types'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { Skeleton } from '@/components/ui/skeleton'
-import type { Transaction } from '@/types'
+
+const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = {
+  cash: Banknote,
+  digital_wallet: Wallet,
+  credit_card: CreditCard,
+  savings: PiggyBank,
+  checking: Landmark,
+  investment: TrendingUp,
+  loan: CircleDollarSign,
+  other: Wallet,
+}
 
 const schema = z.object({
   type: z.enum(['income', 'expense', 'transfer']),
@@ -45,10 +61,12 @@ function TransactionForm({
   defaultValues,
   onSubmit,
   onClose,
+  lockedAccountId,
 }: {
   defaultValues?: Partial<FormValues>
   onSubmit: (values: FormValues) => Promise<void>
   onClose: () => void
+  lockedAccountId?: string
 }) {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
@@ -58,11 +76,11 @@ function TransactionForm({
     resolver: zodResolver(schema) as any,
     defaultValues: {
       type: 'expense',
-      account_id: accounts[0]?.id ?? '',
+      account_id: lockedAccountId ?? accounts[0]?.id ?? '',
       to_account_id: null,
       category_id: null,
       amount: 0,
-      currency: accounts[0]?.currency ?? 'USD',
+      currency: accounts.find((a) => a.id === lockedAccountId)?.currency ?? accounts[0]?.currency ?? 'USD',
       exchange_rate: 1,
       description: '',
       notes: null,
@@ -79,7 +97,6 @@ function TransactionForm({
   const isRecurring = form.watch('is_recurring')
   const selectedAccount = form.watch('account_id')
 
-  // Auto-set currency from account
   const onAccountChange = (id: string | null) => {
     if (!id) return
     const acc = accounts.find((a) => a.id === id)
@@ -87,9 +104,7 @@ function TransactionForm({
     form.setValue('account_id', id)
   }
 
-  const filteredCategories = categories.filter(
-    (c) => c.type === type || c.type === 'both'
-  )
+  const filteredCategories = categories.filter((c) => c.type === type || c.type === 'both')
 
   return (
     <Form {...form}>
@@ -126,7 +141,11 @@ function TransactionForm({
               return (
                 <FormItem>
                   <FormLabel>{type === 'transfer' ? 'From Account' : 'Account'}</FormLabel>
-                  <Select onValueChange={onAccountChange} value={field.value}>
+                  <Select
+                    onValueChange={onAccountChange}
+                    value={field.value}
+                    disabled={!!lockedAccountId && type !== 'transfer'}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select account">
@@ -154,10 +173,7 @@ function TransactionForm({
                 return (
                   <FormItem>
                     <FormLabel>To Account</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value ?? ''}
-                    >
+                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select account">
@@ -390,41 +406,42 @@ const TYPE_COLOR = {
   transfer: 'text-[oklch(0.700_0.115_72)]',
 }
 
-export default function TransactionsPage() {
+export default function AccountTransactionsPage() {
+  const { accountId } = useParams<{ accountId: string }>()
+  const navigate = useNavigate()
+  const { profile } = useAuth()
+  const { accounts, refetch: refetchAccounts } = useAccounts()
+  const { transactions, loading, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
+
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
 
-  const { transactions, loading, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
+  const account = accounts.find((a) => a.id === accountId)
+  const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet
+
+  // Filter to only transactions involving this account (source or destination)
+  const accountTransactions = useMemo(() => {
+    return transactions.filter(
+      (t) => t.account_id === accountId || t.to_account_id === accountId
+    )
+  }, [transactions, accountId])
 
   const filtered = useMemo(() => {
-    let result = transactions
+    let result = accountTransactions
     if (filterType !== 'all') result = result.filter((t) => t.type === filterType)
     if (search) {
       const q = search.toLowerCase()
       result = result.filter(
         (t) =>
           t.description.toLowerCase().includes(q) ||
-          t.category?.name.toLowerCase().includes(q) ||
-          t.account?.name.toLowerCase().includes(q)
+          t.category?.name.toLowerCase().includes(q)
       )
     }
     return result
-  }, [transactions, filterType, search])
+  }, [accountTransactions, filterType, search])
 
-  const handleCreate = async (values: FormValues) => {
-    await createTransaction(values as Parameters<typeof createTransaction>[0])
-    setCreateOpen(false)
-  }
-
-  const handleEdit = async (values: FormValues) => {
-    if (!editingTx) return
-    await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
-    setEditingTx(null)
-  }
-
-  // Group by date
   const grouped = useMemo(() => {
     const groups: Record<string, Transaction[]> = {}
     for (const tx of filtered) {
@@ -434,20 +451,104 @@ export default function TransactionsPage() {
     return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
   }, [filtered])
 
+  // Summary stats for this account's transactions
+  const stats = useMemo(() => {
+    const income = accountTransactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+    const expenses = accountTransactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+    // Outgoing transfers debit amount + fee; incoming transfers credit amount * exchange_rate
+    const transfersSent = accountTransactions
+      .filter((t) => t.type === 'transfer' && t.account_id === accountId)
+      .reduce((s, t) => s + t.amount + (t.transfer_fee ?? 0), 0)
+    const transfersReceived = accountTransactions
+      .filter((t) => t.type === 'transfer' && t.to_account_id === accountId)
+      .reduce((s, t) => s + t.amount * (t.exchange_rate ?? 1), 0)
+    return { income, expenses, transfersSent, transfersReceived }
+  }, [accountTransactions, accountId])
+
+  const currency = account?.currency ?? profile?.default_currency ?? 'USD'
+
+  const handleCreate = async (values: FormValues) => {
+    await createTransaction(values as Parameters<typeof createTransaction>[0])
+    refetchAccounts()
+    setCreateOpen(false)
+  }
+
+  const handleEdit = async (values: FormValues) => {
+    if (!editingTx) return
+    await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
+    refetchAccounts()
+    setEditingTx(null)
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Transactions</h1>
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/accounts')} className="shrink-0">
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        {account ? (
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div
+              className="p-2.5 rounded-xl shrink-0"
+              style={{ backgroundColor: account.color + '20', color: account.color }}
+            >
+              <Icon className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold truncate">{account.name}</h1>
+              <p className="text-sm text-muted-foreground">{ACCOUNT_TYPE_LABELS[account.type]}</p>
+            </div>
+          </div>
+        ) : (
+          <h1 className="text-xl font-bold">Account Transactions</h1>
+        )}
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger render={<Button className="gap-2" />}>
+          <DialogTrigger render={<Button className="gap-2 shrink-0" />}>
             <Plus className="w-4 h-4" />Add
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
-            <TransactionForm onSubmit={handleCreate} onClose={() => setCreateOpen(false)} />
+            <TransactionForm
+              onSubmit={handleCreate}
+              onClose={() => setCreateOpen(false)}
+              lockedAccountId={accountId}
+              defaultValues={{ account_id: accountId }}
+            />
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Account balance card */}
+      {account && (
+        <div
+          className="rounded-xl p-4 text-white"
+          style={{ background: `linear-gradient(135deg, ${account.color}dd, ${account.color}99)` }}
+        >
+          <p className="text-sm font-medium opacity-80">Current Balance</p>
+          <p className="money text-3xl font-bold mt-1">
+            {formatCurrency(account.balance, account.currency)}
+          </p>
+          <div className="flex gap-4 mt-3 text-sm opacity-90">
+            <div>
+              <p className="text-xs opacity-70">Income</p>
+              <p className="font-semibold">+{formatCurrency(stats.income, currency)}</p>
+            </div>
+            <div>
+              <p className="text-xs opacity-70">Expenses</p>
+              <p className="font-semibold">-{formatCurrency(stats.expenses, currency)}</p>
+            </div>
+            <div>
+              <p className="text-xs opacity-70">Sent</p>
+              <p className="font-semibold">-{formatCurrency(stats.transfersSent, currency)}</p>
+            </div>
+            <div>
+              <p className="text-xs opacity-70">Received</p>
+              <p className="font-semibold">+{formatCurrency(stats.transfersReceived, currency)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2">
@@ -470,6 +571,7 @@ export default function TransactionsPage() {
         </Tabs>
       </div>
 
+      {/* Transaction list */}
       {loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : filtered.length === 0 ? (
@@ -478,7 +580,7 @@ export default function TransactionsPage() {
             <ArrowLeftRight className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <p className="font-medium">No transactions found</p>
             <p className="text-sm text-muted-foreground">
-              {search ? 'Try a different search' : 'Add your first transaction'}
+              {search || filterType !== 'all' ? 'Try adjusting your filters' : 'Add your first transaction for this account'}
             </p>
           </CardContent>
         </Card>
@@ -496,38 +598,46 @@ export default function TransactionsPage() {
               </div>
               <div className="space-y-1">
                 {txs.map((tx) => {
-                  const Icon = TYPE_ICON[tx.type]
+                  const TxIcon = TYPE_ICON[tx.type]
+                  // For transfers, show direction relative to this account
+                  const isIncoming = tx.type === 'transfer' && tx.to_account_id === accountId
                   return (
                     <div
                       key={tx.id}
                       className="flex items-center gap-3 p-3 rounded-lg bg-card border hover:bg-accent/50 transition-colors group"
                     >
-                      {/* Icon */}
                       <div
                         className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-base"
                         style={tx.category ? { backgroundColor: tx.category.color + '20' } : { backgroundColor: '#f1f5f9' }}
                       >
-                        {tx.category ? tx.category.icon : <Icon className={`w-4 h-4 ${TYPE_COLOR[tx.type]}`} />}
+                        {tx.category ? tx.category.icon : <TxIcon className={`w-4 h-4 ${TYPE_COLOR[tx.type]}`} />}
                       </div>
 
-                      {/* Two-row text block */}
                       <div className="flex-1 min-w-0 space-y-0.5">
-                        {/* Row 1: description | amount */}
                         <div className="flex items-baseline justify-between gap-2">
                           <p className="text-sm font-medium truncate">{tx.description}</p>
-                          <p className={`text-sm font-semibold shrink-0 ${TYPE_COLOR[tx.type]}`}>
-                            {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
-                            {formatCurrency(tx.amount, tx.currency)}
+                          <p className={`text-sm font-semibold shrink-0 ${
+                            tx.type === 'income' || isIncoming
+                              ? TYPE_COLOR.income
+                              : tx.type === 'expense'
+                              ? TYPE_COLOR.expense
+                              : TYPE_COLOR.transfer
+                          }`}>
+                            {tx.type === 'income' || isIncoming ? '+' : tx.type === 'expense' ? '-' : ''}
+                            {formatCurrency(
+                              isIncoming ? tx.amount * (tx.exchange_rate ?? 1) : tx.amount,
+                              tx.currency
+                            )}
                           </p>
                         </div>
-                        {/* Row 2: labels | currency */}
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {tx.account && (
-                              <span className="text-xs text-muted-foreground">{tx.account.name}</span>
-                            )}
-                            {tx.type === 'transfer' && tx.to_account && (
-                              <span className="text-xs text-muted-foreground">→ {tx.to_account.name}</span>
+                            {tx.type === 'transfer' && (
+                              <span className="text-xs text-muted-foreground">
+                                {isIncoming
+                                  ? `← from ${tx.account?.name ?? ''}`
+                                  : `→ to ${tx.to_account?.name ?? ''}`}
+                              </span>
                             )}
                             {tx.category && (
                               <Badge variant="secondary" className="text-xs py-0 px-1.5">{tx.category.name}</Badge>
@@ -538,14 +648,15 @@ export default function TransactionsPage() {
                               </Badge>
                             )}
                             {tx.type === 'transfer' && tx.transfer_fee != null && tx.transfer_fee > 0 && (
-                              <span className="text-xs text-muted-foreground">Fee: {formatCurrency(tx.transfer_fee, tx.currency)}</span>
+                              <span className="text-xs text-muted-foreground">
+                                Fee: {formatCurrency(tx.transfer_fee, tx.currency)}
+                              </span>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground shrink-0">{tx.currency}</p>
                         </div>
                       </div>
 
-                      {/* Edit */}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -555,7 +666,6 @@ export default function TransactionsPage() {
                         <Pencil className="w-3 h-3" />
                       </Button>
 
-                      {/* Delete */}
                       <AlertDialog>
                         <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0" />}>
                           <Trash2 className="w-3 h-3" />
@@ -569,7 +679,7 @@ export default function TransactionsPage() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteTransaction(tx.id)}>Delete</AlertDialogAction>
+                            <AlertDialogAction onClick={async () => { await deleteTransaction(tx.id); refetchAccounts() }}>Delete</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>

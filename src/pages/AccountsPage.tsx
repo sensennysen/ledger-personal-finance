@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, CreditCard, Wallet, PiggyBank, Banknote, TrendingUp, Landmark, CircleDollarSign, MoreHorizontal } from 'lucide-react'
+import { Plus, Pencil, Trash2, CreditCard, Wallet, PiggyBank, Banknote, TrendingUp, Landmark, CircleDollarSign, MoreHorizontal, TriangleAlert } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_COLORS, CURRENCIES, type AccountType } from '@/types'
 import { formatCurrency } from '@/lib/utils'
@@ -46,10 +48,12 @@ function AccountForm({
   defaultValues,
   onSubmit,
   onClose,
+  originalBalance,
 }: {
   defaultValues?: Partial<FormValues>
   onSubmit: (values: FormValues) => Promise<void>
   onClose: () => void
+  originalBalance?: number
 }) {
   const form = useForm<FormValues, any, FormValues>({
     resolver: zodResolver(schema) as any,
@@ -65,6 +69,8 @@ function AccountForm({
     },
   })
   const type = form.watch('type')
+  const watchedBalance = form.watch('balance')
+  const balanceChanged = originalBalance !== undefined && Number(watchedBalance) !== originalBalance
 
   return (
     <Form {...form}>
@@ -88,7 +94,7 @@ function AccountForm({
               <FormItem>
                 <FormLabel>Type</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <FormControl><SelectTrigger><SelectValue>{(v: string | null) => v ? ACCOUNT_TYPE_LABELS[v as AccountType] : 'Select type'}</SelectValue></SelectTrigger></FormControl>
                   <SelectContent>
                     {Object.entries(ACCOUNT_TYPE_LABELS).map(([k, v]) => (
                       <SelectItem key={k} value={k}>{v}</SelectItem>
@@ -106,7 +112,7 @@ function AccountForm({
               <FormItem>
                 <FormLabel>Currency</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <FormControl><SelectTrigger><SelectValue>{(v: string | null) => v ?? 'Select currency'}</SelectValue></SelectTrigger></FormControl>
                   <SelectContent>
                     {CURRENCIES.map((c) => (
                       <SelectItem key={c.code} value={c.code}>{c.code} — {c.name}</SelectItem>
@@ -126,6 +132,14 @@ function AccountForm({
               <FormLabel>Current Balance</FormLabel>
               <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
               <FormMessage />
+              {balanceChanged && (
+                <div className="flex items-start gap-2 rounded-md border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-950/30 p-2.5 text-sm text-yellow-800 dark:text-yellow-300">
+                  <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>
+                    Changing the balance will create a <strong>Balance Adjustment</strong> transaction for the difference ({Number(watchedBalance) > originalBalance! ? '+' : ''}{formatCurrency(Number(watchedBalance) - originalBalance!, defaultValues?.currency ?? 'USD')}). This keeps your transaction history accurate.
+                  </span>
+                </div>
+              )}
             </FormItem>
           )}
         />
@@ -203,11 +217,14 @@ function AccountForm({
 }
 
 export default function AccountsPage() {
-  const { accounts, loading, createAccount, updateAccount, deleteAccount } = useAccounts()
+  const { profile } = useAuth()
+  const { accounts, loading, createAccount, updateAccount, updateAccountWithAdjustment, deleteAccount } = useAccounts()
+  const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
+  const defaultCurrency = profile?.default_currency ?? 'USD'
 
   const handleCreate = async (values: FormValues) => {
     await createAccount({ ...values, is_active: true, icon: null })
@@ -216,7 +233,7 @@ export default function AccountsPage() {
 
   const handleEdit = async (values: FormValues) => {
     if (!editAccount) return
-    await updateAccount(editAccount.id, values)
+    await updateAccountWithAdjustment(editAccount.id, values, editAccount.balance)
     setEditAccount(null)
   }
 
@@ -226,7 +243,7 @@ export default function AccountsPage() {
         <div>
           <h1 className="text-2xl font-bold">Accounts</h1>
           <p className="text-muted-foreground text-sm">
-            Total net worth: <span className="font-semibold text-foreground">{formatCurrency(totalBalance)}</span>
+            Total net worth: <span className="font-semibold text-foreground">{formatCurrency(totalBalance, defaultCurrency)}</span>
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -235,7 +252,7 @@ export default function AccountsPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
-            <AccountForm onSubmit={handleCreate} onClose={() => setCreateOpen(false)} />
+            <AccountForm onSubmit={handleCreate} onClose={() => setCreateOpen(false)} defaultValues={{ currency: defaultCurrency }} />
           </DialogContent>
         </Dialog>
       </div>
@@ -257,37 +274,37 @@ export default function AccountsPage() {
           {accounts.map((account) => {
             const Icon = ACCOUNT_ICONS[account.type]
             return (
-              <Card key={account.id} className="relative overflow-hidden">
+              <Card key={account.id} className="relative overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/accounts/${account.id}`)}>
                 <div
                   className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
                   style={{ backgroundColor: account.color }}
                 />
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="p-2 rounded-lg"
-                        style={{ backgroundColor: account.color + '20', color: account.color }}
-                      >
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <div
+                          className="p-2 rounded-lg shrink-0"
+                          style={{ backgroundColor: account.color + '20', color: account.color }}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </div>
                         <CardTitle className="text-base">{account.name}</CardTitle>
-                        <Badge variant="secondary" className="text-xs mt-0.5">
-                          {ACCOUNT_TYPE_LABELS[account.type]}
-                        </Badge>
                       </div>
+                      <Badge variant="secondary" className="text-xs ml-10">
+                        {ACCOUNT_TYPE_LABELS[account.type]}
+                      </Badge>
                     </div>
                     <DropdownMenu>
-                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7" />}>
+                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} />}>
                         <MoreHorizontal className="w-4 h-4" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditAccount(account)}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditAccount(account) }}>
                           <Pencil className="w-4 h-4 mr-2" />Edit
                         </DropdownMenuItem>
                         <AlertDialog>
-                          <AlertDialogTrigger render={<DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive" />}>
+                          <AlertDialogTrigger render={<DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => e.stopPropagation()} className="text-destructive focus:text-destructive" />}>
                             <Trash2 className="w-4 h-4 mr-2" />Delete
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -310,7 +327,7 @@ export default function AccountsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">
+                  <p className="money text-[22px] font-bold" style={{ color: 'oklch(0.700 0.115 72)' }}>
                     {formatCurrency(account.balance, account.currency)}
                   </p>
                   {account.type === 'credit_card' && account.credit_limit != null && (
@@ -336,6 +353,7 @@ export default function AccountsPage() {
               defaultValues={editAccount}
               onSubmit={handleEdit}
               onClose={() => setEditAccount(null)}
+              originalBalance={editAccount.balance}
             />
           )}
         </DialogContent>

@@ -8,6 +8,7 @@ import TransactionsPage from '@/pages/TransactionsPage'
 import CategoriesPage from '@/pages/CategoriesPage'
 import BudgetsPage from '@/pages/BudgetsPage'
 import SettingsPage from '@/pages/SettingsPage'
+import AccountTransactionsPage from '@/pages/AccountTransactionsPage'
 
 function ProtectedRoutes() {
   const { session, loading } = useAuth()
@@ -15,8 +16,12 @@ function ProtectedRoutes() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+        <div
+          className="w-9 h-9 rounded-full border-2 border-t-transparent animate-spin"
+          style={{ borderColor: 'oklch(0.700 0.115 72 / 0.25)', borderTopColor: 'oklch(0.700 0.115 72)' }}
+        />
+        <p className="text-[12px] text-muted-foreground tracking-[0.12em] uppercase">Loading</p>
       </div>
     )
   }
@@ -32,6 +37,7 @@ function ProtectedRoutes() {
       <Route element={<AppLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="accounts" element={<AccountsPage />} />
+        <Route path="accounts/:accountId" element={<AccountTransactionsPage />} />
         <Route path="transactions" element={<TransactionsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="budgets" element={<BudgetsPage />} />

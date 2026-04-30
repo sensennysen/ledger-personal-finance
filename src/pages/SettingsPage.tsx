@@ -1,10 +1,14 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { ChevronRight, Tag, Sun, Moon } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -23,6 +27,7 @@ type ProfileValues = z.infer<typeof profileSchema>
 
 export default function SettingsPage() {
   const { user, profile, signOut, refreshProfile } = useAuth()
+  const { theme, setTheme } = useTheme()
   const [saved, setSaved] = useState(false)
 
   const initials = (profile?.full_name ?? user?.email ?? 'U')
@@ -34,7 +39,7 @@ export default function SettingsPage() {
 
   const form = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
+    values: {
       full_name: profile?.full_name ?? '',
       default_currency: profile?.default_currency ?? 'USD',
     },
@@ -109,10 +114,46 @@ export default function SettingsPage() {
                 <Button type="submit" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
                 </Button>
-                {saved && <span className="text-sm text-green-600">Saved!</span>}
+                {saved && <span className="text-sm" style={{ color: 'oklch(0.660 0.150 155)' }}>Saved!</span>}
               </div>
             </form>
           </Form>
+        </CardContent>
+      </Card>
+
+      {/* Appearance */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+          <CardDescription>Choose your preferred colour scheme</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setTheme('light')}
+              className={cn(
+                'flex flex-col items-center gap-2 rounded-xl border-2 px-5 py-4 transition-all cursor-pointer',
+                theme === 'light'
+                  ? 'border-primary bg-primary/8'
+                  : 'border-border hover:border-primary/40 hover:bg-accent'
+              )}
+            >
+              <Sun className={cn('w-5 h-5', theme === 'light' ? 'text-primary' : 'text-muted-foreground')} />
+              <span className={cn('text-sm font-medium', theme === 'light' ? 'text-primary' : 'text-muted-foreground')}>Light</span>
+            </button>
+            <button
+              onClick={() => setTheme('dark')}
+              className={cn(
+                'flex flex-col items-center gap-2 rounded-xl border-2 px-5 py-4 transition-all cursor-pointer',
+                theme === 'dark'
+                  ? 'border-primary bg-primary/8'
+                  : 'border-border hover:border-primary/40 hover:bg-accent'
+              )}
+            >
+              <Moon className={cn('w-5 h-5', theme === 'dark' ? 'text-primary' : 'text-muted-foreground')} />
+              <span className={cn('text-sm font-medium', theme === 'dark' ? 'text-primary' : 'text-muted-foreground')}>Dark</span>
+            </button>
+          </div>
         </CardContent>
       </Card>
 
@@ -124,6 +165,26 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <Button variant="destructive" onClick={signOut}>Sign Out</Button>
+        </CardContent>
+      </Card>
+
+      {/* Customization — visible on mobile where BottomNav omits Categories */}
+      <Card className="md:hidden">
+        <CardHeader>
+          <CardTitle>Customization</CardTitle>
+          <CardDescription>Manage your transaction categories</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Link
+            to="/categories"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors rounded-b-lg"
+          >
+            <div className="flex items-center gap-3">
+              <Tag className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Categories</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
         </CardContent>
       </Card>
     </div>

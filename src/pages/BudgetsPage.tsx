@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, Trash2, Target } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useCategories } from '@/hooks/useCategories'
 import { CURRENCIES } from '@/types'
@@ -78,7 +79,16 @@ function BudgetForm({
             <FormItem>
               <FormLabel>Category</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category">
+                      {(value: string) => {
+                        const cat = categories.find((c) => c.id === value)
+                        return cat ? `${cat.icon} ${cat.name}` : 'Select category'
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                </FormControl>
                 <SelectContent>
                   {categories.filter((c) => c.type === 'expense' || c.type === 'both').map((c) => (
                     <SelectItem key={c.id} value={c.id}>
@@ -180,9 +190,11 @@ function BudgetForm({
 }
 
 export default function BudgetsPage() {
+  const { profile } = useAuth()
   const { budgets, loading, createBudget, updateBudget, deleteBudget } = useBudgets()
   const [createOpen, setCreateOpen] = useState(false)
   const [editBudget, setEditBudget] = useState<Budget | null>(null)
+  const defaultCurrency = profile?.default_currency ?? 'USD'
 
   const handleCreate = async (values: FormValues) => {
     await createBudget({ ...values, is_active: true })
@@ -208,7 +220,7 @@ export default function BudgetsPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Budget</DialogTitle></DialogHeader>
-            <BudgetForm onSubmit={handleCreate} onClose={() => setCreateOpen(false)} />
+            <BudgetForm onSubmit={handleCreate} onClose={() => setCreateOpen(false)} defaultValues={{ currency: defaultCurrency }} />
           </DialogContent>
         </Dialog>
       </div>
@@ -283,7 +295,7 @@ export default function BudgetsPage() {
                     <span className="font-medium">
                       {over
                         ? <span className="text-destructive">{formatCurrency(Math.abs(remaining), budget.currency)} over</span>
-                        : <span className="text-green-600">{formatCurrency(remaining, budget.currency)} left</span>
+                        : <span style={{ color: 'oklch(0.660 0.150 155)' }}>{formatCurrency(remaining, budget.currency)} left</span>
                       }
                     </span>
                   </div>

@@ -69,6 +69,7 @@ export interface Transaction {
   description: string
   notes: string | null
   date: string
+  transfer_fee: number | null
   is_recurring: boolean
   recurrence_interval: RecurrenceInterval | null
   recurrence_end_date: string | null

@@ -38,6 +38,39 @@ export function useAccounts() {
     return { error: error?.message ?? null }
   }
 
+  const updateAccountWithAdjustment = async (id: string, values: Partial<Account>, oldBalance: number) => {
+    if (!user) return { error: 'Not authenticated' }
+    const newBalance = values.balance ?? oldBalance
+
+    // Update account fields; if balance changed, omit it — the transaction trigger handles it
+    const updatePayload: Partial<Account> = { ...values }
+    if (newBalance !== oldBalance) {
+      delete updatePayload.balance
+    }
+
+    const { error: updateError } = await supabase.from('accounts').update(updatePayload).eq('id', id)
+    if (updateError) return { error: updateError.message }
+
+    if (newBalance !== oldBalance) {
+      const diff = newBalance - oldBalance
+      const account = accounts.find((a) => a.id === id)
+      const { error: txError } = await supabase.from('transactions').insert({
+        user_id: user.id,
+        account_id: id,
+        type: diff > 0 ? 'income' : 'expense',
+        amount: Math.abs(diff),
+        currency: account?.currency ?? values.currency ?? 'USD',
+        exchange_rate: 1,
+        description: 'Balance Adjustment',
+        date: new Date().toISOString().split('T')[0],
+      })
+      if (txError) return { error: txError.message }
+    }
+
+    await fetch()
+    return { error: null }
+  }
+
   const deleteAccount = async (id: string) => {
     const { error } = await supabase
       .from('accounts')
@@ -47,5 +80,5 @@ export function useAccounts() {
     return { error: error?.message ?? null }
   }
 
-  return { accounts, loading, error, refetch: fetch, createAccount, updateAccount, deleteAccount }
+  return { accounts, loading, error, refetch: fetch, createAccount, updateAccount, updateAccountWithAdjustment, deleteAccount }
 }

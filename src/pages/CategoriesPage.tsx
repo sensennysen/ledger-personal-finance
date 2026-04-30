@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Tag } from 'lucide-react'
+import { Plus, Pencil, Trash2, Tag, Smile } from 'lucide-react'
+import EmojiPicker, { Theme } from 'emoji-picker-react'
 import { useCategories } from '@/hooks/useCategories'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,18 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { Category } from '@/types'
 
 const CATEGORY_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
   '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#06b6d4',
   '#a855f7', '#f43f5e', '#84cc16', '#f59e0b', '#10b981',
-]
-
-const CATEGORY_ICONS = [
-  '🍔', '🛒', '🏠', '🚗', '💊', '🎓', '🎮', '✈️', '👗',
-  '💡', '📱', '🎵', '🏋️', '🍷', '☕', '💼', '🎁', '💰',
-  '📈', '🏦', '💳', '🛡️', '🔧', '🌿', '🐾', '📚',
 ]
 
 const schema = z.object({
@@ -51,7 +47,7 @@ function CategoryForm({
       name: '',
       type: 'expense',
       color: CATEGORY_COLORS[0],
-      icon: CATEGORY_ICONS[0],
+      icon: '🏷️',
       ...defaultValues,
     },
   })
@@ -77,7 +73,13 @@ function CategoryForm({
             <FormItem>
               <FormLabel>Type</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue>
+                      {field.value === 'expense' ? 'Expense' : field.value === 'income' ? 'Income' : 'Both'}
+                    </SelectValue>
+                  </SelectTrigger>
+                </FormControl>
                 <SelectContent>
                   <SelectItem value="expense">Expense</SelectItem>
                   <SelectItem value="income">Income</SelectItem>
@@ -95,19 +97,26 @@ function CategoryForm({
             <FormItem>
               <FormLabel>Icon</FormLabel>
               <FormControl>
-                <div className="flex gap-1 flex-wrap">
-                  {CATEGORY_ICONS.map((icon) => (
-                    <button
-                      key={icon}
-                      type="button"
-                      onClick={() => field.onChange(icon)}
-                      className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center border-2 transition-all ${
-                        field.value === icon ? 'border-primary bg-primary/10' : 'border-transparent hover:border-muted'
-                      }`}
-                    >
-                      {icon}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl border-2 border-border flex items-center justify-center text-2xl bg-muted/50">
+                    {field.value || '😀'}
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="gap-2">
+                        <Smile className="w-4 h-4" />
+                        Choose Emoji
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 border-0 shadow-xl" align="start">
+                      <EmojiPicker
+                        onEmojiClick={(e) => field.onChange(e.emoji)}
+                        theme={Theme.AUTO}
+                        skinTonesDisabled
+                        searchPlaceholder="Search emoji..."
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </FormControl>
             </FormItem>
@@ -169,49 +178,47 @@ export default function CategoriesPage() {
     cats.map((cat) => (
       <div
         key={cat.id}
-        className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+        className="flex items-center justify-between gap-2 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center text-lg"
+            className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-lg"
             style={{ backgroundColor: cat.color + '20' }}
           >
             {cat.icon}
           </div>
-          <div>
-            <p className="font-medium text-sm">{cat.name}</p>
+          <div className="min-w-0 flex flex-col items-start">
+            <p className="font-medium text-sm truncate">{cat.name}</p>
             <Badge variant="outline" className="text-xs">
-              {cat.type === 'both' ? 'Income & Expense' : cat.type}
+              {cat.type === 'both' ? 'Income & Expense' : cat.type === 'expense' ? 'Expense' : 'Income'}
             </Badge>
           </div>
         </div>
-        {!cat.is_default && (
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditCategory(cat)}>
-              <Pencil className="w-3 h-3" />
-            </Button>
-            <AlertDialog>
-              <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" />}>
-                <Trash2 className="w-3 h-3" />
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete category?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will delete "{cat.name}". Transactions using it will become uncategorized.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => deleteCategory(cat.id)}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        )}
-        {cat.is_default && (
-          <Badge variant="secondary" className="text-xs">Default</Badge>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {cat.is_default && (
+            <Badge variant="secondary" className="text-xs">Default</Badge>
+          )}
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditCategory(cat)}>
+            <Pencil className="w-3 h-3" />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" />}>
+              <Trash2 className="w-3 h-3" />
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete category?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will delete "{cat.name}". Transactions using it will become uncategorized.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => deleteCategory(cat.id)}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
     ))
 

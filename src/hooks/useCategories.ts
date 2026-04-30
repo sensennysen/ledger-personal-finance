@@ -43,7 +43,7 @@ export function useCategories() {
   }
 
   const deleteCategory = async (id: string) => {
-    const { error } = await supabase.from('categories').delete().eq('id', id).eq('is_default', false)
+    const { error } = await supabase.from('categories').delete().eq('id', id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }

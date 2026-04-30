@@ -126,6 +126,7 @@ create table if not exists public.transactions (
   description           text not null,
   notes                 text,
   date                  date not null default current_date,
+  transfer_fee          numeric(18,2) check (transfer_fee >= 0),
   is_recurring          boolean not null default false,
   recurrence_interval   text check (recurrence_interval in ('daily','weekly','biweekly','monthly','quarterly','yearly')),
   recurrence_end_date   date,
@@ -181,3 +182,82 @@ create trigger set_accounts_updated_at     before update on public.accounts     
 create trigger set_categories_updated_at   before update on public.categories   for each row execute procedure public.set_updated_at();
 create trigger set_transactions_updated_at before update on public.transactions for each row execute procedure public.set_updated_at();
 create trigger set_budgets_updated_at      before update on public.budgets      for each row execute procedure public.set_updated_at();
+
+-- ────────────────────────────────────────────────────────────
+-- ACCOUNT BALANCE TRIGGERS
+-- Automatically adjust account.balance whenever a transaction
+-- is inserted, updated, or deleted.
+--
+-- Rules:
+--   income   → +amount on account_id
+--   expense  → -amount on account_id
+--   transfer → -(amount + transfer_fee) on account_id
+--              +(amount * exchange_rate) on to_account_id
+-- ────────────────────────────────────────────────────────────
+
+create or replace function public.update_account_balance()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  -- ── Reverse the OLD row's effect ──────────────────────────
+  if tg_op in ('UPDATE', 'DELETE') then
+    if old.type = 'income' then
+      update accounts set balance = balance - old.amount where id = old.account_id;
+
+    elsif old.type = 'expense' then
+      update accounts set balance = balance + old.amount where id = old.account_id;
+
+    elsif old.type = 'transfer' then
+      update accounts
+        set balance = balance + old.amount + coalesce(old.transfer_fee, 0)
+        where id = old.account_id;
+      if old.to_account_id is not null then
+        update accounts
+          set balance = balance - (old.amount * old.exchange_rate)
+          where id = old.to_account_id;
+      end if;
+    end if;
+  end if;
+
+  -- ── Apply the NEW row's effect ────────────────────────────
+  if tg_op in ('INSERT', 'UPDATE') then
+    if new.type = 'income' then
+      update accounts set balance = balance + new.amount where id = new.account_id;
+
+    elsif new.type = 'expense' then
+      update accounts set balance = balance - new.amount where id = new.account_id;
+
+    elsif new.type = 'transfer' then
+      update accounts
+        set balance = balance - new.amount - coalesce(new.transfer_fee, 0)
+        where id = new.account_id;
+      if new.to_account_id is not null then
+        update accounts
+          set balance = balance + (new.amount * new.exchange_rate)
+          where id = new.to_account_id;
+      end if;
+    end if;
+  end if;
+
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_update_balance_insert on public.transactions;
+drop trigger if exists trg_update_balance_update on public.transactions;
+drop trigger if exists trg_update_balance_delete on public.transactions;
+
+create trigger trg_update_balance_insert
+  after insert on public.transactions
+  for each row execute procedure public.update_account_balance();
+
+create trigger trg_update_balance_update
+  after update of amount, type, account_id, to_account_id, exchange_rate, transfer_fee
+  on public.transactions
+  for each row execute procedure public.update_account_balance();
+
+create trigger trg_update_balance_delete
+  after delete on public.transactions
+  for each row execute procedure public.update_account_balance();

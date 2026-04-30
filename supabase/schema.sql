@@ -261,3 +261,49 @@ create trigger trg_update_balance_update
 create trigger trg_update_balance_delete
   after delete on public.transactions
   for each row execute procedure public.update_account_balance();
+
+-- ────────────────────────────────────────────────────────────
+-- RECEIPT ATTACHMENTS
+-- Run this migration to enable photo proof on transactions.
+-- ────────────────────────────────────────────────────────────
+
+-- 1. Add receipt_url column to transactions
+alter table public.transactions
+  add column if not exists receipt_url text;
+
+-- 2. Create a public storage bucket for receipts
+--    Files are namespaced under the user's UUID so paths are not easily guessable.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'receipts',
+  'receipts',
+  true,
+  5242880, -- 5 MB
+  '{image/jpeg,image/png,image/webp,image/gif}'
+)
+on conflict (id) do nothing;
+
+-- 3. RLS policies for storage.objects
+create policy "Authenticated users can upload their own receipts"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'receipts'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Authenticated users can update their own receipts"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'receipts'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Authenticated users can delete their own receipts"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'receipts'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );

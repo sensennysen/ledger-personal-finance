@@ -160,6 +160,7 @@ export default function TransactionsPage() {
                 is_recurring: editingTx.is_recurring,
                 recurrence_interval: editingTx.recurrence_interval,
                 recurrence_end_date: editingTx.recurrence_end_date,
+                receipt_url: editingTx.receipt_url,
               }}
               onSubmit={handleEdit}
               onClose={() => setEditingTx(null)}

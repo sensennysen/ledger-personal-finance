@@ -1,4 +1,5 @@
-import { Pencil, Trash2, RepeatIcon } from 'lucide-react'
+import { useState } from 'react'
+import { Pencil, Trash2, RepeatIcon, ImageIcon } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import type { Transaction } from '@/types'
 
 interface TransactionRowProps {
@@ -28,6 +35,7 @@ interface TransactionRowProps {
 }
 
 export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: TransactionRowProps) {
+  const [receiptOpen, setReceiptOpen] = useState(false)
   const Icon = TRANSACTION_TYPE_ICON[tx.type]
   const isIncoming = tx.type === 'transfer' && tx.to_account_id === contextAccountId
 
@@ -104,6 +112,15 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
                 Fee: {formatCurrency(tx.transfer_fee, tx.currency)}
               </span>
             )}
+            {tx.receipt_url && (
+              <button
+                type="button"
+                onClick={() => setReceiptOpen(true)}
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <ImageIcon className="w-3 h-3" />Receipt
+              </button>
+            )}
           </div>
           <p className="text-xs text-muted-foreground shrink-0">{tx.currency}</p>
         </div>
@@ -145,6 +162,22 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Receipt viewer */}
+      {tx.receipt_url && (
+        <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Receipt — {tx.description}</DialogTitle>
+            </DialogHeader>
+            <img
+              src={tx.receipt_url}
+              alt={`Receipt for ${tx.description}`}
+              className="w-full rounded-lg object-contain max-h-[70vh]"
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

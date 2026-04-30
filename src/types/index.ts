@@ -73,6 +73,7 @@ export interface Transaction {
   is_recurring: boolean
   recurrence_interval: RecurrenceInterval | null
   recurrence_end_date: string | null
+  receipt_url: string | null
   created_at: string
   updated_at: string
   // joined

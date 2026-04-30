@@ -284,26 +284,44 @@ values (
 on conflict (id) do nothing;
 
 -- 3. RLS policies for storage.objects
+--    Drop first so re-running this script is idempotent.
+drop policy if exists "Authenticated users can upload their own receipts"  on storage.objects;
+drop policy if exists "Authenticated users can update their own receipts"  on storage.objects;
+drop policy if exists "Authenticated users can delete their own receipts"  on storage.objects;
+drop policy if exists "Public can read receipts"                           on storage.objects;
+
+--  INSERT – user may only create files under their own UUID folder
 create policy "Authenticated users can upload their own receipts"
   on storage.objects for insert
   to authenticated
   with check (
     bucket_id = 'receipts'
-    and auth.uid()::text = (storage.foldername(name))[1]
+    and (string_to_array(name, '/'))[1] = auth.uid()::text
   );
 
+--  UPDATE – user may only overwrite their own files
 create policy "Authenticated users can update their own receipts"
   on storage.objects for update
   to authenticated
   using (
     bucket_id = 'receipts'
-    and auth.uid()::text = (storage.foldername(name))[1]
+    and (string_to_array(name, '/'))[1] = auth.uid()::text
+  )
+  with check (
+    bucket_id = 'receipts'
+    and (string_to_array(name, '/'))[1] = auth.uid()::text
   );
 
+--  DELETE – user may only remove their own files
 create policy "Authenticated users can delete their own receipts"
   on storage.objects for delete
   to authenticated
   using (
     bucket_id = 'receipts'
-    and auth.uid()::text = (storage.foldername(name))[1]
+    and (string_to_array(name, '/'))[1] = auth.uid()::text
   );
+
+--  SELECT – bucket is public so anyone can read (needed for rendering images)
+create policy "Public can read receipts"
+  on storage.objects for select
+  using (bucket_id = 'receipts');

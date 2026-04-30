@@ -76,7 +76,9 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
       return
     }
     setPendingFile(file)
-    setPreviewUrl(URL.createObjectURL(file))
+    const reader = new FileReader()
+    reader.onload = (ev) => setPreviewUrl(ev.target?.result as string)
+    reader.readAsDataURL(file)
     setUploadError(null)
   }
 
@@ -117,7 +119,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
       const path = `${user.id}/${Date.now()}.${ext}`
       const { error } = await supabase.storage
         .from('receipts')
-        .upload(path, pendingFile, { upsert: true })
+        .upload(path, pendingFile)
       setUploading(false)
       if (error) {
         setUploadError('Failed to upload receipt. Please try again.')
@@ -432,10 +434,11 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
         <div className="space-y-2">
           <p className="text-sm font-medium leading-none">Receipt / Proof</p>
           <input
+            id="receipt-file-input"
             ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
-            className="hidden"
+            className="sr-only"
             onChange={handleFileChange}
           />
           {previewUrl ? (
@@ -454,14 +457,13 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 w-full rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+            <label
+              htmlFor="receipt-file-input"
+              className="flex items-center gap-2 w-full rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors cursor-pointer"
             >
               <ImagePlus className="w-4 h-4 shrink-0" />
               Attach receipt image (JPEG, PNG, WebP — max 5 MB)
-            </button>
+            </label>
           )}
           {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
         </div>

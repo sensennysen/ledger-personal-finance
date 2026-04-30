@@ -66,7 +66,7 @@ export default function DataDeletionPage() {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-            Back to Login
+            Back
           </Link>
           <span className="text-border">·</span>
           <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">

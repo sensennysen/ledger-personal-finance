@@ -191,6 +191,10 @@ export default function ReportsPage() {
 
   const { start, end } = useMemo(() => {
     if (preset === 'custom') {
+      // Guard against inverted ranges which would match nothing (or everything)
+      if (customStart && customEnd && customStart > customEnd) {
+        return { start: '', end: '' }
+      }
       return { start: customStart, end: customEnd }
     }
     if (preset === 'all_time') {
@@ -396,6 +400,11 @@ export default function ReportsPage() {
                 className="w-40 text-[13px] h-8"
               />
             </div>
+            {customStart && customEnd && customStart > customEnd && (
+              <p className="self-end pb-1 text-xs text-destructive">
+                Start date must be on or before end date.
+              </p>
+            )}
           </div>
         )}
       </div>

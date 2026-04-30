@@ -101,6 +101,21 @@ export function useAccounts() {
 
   const deleteAccount = async (id: string) => {
     if (!user) return { error: 'Not authenticated' }
+
+    // Block deactivation if the account still has linked transactions, so the
+    // user doesn't accidentally hide an account they depend on for history.
+    const { count, error: countError } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .or(`account_id.eq.${id},to_account_id.eq.${id}`)
+      .eq('user_id', user.id)
+    if (countError) return { error: countError.message }
+    if (count && count > 0) {
+      return {
+        error: `This account has ${count} transaction(s). Move or delete them before removing the account.`,
+      }
+    }
+
     const { error } = await supabase
       .from('accounts')
       .update({ is_active: false })

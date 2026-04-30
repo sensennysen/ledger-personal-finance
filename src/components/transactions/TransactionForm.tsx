@@ -117,9 +117,13 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
     if (pendingFile && user) {
       if (!navigator.onLine) {
         // Definitely offline — store the file locally and let the sync queue upload it later
-        const tempId = crypto.randomUUID()
-        await storePendingReceipt(tempId, pendingFile)
-        values.receipt_url = `${PENDING_RECEIPT_PREFIX}${tempId}`
+        try {
+          const tempId = crypto.randomUUID()
+          await storePendingReceipt(tempId, pendingFile)
+          values.receipt_url = `${PENDING_RECEIPT_PREFIX}${tempId}`
+        } catch {
+          setUploadError('Could not save receipt locally. It will not be attached.')
+        }
       } else {
         // Try to upload; if it fails for any reason (network hiccup, captive portal, etc.)
         // fall back to the same offline path so the transaction still saves with the image.
@@ -131,9 +135,13 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           .upload(path, pendingFile)
         setUploading(false)
         if (error) {
-          const tempId = crypto.randomUUID()
-          await storePendingReceipt(tempId, pendingFile)
-          values.receipt_url = `${PENDING_RECEIPT_PREFIX}${tempId}`
+          try {
+            const tempId = crypto.randomUUID()
+            await storePendingReceipt(tempId, pendingFile)
+            values.receipt_url = `${PENDING_RECEIPT_PREFIX}${tempId}`
+          } catch {
+            setUploadError('Upload failed and receipt could not be saved locally.')
+          }
         } else {
           const { data } = supabase.storage.from('receipts').getPublicUrl(path)
           values.receipt_url = data.publicUrl
@@ -450,6 +458,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
+            aria-label="Attach receipt image"
             className="sr-only"
             onChange={handleFileChange}
           />

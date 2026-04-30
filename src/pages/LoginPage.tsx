@@ -6,9 +6,13 @@ export default function LoginPage() {
   const params = new URLSearchParams(window.location.search)
   // Only show the error when Supabase supplies both `error` and `error_description`
   // to prevent an attacker from crafting a URL that displays arbitrary text.
+  // Strip control characters as an extra layer of defense (React already escapes text nodes).
   const authError =
     params.has('error') && params.has('error_description')
-      ? (params.get('error_description') ?? '').replace(/\+/g, ' ').slice(0, 200)
+      ? (params.get('error_description') ?? '')
+          .replace(/\+/g, ' ')
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // strip control / C1 chars
+          .slice(0, 200)
       : null
 
   return (

@@ -89,7 +89,7 @@ export function useBudgets() {
 
     const { data: spentData, error: spentError } = await supabase
       .from('transactions')
-      .select('category_id, amount, date')
+      .select('category_id, amount, date, currency, exchange_rate')
       .eq('user_id', user.id)
       .eq('type', 'expense')
       .gte('date', yearStart)
@@ -109,7 +109,13 @@ export function useBudgets() {
       const spent = allTx.reduce((sum, tx) => {
         if (tx.category_id !== b.category_id) return sum
         if (tx.date < start || tx.date > end) return sum
-        return sum + tx.amount
+        // Apply exchange_rate when the transaction currency differs from the
+        // budget currency so comparisons are always in the same denomination.
+        const txAmount =
+          tx.currency === b.currency
+            ? tx.amount
+            : tx.amount * (tx.exchange_rate ?? 1)
+        return sum + txAmount
       }, 0)
       return { ...b, spent }
     })

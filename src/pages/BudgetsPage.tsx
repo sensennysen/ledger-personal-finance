@@ -299,6 +299,11 @@ export default function BudgetsPage() {
                     value={pct}
                     className={over ? '[&>div]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-yellow-500' : ''}
                   />
+                  {budget.currency !== defaultCurrency && (
+                    <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                      Budget is in {budget.currency} — transactions in other currencies are converted using their exchange rate.
+                    </p>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className={over ? 'text-destructive font-medium' : 'text-muted-foreground'}>
                       {formatCurrency(spent, budget.currency)} spent

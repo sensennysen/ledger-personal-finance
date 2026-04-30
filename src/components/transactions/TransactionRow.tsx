@@ -3,6 +3,16 @@ import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload } from 'lucide-react
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
 import { PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
+
+/** Reject non-https receipt URLs to block javascript:, data:, etc. */
+function isValidReceiptUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url)
+    return protocol === 'https:'
+  } catch {
+    return false
+  }
+}
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -118,7 +128,7 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <CloudUpload className="w-3 h-3" />Receipt (syncing…)
                 </span>
-              ) : (
+              ) : isValidReceiptUrl(tx.receipt_url) ? (
                 <button
                   type="button"
                   onClick={() => setReceiptOpen(true)}
@@ -126,7 +136,7 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
                 >
                   <ImageIcon className="w-3 h-3" />Receipt
                 </button>
-              )
+              ) : null
             )}
           </div>
           <p className="text-xs text-muted-foreground shrink-0">{tx.currency}</p>
@@ -171,7 +181,7 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
       </AlertDialog>
 
       {/* Receipt viewer */}
-      {tx.receipt_url && !tx.receipt_url.startsWith(PENDING_RECEIPT_PREFIX) && (
+      {tx.receipt_url && !tx.receipt_url.startsWith(PENDING_RECEIPT_PREFIX) && isValidReceiptUrl(tx.receipt_url) && (
         <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>

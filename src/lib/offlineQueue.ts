@@ -16,6 +16,9 @@ export interface QueueItem {
 
 const QUEUE_KEY = 'ledger_offline_queue'
 
+/** Queue items older than this are dropped on drain to avoid stale mutations. */
+const MAX_QUEUE_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+
 function readQueue(): QueueItem[] {
   try {
     const raw = localStorage.getItem(QUEUE_KEY)
@@ -48,10 +51,20 @@ export async function drainQueue(): Promise<number> {
   const queue = readQueue()
   if (queue.length === 0) return 0
 
+  // Drop items that are too old to be reliably replayed
+  const now = Date.now()
+  const fresh = queue.filter((item) => now - item.timestamp <= MAX_QUEUE_AGE_MS)
+  const staleCount = queue.length - fresh.length
+  if (staleCount > 0) {
+    console.warn(`[offlineQueue] Dropping ${staleCount} stale item(s) older than 30 days`)
+    writeQueue(fresh)
+  }
+  if (fresh.length === 0) return 0
+
   const remaining: QueueItem[] = []
   let synced = 0
 
-  for (const item of queue) {
+  for (const item of fresh) {
     try {
       let skipInsert = false
 
@@ -103,6 +116,28 @@ export async function drainQueue(): Promise<number> {
         const { error: err } = await supabase.from(item.table).insert(item.payload)
         error = err
       } else if (item.operation === 'update' && item.rowId) {
+        // Conflict detection: if the server record's updated_at is newer than when
+        // we queued this change, a concurrent edit happened — skip to avoid overwrite.
+        try {
+          const { data: serverRow } = await supabase
+            .from(item.table)
+            .select('updated_at')
+            .eq('id', item.rowId)
+            .eq('user_id', item.userId)
+            .maybeSingle()
+          if (serverRow?.updated_at) {
+            const serverMs = new Date(serverRow.updated_at as string).getTime()
+            if (serverMs > item.timestamp) {
+              console.warn(
+                `[offlineQueue] Conflict detected for ${item.table}:${item.rowId} — skipping stale update`
+              )
+              synced++ // count as processed
+              continue
+            }
+          }
+        } catch {
+          // If the conflict check itself fails, proceed with the update anyway
+        }
         const { error: err } = await supabase
           .from(item.table)
           .update(item.payload)

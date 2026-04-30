@@ -10,4 +10,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    headers: {
+      // Custom header used as a lightweight CSRF signal; the Supabase API
+      // ignores unknown headers, but it distinguishes our requests from
+      // simple cross-origin form submissions that cannot set custom headers.
+      'X-Client-ID': 'ledger-web-v1',
+    },
+  },
+})

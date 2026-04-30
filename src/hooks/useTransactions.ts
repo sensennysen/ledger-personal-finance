@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
+import { readCache, writeCache } from '@/lib/dataCache'
 import type { Transaction } from '@/types'
 
 interface TransactionFilters {
@@ -25,7 +26,22 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setLoading(false)
       return
     }
-    setLoading(true)
+    const cacheKey = `${user.id}:transactions:${JSON.stringify({
+      accountId: filters.accountId,
+      categoryId: filters.categoryId,
+      type: filters.type,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      limit: filters.limit,
+    })}`
+    const cached = readCache<Transaction[]>(cacheKey)
+    if (cached) {
+      setTransactions(cached)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+    if (!navigator.onLine) return
     let query = supabase
       .from('transactions')
       .select(`
@@ -46,8 +62,12 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (filters.limit) query = query.limit(filters.limit)
 
     const { data, error } = await query
-    if (error) setError(error.message)
-    else setTransactions(data as Transaction[])
+    if (error) {
+      setError(error.message)
+    } else {
+      setTransactions(data as Transaction[])
+      writeCache(cacheKey, data)
+    }
     setLoading(false)
   }, [user, filters.accountId, filters.categoryId, filters.type, filters.startDate, filters.endDate, filters.limit])
 

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
+import { readCache, writeCache } from '@/lib/dataCache'
 import type { Account } from '@/types'
 
 export function useAccounts() {
@@ -15,15 +16,27 @@ export function useAccounts() {
       setLoading(false)
       return
     }
-    setLoading(true)
+    const cacheKey = `${user.id}:accounts`
+    const cached = readCache<Account[]>(cacheKey)
+    if (cached) {
+      setAccounts(cached)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+    if (!navigator.onLine) return
     const { data, error } = await supabase
       .from('accounts')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: true })
-    if (error) setError(error.message)
-    else setAccounts(data as Account[])
+    if (error) {
+      setError(error.message)
+    } else {
+      setAccounts(data as Account[])
+      writeCache(cacheKey, data)
+    }
     setLoading(false)
   }, [user])
 

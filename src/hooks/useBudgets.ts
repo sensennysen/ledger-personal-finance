@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { readCache, writeCache } from '@/lib/dataCache'
 import type { Budget } from '@/types'
 
 function getBudgetPeriodRange(period: Budget['period']): { start: string; end: string } {
@@ -52,7 +53,15 @@ export function useBudgets() {
       setLoading(false)
       return
     }
-    setLoading(true)
+    const cacheKey = `${user.id}:budgets`
+    const cached = readCache<Budget[]>(cacheKey)
+    if (cached) {
+      setBudgets(cached)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+    if (!navigator.onLine) return
 
     const { data: budgetData, error: budgetError } = await supabase
       .from('budgets')
@@ -102,6 +111,7 @@ export function useBudgets() {
     })
 
     setBudgets(enriched)
+    writeCache(cacheKey, enriched)
     setLoading(false)
   }, [user])
 

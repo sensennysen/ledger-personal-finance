@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { clearCacheByPrefix } from '@/lib/dataCache'
 import type { Profile } from '@/types'
 
 interface AuthContextValue {
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    if (user) clearCacheByPrefix(user.id)
     const { error } = await supabase.auth.signOut()
     if (error) console.error('Sign out failed:', error.message)
   }

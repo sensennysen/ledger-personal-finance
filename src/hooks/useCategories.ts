@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { readCache, writeCache } from '@/lib/dataCache'
 import type { Category } from '@/types'
 
 export function useCategories() {
@@ -14,15 +15,27 @@ export function useCategories() {
       setLoading(false)
       return
     }
-    setLoading(true)
+    const cacheKey = `${user.id}:categories`
+    const cached = readCache<Category[]>(cacheKey)
+    if (cached) {
+      setCategories(cached)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+    if (!navigator.onLine) return
     const { data, error } = await supabase
       .from('categories')
       .select('*')
       .eq('user_id', user.id)
       .order('is_default', { ascending: false })
       .order('name', { ascending: true })
-    if (error) setError(error.message)
-    else setCategories(data as Category[])
+    if (error) {
+      setError(error.message)
+    } else {
+      setCategories(data as Category[])
+      writeCache(cacheKey, data)
+    }
     setLoading(false)
   }, [user])
 

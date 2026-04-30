@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Wallet, ArrowLeftRight, Target, Settings } from 'lucide-react'
+import { LayoutDashboard, Wallet, ArrowLeftRight, Target, Settings, FileBarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -7,6 +7,7 @@ const navItems = [
   { to: '/accounts', label: 'Accounts', icon: Wallet },
   { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { to: '/budgets', label: 'Budgets', icon: Target },
+  { to: '/reports', label: 'Reports', icon: FileBarChart2 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

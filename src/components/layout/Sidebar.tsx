@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Sun,
   Moon,
+  FileBarChart2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -31,6 +32,7 @@ const navItems = [
   { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { to: '/categories', label: 'Categories', icon: Tag },
   { to: '/budgets', label: 'Budgets', icon: Target },
+  { to: '/reports', label: 'Reports', icon: FileBarChart2 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
 

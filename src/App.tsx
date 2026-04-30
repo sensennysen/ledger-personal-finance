@@ -12,6 +12,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import AccountTransactionsPage from '@/pages/AccountTransactionsPage'
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage'
 import DataDeletionPage from '@/pages/DataDeletionPage'
+import ReportsPage from '@/pages/ReportsPage'
 
 type RouteMetaEntry = {
   test: (pathname: string) => boolean
@@ -54,6 +55,11 @@ const routeMeta: RouteMetaEntry[] = [
     test: (pathname) => pathname === '/settings',
     title: 'Settings',
     description: 'Manage your profile, preferences, and application settings.',
+  },
+  {
+    test: (pathname) => pathname === '/reports',
+    title: 'Reports',
+    description: 'Review financial summaries, account balances, and export transaction data.',
   },
   {
     test: (pathname) => pathname === '/login',
@@ -163,6 +169,7 @@ function ProtectedRoutes() {
         <Route path="transactions" element={<TransactionsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="budgets" element={<BudgetsPage />} />
+        <Route path="reports" element={<ReportsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>

@@ -53,7 +53,7 @@ export function useAccounts() {
       delete updatePayload.balance
     }
 
-    const { error: updateError } = await supabase.from('accounts').update(updatePayload).eq('id', id)
+    const { error: updateError } = await supabase.from('accounts').update(updatePayload).eq('id', id).eq('user_id', user.id)
     if (updateError) return { error: updateError.message }
 
     if (newBalance !== oldBalance) {

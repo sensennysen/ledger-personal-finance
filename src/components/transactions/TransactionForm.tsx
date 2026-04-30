@@ -28,6 +28,14 @@ export const transactionSchema = z.object({
   is_recurring: z.boolean().default(false),
   recurrence_interval: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).nullable(),
   recurrence_end_date: z.string().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.type === 'transfer' && !data.to_account_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Destination account is required for transfers',
+      path: ['to_account_id'],
+    })
+  }
 })
 
 export type TransactionFormValues = z.infer<typeof transactionSchema>

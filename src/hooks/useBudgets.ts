@@ -2,18 +2,43 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Budget } from '@/types'
-import { getMonthRange } from '@/lib/utils'
 
-function buildSpentMap(
-  spentData: { category_id: string | null; amount: number }[],
-): Record<string, number> {
-  const map: Record<string, number> = {}
-  for (const tx of spentData) {
-    if (tx.category_id) {
-      map[tx.category_id] = (map[tx.category_id] ?? 0) + tx.amount
+function getBudgetPeriodRange(period: Budget['period']): { start: string; end: string } {
+  const now = new Date()
+  if (period === 'weekly') {
+    const dayOfWeek = now.getDay()
+    const monday = new Date(now)
+    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7))
+    monday.setHours(0, 0, 0, 0)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    return {
+      start: monday.toISOString().split('T')[0],
+      end: sunday.toISOString().split('T')[0],
+    }
+  } else if (period === 'quarterly') {
+    const q = Math.floor(now.getMonth() / 3)
+    const startMonth = q * 3
+    const start = new Date(now.getFullYear(), startMonth, 1)
+    const end = new Date(now.getFullYear(), startMonth + 3, 0)
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+    }
+  } else if (period === 'yearly') {
+    return {
+      start: `${now.getFullYear()}-01-01`,
+      end: `${now.getFullYear()}-12-31`,
+    }
+  } else {
+    // monthly
+    const start = new Date(now.getFullYear(), now.getMonth(), 1)
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
     }
   }
-  return map
 }
 
 export function useBudgets() {
@@ -29,8 +54,6 @@ export function useBudgets() {
     }
     setLoading(true)
 
-    const { start, end } = getMonthRange()
-
     const { data: budgetData, error: budgetError } = await supabase
       .from('budgets')
       .select('*, category:categories(id, name, color, icon)')
@@ -44,14 +67,20 @@ export function useBudgets() {
       return
     }
 
-    // Fetch spent amounts per category for current month
+    const budgets = budgetData as Budget[]
+
+    // Fetch all expense transactions for the current year (covers all period types)
+    const now = new Date()
+    const yearStart = `${now.getFullYear()}-01-01`
+    const yearEnd = `${now.getFullYear()}-12-31`
+
     const { data: spentData, error: spentError } = await supabase
       .from('transactions')
-      .select('category_id, amount')
+      .select('category_id, amount, date')
       .eq('user_id', user.id)
       .eq('type', 'expense')
-      .gte('date', start)
-      .lte('date', end)
+      .gte('date', yearStart)
+      .lte('date', yearEnd)
 
     if (spentError) {
       setError(spentError.message)
@@ -59,12 +88,18 @@ export function useBudgets() {
       return
     }
 
-    const spentByCategory = buildSpentMap(spentData ?? [])
+    const allTx = spentData ?? []
 
-    const enriched = (budgetData as Budget[]).map((b) => ({
-      ...b,
-      spent: spentByCategory[b.category_id] ?? 0,
-    }))
+    // For each budget, compute spending within its own period's date range
+    const enriched = budgets.map((b) => {
+      const { start, end } = getBudgetPeriodRange(b.period)
+      const spent = allTx.reduce((sum, tx) => {
+        if (tx.category_id !== b.category_id) return sum
+        if (tx.date < start || tx.date > end) return sum
+        return sum + tx.amount
+      }, 0)
+      return { ...b, spent }
+    })
 
     setBudgets(enriched)
     setLoading(false)

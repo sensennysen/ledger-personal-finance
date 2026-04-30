@@ -52,66 +52,80 @@ export async function drainQueue(): Promise<number> {
   let synced = 0
 
   for (const item of queue) {
-    let error: unknown = null
-    let skipInsert = false
+    try {
+      let skipInsert = false
 
-    // Resolve any pending receipt file before the DB insert
-    if (
-      item.operation === 'insert' &&
-      typeof item.payload.receipt_url === 'string' &&
-      item.payload.receipt_url.startsWith(PENDING_RECEIPT_PREFIX)
-    ) {
-      const tempId = item.payload.receipt_url.slice(PENDING_RECEIPT_PREFIX.length)
-      let file: File | null = null
-      try {
-        file = await getPendingReceipt(tempId)
-      } catch {
-        // IndexedDB unavailable — treat as missing file, insert without receipt
-      }
-      if (file) {
-        const ext = file.name.split('.').pop() ?? 'jpg'
-        const path = `${item.userId}/${Date.now()}.${ext}`
-        const { error: uploadErr } = await supabase.storage.from('receipts').upload(path, file)
-        if (uploadErr) {
-          // Upload failed — keep in queue and retry next time
-          remaining.push(item)
-          skipInsert = true
-        } else {
-          const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
-          item.payload = { ...item.payload, receipt_url: urlData.publicUrl }
-          try { await removePendingReceipt(tempId) } catch { /* best-effort */ }
+      // Resolve any pending receipt file before the DB insert
+      if (
+        item.operation === 'insert' &&
+        typeof item.payload.receipt_url === 'string' &&
+        item.payload.receipt_url.startsWith(PENDING_RECEIPT_PREFIX)
+      ) {
+        const tempId = item.payload.receipt_url.slice(PENDING_RECEIPT_PREFIX.length)
+        let file: File | null = null
+        try {
+          file = await getPendingReceipt(tempId)
+        } catch {
+          // IndexedDB unavailable — treat as missing file, insert without receipt
         }
-      } else {
-        // File missing (e.g. IndexedDB was cleared) — insert without receipt
-        item.payload = { ...item.payload, receipt_url: null }
+        if (file) {
+          // When retrieved from IndexedDB, a File may come back as a plain Blob
+          // without a .name property on some browsers — guard against that.
+          const fileName = (file as File).name ?? ''
+          const ext = fileName.split('.').pop() || 'jpg'
+          const path = `${item.userId}/${Date.now()}.${ext}`
+          let uploadErr: unknown = null
+          try {
+            const { error: err } = await supabase.storage.from('receipts').upload(path, file)
+            uploadErr = err
+          } catch (e) {
+            uploadErr = e
+          }
+          if (uploadErr) {
+            // Upload failed — keep in queue and retry next time
+            remaining.push(item)
+            skipInsert = true
+          } else {
+            const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
+            item.payload = { ...item.payload, receipt_url: urlData.publicUrl }
+            try { await removePendingReceipt(tempId) } catch { /* best-effort */ }
+          }
+        } else {
+          // File missing (e.g. IndexedDB was cleared) — insert without receipt
+          item.payload = { ...item.payload, receipt_url: null }
+        }
       }
-    }
 
-    if (skipInsert) continue
+      if (skipInsert) continue
 
-    if (item.operation === 'insert') {
-      const { error: err } = await supabase.from(item.table).insert(item.payload)
-      error = err
-    } else if (item.operation === 'update' && item.rowId) {
-      const { error: err } = await supabase
-        .from(item.table)
-        .update(item.payload)
-        .eq('id', item.rowId)
-        .eq('user_id', item.userId)
-      error = err
-    } else if (item.operation === 'delete' && item.rowId) {
-      const { error: err } = await supabase
-        .from(item.table)
-        .delete()
-        .eq('id', item.rowId)
-        .eq('user_id', item.userId)
-      error = err
-    }
+      let error: unknown = null
+      if (item.operation === 'insert') {
+        const { error: err } = await supabase.from(item.table).insert(item.payload)
+        error = err
+      } else if (item.operation === 'update' && item.rowId) {
+        const { error: err } = await supabase
+          .from(item.table)
+          .update(item.payload)
+          .eq('id', item.rowId)
+          .eq('user_id', item.userId)
+        error = err
+      } else if (item.operation === 'delete' && item.rowId) {
+        const { error: err } = await supabase
+          .from(item.table)
+          .delete()
+          .eq('id', item.rowId)
+          .eq('user_id', item.userId)
+        error = err
+      }
 
-    if (error) {
+      if (error) {
+        remaining.push(item)
+      } else {
+        synced++
+      }
+    } catch {
+      // Unexpected error for this item — keep it in the queue for the next retry
       remaining.push(item)
-    } else {
-      synced++
     }
   }
 

@@ -8,6 +8,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_COLORS, CURRENCIES, type AccountType } from '@/types'
 import { formatCurrency } from '@/lib/utils'
+import { GOLD } from '@/constants/colors'
+import { DEFAULT_CURRENCY } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -51,7 +53,7 @@ function AccountForm({
     defaultValues: {
       name: '',
       type: 'cash',
-      currency: 'USD',
+      currency: DEFAULT_CURRENCY,
       balance: 0,
       color: ACCOUNT_COLORS[0],
       credit_limit: null,
@@ -213,18 +215,23 @@ export default function AccountsPage() {
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
   const defaultCurrency = profile?.default_currency ?? 'USD'
 
   const handleCreate = async (values: FormValues) => {
-    await createAccount({ ...values, is_active: true, icon: null })
+    const { error } = await createAccount({ ...values, is_active: true, icon: null })
+    if (error) { setFormError(error); return }
+    setFormError(null)
     setCreateOpen(false)
   }
 
   const handleEdit = async (values: FormValues) => {
     if (!editAccount) return
-    await updateAccountWithAdjustment(editAccount.id, values, editAccount.balance)
+    const { error } = await updateAccountWithAdjustment(editAccount.id, values, editAccount.balance)
+    if (error) { setFormError(error); return }
+    setFormError(null)
     setEditAccount(null)
   }
 
@@ -243,7 +250,8 @@ export default function AccountsPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
-            <AccountForm onSubmit={handleCreate} onClose={() => setCreateOpen(false)} defaultValues={{ currency: defaultCurrency }} />
+            {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+            <AccountForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} defaultValues={{ currency: defaultCurrency }} />
           </DialogContent>
         </Dialog>
       </div>
@@ -305,7 +313,10 @@ export default function AccountsPage() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteAccount(account.id)}>
+                              <AlertDialogAction onClick={async () => {
+                                const { error } = await deleteAccount(account.id)
+                                if (error) console.error('Failed to delete account:', error)
+                              }}>
                                 Delete
                               </AlertDialogAction>
                             </AlertDialogFooter>
@@ -316,7 +327,7 @@ export default function AccountsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="money text-[22px] font-bold" style={{ color: 'oklch(0.700 0.115 72)' }}>
+                  <p className="money text-[22px] font-bold" style={{ color: GOLD }}>
                     {formatCurrency(account.balance, account.currency)}
                   </p>
                   {account.type === 'credit_card' && account.credit_limit != null && (
@@ -334,9 +345,10 @@ export default function AccountsPage() {
       )}
 
       {/* Edit dialog */}
-      <Dialog open={!!editAccount} onOpenChange={(o) => !o && setEditAccount(null)}>
+      <Dialog open={!!editAccount} onOpenChange={(o) => { if (!o) { setEditAccount(null); setFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
+          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editAccount && (
             <AccountForm
               defaultValues={editAccount}

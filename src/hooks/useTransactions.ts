@@ -19,7 +19,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
   const [error, setError] = useState<string | null>(null)
 
   const fetch = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     let query = supabase
       .from('transactions')

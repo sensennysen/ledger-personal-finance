@@ -8,6 +8,8 @@ import { useBudgets } from '@/hooks/useBudgets'
 import { useCategories } from '@/hooks/useCategories'
 import { CURRENCIES } from '@/types'
 import { formatCurrency } from '@/lib/utils'
+import { EMERALD } from '@/constants/colors'
+import { BUDGET_WARNING_THRESHOLD, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -50,7 +52,7 @@ function BudgetForm({
       name: '',
       category_id: '',
       amount: 0,
-      currency: 'USD',
+      currency: DEFAULT_CURRENCY,
       period: 'monthly',
       start_date: today,
       end_date: null,
@@ -194,16 +196,21 @@ export default function BudgetsPage() {
   const { budgets, loading, createBudget, updateBudget, deleteBudget } = useBudgets()
   const [createOpen, setCreateOpen] = useState(false)
   const [editBudget, setEditBudget] = useState<Budget | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const defaultCurrency = profile?.default_currency ?? 'USD'
 
   const handleCreate = async (values: FormValues) => {
-    await createBudget({ ...values, is_active: true })
+    const { error } = await createBudget({ ...values, is_active: true })
+    if (error) { setFormError(error); return }
+    setFormError(null)
     setCreateOpen(false)
   }
 
   const handleEdit = async (values: FormValues) => {
     if (!editBudget) return
-    await updateBudget(editBudget.id, values)
+    const { error } = await updateBudget(editBudget.id, values)
+    if (error) { setFormError(error); return }
+    setFormError(null)
     setEditBudget(null)
   }
 
@@ -220,7 +227,8 @@ export default function BudgetsPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Budget</DialogTitle></DialogHeader>
-            <BudgetForm onSubmit={handleCreate} onClose={() => setCreateOpen(false)} defaultValues={{ currency: defaultCurrency }} />
+            {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+            <BudgetForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} defaultValues={{ currency: defaultCurrency }} />
           </DialogContent>
         </Dialog>
       </div>
@@ -276,7 +284,10 @@ export default function BudgetsPage() {
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => deleteBudget(budget.id)}>Delete</AlertDialogAction>
+                            <AlertDialogAction onClick={async () => {
+                              const { error } = await deleteBudget(budget.id)
+                              if (error) console.error('Failed to delete budget:', error)
+                            }}>Delete</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
@@ -286,7 +297,7 @@ export default function BudgetsPage() {
                 <CardContent className="space-y-2">
                   <Progress
                     value={pct}
-                    className={over ? '[&>div]:bg-destructive' : pct > 80 ? '[&>div]:bg-yellow-500' : ''}
+                    className={over ? '[&>div]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-yellow-500' : ''}
                   />
                   <div className="flex justify-between text-sm">
                     <span className={over ? 'text-destructive font-medium' : 'text-muted-foreground'}>
@@ -295,7 +306,7 @@ export default function BudgetsPage() {
                     <span className="font-medium">
                       {over
                         ? <span className="text-destructive">{formatCurrency(Math.abs(remaining), budget.currency)} over</span>
-                        : <span style={{ color: 'oklch(0.660 0.150 155)' }}>{formatCurrency(remaining, budget.currency)} left</span>
+                        : <span style={{ color: EMERALD }}>{formatCurrency(remaining, budget.currency)} left</span>
                       }
                     </span>
                   </div>
@@ -309,14 +320,15 @@ export default function BudgetsPage() {
         </div>
       )}
 
-      <Dialog open={!!editBudget} onOpenChange={(o) => !o && setEditBudget(null)}>
+      <Dialog open={!!editBudget} onOpenChange={(o) => { if (!o) { setEditBudget(null); setFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Budget</DialogTitle></DialogHeader>
+          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editBudget && (
             <BudgetForm
               defaultValues={editBudget}
               onSubmit={handleEdit}
-              onClose={() => setEditBudget(null)}
+              onClose={() => { setEditBudget(null); setFormError(null) }}
             />
           )}
         </DialogContent>

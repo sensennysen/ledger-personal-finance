@@ -159,15 +159,20 @@ export default function CategoriesPage() {
   const { categories, loading, createCategory, updateCategory, deleteCategory } = useCategories()
   const [createOpen, setCreateOpen] = useState(false)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const handleCreate = async (values: FormValues) => {
-    await createCategory(values)
+    const { error } = await createCategory(values)
+    if (error) { setFormError(error); return }
+    setFormError(null)
     setCreateOpen(false)
   }
 
   const handleEdit = async (values: FormValues) => {
     if (!editCategory) return
-    await updateCategory(editCategory.id, values)
+    const { error } = await updateCategory(editCategory.id, values)
+    if (error) { setFormError(error); return }
+    setFormError(null)
     setEditCategory(null)
   }
 
@@ -214,7 +219,10 @@ export default function CategoriesPage() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => deleteCategory(cat.id)}>Delete</AlertDialogAction>
+                <AlertDialogAction onClick={async () => {
+                  const { error } = await deleteCategory(cat.id)
+                  if (error) console.error('Failed to delete category:', error)
+                }}>Delete</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -235,7 +243,8 @@ export default function CategoriesPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>Add Category</DialogTitle></DialogHeader>
-            <CategoryForm onSubmit={handleCreate} onClose={() => setCreateOpen(false)} />
+            {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+            <CategoryForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} />
           </DialogContent>
         </Dialog>
       </div>
@@ -272,14 +281,15 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      <Dialog open={!!editCategory} onOpenChange={(o) => !o && setEditCategory(null)}>
+      <Dialog open={!!editCategory} onOpenChange={(o) => { if (!o) { setEditCategory(null); setFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Category</DialogTitle></DialogHeader>
+          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editCategory && (
             <CategoryForm
               defaultValues={editCategory as Partial<FormValues>}
               onSubmit={handleEdit}
-              onClose={() => setEditCategory(null)}
+              onClose={() => { setEditCategory(null); setFormError(null) }}
             />
           )}
         </DialogContent>

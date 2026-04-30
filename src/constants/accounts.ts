@@ -34,3 +34,8 @@ export const TRANSACTION_TYPE_COLOR: Record<TransactionType, string> = {
   expense: 'text-[oklch(0.620_0.160_18)]',
   transfer: 'text-[oklch(0.700_0.115_72)]',
 }
+
+export const BALANCE_ADJUSTMENT_DESCRIPTION = 'Balance Adjustment'
+export const DEFAULT_CURRENCY = 'USD'
+export const BUDGET_WARNING_THRESHOLD = 80
+export const UNCATEGORIZED_VALUE = '__none'

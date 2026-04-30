@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { CURRENCIES } from '@/types'
+import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -53,7 +54,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
       category_id: null,
       amount: 0,
       currency:
-        accounts.find((a) => a.id === lockedAccountId)?.currency ?? accounts[0]?.currency ?? 'USD',
+        accounts.find((a) => a.id === lockedAccountId)?.currency ?? accounts[0]?.currency ?? DEFAULT_CURRENCY,
       exchange_rate: 1,
       description: '',
       notes: null,
@@ -177,8 +178,8 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <Select
-                      onValueChange={(v) => field.onChange(v === '__none' ? null : v)}
-                      value={field.value ?? '__none'}
+                      onValueChange={(v) => field.onChange(v === UNCATEGORIZED_VALUE ? null : v)}
+                      value={field.value ?? UNCATEGORIZED_VALUE}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -188,7 +189,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="__none">Uncategorized</SelectItem>
+                        <SelectItem value={UNCATEGORIZED_VALUE}>Uncategorized</SelectItem>
                         {filteredCategories.map((c) => (
                           <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
                         ))}
@@ -321,8 +322,8 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                 <FormItem>
                   <FormLabel>Interval</FormLabel>
                   <Select
-                    onValueChange={(v) => field.onChange(v === '__none' ? null : v)}
-                    value={field.value ?? '__none'}
+                    onValueChange={(v) => field.onChange(v === UNCATEGORIZED_VALUE ? null : v)}
+                    value={field.value ?? UNCATEGORIZED_VALUE}
                   >
                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>

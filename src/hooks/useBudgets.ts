@@ -4,6 +4,18 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { Budget } from '@/types'
 import { getMonthRange } from '@/lib/utils'
 
+function buildSpentMap(
+  spentData: { category_id: string | null; amount: number }[],
+): Record<string, number> {
+  const map: Record<string, number> = {}
+  for (const tx of spentData) {
+    if (tx.category_id) {
+      map[tx.category_id] = (map[tx.category_id] ?? 0) + tx.amount
+    }
+  }
+  return map
+}
+
 export function useBudgets() {
   const { user } = useAuth()
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -11,7 +23,10 @@ export function useBudgets() {
   const [error, setError] = useState<string | null>(null)
 
   const fetch = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
 
     const { start, end } = getMonthRange()
@@ -30,7 +45,7 @@ export function useBudgets() {
     }
 
     // Fetch spent amounts per category for current month
-    const { data: spentData } = await supabase
+    const { data: spentData, error: spentError } = await supabase
       .from('transactions')
       .select('category_id, amount')
       .eq('user_id', user.id)
@@ -38,14 +53,13 @@ export function useBudgets() {
       .gte('date', start)
       .lte('date', end)
 
-    const spentByCategory: Record<string, number> = {}
-    if (spentData) {
-      for (const tx of spentData) {
-        if (tx.category_id) {
-          spentByCategory[tx.category_id] = (spentByCategory[tx.category_id] ?? 0) + tx.amount
-        }
-      }
+    if (spentError) {
+      setError(spentError.message)
+      setLoading(false)
+      return
     }
+
+    const spentByCategory = buildSpentMap(spentData ?? [])
 
     const enriched = (budgetData as Budget[]).map((b) => ({
       ...b,

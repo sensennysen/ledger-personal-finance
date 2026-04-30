@@ -10,7 +10,10 @@ export function useCategories() {
   const [error, setError] = useState<string | null>(null)
 
   const fetch = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     const { data, error } = await supabase
       .from('categories')

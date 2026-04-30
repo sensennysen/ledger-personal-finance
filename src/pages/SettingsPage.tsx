@@ -9,6 +9,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
 import { cn } from '@/lib/utils'
+import { EMERALD } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -47,7 +48,11 @@ export default function SettingsPage() {
 
   const onSave = async (values: ProfileValues) => {
     if (!user) return
-    await supabase.from('profiles').update(values).eq('id', user.id)
+    const { error } = await supabase.from('profiles').update(values).eq('id', user.id)
+    if (error) {
+      form.setError('root', { message: error.message })
+      return
+    }
     await refreshProfile()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -114,7 +119,10 @@ export default function SettingsPage() {
                 <Button type="submit" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
                 </Button>
-                {saved && <span className="text-sm" style={{ color: 'oklch(0.660 0.150 155)' }}>Saved!</span>}
+                {form.formState.errors.root && (
+                  <span className="text-sm text-destructive">{form.formState.errors.root.message}</span>
+                )}
+                {saved && <span className="text-sm" style={{ color: EMERALD }}>Saved!</span>}
               </div>
             </form>
           </Form>

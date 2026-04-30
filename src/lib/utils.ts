@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { CURRENCIES } from "@/types"
+import type { Transaction, Category } from "@/types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -106,3 +107,26 @@ export function getLast8Quarters(): Array<{ label: string; start: string; end: s
   return quarters
 }
 
+export function groupExpensesByCategory(
+  transactions: Transaction[],
+  categories: Category[],
+  startDate: string,
+  endDate: string,
+  limit = 8,
+): { name: string; color: string; icon: string; amount: number }[] {
+  const map: Record<string, { name: string; color: string; icon: string; amount: number }> = {}
+  for (const tx of transactions) {
+    if (tx.type !== 'expense' || tx.date < startDate || tx.date > endDate || !tx.category_id) continue
+    const cat = categories.find((c) => c.id === tx.category_id)
+    if (!map[tx.category_id]) {
+      map[tx.category_id] = {
+        name: cat?.name ?? 'Unknown',
+        color: cat?.color ?? '#94a3b8',
+        icon: cat?.icon ?? '📦',
+        amount: 0,
+      }
+    }
+    map[tx.category_id].amount += tx.amount
+  }
+  return Object.values(map).sort((a, b) => b.amount - a.amount).slice(0, limit)
+}

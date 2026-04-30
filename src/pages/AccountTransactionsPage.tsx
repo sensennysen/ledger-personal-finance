@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, RepeatIcon, Search, Pencil, Trash2, Plus, Wallet } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
@@ -11,11 +11,11 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
-import { ACCOUNT_ICONS, TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
+import { TransactionRow } from '@/components/transactions/TransactionRow'
+import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Transaction } from '@/types'
 
 export default function AccountTransactionsPage() {
@@ -29,6 +29,7 @@ export default function AccountTransactionsPage() {
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const account = accounts.find((a) => a.id === accountId)
   const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet
@@ -80,16 +81,26 @@ export default function AccountTransactionsPage() {
   const currency = account?.currency ?? profile?.default_currency ?? 'USD'
 
   const handleCreate = async (values: TransactionFormValues) => {
-    await createTransaction(values as Parameters<typeof createTransaction>[0])
+    const { error } = await createTransaction(values as Parameters<typeof createTransaction>[0])
+    if (error) { setFormError(error); return }
+    setFormError(null)
     refetchAccounts()
     setCreateOpen(false)
   }
 
   const handleEdit = async (values: TransactionFormValues) => {
     if (!editingTx) return
-    await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
+    const { error } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
+    if (error) { setFormError(error); return }
+    setFormError(null)
     refetchAccounts()
     setEditingTx(null)
+  }
+
+  const handleDelete = async (id: string) => {
+    const { error } = await deleteTransaction(id)
+    if (error) console.error('Failed to delete transaction:', error)
+    else refetchAccounts()
   }
 
   return (
@@ -121,9 +132,10 @@ export default function AccountTransactionsPage() {
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
+            {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
             <TransactionForm
               onSubmit={handleCreate}
-              onClose={() => setCreateOpen(false)}
+              onClose={() => { setCreateOpen(false); setFormError(null) }}
               lockedAccountId={accountId}
               defaultValues={{ account_id: accountId }}
             />
@@ -205,95 +217,15 @@ export default function AccountTransactionsPage() {
                 </p>
               </div>
               <div className="space-y-1">
-                {txs.map((tx) => {
-                  const TxIcon = TRANSACTION_TYPE_ICON[tx.type]
-                  // For transfers, show direction relative to this account
-                  const isIncoming = tx.type === 'transfer' && tx.to_account_id === accountId
-                  return (
-                    <div
-                      key={tx.id}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-card border hover:bg-accent/50 transition-colors group"
-                    >
-                      <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-base"
-                        style={tx.category ? { backgroundColor: tx.category.color + '20' } : { backgroundColor: '#f1f5f9' }}
-                      >
-                        {tx.category ? tx.category.icon : <TxIcon className={`w-4 h-4 ${TRANSACTION_TYPE_COLOR[tx.type]}`} />}
-                      </div>
-
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <p className="text-sm font-medium truncate">{tx.description}</p>
-                          <p className={`text-sm font-semibold shrink-0 ${
-                            tx.type === 'income' || isIncoming
-                              ? TRANSACTION_TYPE_COLOR.income
-                              : tx.type === 'expense'
-                              ? TRANSACTION_TYPE_COLOR.expense
-                              : TRANSACTION_TYPE_COLOR.transfer
-                          }`}>
-                            {tx.type === 'income' || isIncoming ? '+' : tx.type === 'expense' ? '-' : ''}
-                            {formatCurrency(
-                              isIncoming ? tx.amount * (tx.exchange_rate ?? 1) : tx.amount,
-                              tx.currency
-                            )}
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {tx.type === 'transfer' && (
-                              <span className="text-xs text-muted-foreground">
-                                {isIncoming
-                                  ? `← from ${tx.account?.name ?? ''}`
-                                  : `→ to ${tx.to_account?.name ?? ''}`}
-                              </span>
-                            )}
-                            {tx.category && (
-                              <Badge variant="secondary" className="text-xs py-0 px-1.5">{tx.category.name}</Badge>
-                            )}
-                            {tx.is_recurring && (
-                              <Badge variant="outline" className="text-xs py-0 px-1.5 gap-1">
-                                <RepeatIcon className="w-2.5 h-2.5" />{tx.recurrence_interval}
-                              </Badge>
-                            )}
-                            {tx.type === 'transfer' && tx.transfer_fee != null && tx.transfer_fee > 0 && (
-                              <span className="text-xs text-muted-foreground">
-                                Fee: {formatCurrency(tx.transfer_fee, tx.currency)}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground shrink-0">{tx.currency}</p>
-                        </div>
-                      </div>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        onClick={() => setEditingTx(tx)}
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </Button>
-
-                      <AlertDialog>
-                        <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0" />}>
-                          <Trash2 className="w-3 h-3" />
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete "{tx.description}".
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={async () => { await deleteTransaction(tx.id); refetchAccounts() }}>Delete</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  )
-                })}
+                {txs.map((tx) => (
+                  <TransactionRow
+                    key={tx.id}
+                    tx={tx}
+                    onEdit={setEditingTx}
+                    onDelete={handleDelete}
+                    contextAccountId={accountId}
+                  />
+                ))}
               </div>
             </div>
           ))}
@@ -301,9 +233,10 @@ export default function AccountTransactionsPage() {
       )}
 
       {/* Edit dialog */}
-      <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) setEditingTx(null) }}>
+      <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
+          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editingTx && (
             <TransactionForm
               defaultValues={{
@@ -323,7 +256,7 @@ export default function AccountTransactionsPage() {
                 recurrence_end_date: editingTx.recurrence_end_date,
               }}
               onSubmit={handleEdit}
-              onClose={() => setEditingTx(null)}
+              onClose={() => { setEditingTx(null); setFormError(null) }}
             />
           )}
         </DialogContent>

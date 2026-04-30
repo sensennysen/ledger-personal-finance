@@ -18,7 +18,9 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useBudgets } from '@/hooks/useBudgets'
-import { formatCurrency, getCurrencySymbol, getLast12Months, getLast8Weeks, getLast8Quarters, getMonthRange, cn } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol, getLast12Months, getLast8Weeks, getLast8Quarters, getMonthRange, groupExpensesByCategory, cn } from '@/lib/utils'
+import { BUDGET_WARNING_THRESHOLD } from '@/constants/accounts'
+import { EMERALD, CORAL, GOLD } from '@/constants/colors'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -27,9 +29,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useNavigate } from 'react-router-dom'
 
-const EMERALD = 'oklch(0.660 0.150 155)'
-const CORAL = 'oklch(0.620 0.160 18)'
-const GOLD = 'oklch(0.700 0.115 72)'
 const CHART_TOOLTIP_STYLE = {
   backgroundColor: 'var(--popover)',
   border: '1px solid var(--border)',
@@ -176,26 +175,10 @@ export default function DashboardPage() {
   )
 
   // ---- Expenses by category (this month) ----
-  const expensesByCategory = useMemo(() => {
-    const monthExpenses = transactions.filter(
-      (t) => t.type === 'expense' && t.date >= monthStart && t.date <= monthEnd && t.category_id
-    )
-    const map: Record<string, { name: string; color: string; icon: string; amount: number }> = {}
-    for (const tx of monthExpenses) {
-      if (!tx.category_id) continue
-      const cat = categories.find((c) => c.id === tx.category_id)
-      if (!map[tx.category_id]) {
-        map[tx.category_id] = {
-          name: cat?.name ?? 'Unknown',
-          color: cat?.color ?? '#94a3b8',
-          icon: cat?.icon ?? '📦',
-          amount: 0,
-        }
-      }
-      map[tx.category_id].amount += tx.amount
-    }
-    return Object.values(map).sort((a, b) => b.amount - a.amount).slice(0, 8)
-  }, [transactions, categories, monthStart, monthEnd])
+  const expensesByCategory = useMemo(
+    () => groupExpensesByCategory(transactions, categories, monthStart, monthEnd),
+    [transactions, categories, monthStart, monthEnd],
+  )
 
   // ---- Recent transactions ----
   const recentTx = useMemo(() => transactions.slice(0, 5), [transactions])
@@ -393,14 +376,14 @@ export default function DashboardPage() {
                       </span>
                       <span
                         className="money text-[12px]"
-                        style={{ color: over ? CORAL : pct > 80 ? 'oklch(0.750 0.140 75)' : 'oklch(0.570 0.015 290)' }}
+                        style={{ color: over ? CORAL : pct > BUDGET_WARNING_THRESHOLD ? 'oklch(0.750 0.140 75)' : 'oklch(0.570 0.015 290)' }}
                       >
                         {formatCurrency(spent, b.currency)} / {formatCurrency(b.amount, b.currency)}
                       </span>
                     </div>
                     <Progress
                       value={pct}
-                      className={over ? '[&>div]:bg-[oklch(0.620_0.160_18)]' : pct > 80 ? '[&>div]:bg-[oklch(0.750_0.140_75)]' : '[&>div]:bg-primary'}
+                      className={over ? '[&>div]:bg-[oklch(0.620_0.160_18)]' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-[oklch(0.750_0.140_75)]' : '[&>div]:bg-primary'}
                     />
                   </div>
                 )

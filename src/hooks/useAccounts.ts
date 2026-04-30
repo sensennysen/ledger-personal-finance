@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
 import type { Account } from '@/types'
 
 export function useAccounts() {
@@ -10,7 +11,10 @@ export function useAccounts() {
   const [error, setError] = useState<string | null>(null)
 
   const fetch = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     const { data, error } = await supabase
       .from('accounts')
@@ -60,9 +64,9 @@ export function useAccounts() {
         account_id: id,
         type: diff > 0 ? 'income' : 'expense',
         amount: Math.abs(diff),
-        currency: account?.currency ?? values.currency ?? 'USD',
+        currency: account?.currency ?? values.currency ?? DEFAULT_CURRENCY,
         exchange_rate: 1,
-        description: 'Balance Adjustment',
+        description: BALANCE_ADJUSTMENT_DESCRIPTION,
         date: new Date().toISOString().split('T')[0],
       })
       if (txError) return { error: txError.message }

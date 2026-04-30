@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { clearCacheByPrefix } from '@/lib/dataCache'
+import { readCache, writeCache, clearCacheByPrefix } from '@/lib/dataCache'
 import type { Profile } from '@/types'
 
 interface AuthContextValue {
@@ -23,6 +23,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = async (userId: string) => {
+    // Seed from cache immediately so pages have a profile available offline
+    const cacheKey = `${userId}:profile`
+    const cached = readCache<Profile>(cacheKey)
+    if (cached) setProfile(cached)
+    if (!navigator.onLine) return
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -32,7 +37,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to fetch profile:', error.message)
       return
     }
-    if (data) setProfile(data as Profile)
+    if (data) {
+      setProfile(data as Profile)
+      writeCache(cacheKey, data)
+    }
   }
 
   const refreshProfile = async () => {

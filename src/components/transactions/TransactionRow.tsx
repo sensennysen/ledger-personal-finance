@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Pencil, Trash2, RepeatIcon, ImageIcon } from 'lucide-react'
+import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
+import { PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -113,13 +114,19 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
               </span>
             )}
             {tx.receipt_url && (
-              <button
-                type="button"
-                onClick={() => setReceiptOpen(true)}
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                <ImageIcon className="w-3 h-3" />Receipt
-              </button>
+              tx.receipt_url.startsWith(PENDING_RECEIPT_PREFIX) ? (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <CloudUpload className="w-3 h-3" />Receipt (syncing…)
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setReceiptOpen(true)}
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <ImageIcon className="w-3 h-3" />Receipt
+                </button>
+              )
             )}
           </div>
           <p className="text-xs text-muted-foreground shrink-0">{tx.currency}</p>
@@ -164,7 +171,7 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
       </AlertDialog>
 
       {/* Receipt viewer */}
-      {tx.receipt_url && (
+      {tx.receipt_url && !tx.receipt_url.startsWith(PENDING_RECEIPT_PREFIX) && (
         <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>

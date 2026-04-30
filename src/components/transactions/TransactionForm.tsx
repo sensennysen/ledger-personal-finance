@@ -8,6 +8,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useDescriptionSuggestions } from '@/hooks/useDescriptionSuggestions'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { storePendingReceipt, PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
 import { CURRENCIES } from '@/types'
 import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
@@ -114,19 +115,26 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
 
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
     if (pendingFile && user) {
-      setUploading(true)
-      const ext = pendingFile.name.split('.').pop() ?? 'jpg'
-      const path = `${user.id}/${Date.now()}.${ext}`
-      const { error } = await supabase.storage
-        .from('receipts')
-        .upload(path, pendingFile)
-      setUploading(false)
-      if (error) {
-        setUploadError('Failed to upload receipt. Please try again.')
-        return
+      if (!navigator.onLine) {
+        // Store the file in IndexedDB; the sync worker will upload it later
+        const tempId = crypto.randomUUID()
+        await storePendingReceipt(tempId, pendingFile)
+        values.receipt_url = `${PENDING_RECEIPT_PREFIX}${tempId}`
+      } else {
+        setUploading(true)
+        const ext = pendingFile.name.split('.').pop() ?? 'jpg'
+        const path = `${user.id}/${Date.now()}.${ext}`
+        const { error } = await supabase.storage
+          .from('receipts')
+          .upload(path, pendingFile)
+        setUploading(false)
+        if (error) {
+          setUploadError('Failed to upload receipt. Please try again.')
+          return
+        }
+        const { data } = supabase.storage.from('receipts').getPublicUrl(path)
+        values.receipt_url = data.publicUrl
       }
-      const { data } = supabase.storage.from('receipts').getPublicUrl(path)
-      values.receipt_url = data.publicUrl
     }
     await onSubmit(values)
   }

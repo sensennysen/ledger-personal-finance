@@ -33,7 +33,8 @@ export function useAccounts() {
   }
 
   const updateAccount = async (id: string, values: Partial<Account>) => {
-    const { error } = await supabase.from('accounts').update(values).eq('id', id)
+    if (!user) return { error: 'Not authenticated' }
+    const { error } = await supabase.from('accounts').update(values).eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }
@@ -72,10 +73,12 @@ export function useAccounts() {
   }
 
   const deleteAccount = async (id: string) => {
+    if (!user) return { error: 'Not authenticated' }
     const { error } = await supabase
       .from('accounts')
       .update({ is_active: false })
       .eq('id', id)
+      .eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }

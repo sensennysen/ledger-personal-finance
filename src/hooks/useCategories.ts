@@ -37,13 +37,15 @@ export function useCategories() {
   }
 
   const updateCategory = async (id: string, values: Partial<Category>) => {
-    const { error } = await supabase.from('categories').update(values).eq('id', id)
+    if (!user) return { error: 'Not authenticated' }
+    const { error } = await supabase.from('categories').update(values).eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }
 
   const deleteCategory = async (id: string) => {
-    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (!user) return { error: 'Not authenticated' }
+    const { error } = await supabase.from('categories').delete().eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }

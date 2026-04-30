@@ -58,13 +58,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
   }
 
   const updateTransaction = async (id: string, values: Partial<Transaction>) => {
-    const { error } = await supabase.from('transactions').update(values).eq('id', id)
+    if (!user) return { error: 'Not authenticated' }
+    const { error } = await supabase.from('transactions').update(values).eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }
 
   const deleteTransaction = async (id: string) => {
-    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    if (!user) return { error: 'Not authenticated' }
+    const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }

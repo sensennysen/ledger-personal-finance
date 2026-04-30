@@ -4,7 +4,12 @@ export default function LoginPage() {
   const { signInWithGoogle, loading } = useAuth()
 
   const params = new URLSearchParams(window.location.search)
-  const authError = params.get('error_description')?.replace(/\+/g, ' ')
+  // Only show the error when Supabase supplies both `error` and `error_description`
+  // to prevent an attacker from crafting a URL that displays arbitrary text.
+  const authError =
+    params.has('error') && params.has('error_description')
+      ? (params.get('error_description') ?? '').replace(/\+/g, ' ').slice(0, 200)
+      : null
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">

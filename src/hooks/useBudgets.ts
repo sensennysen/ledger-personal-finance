@@ -68,13 +68,15 @@ export function useBudgets() {
   }
 
   const updateBudget = async (id: string, values: Partial<Budget>) => {
-    const { error } = await supabase.from('budgets').update(values).eq('id', id)
+    if (!user) return { error: 'Not authenticated' }
+    const { error } = await supabase.from('budgets').update(values).eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }
 
   const deleteBudget = async (id: string) => {
-    const { error } = await supabase.from('budgets').delete().eq('id', id)
+    if (!user) return { error: 'Not authenticated' }
+    const { error } = await supabase.from('budgets').delete().eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }

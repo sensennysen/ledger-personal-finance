@@ -31,10 +31,12 @@ export function useNetworkStatus(): NetworkStatus {
     setIsSyncing(true)
     try {
       await drainQueue()
-      setCount(pendingCount())
-      // Notify all registered data hooks to refetch fresh data
       notifySyncListeners()
+    } catch {
+      // drainQueue itself failed — count will be refreshed in finally
     } finally {
+      // Always refresh the displayed count, even if the drain partially failed
+      setCount(pendingCount())
       setIsSyncing(false)
     }
   }, [isSyncing])

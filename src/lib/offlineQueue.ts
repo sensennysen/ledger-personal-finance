@@ -53,6 +53,7 @@ export async function drainQueue(): Promise<number> {
 
   for (const item of queue) {
     let error: unknown = null
+    let skipInsert = false
 
     // Resolve any pending receipt file before the DB insert
     if (
@@ -61,7 +62,12 @@ export async function drainQueue(): Promise<number> {
       item.payload.receipt_url.startsWith(PENDING_RECEIPT_PREFIX)
     ) {
       const tempId = item.payload.receipt_url.slice(PENDING_RECEIPT_PREFIX.length)
-      const file = await getPendingReceipt(tempId)
+      let file: File | null = null
+      try {
+        file = await getPendingReceipt(tempId)
+      } catch {
+        // IndexedDB unavailable — treat as missing file, insert without receipt
+      }
       if (file) {
         const ext = file.name.split('.').pop() ?? 'jpg'
         const path = `${item.userId}/${Date.now()}.${ext}`
@@ -69,16 +75,19 @@ export async function drainQueue(): Promise<number> {
         if (uploadErr) {
           // Upload failed — keep in queue and retry next time
           remaining.push(item)
-          continue
+          skipInsert = true
+        } else {
+          const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
+          item.payload = { ...item.payload, receipt_url: urlData.publicUrl }
+          try { await removePendingReceipt(tempId) } catch { /* best-effort */ }
         }
-        const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
-        item.payload = { ...item.payload, receipt_url: urlData.publicUrl }
-        await removePendingReceipt(tempId)
       } else {
         // File missing (e.g. IndexedDB was cleared) — insert without receipt
         item.payload = { ...item.payload, receipt_url: null }
       }
     }
+
+    if (skipInsert) continue
 
     if (item.operation === 'insert') {
       const { error: err } = await supabase.from(item.table).insert(item.payload)

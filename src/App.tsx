@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import AppLayout from '@/components/layout/AppLayout'
@@ -9,6 +10,115 @@ import CategoriesPage from '@/pages/CategoriesPage'
 import BudgetsPage from '@/pages/BudgetsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import AccountTransactionsPage from '@/pages/AccountTransactionsPage'
+
+type RouteMetaEntry = {
+  test: (pathname: string) => boolean
+  title: string
+  description: string
+}
+
+const routeMeta: RouteMetaEntry[] = [
+  {
+    test: (pathname) => pathname === '/',
+    title: 'Dashboard',
+    description: 'Get a quick overview of balances, spending trends, and your latest activity.',
+  },
+  {
+    test: (pathname) => pathname === '/accounts',
+    title: 'Accounts',
+    description: 'View and organize all your financial accounts in one place.',
+  },
+  {
+    test: (pathname) => /^\/accounts\/[^/]+$/.test(pathname),
+    title: 'Account Transactions',
+    description: 'Review transactions and activity for this account.',
+  },
+  {
+    test: (pathname) => pathname === '/transactions',
+    title: 'Transactions',
+    description: 'Track, search, and manage your income and expenses.',
+  },
+  {
+    test: (pathname) => pathname === '/categories',
+    title: 'Categories',
+    description: 'Customize categories to better organize your transactions.',
+  },
+  {
+    test: (pathname) => pathname === '/budgets',
+    title: 'Budgets',
+    description: 'Set budget targets and monitor your spending progress.',
+  },
+  {
+    test: (pathname) => pathname === '/settings',
+    title: 'Settings',
+    description: 'Manage your profile, preferences, and application settings.',
+  },
+  {
+    test: (pathname) => pathname === '/login',
+    title: 'Login',
+    description: 'Sign in to access your personal wallet dashboard securely.',
+  },
+]
+
+function upsertMetaByName(name: string, content: string) {
+  let meta = document.head.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null
+  if (!meta) {
+    meta = document.createElement('meta')
+    meta.setAttribute('name', name)
+    document.head.appendChild(meta)
+  }
+  meta.setAttribute('content', content)
+}
+
+function upsertMetaByProperty(property: string, content: string) {
+  let meta = document.head.querySelector(`meta[property="${property}"]`) as HTMLMetaElement | null
+  if (!meta) {
+    meta = document.createElement('meta')
+    meta.setAttribute('property', property)
+    document.head.appendChild(meta)
+  }
+  meta.setAttribute('content', content)
+}
+
+function upsertCanonical(href: string) {
+  let canonical = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null
+  if (!canonical) {
+    canonical = document.createElement('link')
+    canonical.setAttribute('rel', 'canonical')
+    document.head.appendChild(canonical)
+  }
+  canonical.setAttribute('href', href)
+}
+
+function RouteMeta() {
+  const location = useLocation()
+
+  useEffect(() => {
+    const pathname = location.pathname
+    const matched = routeMeta.find((entry) => entry.test(pathname))
+
+    const baseTitle = 'Ledger'
+    const pageTitle = matched ? `${matched.title} | ${baseTitle}` : `Personal Finance Dashboard | ${baseTitle}`
+    const description = matched
+      ? matched.description
+      : 'Track accounts, transactions, and budgets with a streamlined personal finance dashboard.'
+
+    document.title = pageTitle
+
+    upsertMetaByName('description', description)
+    upsertMetaByName('robots', pathname === '/login' ? 'noindex, nofollow' : 'index, follow')
+    upsertMetaByName('twitter:title', pageTitle)
+    upsertMetaByName('twitter:description', description)
+
+    upsertMetaByProperty('og:title', pageTitle)
+    upsertMetaByProperty('og:description', description)
+    upsertMetaByProperty('og:url', `${window.location.origin}${pathname}`)
+
+    upsertCanonical(`${window.location.origin}${pathname}`)
+  }, [location.pathname])
+
+  return null
+}
 
 function ProtectedRoutes() {
   const { session, loading } = useAuth()
@@ -58,6 +168,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <RouteMeta />
         <Routes>
           <Route path="/login" element={<LoginPageWrapper />} />
           <Route path="/*" element={<ProtectedRoutes />} />

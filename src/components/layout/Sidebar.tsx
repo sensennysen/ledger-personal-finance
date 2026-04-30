@@ -84,7 +84,7 @@ export default function Sidebar() {
               className="text-primary text-sm font-bold"
               style={{ fontFamily: '"DM Mono", monospace', letterSpacing: '0.05em' }}
             >
-              W
+              L
             </span>
           </div>
           {!collapsed && (

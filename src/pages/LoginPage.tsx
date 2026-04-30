@@ -66,7 +66,7 @@ export default function LoginPage() {
                 className="text-primary text-xl font-bold"
                 style={{ fontFamily: '"DM Mono", monospace' }}
               >
-                W
+                L
               </span>
             </div>
           </div>
@@ -79,7 +79,7 @@ export default function LoginPage() {
             <span style={{ color: 'oklch(0.700 0.115 72)' }}>.</span>
           </h1>
           <p className="text-muted-foreground text-[15px] leading-relaxed">
-            Your wealth, clearly organized.
+            Your finances, clearly organized.
           </p>
         </div>
 

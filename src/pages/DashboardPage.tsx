@@ -2,8 +2,6 @@ import { useMemo, useState } from 'react'
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -14,7 +12,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -25,6 +23,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useNavigate } from 'react-router-dom'
 
 const EMERALD = 'oklch(0.660 0.150 155)'
@@ -47,6 +47,7 @@ function StatCard({
   trend,
   loading,
   variant = 'default',
+  onClick,
 }: {
   title: string
   value: string
@@ -55,6 +56,7 @@ function StatCard({
   trend?: 'up' | 'down' | 'neutral'
   loading?: boolean
   variant?: 'balance' | 'income' | 'expense' | 'default'
+  onClick?: () => void
 }) {
   const accentColor =
     variant === 'income' ? EMERALD
@@ -63,7 +65,11 @@ function StatCard({
 
   return (
     <div
-      className="relative overflow-hidden rounded-xl border border-border/60 p-5 transition-all duration-300 group bg-card"
+      className={cn(
+        'relative overflow-hidden rounded-xl border border-border/60 p-5 transition-all duration-300 group bg-card',
+        onClick && 'cursor-pointer select-none'
+      )}
+      onClick={onClick}
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow = `0 4px 24px oklch(0 0 0 / 25%)`
       }}
@@ -79,10 +85,15 @@ function StatCard({
 
       <div className="flex items-start justify-between mb-4">
         <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest">{title}</p>
-        <div
-          className="w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border"
-        >
-          <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+        <div className="flex items-center gap-1.5">
+          <div
+            className="w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border"
+          >
+            <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+          </div>
+          {onClick && (
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+          )}
         </div>
       </div>
 
@@ -125,6 +136,7 @@ export default function DashboardPage() {
   const { categories } = useCategories()
   const { budgets } = useBudgets()
   const [chartPeriod, setChartPeriod] = useState<'weekly' | 'monthly' | 'quarterly'>('monthly')
+  const [detailView, setDetailView] = useState<'balance' | 'income' | 'expenses' | 'categories' | null>(null)
 
   const { start: monthStart, end: monthEnd } = getMonthRange()
 
@@ -153,6 +165,16 @@ export default function DashboardPage() {
     })
   }, [transactions, chartPeriod])
 
+  // ---- Month income / expense transaction lists (for detail dialogs) ----
+  const monthIncomeTx = useMemo(
+    () => transactions.filter((t) => t.type === 'income' && t.date >= monthStart && t.date <= monthEnd),
+    [transactions, monthStart, monthEnd]
+  )
+  const monthExpenseTx = useMemo(
+    () => transactions.filter((t) => t.type === 'expense' && t.date >= monthStart && t.date <= monthEnd),
+    [transactions, monthStart, monthEnd]
+  )
+
   // ---- Expenses by category (this month) ----
   const expensesByCategory = useMemo(() => {
     const monthExpenses = transactions.filter(
@@ -174,12 +196,6 @@ export default function DashboardPage() {
     }
     return Object.values(map).sort((a, b) => b.amount - a.amount).slice(0, 8)
   }, [transactions, categories, monthStart, monthEnd])
-
-  // ---- Account balances ----
-  const accountBalanceData = useMemo(
-    () => accounts.map((a) => ({ name: a.name, balance: a.balance, color: a.color })),
-    [accounts]
-  )
 
   // ---- Recent transactions ----
   const recentTx = useMemo(() => transactions.slice(0, 5), [transactions])
@@ -216,6 +232,7 @@ export default function DashboardPage() {
           icon={Wallet}
           variant="balance"
           loading={loading}
+          onClick={() => setDetailView('balance')}
         />
         <StatCard
           title="Monthly Income"
@@ -225,6 +242,7 @@ export default function DashboardPage() {
           trend="up"
           variant="income"
           loading={loading}
+          onClick={() => setDetailView('income')}
         />
         <StatCard
           title="Monthly Expenses"
@@ -234,6 +252,7 @@ export default function DashboardPage() {
           trend="down"
           variant="expense"
           loading={loading}
+          onClick={() => setDetailView('expenses')}
         />
         <StatCard
           title="Net Cash Flow"
@@ -300,9 +319,13 @@ export default function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Expenses by category — pie */}
         <div
-          className="rounded-xl border border-border/60 p-5 bg-card"
+          className="rounded-xl border border-border/60 p-5 bg-card cursor-pointer transition-shadow duration-300 hover:shadow-[0_4px_24px_oklch(0_0_0/25%)]"
+          onClick={() => setDetailView('categories')}
         >
-          <p className="font-semibold text-[15px] mb-0.5">Expenses by Category</p>
+          <div className="flex items-start justify-between mb-0.5">
+            <p className="font-semibold text-[15px]">Expenses by Category</p>
+            <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5" />
+          </div>
           <p className="text-[12px] text-muted-foreground mb-4">This month's spending breakdown</p>
           {loading ? (
             <Skeleton className="h-56 w-full" />
@@ -346,36 +369,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Account balances — bar */}
-        <div
-          className="rounded-xl border border-border/60 p-5 bg-card"
-        >
-          <p className="font-semibold text-[15px] mb-0.5">Account Balances</p>
-          <p className="text-[12px] text-muted-foreground mb-4">Current balance per account</p>
-          {loading ? (
-            <Skeleton className="h-56 w-full" />
-          ) : accountBalanceData.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-12">No accounts yet</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={accountBalanceData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${currencySymbol}${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  formatter={(v) => formatCurrency(v as number, currency)}
-                  contentStyle={CHART_TOOLTIP_STYLE}
-                  cursor={{ fill: 'var(--muted)' }}
-                />
-                <Bar dataKey="balance" radius={[5, 5, 0, 0]} name="Balance">
-                  {accountBalanceData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -470,6 +463,185 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* ---- Detail Dialogs ---- */}
+
+      {/* Total Balance detail */}
+      <Dialog open={detailView === 'balance'} onOpenChange={(o) => !o && setDetailView(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Total Balance</DialogTitle>
+            <p className="text-[12px] text-muted-foreground">Breakdown by account</p>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-2 pr-2">
+              {accounts.map((acc) => (
+                <div key={acc.id} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 bg-muted/30">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[16px] shrink-0 border border-border/50"
+                    style={{ backgroundColor: acc.color + '22' }}
+                  >
+                    {acc.icon ?? '🏦'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium truncate">{acc.name}</p>
+                    <p className="text-[11px] text-muted-foreground capitalize">{acc.type.replace('_', ' ')}</p>
+                  </div>
+                  <p
+                    className="money text-[14px] font-semibold shrink-0"
+                    style={{ color: acc.balance >= 0 ? EMERALD : CORAL }}
+                  >
+                    {formatCurrency(acc.balance, acc.currency)}
+                  </p>
+                </div>
+              ))}
+              {accounts.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">No accounts yet</p>
+              )}
+            </div>
+          </ScrollArea>
+          {accounts.length > 0 && (
+            <div className="flex items-center justify-between pt-2 border-t border-border/50">
+              <span className="text-[12px] text-muted-foreground font-medium uppercase tracking-wider">Total</span>
+              <span className="money text-[16px] font-bold balance-gradient">{formatCurrency(stats.totalBalance, currency)}</span>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Monthly Income detail */}
+      <Dialog open={detailView === 'income'} onOpenChange={(o) => !o && setDetailView(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Monthly Income</DialogTitle>
+            <p className="text-[12px] text-muted-foreground">{monthIncomeTx.length} transaction{monthIncomeTx.length !== 1 ? 's' : ''} this month</p>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-1 pr-2">
+              {monthIncomeTx.map((tx) => (
+                <div key={tx.id} className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-white/3">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0"
+                    style={{ backgroundColor: (tx.category?.color ?? '#6b7280') + '22' }}
+                  >
+                    {tx.category?.icon ?? '💰'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium truncate">{tx.description}</p>
+                    <p className="text-[11px] text-muted-foreground">{tx.category?.name ?? 'Uncategorized'} · {tx.date}</p>
+                  </div>
+                  <p className="money text-[13px] font-semibold shrink-0" style={{ color: EMERALD }}>
+                    +{formatCurrency(tx.amount, tx.currency)}
+                  </p>
+                </div>
+              ))}
+              {monthIncomeTx.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">No income this month</p>
+              )}
+            </div>
+          </ScrollArea>
+          {monthIncomeTx.length > 0 && (
+            <div className="flex items-center justify-between pt-2 border-t border-border/50">
+              <span className="text-[12px] text-muted-foreground font-medium uppercase tracking-wider">Total Income</span>
+              <span className="money text-[16px] font-bold" style={{ color: EMERALD }}>{formatCurrency(stats.income, currency)}</span>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Monthly Expenses detail */}
+      <Dialog open={detailView === 'expenses'} onOpenChange={(o) => !o && setDetailView(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Monthly Expenses</DialogTitle>
+            <p className="text-[12px] text-muted-foreground">{monthExpenseTx.length} transaction{monthExpenseTx.length !== 1 ? 's' : ''} this month</p>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-1 pr-2">
+              {monthExpenseTx.map((tx) => (
+                <div key={tx.id} className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-white/3">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0"
+                    style={{ backgroundColor: (tx.category?.color ?? '#6b7280') + '22' }}
+                  >
+                    {tx.category?.icon ?? '💸'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium truncate">{tx.description}</p>
+                    <p className="text-[11px] text-muted-foreground">{tx.category?.name ?? 'Uncategorized'} · {tx.date}</p>
+                  </div>
+                  <p className="money text-[13px] font-semibold shrink-0" style={{ color: CORAL }}>
+                    −{formatCurrency(tx.amount, tx.currency)}
+                  </p>
+                </div>
+              ))}
+              {monthExpenseTx.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">No expenses this month</p>
+              )}
+            </div>
+          </ScrollArea>
+          {monthExpenseTx.length > 0 && (
+            <div className="flex items-center justify-between pt-2 border-t border-border/50">
+              <span className="text-[12px] text-muted-foreground font-medium uppercase tracking-wider">Total Expenses</span>
+              <span className="money text-[16px] font-bold" style={{ color: CORAL }}>{formatCurrency(stats.expenses, currency)}</span>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Expenses by Category detail */}
+      <Dialog open={detailView === 'categories'} onOpenChange={(o) => !o && setDetailView(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Expenses by Category</DialogTitle>
+            <p className="text-[12px] text-muted-foreground">This month's spending breakdown</p>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="space-y-3 pr-2">
+              {expensesByCategory.map((cat, i) => {
+                const pct = stats.expenses > 0 ? (cat.amount / stats.expenses) * 100 : 0
+                const catTxs = monthExpenseTx.filter((t) => {
+                  const c = categories.find((c) => c.name === cat.name)
+                  return c ? t.category_id === c.id : false
+                })
+                return (
+                  <div key={i} className="rounded-lg border border-border/50 px-3 py-3 bg-muted/20 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[18px]">{cat.icon}</span>
+                      <span className="flex-1 text-[13px] font-medium">{cat.name}</span>
+                      <span className="money text-[13px] font-semibold shrink-0" style={{ color: cat.color }}>
+                        {formatCurrency(cat.amount, currency)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${pct}%`, backgroundColor: cat.color }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">{pct.toFixed(1)}% of total · {catTxs.length} transaction{catTxs.length !== 1 ? 's' : ''}</p>
+                    {catTxs.length > 0 && (
+                      <div className="space-y-1 pt-1 border-t border-border/30">
+                        {catTxs.map((tx) => (
+                          <div key={tx.id} className="flex items-center justify-between gap-2 py-1">
+                            <p className="text-[12px] text-muted-foreground truncate flex-1">{tx.description}</p>
+                            <p className="text-[12px] money font-medium shrink-0" style={{ color: CORAL }}>
+                              −{formatCurrency(tx.amount, tx.currency)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {expensesByCategory.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-8">No expenses this month</p>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

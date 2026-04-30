@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, CreditCard, Wallet, PiggyBank, Banknote, TrendingUp, Landmark, CircleDollarSign, MoreHorizontal, TriangleAlert } from 'lucide-react'
+import { Plus, Pencil, Trash2, Wallet, MoreHorizontal, TriangleAlert } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_COLORS, CURRENCIES, type AccountType } from '@/types'
@@ -19,18 +19,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
-
-const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = {
-  cash: Banknote,
-  digital_wallet: Wallet,
-  credit_card: CreditCard,
-  savings: PiggyBank,
-  checking: Landmark,
-  investment: TrendingUp,
-  loan: CircleDollarSign,
-  other: Wallet,
-}
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(50),
@@ -262,13 +253,11 @@ export default function AccountsPage() {
           {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
         </div>
       ) : accounts.length === 0 ? (
-        <Card className="text-center py-16">
-          <CardContent>
-            <Wallet className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <p className="font-medium">No accounts yet</p>
-            <p className="text-sm text-muted-foreground">Add your first account to get started</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Wallet}
+          title="No accounts yet"
+          description="Add your first account to get started"
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {accounts.map((account) => {

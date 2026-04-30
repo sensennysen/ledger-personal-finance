@@ -1,394 +1,18 @@
 import { useState, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Plus, Search, Trash2, Pencil, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, RepeatIcon } from 'lucide-react'
+import { Plus, Search, Trash2, Pencil, ArrowLeftRight, RepeatIcon } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
-import { useAccounts } from '@/hooks/useAccounts'
-import { useCategories } from '@/hooks/useCategories'
-import { CURRENCIES } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
+import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import type { Transaction } from '@/types'
-
-const schema = z.object({
-  type: z.enum(['income', 'expense', 'transfer']),
-  account_id: z.string().min(1, 'Account is required'),
-  to_account_id: z.string().nullable(),
-  category_id: z.string().nullable(),
-  amount: z.coerce.number().positive('Amount must be positive'),
-  currency: z.string().min(1),
-  exchange_rate: z.coerce.number().default(1),
-  description: z.string().min(1, 'Description is required'),
-  notes: z.string().nullable(),
-  date: z.string().min(1),
-  transfer_fee: z.coerce.number().min(0).nullable(),
-  is_recurring: z.boolean().default(false),
-  recurrence_interval: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).nullable(),
-  recurrence_end_date: z.string().nullable(),
-})
-
-type FormValues = z.infer<typeof schema>
-
-function TransactionForm({
-  defaultValues,
-  onSubmit,
-  onClose,
-}: {
-  defaultValues?: Partial<FormValues>
-  onSubmit: (values: FormValues) => Promise<void>
-  onClose: () => void
-}) {
-  const { accounts } = useAccounts()
-  const { categories } = useCategories()
-  const today = new Date().toISOString().split('T')[0]
-
-  const form = useForm<FormValues, any, FormValues>({
-    resolver: zodResolver(schema) as any,
-    defaultValues: {
-      type: 'expense',
-      account_id: accounts[0]?.id ?? '',
-      to_account_id: null,
-      category_id: null,
-      amount: 0,
-      currency: accounts[0]?.currency ?? 'USD',
-      exchange_rate: 1,
-      description: '',
-      notes: null,
-      date: today,
-      transfer_fee: null,
-      is_recurring: false,
-      recurrence_interval: null,
-      recurrence_end_date: null,
-      ...defaultValues,
-    },
-  })
-
-  const type = form.watch('type')
-  const isRecurring = form.watch('is_recurring')
-  const selectedAccount = form.watch('account_id')
-
-  // Auto-set currency from account
-  const onAccountChange = (id: string | null) => {
-    if (!id) return
-    const acc = accounts.find((a) => a.id === id)
-    if (acc) form.setValue('currency', acc.currency)
-    form.setValue('account_id', id)
-  }
-
-  const filteredCategories = categories.filter(
-    (c) => c.type === type || c.type === 'both'
-  )
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="type"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Type</FormLabel>
-              <Tabs
-                value={field.value}
-                onValueChange={(v) => {
-                  field.onChange(v)
-                  if (v !== 'transfer') form.setValue('to_account_id', null)
-                }}
-              >
-                <TabsList className="w-full">
-                  <TabsTrigger value="expense" className="flex-1">Expense</TabsTrigger>
-                  <TabsTrigger value="income" className="flex-1">Income</TabsTrigger>
-                  <TabsTrigger value="transfer" className="flex-1">Transfer</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </FormItem>
-          )}
-        />
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="account_id"
-            render={({ field }) => {
-              const selectedAcc = accounts.find((a) => a.id === field.value)
-              return (
-                <FormItem>
-                  <FormLabel>{type === 'transfer' ? 'From Account' : 'Account'}</FormLabel>
-                  <Select onValueChange={onAccountChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select account">
-                          {selectedAcc ? selectedAcc.name : 'Select account'}
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {accounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )
-            }}
-          />
-          {type === 'transfer' ? (
-            <FormField
-              control={form.control}
-              name="to_account_id"
-              render={({ field }) => {
-                const selectedToAcc = accounts.find((a) => a.id === field.value)
-                return (
-                  <FormItem>
-                    <FormLabel>To Account</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value ?? ''}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select account">
-                            {selectedToAcc ? selectedToAcc.name : 'Select account'}
-                          </SelectValue>
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {accounts
-                          .filter((a) => a.id !== selectedAccount)
-                          .map((a) => (
-                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )
-              }}
-            />
-          ) : (
-            <FormField
-              control={form.control}
-              name="category_id"
-              render={({ field }) => {
-                const selectedCat = categories.find((c) => c.id === field.value)
-                return (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select
-                      onValueChange={(v) => field.onChange(v === '__none' ? null : v)}
-                      value={field.value ?? '__none'}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category">
-                            {selectedCat ? `${selectedCat.icon} ${selectedCat.name}` : 'Uncategorized'}
-                          </SelectValue>
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="__none">Uncategorized</SelectItem>
-                        {filteredCategories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )
-              }}
-            />
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="amount"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Amount</FormLabel>
-                <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Currency</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {CURRENCIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {type === 'transfer' && (
-          <FormField
-            control={form.control}
-            name="transfer_fee"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Transfer Fee (optional)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
-
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl><Input placeholder="e.g. Grocery run" {...field} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="date"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Date</FormLabel>
-              <FormControl><Input type="date" {...field} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes (optional)</FormLabel>
-              <FormControl>
-                <Textarea
-                  value={field.value ?? ''}
-                  onChange={(e) => field.onChange(e.target.value || null)}
-                  rows={2}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="is_recurring"
-          render={({ field }) => (
-            <FormItem className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <FormLabel className="text-sm font-medium">Recurring transaction</FormLabel>
-                <p className="text-xs text-muted-foreground">Repeat this transaction automatically</p>
-              </div>
-              <FormControl>
-                <Switch checked={field.value} onCheckedChange={field.onChange} />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-
-        {isRecurring && (
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="recurrence_interval"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Interval</FormLabel>
-                  <Select
-                    onValueChange={(v) => field.onChange(v === '__none' ? null : v)}
-                    value={field.value ?? '__none'}
-                  >
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="biweekly">Bi-weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="recurrence_end_date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>End Date</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value || null)}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          </div>
-        )}
-
-        <div className="flex gap-2 justify-end pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? 'Saving...' : 'Save Transaction'}
-          </Button>
-        </div>
-      </form>
-    </Form>
-  )
-}
-
-const TYPE_ICON = {
-  income: ArrowDownLeft,
-  expense: ArrowUpRight,
-  transfer: ArrowLeftRight,
-}
-
-const TYPE_COLOR = {
-  income: 'text-[oklch(0.660_0.150_155)]',
-  expense: 'text-[oklch(0.620_0.160_18)]',
-  transfer: 'text-[oklch(0.700_0.115_72)]',
-}
 
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState<string>('all')
@@ -413,12 +37,12 @@ export default function TransactionsPage() {
     return result
   }, [transactions, filterType, search])
 
-  const handleCreate = async (values: FormValues) => {
+  const handleCreate = async (values: TransactionFormValues) => {
     await createTransaction(values as Parameters<typeof createTransaction>[0])
     setCreateOpen(false)
   }
 
-  const handleEdit = async (values: FormValues) => {
+  const handleEdit = async (values: TransactionFormValues) => {
     if (!editingTx) return
     await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
     setEditingTx(null)
@@ -473,15 +97,11 @@ export default function TransactionsPage() {
       {loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : filtered.length === 0 ? (
-        <Card className="text-center py-16">
-          <CardContent>
-            <ArrowLeftRight className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <p className="font-medium">No transactions found</p>
-            <p className="text-sm text-muted-foreground">
-              {search ? 'Try a different search' : 'Add your first transaction'}
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={ArrowLeftRight}
+          title="No transactions found"
+          description={search ? 'Try a different search' : 'Add your first transaction'}
+        />
       ) : (
         <div className="space-y-4">
           {grouped.map(([date, txs]) => (
@@ -496,7 +116,7 @@ export default function TransactionsPage() {
               </div>
               <div className="space-y-1">
                 {txs.map((tx) => {
-                  const Icon = TYPE_ICON[tx.type]
+                  const Icon = TRANSACTION_TYPE_ICON[tx.type]
                   return (
                     <div
                       key={tx.id}
@@ -507,7 +127,7 @@ export default function TransactionsPage() {
                         className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-base"
                         style={tx.category ? { backgroundColor: tx.category.color + '20' } : { backgroundColor: '#f1f5f9' }}
                       >
-                        {tx.category ? tx.category.icon : <Icon className={`w-4 h-4 ${TYPE_COLOR[tx.type]}`} />}
+                        {tx.category ? tx.category.icon : <Icon className={`w-4 h-4 ${TRANSACTION_TYPE_COLOR[tx.type]}`} />}
                       </div>
 
                       {/* Two-row text block */}
@@ -515,7 +135,7 @@ export default function TransactionsPage() {
                         {/* Row 1: description | amount */}
                         <div className="flex items-baseline justify-between gap-2">
                           <p className="text-sm font-medium truncate">{tx.description}</p>
-                          <p className={`text-sm font-semibold shrink-0 ${TYPE_COLOR[tx.type]}`}>
+                          <p className={`text-sm font-semibold shrink-0 ${TRANSACTION_TYPE_COLOR[tx.type]}`}>
                             {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
                             {formatCurrency(tx.amount, tx.currency)}
                           </p>

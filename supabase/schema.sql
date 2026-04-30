@@ -15,9 +15,15 @@ create table if not exists public.profiles (
   full_name       text,
   avatar_url      text,
   default_currency text not null default 'USD',
+  month_start_day  integer not null default 1 check (month_start_day between 1 and 28),
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
+
+-- ⚠️  EXISTING DATABASE? Run this migration manually in the Supabase SQL editor:
+-- alter table public.profiles
+--   add column if not exists month_start_day integer not null default 1
+--   check (month_start_day between 1 and 28);
 
 alter table public.profiles enable row level security;
 

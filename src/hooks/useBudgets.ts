@@ -4,6 +4,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
 import type { Budget } from '@/types'
 
+function localDateStr(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 function getBudgetPeriodRange(period: Budget['period']): { start: string; end: string } {
   const now = new Date()
   if (period === 'weekly') {
@@ -14,8 +18,8 @@ function getBudgetPeriodRange(period: Budget['period']): { start: string; end: s
     const sunday = new Date(monday)
     sunday.setDate(monday.getDate() + 6)
     return {
-      start: monday.toISOString().split('T')[0],
-      end: sunday.toISOString().split('T')[0],
+      start: localDateStr(monday),
+      end: localDateStr(sunday),
     }
   } else if (period === 'quarterly') {
     const q = Math.floor(now.getMonth() / 3)
@@ -23,8 +27,8 @@ function getBudgetPeriodRange(period: Budget['period']): { start: string; end: s
     const start = new Date(now.getFullYear(), startMonth, 1)
     const end = new Date(now.getFullYear(), startMonth + 3, 0)
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: localDateStr(start),
+      end: localDateStr(end),
     }
   } else if (period === 'yearly') {
     return {
@@ -36,8 +40,8 @@ function getBudgetPeriodRange(period: Budget['period']): { start: string; end: s
     const start = new Date(now.getFullYear(), now.getMonth(), 1)
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: localDateStr(start),
+      end: localDateStr(end),
     }
   }
 }

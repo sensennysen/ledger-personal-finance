@@ -12,13 +12,14 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight, ChevronLeft } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useBudgets } from '@/hooks/useBudgets'
-import { formatCurrency, getCurrencySymbol, getLast8Quarters, getCurrentWeekDays, getCurrentMonthDays, getLast5Years, getMonthRange, groupExpensesByCategory, cn } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol, getLast8Quarters, getCurrentWeekDays, getCurrentMonthDays, getLast5Years, getCustomMonthRange, getCurrentCycleMonthKey, groupExpensesByCategory, cn } from '@/lib/utils'
+import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { BUDGET_WARNING_THRESHOLD } from '@/constants/accounts'
 import { EMERALD, CORAL, GOLD } from '@/constants/colors'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -125,6 +126,21 @@ function StatCard({
   )
 }
 
+function getMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function formatMonthLabel(key: string) {
+  const [year, month] = key.split('-').map(Number)
+  return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+}
+
+function addMonths(key: string, delta: number) {
+  const [year, month] = key.split('-').map(Number)
+  const d = new Date(year, month - 1 + delta, 1)
+  return getMonthKey(d)
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { profile } = useAuth()
@@ -134,10 +150,14 @@ export default function DashboardPage() {
   const { transactions, loading: txLoading } = useTransactions()
   const { categories } = useCategories()
   const { budgets } = useBudgets()
+  const { startDay } = useMonthCycle()
   const [chartPeriod, setChartPeriod] = useState<'week' | 'month' | 'quarterly' | 'yearly'>('month')
   const [detailView, setDetailView] = useState<'balance' | 'income' | 'expenses' | 'categories' | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState(() => getCurrentCycleMonthKey(startDay))
 
-  const { start: monthStart, end: monthEnd } = getMonthRange()
+  const { start: monthStart, end: monthEnd } = getCustomMonthRange(selectedMonth, startDay)
+  const isCurrentMonth = selectedMonth === getCurrentCycleMonthKey(startDay)
+  const monthLabel = formatMonthLabel(selectedMonth)
 
   // ---- Stats ----
   const stats = useMemo(() => {
@@ -181,8 +201,11 @@ export default function DashboardPage() {
     [transactions, categories, monthStart, monthEnd],
   )
 
-  // ---- Recent transactions ----
-  const recentTx = useMemo(() => transactions.slice(0, 5), [transactions])
+  // ---- Recent transactions (filtered to selected month) ----
+  const recentTx = useMemo(
+    () => transactions.filter((t) => t.date >= monthStart && t.date <= monthEnd).slice(0, 5),
+    [transactions, monthStart, monthEnd]
+  )
 
   const loading = accountsLoading || txLoading
 
@@ -208,6 +231,22 @@ export default function DashboardPage() {
       {/* Gold separator */}
       <div className="h-px" style={{ background: 'linear-gradient(90deg, oklch(0.700 0.115 72 / 0.35), transparent)' }} />
 
+      {/* Month navigation */}
+      <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2">
+        <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <span className="text-sm font-semibold flex-1 text-center">{monthLabel}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
+          disabled={isCurrentMonth}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+
       {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -221,7 +260,7 @@ export default function DashboardPage() {
         <StatCard
           title="Monthly Income"
           value={formatCurrency(stats.income, currency)}
-          sub="This month"
+          sub={isCurrentMonth ? 'This month' : monthLabel}
           icon={TrendingUp}
           trend="up"
           variant="income"
@@ -231,7 +270,7 @@ export default function DashboardPage() {
         <StatCard
           title="Monthly Expenses"
           value={formatCurrency(stats.expenses, currency)}
-          sub="This month"
+          sub={isCurrentMonth ? 'This month' : monthLabel}
           icon={TrendingDown}
           trend="down"
           variant="expense"
@@ -311,11 +350,11 @@ export default function DashboardPage() {
             <p className="font-semibold text-[15px]">Expenses by Category</p>
             <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5" />
           </div>
-          <p className="text-[12px] text-muted-foreground mb-4">This month's spending breakdown</p>
+          <p className="text-[12px] text-muted-foreground mb-4">{monthLabel} spending breakdown</p>
           {loading ? (
             <Skeleton className="h-56 w-full" />
           ) : expensesByCategory.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-12">No expenses this month</p>
+              <p className="text-sm text-muted-foreground text-center py-12">No expenses for {monthLabel}</p>
           ) : (
             <div className="flex gap-4 items-center">
               <ResponsiveContainer width="50%" height={200}>
@@ -363,7 +402,7 @@ export default function DashboardPage() {
             className="rounded-xl border border-border/60 p-5 bg-card"
           >
             <p className="font-semibold text-[15px] mb-0.5">Budget Progress</p>
-            <p className="text-[12px] text-muted-foreground mb-4">Spending vs budget limits this month</p>
+            <p className="text-[12px] text-muted-foreground mb-4">Spending vs budget limits · {monthLabel}</p>
             <div className="space-y-4">
               {budgets.slice(0, 4).map((b) => {
                 const spent = b.spent ?? 0
@@ -401,7 +440,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="font-semibold text-[15px]">Recent Transactions</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">Latest activity</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">{isCurrentMonth ? 'Latest activity' : monthLabel}</p>
             </div>
             <Button
               variant="ghost"
@@ -498,8 +537,8 @@ export default function DashboardPage() {
       <Dialog open={detailView === 'income'} onOpenChange={(o) => !o && setDetailView(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Monthly Income</DialogTitle>
-            <p className="text-[12px] text-muted-foreground">{monthIncomeTx.length} transaction{monthIncomeTx.length !== 1 ? 's' : ''} this month</p>
+            <DialogTitle>Income — {monthLabel}</DialogTitle>
+            <p className="text-[12px] text-muted-foreground">{monthIncomeTx.length} transaction{monthIncomeTx.length !== 1 ? 's' : ''}</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-1 pr-2">
@@ -538,8 +577,8 @@ export default function DashboardPage() {
       <Dialog open={detailView === 'expenses'} onOpenChange={(o) => !o && setDetailView(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Monthly Expenses</DialogTitle>
-            <p className="text-[12px] text-muted-foreground">{monthExpenseTx.length} transaction{monthExpenseTx.length !== 1 ? 's' : ''} this month</p>
+            <DialogTitle>Expenses — {monthLabel}</DialogTitle>
+            <p className="text-[12px] text-muted-foreground">{monthExpenseTx.length} transaction{monthExpenseTx.length !== 1 ? 's' : ''}</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-1 pr-2">
@@ -579,7 +618,7 @@ export default function DashboardPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Expenses by Category</DialogTitle>
-            <p className="text-[12px] text-muted-foreground">This month's spending breakdown</p>
+            <p className="text-[12px] text-muted-foreground">{monthLabel} spending breakdown</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-3 pr-2">

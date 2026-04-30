@@ -24,6 +24,7 @@ export interface Profile {
   full_name: string | null
   avatar_url: string | null
   default_currency: string
+  month_start_day: number
   created_at: string
   updated_at: string
 }

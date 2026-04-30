@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2 } from 'lucide-react'
+import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
 import { cn } from '@/lib/utils'
@@ -29,6 +30,7 @@ type ProfileValues = z.infer<typeof profileSchema>
 export default function SettingsPage() {
   const { user, profile, signOut, refreshProfile } = useAuth()
   const { theme, setTheme } = useTheme()
+  const { startDay, setStartDay } = useMonthCycle()
   const [saved, setSaved] = useState(false)
 
   const initials = (profile?.full_name ?? user?.email ?? 'U')
@@ -162,6 +164,41 @@ export default function SettingsPage() {
               <span className={cn('text-sm font-medium', theme === 'dark' ? 'text-primary' : 'text-muted-foreground')}>Dark</span>
             </button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Month Cycle */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4" /> Month Cycle
+          </CardTitle>
+          <CardDescription>Set the day your financial month starts (e.g. payday)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium w-28">Starts on day</label>
+            <Select
+              value={String(startDay)}
+              onValueChange={(v) => setStartDay(Number(v))}
+            >
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                  <SelectItem key={d} value={String(d)}>
+                    {d === 1 ? '1st (default)' : d === 2 ? '2nd' : d === 3 ? '3rd' : `${d}th`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {startDay === 1
+              ? 'Your month runs from the 1st to the last day of each calendar month.'
+              : `Your month runs from the ${startDay}th of one month to the ${startDay - 1}th of the next.`}
+          </p>
         </CardContent>
       </Card>
 

@@ -7,6 +7,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Format a Date as "YYYY-MM-DD" using the user's LOCAL timezone, not UTC. */
+function localDateStr(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 export function formatCurrency(
   amount: number,
   currencyCode: string = 'USD',
@@ -45,9 +53,45 @@ export function getMonthRange(date: Date = new Date()): { start: string; end: st
   const start = new Date(date.getFullYear(), date.getMonth(), 1)
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 0)
   return {
-    start: start.toISOString().split('T')[0],
-    end: end.toISOString().split('T')[0],
+    start: localDateStr(start),
+    end: localDateStr(end),
   }
+}
+
+/**
+ * Returns the start/end date strings for a given month key (e.g. "2026-05")
+ * and a custom cycle start day (1–28).
+ * e.g. key="2026-05", startDay=25 → "2026-05-25" to "2026-06-24"
+ */
+export function getCustomMonthRange(
+  monthKey: string,
+  startDay: number = 1,
+): { start: string; end: string } {
+  const [year, month] = monthKey.split('-').map(Number)
+  const start = new Date(year, month - 1, startDay)
+  // end = one day before the same startDay in the following month
+  const end = new Date(year, month, startDay - 1)
+  return {
+    start: localDateStr(start),
+    end: localDateStr(end),
+  }
+}
+
+/**
+ * Returns the "YYYY-MM" key for the current cycle, given a custom start day.
+ * If today >= startDay of this calendar month → current month key.
+ * Else → previous month key.
+ */
+export function getCurrentCycleMonthKey(startDay: number = 1): string {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = today.getMonth() // 0-indexed
+  const day = today.getDate()
+  if (day >= startDay) {
+    return `${year}-${String(month + 1).padStart(2, '0')}`
+  }
+  const prev = new Date(year, month - 1, 1)
+  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
 }
 
 export function getLast12Months(): Array<{ label: string; start: string; end: string }> {
@@ -59,8 +103,8 @@ export function getLast12Months(): Array<{ label: string; start: string; end: st
     const end = new Date(date.getFullYear(), date.getMonth() + 1, 0)
     months.push({
       label: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: localDateStr(start),
+      end: localDateStr(end),
     })
   }
   return months
@@ -80,8 +124,8 @@ export function getLast8Weeks(): Array<{ label: string; start: string; end: stri
     weekEnd.setDate(weekStart.getDate() + 6)
     weeks.push({
       label: weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      start: weekStart.toISOString().split('T')[0],
-      end: weekEnd.toISOString().split('T')[0],
+      start: localDateStr(weekStart),
+      end: localDateStr(weekEnd),
     })
   }
   return weeks
@@ -100,8 +144,8 @@ export function getLast8Quarters(): Array<{ label: string; start: string; end: s
     const end = new Date(y, startMonth + 3, 0)
     quarters.push({
       label: `Q${q + 1} '${String(y).slice(2)}`,
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: localDateStr(start),
+      end: localDateStr(end),
     })
   }
   return quarters
@@ -117,7 +161,7 @@ export function getCurrentWeekDays(): Array<{ label: string; start: string; end:
   return dayNames.map((label, i) => {
     const day = new Date(monday)
     day.setDate(monday.getDate() + i)
-    const dateStr = day.toISOString().split('T')[0]
+    const dateStr = localDateStr(day)
     return { label, start: dateStr, end: dateStr }
   })
 }
@@ -130,7 +174,7 @@ export function getCurrentMonthDays(): Array<{ label: string; start: string; end
   const days = []
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d)
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = localDateStr(date)
     days.push({ label: String(d), start: dateStr, end: dateStr })
   }
   return days

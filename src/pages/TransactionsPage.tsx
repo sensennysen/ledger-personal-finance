@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
-import { Plus, Search, ArrowLeftRight } from 'lucide-react'
+import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
-import { formatDate } from '@/lib/utils'
+import { useMonthCycle } from '@/hooks/useMonthCycle'
+import { formatDate, getCustomMonthRange, getCurrentCycleMonthKey } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -12,9 +13,26 @@ import { TransactionForm, type TransactionFormValues } from '@/components/transa
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import type { Transaction } from '@/types'
 
+function getMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function formatMonthLabel(key: string) {
+  const [year, month] = key.split('-').map(Number)
+  return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+}
+
+function addMonths(key: string, delta: number) {
+  const [year, month] = key.split('-').map(Number)
+  const d = new Date(year, month - 1 + delta, 1)
+  return getMonthKey(d)
+}
+
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
+  const { startDay } = useMonthCycle()
+  const [selectedMonth, setSelectedMonth] = useState(() => getCurrentCycleMonthKey(startDay))
   const [createOpen, setCreateOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
@@ -22,7 +40,8 @@ export default function TransactionsPage() {
   const { transactions, loading, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
   const filtered = useMemo(() => {
-    let result = transactions
+    const { start, end } = getCustomMonthRange(selectedMonth, startDay)
+    let result = transactions.filter((t) => t.date >= start && t.date <= end)
     if (filterType !== 'all') result = result.filter((t) => t.type === filterType)
     if (search) {
       const q = search.toLowerCase()
@@ -34,7 +53,7 @@ export default function TransactionsPage() {
       )
     }
     return result
-  }, [transactions, filterType, search])
+  }, [transactions, filterType, search, selectedMonth])
 
   const handleCreate = async (values: TransactionFormValues) => {
     const { error } = await createTransaction(values as Parameters<typeof createTransaction>[0])
@@ -68,6 +87,22 @@ export default function TransactionsPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">
+      {/* Month navigation */}
+      <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2">
+        <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <span className="text-sm font-semibold flex-1 text-center">{formatMonthLabel(selectedMonth)}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
+          disabled={selectedMonth >= getCurrentCycleMonthKey(startDay)}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Transactions</h1>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>

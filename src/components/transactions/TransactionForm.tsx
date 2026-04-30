@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
+import { useDescriptionSuggestions } from '@/hooks/useDescriptionSuggestions'
 import { CURRENCIES } from '@/types'
 import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
@@ -51,6 +52,7 @@ interface TransactionFormProps {
 export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccountId }: TransactionFormProps) {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
+  const descriptionSuggestions = useDescriptionSuggestions()
   const today = new Date().toISOString().split('T')[0]
 
   const form = useForm<TransactionFormValues, any, TransactionFormValues>({
@@ -270,7 +272,16 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           render={({ field }) => (
             <FormItem>
               <FormLabel>Description</FormLabel>
-              <FormControl><Input placeholder="e.g. Grocery run" {...field} /></FormControl>
+              <FormControl>
+                <>
+                  <datalist id="description-suggestions">
+                    {descriptionSuggestions.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                  <Input placeholder="e.g. Grocery run" list="description-suggestions" {...field} />
+                </>
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

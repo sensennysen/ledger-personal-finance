@@ -21,7 +21,6 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useBudgets } from '@/hooks/useBudgets'
 import { formatCurrency, getCurrencySymbol, getLast12Months, getLast8Weeks, getLast8Quarters, getMonthRange, cn } from '@/lib/utils'
-import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -81,8 +80,7 @@ function StatCard({
       <div className="flex items-start justify-between mb-4">
         <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest">{title}</p>
         <div
-          className="w-7 h-7 rounded-md flex items-center justify-center"
-          className="bg-muted border border-border"
+          className="w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border"
         >
           <Icon className="w-3.5 h-3.5 text-muted-foreground" />
         </div>

@@ -102,12 +102,12 @@ function CategoryForm({
                     {field.value || '😀'}
                   </div>
                   <Popover>
-                    <PopoverTrigger asChild>
+                    <PopoverTrigger render={
                       <Button type="button" variant="outline" className="gap-2">
                         <Smile className="w-4 h-4" />
                         Choose Emoji
                       </Button>
-                    </PopoverTrigger>
+                    } />
                     <PopoverContent className="w-auto p-0 border-0 shadow-xl" align="start">
                       <EmojiPicker
                         onEmojiClick={(e) => field.onChange(e.emoji)}

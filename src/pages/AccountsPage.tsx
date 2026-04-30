@@ -218,7 +218,7 @@ function AccountForm({
 
 export default function AccountsPage() {
   const { profile } = useAuth()
-  const { accounts, loading, createAccount, updateAccount, updateAccountWithAdjustment, deleteAccount } = useAccounts()
+  const { accounts, loading, createAccount, updateAccountWithAdjustment, deleteAccount } = useAccounts()
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)

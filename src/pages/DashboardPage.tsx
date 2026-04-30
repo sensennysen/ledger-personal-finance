@@ -393,46 +393,6 @@ export default function DashboardPage() {
           )}
         </div>
 
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Budget progress */}
-        {budgets.length > 0 && (
-          <div
-            className="rounded-xl border border-border/60 p-5 bg-card"
-          >
-            <p className="font-semibold text-[15px] mb-0.5">Budget Progress</p>
-            <p className="text-[12px] text-muted-foreground mb-4">Spending vs budget limits · {monthLabel}</p>
-            <div className="space-y-4">
-              {budgets.slice(0, 4).map((b) => {
-                const spent = b.spent ?? 0
-                const pct = Math.min((spent / b.amount) * 100, 100)
-                const over = spent > b.amount
-                return (
-                  <div key={b.id} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-[13px]">
-                        <span>{b.category?.icon}</span>
-                        <span className="text-foreground/80">{b.name}</span>
-                      </span>
-                      <span
-                        className="money text-[12px]"
-                        style={{ color: over ? CORAL : pct > BUDGET_WARNING_THRESHOLD ? 'oklch(0.750 0.140 75)' : 'oklch(0.570 0.015 290)' }}
-                      >
-                        {formatCurrency(spent, b.currency)} / {formatCurrency(b.amount, b.currency)}
-                      </span>
-                    </div>
-                    <Progress
-                      value={pct}
-                      className={over ? '[&>div]:bg-[oklch(0.620_0.160_18)]' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-[oklch(0.750_0.140_75)]' : '[&>div]:bg-primary'}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Recent transactions */}
         <div
           className="rounded-xl border border-border/60 p-5 bg-card"
@@ -486,6 +446,46 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Budget progress */}
+        {budgets.length > 0 && (
+          <div
+            className="rounded-xl border border-border/60 p-5 bg-card"
+          >
+            <p className="font-semibold text-[15px] mb-0.5">Budget Progress</p>
+            <p className="text-[12px] text-muted-foreground mb-4">Spending vs budget limits · {monthLabel}</p>
+            <div className="space-y-4">
+              {budgets.slice(0, 4).map((b) => {
+                const spent = b.spent ?? 0
+                const pct = Math.min((spent / b.amount) * 100, 100)
+                const over = spent > b.amount
+                return (
+                  <div key={b.id} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-[13px]">
+                        <span>{b.category?.icon}</span>
+                        <span className="text-foreground/80">{b.name}</span>
+                      </span>
+                      <span
+                        className="money text-[12px]"
+                        style={{ color: over ? CORAL : pct > BUDGET_WARNING_THRESHOLD ? 'oklch(0.750 0.140 75)' : 'oklch(0.570 0.015 290)' }}
+                      >
+                        {formatCurrency(spent, b.currency)} / {formatCurrency(b.amount, b.currency)}
+                      </span>
+                    </div>
+                    <Progress
+                      value={pct}
+                      className={over ? '[&>div]:bg-[oklch(0.620_0.160_18)]' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-[oklch(0.750_0.140_75)]' : '[&>div]:bg-primary'}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* ---- Detail Dialogs ---- */}

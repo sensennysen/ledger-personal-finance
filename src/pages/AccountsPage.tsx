@@ -1,0 +1,345 @@
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { Plus, Pencil, Trash2, CreditCard, Wallet, PiggyBank, Banknote, TrendingUp, Landmark, CircleDollarSign, MoreHorizontal } from 'lucide-react'
+import { useAccounts } from '@/hooks/useAccounts'
+import { ACCOUNT_TYPE_LABELS, ACCOUNT_COLORS, CURRENCIES, type AccountType } from '@/types'
+import { formatCurrency } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Textarea } from '@/components/ui/textarea'
+import { Skeleton } from '@/components/ui/skeleton'
+import type { Account } from '@/types'
+
+const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = {
+  cash: Banknote,
+  digital_wallet: Wallet,
+  credit_card: CreditCard,
+  savings: PiggyBank,
+  checking: Landmark,
+  investment: TrendingUp,
+  loan: CircleDollarSign,
+  other: Wallet,
+}
+
+const schema = z.object({
+  name: z.string().min(1, 'Name is required').max(50),
+  type: z.enum(['cash', 'digital_wallet', 'credit_card', 'savings', 'checking', 'investment', 'loan', 'other']),
+  currency: z.string().min(1),
+  balance: z.coerce.number(),
+  color: z.string(),
+  credit_limit: z.coerce.number().nullable(),
+  notes: z.string().nullable(),
+})
+
+type FormValues = z.infer<typeof schema>
+
+function AccountForm({
+  defaultValues,
+  onSubmit,
+  onClose,
+}: {
+  defaultValues?: Partial<FormValues>
+  onSubmit: (values: FormValues) => Promise<void>
+  onClose: () => void
+}) {
+  const form = useForm<FormValues, any, FormValues>({
+    resolver: zodResolver(schema) as any,
+    defaultValues: {
+      name: '',
+      type: 'cash',
+      currency: 'USD',
+      balance: 0,
+      color: ACCOUNT_COLORS[0],
+      credit_limit: null,
+      notes: null,
+      ...defaultValues,
+    },
+  })
+  const type = form.watch('type')
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Account Name</FormLabel>
+              <FormControl><Input placeholder="e.g. My Savings" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Type</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {Object.entries(ACCOUNT_TYPE_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="currency"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Currency</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>{c.code} — {c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <FormField
+          control={form.control}
+          name="balance"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Current Balance</FormLabel>
+              <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {type === 'credit_card' && (
+          <FormField
+            control={form.control}
+            name="credit_limit"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Credit Limit</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={field.value ?? ''}
+                    onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+        <FormField
+          control={form.control}
+          name="color"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Color</FormLabel>
+              <FormControl>
+                <div className="flex gap-2 flex-wrap">
+                  {ACCOUNT_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => field.onChange(c)}
+                      className="w-7 h-7 rounded-full border-2 transition-all"
+                      style={{
+                        backgroundColor: c,
+                        borderColor: field.value === c ? 'black' : 'transparent',
+                      }}
+                    />
+                  ))}
+                </div>
+              </FormControl>
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes (optional)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Any notes about this account..."
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value || null)}
+                  rows={2}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+        <div className="flex gap-2 justify-end pt-2">
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="submit" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? 'Saving...' : 'Save Account'}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  )
+}
+
+export default function AccountsPage() {
+  const { accounts, loading, createAccount, updateAccount, deleteAccount } = useAccounts()
+  const [createOpen, setCreateOpen] = useState(false)
+  const [editAccount, setEditAccount] = useState<Account | null>(null)
+
+  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
+
+  const handleCreate = async (values: FormValues) => {
+    await createAccount({ ...values, is_active: true, icon: null })
+    setCreateOpen(false)
+  }
+
+  const handleEdit = async (values: FormValues) => {
+    if (!editAccount) return
+    await updateAccount(editAccount.id, values)
+    setEditAccount(null)
+  }
+
+  return (
+    <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Accounts</h1>
+          <p className="text-muted-foreground text-sm">
+            Total net worth: <span className="font-semibold text-foreground">{formatCurrency(totalBalance)}</span>
+          </p>
+        </div>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger render={<Button className="gap-2" />}>
+            <Plus className="w-4 h-4" />Add Account
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
+            <AccountForm onSubmit={handleCreate} onClose={() => setCreateOpen(false)} />
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
+        </div>
+      ) : accounts.length === 0 ? (
+        <Card className="text-center py-16">
+          <CardContent>
+            <Wallet className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <p className="font-medium">No accounts yet</p>
+            <p className="text-sm text-muted-foreground">Add your first account to get started</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {accounts.map((account) => {
+            const Icon = ACCOUNT_ICONS[account.type]
+            return (
+              <Card key={account.id} className="relative overflow-hidden">
+                <div
+                  className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
+                  style={{ backgroundColor: account.color }}
+                />
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{ backgroundColor: account.color + '20', color: account.color }}
+                      >
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base">{account.name}</CardTitle>
+                        <Badge variant="secondary" className="text-xs mt-0.5">
+                          {ACCOUNT_TYPE_LABELS[account.type]}
+                        </Badge>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7" />}>
+                        <MoreHorizontal className="w-4 h-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditAccount(account)}>
+                          <Pencil className="w-4 h-4 mr-2" />Edit
+                        </DropdownMenuItem>
+                        <AlertDialog>
+                          <AlertDialogTrigger render={<DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive" />}>
+                            <Trash2 className="w-4 h-4 mr-2" />Delete
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete account?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will archive "{account.name}". Transactions will be preserved.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteAccount(account.id)}>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(account.balance, account.currency)}
+                  </p>
+                  {account.type === 'credit_card' && account.credit_limit != null && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Limit: {formatCurrency(account.credit_limit, account.currency)}
+                      {' '}· Available: {formatCurrency(account.credit_limit - account.balance, account.currency)}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">{account.currency}</p>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Edit dialog */}
+      <Dialog open={!!editAccount} onOpenChange={(o) => !o && setEditAccount(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
+          {editAccount && (
+            <AccountForm
+              defaultValues={editAccount}
+              onSubmit={handleEdit}
+              onClose={() => setEditAccount(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

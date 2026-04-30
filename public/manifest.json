@@ -1,0 +1,19 @@
+{
+  "name": "Ledger – Personal Finance",
+  "short_name": "Ledger",
+  "description": "Track spending, manage accounts, and plan budgets.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0ece5",
+  "theme_color": "#f0ece5",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

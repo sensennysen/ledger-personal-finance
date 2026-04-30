@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
+import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import type { Transaction } from '@/types'
 
 interface TransactionFilters {
@@ -51,10 +53,20 @@ export function useTransactions(filters: TransactionFilters = {}) {
 
   useEffect(() => { fetch() }, [fetch])
 
+  // Refetch when the offline queue is drained (connection restored)
+  useEffect(() => {
+    const unregister = registerSyncListener(fetch)
+    return () => { unregister() }
+  }, [fetch])
+
   const createTransaction = async (
     values: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'account' | 'to_account' | 'category'>
   ) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) {
+      enqueue({ table: 'transactions', operation: 'insert', payload: { ...values, user_id: user.id }, userId: user.id })
+      return { error: null, queued: true }
+    }
     const { error } = await supabase.from('transactions').insert({ ...values, user_id: user.id })
     if (!error) await fetch()
     return { error: error?.message ?? null }
@@ -62,6 +74,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
 
   const updateTransaction = async (id: string, values: Partial<Transaction>) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) {
+      enqueue({ table: 'transactions', operation: 'update', payload: values as Record<string, unknown>, rowId: id, userId: user.id })
+      return { error: null, queued: true }
+    }
     const { error } = await supabase.from('transactions').update(values).eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
@@ -69,6 +85,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
 
   const deleteTransaction = async (id: string) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) {
+      enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: id, userId: user.id })
+      return { error: null, queued: true }
+    }
     const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
@@ -82,5 +102,6 @@ export function useTransactions(filters: TransactionFilters = {}) {
     createTransaction,
     updateTransaction,
     deleteTransaction,
+    pendingSync: queueSize(),
   }
 }

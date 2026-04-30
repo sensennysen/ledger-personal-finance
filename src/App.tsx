@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import AppLayout from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
@@ -176,11 +177,53 @@ function LoginPageWrapper() {
   return <LoginPage />
 }
 
+function OfflineBanner() {
+  const { isOnline, isSyncing, pendingCount } = useNetworkStatus()
+
+  if (isOnline && pendingCount === 0) return null
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed top-0 inset-x-0 z-9999 flex items-center justify-center gap-2 px-4 py-2 text-[11px] font-medium tracking-wide"
+      style={{
+        background: isOnline ? 'oklch(0.700 0.115 72)' : 'oklch(0.45 0.08 40)',
+        color: isOnline ? 'oklch(0.20 0.04 40)' : 'oklch(0.96 0.01 80)',
+      }}
+    >
+      {!isOnline && (
+        <>
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+          You're offline — changes will sync when reconnected
+          {pendingCount > 0 && ` (${pendingCount} pending)`}
+        </>
+      )}
+      {isOnline && isSyncing && (
+        <>
+          <span
+            className="inline-block w-3 h-3 rounded-full border border-t-transparent animate-spin"
+            style={{ borderColor: 'currentColor', borderTopColor: 'transparent' }}
+          />
+          Syncing {pendingCount} pending change{pendingCount !== 1 ? 's' : ''}…
+        </>
+      )}
+      {isOnline && !isSyncing && pendingCount > 0 && (
+        <>
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+          {pendingCount} change{pendingCount !== 1 ? 's' : ''} queued — reconnecting…
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <RouteMeta />
+        <OfflineBanner />
         <Routes>
           <Route path="/login" element={<LoginPageWrapper />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />

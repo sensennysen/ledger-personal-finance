@@ -26,6 +26,7 @@
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.74.0",
+    "react-is": "^19.2.5",
     "react-router-dom": "^7.14.2",
     "recharts": "^3.8.1",
     "shadcn": "^4.6.0",
@@ -47,6 +48,7 @@
     "tailwindcss": "^4.2.4",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vite-plugin-pwa": "^1.2.0"
   }
 }

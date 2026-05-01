@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
-import type { Budget } from '@/types'
+import type { Budget, BudgetHistoryEntry } from '@/types'
 
 function localDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -82,18 +82,18 @@ export function useBudgets() {
 
     const budgets = budgetData as Budget[]
 
-    // Fetch all expense transactions for the current year (covers all period types)
+    // Fetch 13 months of expense transactions to cover history and rollover
     const now = new Date()
-    const yearStart = `${now.getFullYear()}-01-01`
-    const yearEnd = `${now.getFullYear()}-12-31`
+    const fetchStart = localDateStr(new Date(now.getFullYear(), now.getMonth() - 13, 1))
+    const fetchEnd = localDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0))
 
     const { data: spentData, error: spentError } = await supabase
       .from('transactions')
       .select('category_id, amount, date, currency, exchange_rate')
       .eq('user_id', user.id)
       .eq('type', 'expense')
-      .gte('date', yearStart)
-      .lte('date', yearEnd)
+      .gte('date', fetchStart)
+      .lte('date', fetchEnd)
 
     if (spentError) {
       setError(spentError.message)
@@ -102,22 +102,65 @@ export function useBudgets() {
     }
 
     const allTx = spentData ?? []
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    // For each budget, compute spending within its own period's date range
     const enriched = budgets.map((b) => {
       const { start, end } = getBudgetPeriodRange(b.period)
-      const spent = allTx.reduce((sum, tx) => {
-        if (tx.category_id !== b.category_id) return sum
-        if (tx.date < start || tx.date > end) return sum
-        // Apply exchange_rate when the transaction currency differs from the
-        // budget currency so comparisons are always in the same denomination.
-        const txAmount =
-          tx.currency === b.currency
-            ? tx.amount
-            : tx.amount * (tx.exchange_rate ?? 1)
-        return sum + txAmount
-      }, 0)
-      return { ...b, spent }
+
+      const computeSpent = (rangeStart: string, rangeEnd: string) =>
+        allTx.reduce((sum, tx) => {
+          if (tx.category_id !== b.category_id) return sum
+          if (tx.date < rangeStart || tx.date > rangeEnd) return sum
+          const txAmount =
+            tx.currency === b.currency
+              ? tx.amount
+              : tx.amount * (tx.exchange_rate ?? 1)
+          return sum + txAmount
+        }, 0)
+
+      const spent = computeSpent(start, end)
+
+      // Compute monthly rollover and history
+      let rolloverAmount = 0
+      const history: BudgetHistoryEntry[] = []
+
+      if (b.period === 'monthly') {
+        const budgetStartDate = new Date(b.start_date + 'T00:00:00')
+        let d = new Date(budgetStartDate.getFullYear(), budgetStartDate.getMonth(), 1)
+
+        while (d < currentMonthStart) {
+          const periodStart = localDateStr(d)
+          const periodEnd = localDateStr(new Date(d.getFullYear(), d.getMonth() + 1, 0))
+          const periodSpent = computeSpent(periodStart, periodEnd)
+          const surplus = b.amount - periodSpent
+
+          history.push({
+            period_start: periodStart,
+            period_end: periodEnd,
+            budget_amount: b.amount,
+            spent_amount: periodSpent,
+            rollover_in: b.rollover_enabled ? rolloverAmount : 0,
+            currency: b.currency,
+          })
+
+          if (b.rollover_enabled) {
+            rolloverAmount += surplus
+          }
+
+          d = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+        }
+      }
+
+      const recentHistory = history.slice(-6)
+      const effectiveAmount = b.amount + (b.rollover_enabled ? rolloverAmount : 0)
+
+      return {
+        ...b,
+        spent,
+        rollover_amount: rolloverAmount,
+        effective_amount: effectiveAmount,
+        history: recentHistory,
+      }
     })
 
     setBudgets(enriched)
@@ -128,7 +171,7 @@ export function useBudgets() {
   useEffect(() => { fetch() }, [fetch])
 
   const createBudget = async (
-    values: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'spent'>
+    values: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'spent' | 'rollover_amount' | 'effective_amount' | 'history'>
   ) => {
     if (!user) return { error: 'Not authenticated' }
     const { error } = await supabase.from('budgets').insert({ ...values, user_id: user.id })

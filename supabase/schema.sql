@@ -360,3 +360,37 @@ create trigger set_subcategories_updated_at
 -- Add subcategory_id to transactions
 alter table public.transactions
   add column if not exists subcategory_id uuid references public.subcategories(id) on delete set null;
+
+-- ────────────────────────────────────────────────────────────
+-- ROLLOVER BUDGETS
+-- ────────────────────────────────────────────────────────────
+alter table public.budgets
+  add column if not exists rollover_enabled boolean not null default false;
+
+-- ────────────────────────────────────────────────────────────
+-- SAVINGS GOALS
+-- ────────────────────────────────────────────────────────────
+create table if not exists public.savings_goals (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references public.profiles(id) on delete cascade,
+  name            text not null,
+  target_amount   numeric(18,2) not null check (target_amount > 0),
+  current_amount  numeric(18,2) not null default 0 check (current_amount >= 0),
+  currency        text not null default 'USD',
+  deadline        date,
+  color           text not null default '#6366f1',
+  icon            text not null default '🎯',
+  notes           text,
+  is_completed    boolean not null default false,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+alter table public.savings_goals enable row level security;
+
+create policy "Users can manage own savings goals"
+  on public.savings_goals for all using (auth.uid() = user_id);
+
+create trigger set_savings_goals_updated_at
+  before update on public.savings_goals
+  for each row execute procedure public.set_updated_at();

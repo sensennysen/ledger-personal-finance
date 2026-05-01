@@ -94,6 +94,15 @@ export interface Transaction {
   subcategory?: Subcategory
 }
 
+export interface BudgetHistoryEntry {
+  period_start: string
+  period_end: string
+  budget_amount: number
+  spent_amount: number
+  rollover_in: number
+  currency: string
+}
+
 export interface Budget {
   id: string
   user_id: string
@@ -105,11 +114,31 @@ export interface Budget {
   start_date: string
   end_date: string | null
   is_active: boolean
+  rollover_enabled: boolean
   created_at: string
   updated_at: string
-  // joined
+  // joined / computed
   category?: Category
   spent?: number
+  rollover_amount?: number
+  effective_amount?: number
+  history?: BudgetHistoryEntry[]
+}
+
+export interface SavingsGoal {
+  id: string
+  user_id: string
+  name: string
+  target_amount: number
+  current_amount: number
+  currency: string
+  deadline: string | null
+  color: string
+  icon: string
+  notes: string | null
+  is_completed: boolean
+  created_at: string
+  updated_at: string
 }
 
 export interface DashboardStats {

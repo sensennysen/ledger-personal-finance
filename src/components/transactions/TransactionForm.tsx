@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,6 +10,7 @@ import { useDescriptionSuggestions } from '@/hooks/useDescriptionSuggestions'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { storePendingReceipt, PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
+import { buildReceiptObjectPath, isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
 import { CURRENCIES } from '@/types'
 import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
@@ -71,9 +72,16 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
 
+  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      setUploadError('Invalid file type. Only JPEG, PNG, WebP, and GIF images are allowed.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
     const MAX_SIZE = 5 * 1024 * 1024
     if (file.size > MAX_SIZE) {
       setUploadError('File too large. Maximum size is 5 MB.')
@@ -117,6 +125,29 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
     },
   })
 
+  const receiptReference = form.watch('receipt_url')
+  const hasReceipt = !!pendingFile || !!receiptReference || !!previewUrl
+
+  useEffect(() => {
+    if (pendingFile) return
+
+    let cancelled = false
+    const reference = defaultValues?.receipt_url ?? null
+
+    if (!reference || isPendingReceiptReference(reference)) {
+      setPreviewUrl(null)
+      return
+    }
+
+    resolveReceiptUrl(reference).then((url) => {
+      if (!cancelled) setPreviewUrl(url)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [defaultValues?.receipt_url, pendingFile])
+
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
     if (pendingFile && user) {
       if (!navigator.onLine) {
@@ -132,8 +163,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
         // Try to upload; if it fails for any reason (network hiccup, captive portal, etc.)
         // fall back to the same offline path so the transaction still saves with the image.
         setUploading(true)
-        const ext = pendingFile.name.split('.').pop() ?? 'jpg'
-        const path = `${user.id}/${Date.now()}.${ext}`
+        const path = buildReceiptObjectPath(user.id, pendingFile.name)
         const { error } = await supabase.storage
           .from('receipts')
           .upload(path, pendingFile)
@@ -147,8 +177,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             setUploadError('Upload failed and receipt could not be saved locally.')
           }
         } else {
-          const { data } = supabase.storage.from('receipts').getPublicUrl(path)
-          values.receipt_url = data.publicUrl
+          values.receipt_url = path
         }
       }
     }
@@ -548,13 +577,22 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             className="sr-only"
             onChange={handleFileChange}
           />
-          {previewUrl ? (
+          {hasReceipt ? (
             <div className="relative w-full rounded-lg overflow-hidden border bg-muted">
-              <img
-                src={previewUrl}
-                alt="Receipt preview"
-                className="w-full max-h-48 object-contain"
-              />
+              {previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt="Receipt preview"
+                  className="w-full max-h-48 object-contain"
+                />
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
+                  <ImagePlus className="w-4 h-4 shrink-0" />
+                  {receiptReference?.startsWith(PENDING_RECEIPT_PREFIX)
+                    ? 'Receipt saved for sync.'
+                    : 'Receipt attached.'}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={removeReceipt}

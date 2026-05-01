@@ -84,7 +84,11 @@ function resolvePreset(preset: Preset): { start: string; end: string } {
 // ─── csv export ───────────────────────────────────────────────────────────────
 
 function escapeCsvCell(value: string | number | null | undefined): string {
-  const str = String(value ?? '')
+  let str = String(value ?? '')
+  // Neutralize spreadsheet formulas when the CSV is opened in Excel/Sheets.
+  if (/^[=+\-@]/.test(str)) {
+    str = `'${str}`
+  }
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`
   }

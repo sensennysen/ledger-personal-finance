@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { readCache, writeCache, clearCacheByPrefix } from '@/lib/dataCache'
+import { clearOfflineQueue } from '@/lib/offlineQueue'
+import { clearPendingReceipts } from '@/lib/receiptStore'
 import type { Profile } from '@/types'
 
 interface AuthContextValue {
@@ -79,9 +81,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    if (user) clearCacheByPrefix(user.id)
     const { error } = await supabase.auth.signOut()
-    if (error) console.error('Sign out failed:', error.message)
+    if (error) {
+      console.error('Sign out failed:', error.message)
+      return
+    }
+
+    if (user) clearCacheByPrefix(user.id)
+    clearOfflineQueue()
+    try {
+      await clearPendingReceipts()
+    } catch (receiptError) {
+      console.error('Failed to clear pending receipts:', receiptError)
+    }
   }
 
   return (

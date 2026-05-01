@@ -190,6 +190,80 @@ create trigger set_transactions_updated_at before update on public.transactions 
 create trigger set_budgets_updated_at      before update on public.budgets      for each row execute procedure public.set_updated_at();
 
 -- ────────────────────────────────────────────────────────────
+-- OWNERSHIP GUARDS
+-- Ensure cross-table references always point to rows owned by the same user.
+-- ────────────────────────────────────────────────────────────
+
+create or replace function public.enforce_transaction_reference_ownership()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (
+    select 1 from public.accounts a where a.id = new.account_id and a.user_id = new.user_id
+  ) then
+    raise exception 'Transaction account must belong to the same user';
+  end if;
+
+  if new.to_account_id is not null and not exists (
+    select 1 from public.accounts a where a.id = new.to_account_id and a.user_id = new.user_id
+  ) then
+    raise exception 'Transfer destination account must belong to the same user';
+  end if;
+
+  if new.category_id is not null and not exists (
+    select 1 from public.categories c where c.id = new.category_id and c.user_id = new.user_id
+  ) then
+    raise exception 'Transaction category must belong to the same user';
+  end if;
+
+  if new.subcategory_id is not null and not exists (
+    select 1 from public.subcategories s where s.id = new.subcategory_id and s.user_id = new.user_id
+  ) then
+    raise exception 'Transaction subcategory must belong to the same user';
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.enforce_budget_reference_ownership()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (
+    select 1 from public.categories c where c.id = new.category_id and c.user_id = new.user_id
+  ) then
+    raise exception 'Budget category must belong to the same user';
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.enforce_subcategory_reference_ownership()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if not exists (
+    select 1 from public.categories c where c.id = new.category_id and c.user_id = new.user_id
+  ) then
+    raise exception 'Subcategory category must belong to the same user';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_transactions_reference_ownership on public.transactions;
+create trigger trg_transactions_reference_ownership
+  before insert or update of user_id, account_id, to_account_id, category_id, subcategory_id
+  on public.transactions
+  for each row execute procedure public.enforce_transaction_reference_ownership();
+
+drop trigger if exists trg_budgets_reference_ownership on public.budgets;
+create trigger trg_budgets_reference_ownership
+  before insert or update of user_id, category_id
+  on public.budgets
+  for each row execute procedure public.enforce_budget_reference_ownership();
+
+-- ────────────────────────────────────────────────────────────
 -- ACCOUNT BALANCE TRIGGERS
 -- Automatically adjust account.balance whenever a transaction
 -- is inserted, updated, or deleted.
@@ -277,23 +351,28 @@ create trigger trg_update_balance_delete
 alter table public.transactions
   add column if not exists receipt_url text;
 
--- 2. Create a public storage bucket for receipts
---    Files are namespaced under the user's UUID so paths are not easily guessable.
+-- 2. Create a private storage bucket for receipts
+--    Files are namespaced under the user's UUID and accessed via signed URLs.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'receipts',
   'receipts',
-  true,
+  false,
   5242880, -- 5 MB
   '{image/jpeg,image/png,image/webp,image/gif}'
 )
 on conflict (id) do nothing;
+
+update storage.buckets
+set public = false
+where id = 'receipts';
 
 -- 3. RLS policies for storage.objects
 --    Drop first so re-running this script is idempotent.
 drop policy if exists "Authenticated users can upload their own receipts"  on storage.objects;
 drop policy if exists "Authenticated users can update their own receipts"  on storage.objects;
 drop policy if exists "Authenticated users can delete their own receipts"  on storage.objects;
+drop policy if exists "Authenticated users can read their own receipts"    on storage.objects;
 drop policy if exists "Public can read receipts"                           on storage.objects;
 
 --  INSERT – user may only create files under their own UUID folder
@@ -327,10 +406,14 @@ create policy "Authenticated users can delete their own receipts"
     and (string_to_array(name, '/'))[1] = auth.uid()::text
   );
 
---  SELECT – bucket is public so anyone can read (needed for rendering images)
-create policy "Public can read receipts"
+--  SELECT – users may read only their own receipts and generate signed URLs client-side
+create policy "Authenticated users can read their own receipts"
   on storage.objects for select
-  using (bucket_id = 'receipts');
+  to authenticated
+  using (
+    bucket_id = 'receipts'
+    and (string_to_array(name, '/'))[1] = auth.uid()::text
+  );
 
 -- ────────────────────────────────────────────────────────────
 -- SUBCATEGORIES
@@ -352,6 +435,12 @@ create policy "Users can manage own subcategories"
   on public.subcategories for all using (auth.uid() = user_id);
 
 create index if not exists subcategories_category_idx on public.subcategories(category_id);
+
+drop trigger if exists trg_subcategories_reference_ownership on public.subcategories;
+create trigger trg_subcategories_reference_ownership
+  before insert or update of user_id, category_id
+  on public.subcategories
+  for each row execute procedure public.enforce_subcategory_reference_ownership();
 
 create trigger set_subcategories_updated_at
   before update on public.subcategories

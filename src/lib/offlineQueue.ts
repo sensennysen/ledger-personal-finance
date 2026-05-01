@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { PENDING_RECEIPT_PREFIX, getPendingReceipt, removePendingReceipt } from './receiptStore'
+import { buildReceiptObjectPath } from './receiptUrls'
 
 export type QueueOperation = 'insert' | 'update' | 'delete'
 
@@ -30,6 +31,10 @@ function readQueue(): QueueItem[] {
 
 function writeQueue(items: QueueItem[]): void {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(items))
+}
+
+export function clearOfflineQueue(): void {
+  localStorage.removeItem(QUEUE_KEY)
 }
 
 export function enqueue(item: Omit<QueueItem, 'id' | 'timestamp'>): void {
@@ -84,9 +89,8 @@ export async function drainQueue(): Promise<number> {
         if (file) {
           // When retrieved from IndexedDB, a File may come back as a plain Blob
           // without a .name property on some browsers — guard against that.
-          const fileName = (file as File).name ?? ''
-          const ext = fileName.split('.').pop() || 'jpg'
-          const path = `${item.userId}/${Date.now()}.${ext}`
+          const fileName = (file as File).name ?? 'receipt.jpg'
+          const path = buildReceiptObjectPath(item.userId, fileName)
           let uploadErr: unknown = null
           try {
             const { error: err } = await supabase.storage.from('receipts').upload(path, file)
@@ -99,8 +103,7 @@ export async function drainQueue(): Promise<number> {
             remaining.push(item)
             skipInsert = true
           } else {
-            const { data: urlData } = supabase.storage.from('receipts').getPublicUrl(path)
-            item.payload = { ...item.payload, receipt_url: urlData.publicUrl }
+            item.payload = { ...item.payload, receipt_url: path }
             try { await removePendingReceipt(tempId) } catch { /* best-effort */ }
           }
         } else {

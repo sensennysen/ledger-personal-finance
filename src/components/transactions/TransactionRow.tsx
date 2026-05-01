@@ -1,18 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
-import { PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
-
-/** Reject non-https receipt URLs to block javascript:, data:, etc. */
-function isValidReceiptUrl(url: string): boolean {
-  try {
-    const { protocol } = new URL(url)
-    return protocol === 'https:'
-  } catch {
-    return false
-  }
-}
+import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -62,8 +52,34 @@ export function TransactionRow({
   contextAccountId,
 }: TransactionRowProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
+  const [resolvedReceiptUrl, setResolvedReceiptUrl] = useState<string | null>(null)
+  const [receiptLoading, setReceiptLoading] = useState(false)
   const Icon = TRANSACTION_TYPE_ICON[tx.type]
   const isIncoming = tx.type === 'transfer' && tx.to_account_id === contextAccountId
+  const hasReceipt = !!tx.receipt_url && !isPendingReceiptReference(tx.receipt_url)
+
+  useEffect(() => {
+    if (!receiptOpen || !tx.receipt_url || isPendingReceiptReference(tx.receipt_url)) {
+      setResolvedReceiptUrl(null)
+      setReceiptLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setReceiptLoading(true)
+
+    resolveReceiptUrl(tx.receipt_url)
+      .then((url) => {
+        if (!cancelled) setResolvedReceiptUrl(url)
+      })
+      .finally(() => {
+        if (!cancelled) setReceiptLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [receiptOpen, tx.receipt_url])
 
   const amountColorClass = contextAccountId
     ? tx.type === 'income' || isIncoming
@@ -153,11 +169,11 @@ export function TransactionRow({
               </span>
             )}
             {tx.receipt_url && (
-              tx.receipt_url.startsWith(PENDING_RECEIPT_PREFIX) ? (
+              isPendingReceiptReference(tx.receipt_url) ? (
                 <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                   <CloudUpload className="w-3 h-3" />Receipt (syncing…)
                 </span>
-              ) : isValidReceiptUrl(tx.receipt_url) ? (
+              ) : hasReceipt ? (
                 <button
                   type="button"
                   onClick={() => setReceiptOpen(true)}
@@ -255,17 +271,23 @@ export function TransactionRow({
       </div>
 
       {/* Receipt viewer */}
-      {tx.receipt_url && !tx.receipt_url.startsWith(PENDING_RECEIPT_PREFIX) && isValidReceiptUrl(tx.receipt_url) && (
+      {hasReceipt && (
         <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Receipt — {tx.description}</DialogTitle>
             </DialogHeader>
-            <img
-              src={tx.receipt_url}
-              alt={`Receipt for ${tx.description}`}
-              className="w-full rounded-lg object-contain max-h-[70vh]"
-            />
+            {resolvedReceiptUrl ? (
+              <img
+                src={resolvedReceiptUrl}
+                alt={`Receipt for ${tx.description}`}
+                className="w-full rounded-lg object-contain max-h-[70vh]"
+              />
+            ) : (
+              <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+                {receiptLoading ? 'Loading receipt…' : 'Receipt unavailable.'}
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       )}

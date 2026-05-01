@@ -56,3 +56,13 @@ export async function removePendingReceipt(id: string): Promise<void> {
     tx.onerror = () => reject(tx.error)
   })
 }
+
+export async function clearPendingReceipts(): Promise<void> {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    tx.objectStore(STORE).clear()
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}

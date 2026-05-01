@@ -216,6 +216,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const [importResult, setImportResult] = useState<{ imported: number; account: string } | null>(null)
   const [dragOver, setDragOver] = useState(false)
 
+  const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024
+
   const selectedAccount = accounts.find((a) => a.id === accountId)
 
   const reset = () => {
@@ -230,6 +232,10 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     (file: File) => {
       if (!file.name.match(/\.(csv|txt)$/i)) {
         setParseError('Please upload a CSV file (.csv or .txt).')
+        return
+      }
+      if (file.size > MAX_IMPORT_FILE_SIZE) {
+        setParseError('File too large. Maximum import size is 5 MB.')
         return
       }
       const reader = new FileReader()

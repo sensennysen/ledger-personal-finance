@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload } from 'lucide-react'
+import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
 import { PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
@@ -16,17 +16,6 @@ function isValidReceiptUrl(url: string): boolean {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -38,6 +27,14 @@ interface TransactionRowProps {
   tx: Transaction
   onEdit: (tx: Transaction) => void
   onDelete: (id: string) => Promise<void>
+  /** Called when the scissors button is clicked. Only shown when provided and tx.type !== 'transfer'. */
+  onSplit?: (tx: Transaction) => void
+  /** When true, a checkbox is shown for bulk selection. */
+  selectable?: boolean
+  /** Controlled checked state of the checkbox. */
+  selected?: boolean
+  /** Called when the checkbox changes. */
+  onSelect?: (id: string) => void
   /**
    * When provided, amount display and transfer direction labels are shown
    * relative to this account (used in AccountTransactionsPage).
@@ -45,7 +42,16 @@ interface TransactionRowProps {
   contextAccountId?: string
 }
 
-export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: TransactionRowProps) {
+export function TransactionRow({
+  tx,
+  onEdit,
+  onDelete,
+  onSplit,
+  selectable,
+  selected,
+  onSelect,
+  contextAccountId,
+}: TransactionRowProps) {
   const [receiptOpen, setReceiptOpen] = useState(false)
   const Icon = TRANSACTION_TYPE_ICON[tx.type]
   const isIncoming = tx.type === 'transfer' && tx.to_account_id === contextAccountId
@@ -72,6 +78,17 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg bg-card border hover:bg-accent/50 transition-colors group">
+      {/* Checkbox (bulk select) */}
+      {selectable && (
+        <input
+          type="checkbox"
+          checked={!!selected}
+          onChange={() => onSelect?.(tx.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="w-4 h-4 rounded shrink-0 accent-primary cursor-pointer"
+          aria-label="Select transaction"
+        />
+      )}
       {/* Icon */}
       <div
         className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-base"
@@ -156,32 +173,27 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
         <Pencil className="w-3 h-3" />
       </Button>
 
-      {/* Delete */}
-      <AlertDialog>
-        <AlertDialogTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-            />
-          }
+      {/* Split */}
+      {onSplit && tx.type !== 'transfer' && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+          title="Split transaction"
+          onClick={() => onSplit(tx)}
         >
-          <Trash2 className="w-3 h-3" />
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete transaction?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete "{tx.description}".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={async () => { await onDelete(tx.id) }}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          <Scissors className="w-3 h-3" />
+        </Button>
+      )}
+      {/* Delete */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+        onClick={async () => { await onDelete(tx.id) }}
+      >
+        <Trash2 className="w-3 h-3" />
+      </Button>
 
       {/* Receipt viewer */}
       {tx.receipt_url && !tx.receipt_url.startsWith(PENDING_RECEIPT_PREFIX) && isValidReceiptUrl(tx.receipt_url) && (

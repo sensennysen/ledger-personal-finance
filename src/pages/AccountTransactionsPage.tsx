@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
+import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
@@ -29,6 +30,47 @@ export default function AccountTransactionsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Undo delete
+  type UndoState = { snapshots: Transaction[]; message: string }
+  const [undoState, setUndoState] = useState<UndoState | null>(null)
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showUndo = useCallback((snapshots: Transaction[], message: string) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    setUndoState({ snapshots, message })
+    undoTimerRef.current = setTimeout(() => {
+      setUndoState(null)
+      undoTimerRef.current = null
+    }, 5000)
+  }, [])
+
+  const handleUndoDelete = useCallback(async () => {
+    if (!undoState) return
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    setUndoState(null)
+    for (const tx of undoState.snapshots) {
+      await createTransaction({
+        type: tx.type,
+        account_id: tx.account_id,
+        to_account_id: tx.to_account_id,
+        category_id: tx.category_id,
+        subcategory_id: tx.subcategory_id,
+        amount: tx.amount,
+        currency: tx.currency,
+        exchange_rate: tx.exchange_rate,
+        description: tx.description,
+        notes: tx.notes,
+        date: tx.date,
+        transfer_fee: tx.transfer_fee,
+        is_recurring: tx.is_recurring,
+        recurrence_interval: tx.recurrence_interval,
+        recurrence_end_date: tx.recurrence_end_date,
+        receipt_url: tx.receipt_url,
+      })
+    }
+    refetchAccounts()
+  }, [undoState, createTransaction, refetchAccounts])
 
   const account = accounts.find((a) => a.id === accountId)
   const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet
@@ -97,9 +139,11 @@ export default function AccountTransactionsPage() {
   }
 
   const handleDelete = async (id: string) => {
+    const snapshot = transactions.find((t) => t.id === id)
     const { error } = await deleteTransaction(id)
-    if (error) console.error('Failed to delete transaction:', error)
-    else refetchAccounts()
+    if (error) { console.error('Failed to delete transaction:', error); return }
+    refetchAccounts()
+    if (snapshot) showUndo([snapshot], `"${snapshot.description}" deleted`)
   }
 
   return (
@@ -261,6 +305,18 @@ export default function AccountTransactionsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Undo delete toast */}
+      {undoState && (
+        <UndoToast
+          message={undoState.message}
+          onUndo={handleUndoDelete}
+          onDismiss={() => {
+            if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+            setUndoState(null)
+          }}
+        />
+      )}
     </div>
   )
 }

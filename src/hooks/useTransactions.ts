@@ -226,6 +226,91 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return { error: error?.message ?? null }
   }
 
+  const bulkDeleteTransactions = async (ids: string[]) => {
+    if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) {
+      const toDelete = transactions.filter((t) => ids.includes(t.id))
+      const next = transactions.filter((t) => !ids.includes(t.id))
+      setTransactions(next)
+      writeCache(buildCacheKey(), next)
+      toDelete.forEach((tx) => {
+        optimisticAccountDelta((accounts) => reverseTxDelta(accounts, tx))
+        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, userId: user.id })
+      })
+      return { error: null, queued: true }
+    }
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .in('id', ids)
+      .eq('user_id', user.id)
+    if (!error) await fetch()
+    return { error: error?.message ?? null }
+  }
+
+  const bulkUpdateCategory = async (ids: string[], categoryId: string | null) => {
+    if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) {
+      const next = transactions.map((t) =>
+        ids.includes(t.id)
+          ? { ...t, category_id: categoryId, updated_at: new Date().toISOString() }
+          : t
+      )
+      setTransactions(next)
+      writeCache(buildCacheKey(), next)
+      ids.forEach((id) => {
+        enqueue({
+          table: 'transactions',
+          operation: 'update',
+          payload: { category_id: categoryId },
+          rowId: id,
+          userId: user.id,
+        })
+      })
+      return { error: null, queued: true }
+    }
+    const { error } = await supabase
+      .from('transactions')
+      .update({ category_id: categoryId })
+      .in('id', ids)
+      .eq('user_id', user.id)
+    if (!error) await fetch()
+    return { error: error?.message ?? null }
+  }
+
+  const bulkCreateTransactions = async (
+    rows: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'account' | 'to_account' | 'category' | 'subcategory'>[]
+  ) => {
+    if (!user) return { error: 'Not authenticated', imported: 0 }
+    if (!navigator.onLine) {
+      const now = new Date().toISOString()
+      const optimistics: Transaction[] = rows.map((values) => ({
+        ...values,
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        created_at: now,
+        updated_at: now,
+      }))
+      const filtered = optimistics.filter((tx) => txMatchesFilters(tx, filters))
+      if (filtered.length) {
+        const next = [...filtered, ...transactions]
+        const limited = filters.limit ? next.slice(0, filters.limit) : next
+        setTransactions(limited)
+        writeCache(buildCacheKey(), limited)
+      }
+      rows.forEach((values) => {
+        optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
+        enqueue({ table: 'transactions', operation: 'insert', payload: { ...values, user_id: user.id }, userId: user.id })
+      })
+      return { error: null, imported: rows.length }
+    }
+    const { error } = await supabase
+      .from('transactions')
+      .insert(rows.map((r) => ({ ...r, user_id: user.id })))
+    if (!error) await fetch()
+    return { error: error?.message ?? null, imported: error ? 0 : rows.length }
+  }
+
   return {
     transactions,
     loading,
@@ -234,6 +319,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
     createTransaction,
     updateTransaction,
     deleteTransaction,
+    bulkDeleteTransactions,
+    bulkUpdateCategory,
+    bulkCreateTransactions,
     pendingSync: queueSize(),
   }
 }

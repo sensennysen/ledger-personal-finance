@@ -6,7 +6,22 @@ import {
   Wallet,
   FileBarChart2,
   CalendarDays,
+  Store,
 } from 'lucide-react'
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from 'recharts'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
@@ -124,6 +139,140 @@ function exportToCsv(
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+}
+
+// ─── pdf export ──────────────────────────────────────────────────────────────
+
+function exportToPdf(
+  transactions: Transaction[],
+  totalIncome: number,
+  totalExpenses: number,
+  netChange: number,
+  currency: string,
+  dateRangeLabel: string,
+  categoryBreakdown: { name: string; color: string; amount: number }[],
+  merchantBreakdown: { displayName: string; amount: number; count: number }[],
+  filenameLabel: string,
+) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const margin = 14
+
+  // ── Header ──
+  doc.setFontSize(18)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 30)
+  doc.text('Expense Report', margin, 20)
+
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 100, 100)
+  doc.text(`Period: ${dateRangeLabel}`, margin, 28)
+  doc.text(`Generated: ${new Date().toLocaleDateString(undefined, { dateStyle: 'long' })}`, margin, 34)
+
+  // ── Summary boxes ──
+  doc.setTextColor(30, 30, 30)
+  const boxWidth = (pageWidth - margin * 2 - 8) / 3
+  const boxY = 42
+  const summaryItems = [
+    { label: 'Total Income', value: formatCurrency(totalIncome, currency), r: 34, g: 197, b: 94 },
+    { label: 'Total Expenses', value: formatCurrency(totalExpenses, currency), r: 239, g: 68, b: 68 },
+    { label: 'Net Change', value: formatCurrency(netChange, currency), r: netChange >= 0 ? 34 : 239, g: netChange >= 0 ? 197 : 68, b: netChange >= 0 ? 94 : 68 },
+  ]
+  summaryItems.forEach((item, i) => {
+    const x = margin + i * (boxWidth + 4)
+    doc.setDrawColor(220, 220, 220)
+    doc.setFillColor(248, 248, 248)
+    doc.roundedRect(x, boxY, boxWidth, 18, 2, 2, 'FD')
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(120, 120, 120)
+    doc.text(item.label, x + 3, boxY + 6)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(item.r, item.g, item.b)
+    doc.text(item.value, x + 3, boxY + 14)
+  })
+
+  let currentY = boxY + 26
+
+  // ── Category breakdown ──
+  if (categoryBreakdown.length > 0) {
+    doc.setTextColor(30, 30, 30)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('Expenses by Category', margin, currentY)
+    currentY += 4
+    autoTable(doc, {
+      startY: currentY,
+      head: [['Category', 'Amount', '% of Total']],
+      body: categoryBreakdown.slice(0, 8).map((cat) => [
+        cat.name,
+        formatCurrency(cat.amount, currency),
+        totalExpenses > 0 ? `${((cat.amount / totalExpenses) * 100).toFixed(1)}%` : '—',
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [45, 45, 45], textColor: 255, fontStyle: 'bold' },
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+      margin: { left: margin, right: margin },
+    })
+    currentY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
+  }
+
+  // ── Merchant breakdown ──
+  if (merchantBreakdown.length > 0) {
+    if (currentY > 220) { doc.addPage(); currentY = 20 }
+    doc.setTextColor(30, 30, 30)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.text('Top Merchants', margin, currentY)
+    currentY += 4
+    autoTable(doc, {
+      startY: currentY,
+      head: [['Merchant', 'Amount', 'Transactions']],
+      body: merchantBreakdown.slice(0, 10).map((m) => [
+        m.displayName,
+        formatCurrency(m.amount, currency),
+        String(m.count),
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [45, 45, 45], textColor: 255, fontStyle: 'bold' },
+      columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+      margin: { left: margin, right: margin },
+    })
+    currentY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
+  }
+
+  // ── Transaction table ──
+  if (currentY > 210) { doc.addPage(); currentY = 20 }
+  doc.setTextColor(30, 30, 30)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.text('Transactions', margin, currentY)
+  currentY += 4
+  autoTable(doc, {
+    startY: currentY,
+    head: [['Date', 'Description', 'Category', 'Account', 'Amount']],
+    body: transactions.map((t) => [
+      t.date,
+      t.description,
+      t.category?.name ?? '—',
+      t.account?.name ?? '—',
+      `${t.type === 'income' ? '+' : t.type === 'transfer' ? '~' : '-'} ${formatCurrency(t.amount, t.currency)}`,
+    ]),
+    styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak' },
+    headStyles: { fillColor: [45, 45, 45], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 22 },
+      1: { cellWidth: 'auto' },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 32 },
+      4: { halign: 'right', cellWidth: 28 },
+    },
+    margin: { left: margin, right: margin },
+  })
+
+  doc.save(`expense-report_${filenameLabel}.pdf`)
 }
 
 // ─── stat card ────────────────────────────────────────────────────────────────
@@ -260,6 +409,103 @@ export default function ReportsPage() {
     exportToCsv(sortedTransactions, `ledger-report_${filenameLabel}.csv`, txBalanceMap)
   }
 
+  const handleExportPdf = () => {
+    exportToPdf(
+      sortedTransactions,
+      totalIncome,
+      totalExpenses,
+      netChange,
+      currency,
+      presetLabel,
+      categoryBreakdown,
+      merchantBreakdown,
+      filenameLabel,
+    )
+  }
+
+  // ── Net Worth Over Time (last 13 months) ──
+  const netWorthData = useMemo(() => {
+    const now = new Date()
+    const currentNetWorth = accounts.reduce((sum, a) => sum + a.balance, 0)
+    const boundaries: { date: string; label: string }[] = []
+    for (let i = 12; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const monthEnd = i === 0
+        ? now
+        : new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0)
+      const label = monthStart.getFullYear() !== now.getFullYear()
+        ? monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+        : monthStart.toLocaleDateString('en-US', { month: 'short' })
+      boundaries.push({ date: localDateStr(monthEnd), label })
+    }
+    const allSorted = [...transactions].sort(
+      (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at),
+    )
+    let netWorth = currentNetWorth
+    let txIdx = 0
+    const data: { month: string; netWorth: number }[] = []
+    for (let i = 12; i >= 0; i--) {
+      const boundary = boundaries[i].date
+      while (txIdx < allSorted.length && allSorted[txIdx].date > boundary) {
+        const tx = allSorted[txIdx]
+        if (tx.type === 'income') netWorth -= tx.amount
+        else if (tx.type === 'expense') netWorth += tx.amount
+        else if (tx.type === 'transfer') netWorth += (tx.transfer_fee ?? 0)
+        txIdx++
+      }
+      data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
+    }
+    return data
+  }, [accounts, transactions])
+
+  // ── Monthly Income vs Expenses (last 12 months) ──
+  const monthlyData = useMemo(() => {
+    const now = new Date()
+    const result: { month: string; income: number; expenses: number }[] = []
+    for (let i = 11; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const monthEnd = i === 0
+        ? now
+        : new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0)
+      const startStr = localDateStr(monthStart)
+      const endStr = localDateStr(monthEnd)
+      const label = monthStart.getFullYear() !== now.getFullYear()
+        ? monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+        : monthStart.toLocaleDateString('en-US', { month: 'short' })
+      let income = 0
+      let expenses = 0
+      for (const t of transactions) {
+        if (t.date < startStr || t.date > endStr) continue
+        if (t.type === 'income') income += t.amount * (t.exchange_rate ?? 1)
+        else if (t.type === 'expense') expenses += t.amount * (t.exchange_rate ?? 1)
+      }
+      result.push({
+        month: label,
+        income: Math.round(income * 100) / 100,
+        expenses: Math.round(expenses * 100) / 100,
+      })
+    }
+    return result
+  }, [transactions])
+
+  // ── Spending by Merchant (top 10 from filtered period) ──
+  const merchantBreakdown = useMemo(() => {
+    const map = new Map<string, { displayName: string; amount: number; count: number }>()
+    for (const t of filtered) {
+      if (t.type !== 'expense') continue
+      const key = t.description.trim().toLowerCase()
+      if (!key) continue
+      const existing = map.get(key)
+      if (existing) {
+        existing.amount += t.amount * (t.exchange_rate ?? 1)
+        existing.count++
+      } else {
+        map.set(key, { displayName: t.description.trim(), amount: t.amount * (t.exchange_rate ?? 1), count: 1 })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount).slice(0, 10)
+  }, [filtered])
+
   const activeAccounts = accounts.filter((a) => a.is_active)
   const totalBalance = activeAccounts.reduce((sum, a) => sum + a.balance, 0)
 
@@ -335,22 +581,39 @@ export default function ReportsPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <TabsList className="h-8">
               <TabsTrigger value="overview" className="text-[12px] h-7 px-3">Overview</TabsTrigger>
+              <TabsTrigger value="analytics" className="text-[12px] h-7 px-3">Analytics</TabsTrigger>
               <TabsTrigger value="thirteenth" className="text-[12px] h-7 px-3">13th Month</TabsTrigger>
             </TabsList>
-            <Button
-              onClick={handleExport}
-              disabled={loading || filtered.length === 0}
-              size="sm"
-              className="gap-2 text-[12px] font-medium shrink-0"
-              style={{
-                background: 'linear-gradient(135deg, oklch(0.700 0.115 72 / 0.15), oklch(0.700 0.115 72 / 0.08))',
-                border: '1px solid oklch(0.700 0.115 72 / 0.30)',
-                color: GOLD,
-              }}
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export CSV
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleExport}
+                disabled={loading || filtered.length === 0}
+                size="sm"
+                className="gap-2 text-[12px] font-medium shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, oklch(0.700 0.115 72 / 0.15), oklch(0.700 0.115 72 / 0.08))',
+                  border: '1px solid oklch(0.700 0.115 72 / 0.30)',
+                  color: GOLD,
+                }}
+              >
+                <Download className="w-3.5 h-3.5" />
+                CSV
+              </Button>
+              <Button
+                onClick={handleExportPdf}
+                disabled={loading || filtered.length === 0}
+                size="sm"
+                className="gap-2 text-[12px] font-medium shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, oklch(0.620 0.160 18 / 0.15), oklch(0.620 0.160 18 / 0.08))',
+                  border: '1px solid oklch(0.620 0.160 18 / 0.30)',
+                  color: CORAL,
+                }}
+              >
+                <Download className="w-3.5 h-3.5" />
+                PDF
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -641,6 +904,150 @@ export default function ReportsPage() {
           </ScrollArea>
         )}
       </div>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="mt-6 flex flex-col gap-6">
+
+          {/* Net Worth Over Time */}
+          <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-3.5 h-3.5" style={{ color: EMERALD }} />
+              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time</p>
+            </div>
+            {loading ? (
+              <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
+            ) : (
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={netWorthData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v: number) => formatCurrency(v, currency)}
+                      width={72}
+                    />
+                    <Tooltip
+                      formatter={(v: number) => [formatCurrency(v, currency), 'Net Worth']}
+                      contentStyle={{
+                        fontSize: 11,
+                        background: 'var(--card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        color: 'var(--foreground)',
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="netWorth"
+                      stroke={EMERALD}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, fill: EMERALD, strokeWidth: 0 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Monthly Income vs Expenses */}
+          <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
+              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Monthly Income vs. Expenses — Last 12 Months</p>
+            </div>
+            {loading ? (
+              <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
+            ) : (
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v: number) => formatCurrency(v, currency)}
+                      width={72}
+                    />
+                    <Tooltip
+                      formatter={(v: number, name: string) => [formatCurrency(v, currency), name]}
+                      contentStyle={{
+                        fontSize: 11,
+                        background: 'var(--card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        color: 'var(--foreground)',
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+                    <Bar dataKey="income" name="Income" fill={EMERALD} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="expenses" name="Expenses" fill={CORAL} radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Spending by Merchant */}
+          <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Store className="w-3.5 h-3.5" style={{ color: CORAL }} />
+                <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Spending by Merchant</p>
+              </div>
+              <span className="text-[11px] text-muted-foreground">{presetLabel}</span>
+            </div>
+            {loading ? (
+              <div className="flex flex-col gap-2">
+                {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-8 rounded-lg bg-muted animate-pulse" />)}
+              </div>
+            ) : merchantBreakdown.length === 0 ? (
+              <p className="text-[13px] text-muted-foreground text-center py-6">No expense transactions in this period</p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {merchantBreakdown.map((merchant, i) => (
+                  <div key={merchant.displayName + i} className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[11px] tabular-nums text-muted-foreground w-4 text-right shrink-0">{i + 1}</span>
+                        <span className="text-[12px] font-medium truncate">{merchant.displayName}</span>
+                        <span className="text-[10px] text-muted-foreground shrink-0 ml-0.5">{merchant.count}×</span>
+                      </div>
+                      <span className="text-[12px] tabular-nums shrink-0" style={{ color: CORAL }}>
+                        {formatCurrency(merchant.amount, currency)}
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(merchant.amount / merchantBreakdown[0].amount) * 100}%`,
+                          background: CORAL,
+                          opacity: 0.65,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </TabsContent>
 
         <TabsContent value="thirteenth" className="mt-0 -mx-4 md:-mx-6">

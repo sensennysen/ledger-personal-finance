@@ -1,9 +1,11 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
-import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, Upload, CheckSquare, Square, Tag, Trash2 } from 'lucide-react'
+import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { useCategories } from '@/hooks/useCategories'
-import { formatDate, getCustomMonthRange, getCurrentCycleMonthKey } from '@/lib/utils'
+import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
+import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
+import { formatDate, formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -18,6 +20,7 @@ import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
 import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
+import { TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import type { Transaction } from '@/types'
 
 function getMonthKey(date: Date) {
@@ -55,6 +58,14 @@ export default function TransactionsPage() {
 
   // ── Import CSV ────────────────────────────────────────────
   const [importOpen, setImportOpen] = useState(false)
+
+  // ── Templates ─────────────────────────────────────────────
+  const { templates, addTemplate, removeTemplate } = useTransactionTemplates()
+  // tx pending "save as template" name input
+  const [templateSourceTx, setTemplateSourceTx] = useState<Transaction | null>(null)
+  const [templateName, setTemplateName] = useState('')
+  // pre-filled values when opening "Add" dialog from a template
+  const [templateDefaults, setTemplateDefaults] = useState<Partial<TransactionFormValues> | undefined>(undefined)
 
   // ── Undo delete ───────────────────────────────────────────
   type UndoState = { snapshots: Transaction[]; message: string }
@@ -110,6 +121,48 @@ export default function TransactionsPage() {
       })
     }
   }, [undoState, createTransaction])
+
+  // ── Keyboard shortcuts ─────────────────────────────────────
+  useKeyboardShortcut('n', useCallback(() => {
+    setTemplateDefaults(undefined)
+    setCreateOpen(true)
+  }, []))
+
+  // ── Template handlers ──────────────────────────────────────
+
+  const handleUseTemplate = (id: string) => {
+    const t = templates.find((tmpl) => tmpl.id === id)
+    if (!t) return
+    setTemplateDefaults({
+      ...t.values,
+      date: new Date().toISOString().split('T')[0],
+    })
+    setCreateOpen(true)
+  }
+
+  const handleSaveTemplateConfirm = () => {
+    if (!templateSourceTx || !templateName.trim()) return
+    addTemplate(templateName.trim(), {
+      type: templateSourceTx.type,
+      account_id: templateSourceTx.account_id,
+      to_account_id: templateSourceTx.to_account_id,
+      category_id: templateSourceTx.category_id,
+      subcategory_id: templateSourceTx.subcategory_id,
+      amount: templateSourceTx.amount,
+      currency: templateSourceTx.currency,
+      exchange_rate: templateSourceTx.exchange_rate,
+      description: templateSourceTx.description,
+      notes: templateSourceTx.notes,
+      date: templateSourceTx.date,
+      transfer_fee: templateSourceTx.transfer_fee,
+      is_recurring: templateSourceTx.is_recurring,
+      recurrence_interval: templateSourceTx.recurrence_interval,
+      recurrence_end_date: templateSourceTx.recurrence_end_date,
+      receipt_url: null,
+    })
+    setTemplateSourceTx(null)
+    setTemplateName('')
+  }
 
   // ── Filtered / grouped ─────────────────────────────────────
 
@@ -276,7 +329,15 @@ export default function TransactionsPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Transactions</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold">Transactions</h1>
+          <span
+            className="hidden sm:inline-flex items-center gap-1 text-[10px] text-muted-foreground/60 border border-border/40 rounded px-1.5 py-0.5 select-none"
+            title="Keyboard shortcuts: N = new transaction"
+          >
+            <Keyboard className="w-2.5 h-2.5" />N
+          </span>
+        </div>
         <div className="flex items-center gap-1.5">
           <Button
             variant="ghost"
@@ -300,14 +361,18 @@ export default function TransactionsPage() {
             )}
             <span className="hidden sm:inline">Select</span>
           </Button>
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
             <DialogTrigger render={<Button className="gap-2" size="sm" />}>
               <Plus className="w-4 h-4" />Add
             </DialogTrigger>
             <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
               {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
-              <TransactionForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} />
+              <TransactionForm
+                defaultValues={templateDefaults}
+                onSubmit={handleCreate}
+                onClose={() => { setCreateOpen(false); setTemplateDefaults(undefined); setFormError(null) }}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -366,6 +431,40 @@ export default function TransactionsPage() {
         </div>
       )}
 
+      {/* Templates strip */}
+      {templates.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+            <Bookmark className="w-3 h-3" />Templates
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+            {templates.map((tmpl) => (
+              <div
+                key={tmpl.id}
+                className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none"
+                onClick={() => handleUseTemplate(tmpl.id)}
+              >
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-medium truncate max-w-30">{tmpl.name}</span>
+                  <span className={`text-[11px] ${TRANSACTION_TYPE_COLOR[tmpl.values.type]}`}>
+                    {tmpl.values.type === 'income' ? '+' : tmpl.values.type === 'expense' ? '-' : ''}
+                    {formatCurrency(tmpl.values.amount, tmpl.values.currency)}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-muted border border-border text-muted-foreground hover:text-destructive"
+                  onClick={(e) => { e.stopPropagation(); removeTemplate(tmpl.id) }}
+                  aria-label={`Remove ${tmpl.name} template`}
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Transaction list */}
       {loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
@@ -395,6 +494,7 @@ export default function TransactionsPage() {
                     onEdit={setEditingTx}
                     onDelete={handleDelete}
                     onSplit={setSplittingTx}
+                    onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
                     selectable={selectMode}
                     selected={selectedIds.has(tx.id)}
                     onSelect={toggleSelect}
@@ -473,6 +573,34 @@ export default function TransactionsPage() {
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setRecategorizeOpen(false)}>Cancel</Button>
               <Button onClick={handleBulkRecategorize}>Apply</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Save as template dialog */}
+      <Dialog open={!!templateSourceTx} onOpenChange={(open) => { if (!open) { setTemplateSourceTx(null); setTemplateName('') } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bookmark className="w-4 h-4" />Save as Template
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="template-name">Template name</Label>
+              <Input
+                id="template-name"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="e.g. Daily commute"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTemplateConfirm() }}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setTemplateSourceTx(null); setTemplateName('') }}>Cancel</Button>
+              <Button onClick={handleSaveTemplateConfirm} disabled={!templateName.trim()}>Save</Button>
             </div>
           </div>
         </DialogContent>

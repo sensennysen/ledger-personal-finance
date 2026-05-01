@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors } from 'lucide-react'
+import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
 import { PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
@@ -29,6 +29,8 @@ interface TransactionRowProps {
   onDelete: (id: string) => Promise<void>
   /** Called when the scissors button is clicked. Only shown when provided and tx.type !== 'transfer'. */
   onSplit?: (tx: Transaction) => void
+  /** Called when the user wants to save this transaction as a template. */
+  onSaveTemplate?: (tx: Transaction) => void
   /** When true, a checkbox is shown for bulk selection. */
   selectable?: boolean
   /** Controlled checked state of the checkbox. */
@@ -47,6 +49,7 @@ export function TransactionRow({
   onEdit,
   onDelete,
   onSplit,
+  onSaveTemplate,
   selectable,
   selected,
   onSelect,
@@ -183,6 +186,18 @@ export function TransactionRow({
           onClick={() => onSplit(tx)}
         >
           <Scissors className="w-3 h-3" />
+        </Button>
+      )}
+      {/* Save as template */}
+      {onSaveTemplate && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+          title="Save as template"
+          onClick={() => onSaveTemplate(tx)}
+        >
+          <Bookmark className="w-3 h-3" />
         </Button>
       )}
       {/* Delete */}

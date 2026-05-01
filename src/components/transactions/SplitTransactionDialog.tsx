@@ -104,63 +104,72 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
             <p className="font-semibold shrink-0 ml-2">{formatCurrency(total, tx.currency)}</p>
           </div>
 
-          {/* Column headers */}
-          <div className="grid grid-cols-[1fr_144px_88px_32px] gap-2 px-0.5">
-            <Label className="text-xs text-muted-foreground">Description</Label>
-            <Label className="text-xs text-muted-foreground">Category</Label>
-            <Label className="text-xs text-muted-foreground">Amount</Label>
-            <span />
-          </div>
-
           {/* Split lines */}
           <div className="space-y-2">
-            {lines.map((line) => (
-              <div key={line.id} className="grid grid-cols-[1fr_144px_88px_32px] gap-2 items-center">
-                <Input
-                  value={line.description}
-                  onChange={(e) => update(line.id, 'description', e.target.value)}
-                  placeholder="Description"
-                />
-                <Select
-                  value={line.category_id ?? UNCATEGORIZED_VALUE}
-                  onValueChange={(v) => update(line.id, 'category_id', v === UNCATEGORIZED_VALUE ? null : v)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Category">
-                      {line.category_id
-                        ? (() => {
-                            const cat = categories.find((c) => c.id === line.category_id)
-                            return cat ? `${cat.icon} ${cat.name}` : 'Category'
-                          })()
-                        : 'Uncategorized'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UNCATEGORIZED_VALUE}>Uncategorized</SelectItem>
-                    {filteredCats.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.icon} {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={line.amount || ''}
-                  onChange={(e) => update(line.id, 'amount', parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-8 text-muted-foreground hover:text-destructive"
-                  onClick={() => removeLine(line.id)}
-                  disabled={lines.length <= 2}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
+            {lines.map((line, idx) => (
+              <div key={line.id} className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                {/* Row 1: description label + input */}
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">
+                    Split {idx + 1}
+                  </Label>
+                  <Input
+                    value={line.description}
+                    onChange={(e) => update(line.id, 'description', e.target.value)}
+                    placeholder="Description"
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Row 2: category + amount + delete */}
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground mb-1 block">Category</Label>
+                    <Select
+                      value={line.category_id ?? UNCATEGORIZED_VALUE}
+                      onValueChange={(v) => update(line.id, 'category_id', v === UNCATEGORIZED_VALUE ? null : v)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Category">
+                          {line.category_id
+                            ? (() => {
+                                const cat = categories.find((c) => c.id === line.category_id)
+                                return cat ? `${cat.icon} ${cat.name}` : 'Category'
+                              })()
+                            : 'Uncategorized'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNCATEGORIZED_VALUE}>Uncategorized</SelectItem>
+                        {filteredCats.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.icon} {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-28 shrink-0">
+                    <Label className="text-xs text-muted-foreground mb-1 block">Amount</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={line.amount || ''}
+                      onChange={(e) => update(line.id, 'amount', parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-8 shrink-0 self-end text-muted-foreground hover:text-destructive"
+                    onClick={() => removeLine(line.id)}
+                    disabled={lines.length <= 2}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

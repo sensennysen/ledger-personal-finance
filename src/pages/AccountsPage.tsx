@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, Wallet, MoreHorizontal, TriangleAlert } from 'luc
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_COLORS, CURRENCIES, type AccountType } from '@/types'
+import { ColorPicker } from '@/components/ui/color-picker'
 import { formatCurrency } from '@/lib/utils'
 import { GOLD } from '@/constants/colors'
 import { DEFAULT_CURRENCY } from '@/constants/accounts'
@@ -163,20 +164,11 @@ function AccountForm({
             <FormItem>
               <FormLabel>Color</FormLabel>
               <FormControl>
-                <div className="flex gap-2 flex-wrap">
-                  {ACCOUNT_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => field.onChange(c)}
-                      className="w-7 h-7 rounded-full border-2 transition-all"
-                      style={{
-                        backgroundColor: c,
-                        borderColor: field.value === c ? 'black' : 'transparent',
-                      }}
-                    />
-                  ))}
-                </div>
+                <ColorPicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  palette={ACCOUNT_COLORS}
+                />
               </FormControl>
             </FormItem>
           )}

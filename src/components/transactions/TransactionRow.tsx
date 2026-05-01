@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark } from 'lucide-react'
+import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
 import { PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
@@ -21,6 +21,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { Transaction } from '@/types'
 
 interface TransactionRowProps {
@@ -166,49 +172,89 @@ export function TransactionRow({
         </div>
       </div>
 
-      {/* Edit */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-        onClick={() => onEdit(tx)}
-      >
-        <Pencil className="w-3 h-3" />
-      </Button>
+      {/* Action buttons — inline on sm+, dropdown on mobile */}
+      <div className="hidden sm:flex items-center gap-1 shrink-0">
+        {/* Edit */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+          onClick={() => onEdit(tx)}
+        >
+          <Pencil className="w-3 h-3" />
+        </Button>
 
-      {/* Split */}
-      {onSplit && tx.type !== 'transfer' && (
+        {/* Split — always reserves space when onSplit is provided */}
+        {onSplit && (
+          tx.type !== 'transfer' ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              title="Split transaction"
+              onClick={() => onSplit(tx)}
+            >
+              <Scissors className="w-3 h-3" />
+            </Button>
+          ) : (
+            <div className="h-7 w-7 shrink-0" aria-hidden />
+          )
+        )}
+        {/* Save as template */}
+        {onSaveTemplate && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            title="Save as template"
+            onClick={() => onSaveTemplate(tx)}
+          >
+            <Bookmark className="w-3 h-3" />
+          </Button>
+        )}
+        {/* Delete */}
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-          title="Split transaction"
-          onClick={() => onSplit(tx)}
+          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+          onClick={async () => { await onDelete(tx.id) }}
         >
-          <Scissors className="w-3 h-3" />
+          <Trash2 className="w-3 h-3" />
         </Button>
-      )}
-      {/* Save as template */}
-      {onSaveTemplate && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-          title="Save as template"
-          onClick={() => onSaveTemplate(tx)}
-        >
-          <Bookmark className="w-3 h-3" />
-        </Button>
-      )}
-      {/* Delete */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-        onClick={async () => { await onDelete(tx.id) }}
-      >
-        <Trash2 className="w-3 h-3" />
-      </Button>
+      </div>
+
+      {/* Mobile: collapsed actions dropdown */}
+      <div className="sm:hidden shrink-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEdit(tx)}>
+              <Pencil className="w-4 h-4" />
+              Edit
+            </DropdownMenuItem>
+            {onSplit && tx.type !== 'transfer' && (
+              <DropdownMenuItem onClick={() => onSplit(tx)}>
+                <Scissors className="w-4 h-4" />
+                Split
+              </DropdownMenuItem>
+            )}
+            {onSaveTemplate && (
+              <DropdownMenuItem onClick={() => onSaveTemplate(tx)}>
+                <Bookmark className="w-4 h-4" />
+                Save as template
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem variant="destructive" onClick={async () => { await onDelete(tx.id) }}>
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Receipt viewer */}
       {tx.receipt_url && !tx.receipt_url.startsWith(PENDING_RECEIPT_PREFIX) && isValidReceiptUrl(tx.receipt_url) && (

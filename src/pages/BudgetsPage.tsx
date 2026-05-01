@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { ColorPicker } from '@/components/ui/color-picker'
 import type { Budget, SavingsGoal } from '@/types'
 
 // --- Budget form ---
@@ -366,22 +367,11 @@ function GoalForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Color</FormLabel>
-              <div className="flex gap-2 flex-wrap">
-                {ACCOUNT_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => field.onChange(c)}
-                    className="w-7 h-7 rounded-full border-2 transition-transform hover:scale-110"
-                    style={{
-                      backgroundColor: c,
-                      borderColor: selectedColor === c ? 'white' : 'transparent',
-                      outline: selectedColor === c ? `2px solid ${c}` : 'none',
-                      outlineOffset: '1px',
-                    }}
-                  />
-                ))}
-              </div>
+              <ColorPicker
+                value={field.value}
+                onChange={field.onChange}
+                palette={ACCOUNT_COLORS}
+              />
             </FormItem>
           )}
         />

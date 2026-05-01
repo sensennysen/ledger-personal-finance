@@ -398,17 +398,17 @@ export default function DashboardPage() {
         className="rounded-xl border border-border/60 overflow-hidden bg-card"
       >
         <div className="px-5 pt-5 pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-semibold text-[15px]">Cash Flow</p>
               <p className="text-[12px] text-muted-foreground mt-0.5">Income vs expenses over time</p>
             </div>
             <Tabs value={chartPeriod} onValueChange={(v) => setChartPeriod(v as 'week' | 'month' | 'quarterly' | 'yearly')}>
-              <TabsList className="h-8">
-                <TabsTrigger value="week" className="text-xs px-3">This Week</TabsTrigger>
-                <TabsTrigger value="month" className="text-xs px-3">This Month</TabsTrigger>
-                <TabsTrigger value="quarterly" className="text-xs px-3">Quarterly</TabsTrigger>
-                <TabsTrigger value="yearly" className="text-xs px-3">Yearly</TabsTrigger>
+              <TabsList className="h-8 w-full sm:w-auto">
+                <TabsTrigger value="week" className="text-xs flex-1 sm:flex-none px-3">This Week</TabsTrigger>
+                <TabsTrigger value="month" className="text-xs flex-1 sm:flex-none px-3">This Month</TabsTrigger>
+                <TabsTrigger value="quarterly" className="text-xs flex-1 sm:flex-none px-3">Quarterly</TabsTrigger>
+                <TabsTrigger value="yearly" className="text-xs flex-1 sm:flex-none px-3">Yearly</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -462,30 +462,32 @@ export default function DashboardPage() {
           ) : expensesByCategory.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-12">No expenses for {monthLabel}</p>
           ) : (
-            <div className="flex gap-4 items-center">
-              <ResponsiveContainer width="50%" height={200}>
-                <PieChart>
-                  <Pie
-                    data={expensesByCategory}
-                    dataKey="amount"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={52}
-                    outerRadius={78}
-                    strokeWidth={2}
-                    stroke="var(--card)"
-                  >
-                    {expensesByCategory.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v) => formatCurrency(v as number, currency)}
-                    contentStyle={CHART_TOOLTIP_STYLE}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex justify-center sm:block sm:w-[50%]">
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={expensesByCategory}
+                      dataKey="amount"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={52}
+                      outerRadius={78}
+                      strokeWidth={2}
+                      stroke="var(--card)"
+                    >
+                      {expensesByCategory.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v) => formatCurrency(v as number, currency)}
+                      contentStyle={CHART_TOOLTIP_STYLE}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
               <div className="flex-1 space-y-1.5 min-w-0">
                 {expensesByCategory.map((cat, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">

@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ColorPicker } from '@/components/ui/color-picker'
 import type { Category, Subcategory } from '@/types'
 
 const CATEGORY_COLORS = [
@@ -130,17 +131,11 @@ function CategoryForm({
             <FormItem>
               <FormLabel>Color</FormLabel>
               <FormControl>
-                <div className="flex gap-2 flex-wrap">
-                  {CATEGORY_COLORS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => field.onChange(c)}
-                      className="w-7 h-7 rounded-full border-2 transition-all"
-                      style={{ backgroundColor: c, borderColor: field.value === c ? 'black' : 'transparent' }}
-                    />
-                  ))}
-                </div>
+                <ColorPicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  palette={CATEGORY_COLORS}
+                />
               </FormControl>
             </FormItem>
           )}

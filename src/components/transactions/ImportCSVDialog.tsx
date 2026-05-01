@@ -364,7 +364,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                 {/* Account selector */}
                 <div className="space-y-1.5">
                   <Label>Import to account</Label>
-                  <Select value={accountId} onValueChange={setAccountId}>
+                  <Select value={accountId} onValueChange={(v) => setAccountId(v ?? '')}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select account" />
                     </SelectTrigger>

@@ -942,7 +942,7 @@ export default function ReportsPage() {
                       width={72}
                     />
                     <Tooltip
-                      formatter={(v: number) => [formatCurrency(v, currency), 'Net Worth']}
+                      formatter={(v) => [formatCurrency(v as number, currency), 'Net Worth']}
                       contentStyle={{
                         fontSize: 11,
                         background: 'var(--card)',
@@ -992,7 +992,7 @@ export default function ReportsPage() {
                       width={72}
                     />
                     <Tooltip
-                      formatter={(v: number, name: string) => [formatCurrency(v, currency), name]}
+                      formatter={(v, name) => [formatCurrency(v as number, currency), name as string]}
                       contentStyle={{
                         fontSize: 11,
                         background: 'var(--card)',

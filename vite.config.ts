@@ -17,6 +17,7 @@ export default defineConfig({
       workbox: {
         // Cache all app shell assets
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
         // Network-first for navigations so fresh HTML is always preferred
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api\//],

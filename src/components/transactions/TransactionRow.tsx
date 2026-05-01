@@ -13,7 +13,7 @@ function isValidReceiptUrl(url: string): boolean {
     return false
   }
 }
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -226,10 +226,8 @@ export function TransactionRow({
       {/* Mobile: collapsed actions dropdown */}
       <div className="sm:hidden shrink-0">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
+          <DropdownMenuTrigger className={buttonVariants({ variant: 'ghost', size: 'icon', className: 'h-7 w-7 text-muted-foreground hover:text-foreground' })}>
+            <MoreHorizontal className="w-4 h-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onEdit(tx)}>

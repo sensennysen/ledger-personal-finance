@@ -549,7 +549,7 @@ export default function TransactionsPage() {
           <div className="space-y-4 pt-1">
             <div className="space-y-1.5">
               <Label>New category</Label>
-              <Select value={recategorizeCategoryId} onValueChange={setRecategorizeCategoryId}>
+              <Select value={recategorizeCategoryId} onValueChange={(v) => setRecategorizeCategoryId(v ?? '')}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select category">
                     {recategorizeCategoryId === UNCATEGORIZED_VALUE

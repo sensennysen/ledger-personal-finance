@@ -73,20 +73,11 @@ export default function Sidebar() {
       >
         {/* Logo */}
         <div className={cn('flex items-center h-14 px-3 border-b border-sidebar-border', collapsed && 'justify-center')}>
-          <div
-            className="flex items-center justify-center w-8 h-8 rounded-lg shrink-0"
-            style={{
-              background: 'linear-gradient(135deg, oklch(0.700 0.115 72 / 0.25), oklch(0.700 0.115 72 / 0.08))',
-              boxShadow: '0 0 0 1px oklch(0.700 0.115 72 / 0.30)',
-            }}
-          >
-            <span
-              className="text-primary text-sm font-bold"
-              style={{ fontFamily: '"DM Mono", monospace', letterSpacing: '0.05em' }}
-            >
-              L
-            </span>
-          </div>
+          <img
+            src={theme === 'dark' ? '/l-white.png' : '/l-black.png'}
+            alt="Ledger"
+            className="w-8 h-8 object-contain shrink-0"
+          />
           {!collapsed && (
             <span
               className="ml-2.5 text-[13px] font-semibold tracking-[0.08em] text-foreground/80 truncate uppercase"

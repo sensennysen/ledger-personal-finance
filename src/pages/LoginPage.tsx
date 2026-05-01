@@ -1,7 +1,9 @@
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function LoginPage() {
   const { signInWithGoogle, loading } = useAuth()
+  const { theme } = useTheme()
 
   const params = new URLSearchParams(window.location.search)
   // Only show the error when Supabase supplies both `error` and `error_description`
@@ -59,20 +61,11 @@ export default function LoginPage() {
         {/* ── Brand mark ── */}
         <div className="text-center mb-10">
           <div className="flex items-center justify-center mb-7">
-            <div
-              className="w-13 h-13 rounded-2xl flex items-center justify-center"
-              style={{
-                background: 'linear-gradient(135deg, oklch(0.700 0.115 72 / 0.28), oklch(0.700 0.115 72 / 0.08))',
-                boxShadow: '0 0 0 1px oklch(0.700 0.115 72 / 0.35), 0 8px 32px oklch(0.700 0.115 72 / 0.08)',
-              }}
-            >
-              <span
-                className="text-primary text-xl font-bold"
-                style={{ fontFamily: '"DM Mono", monospace' }}
-              >
-                L
-              </span>
-            </div>
+            <img
+              src={theme === 'dark' ? '/l-white.png' : '/l-black.png'}
+              alt="Ledger"
+              className="w-13 h-13 object-contain"
+            />
           </div>
 
           <h1

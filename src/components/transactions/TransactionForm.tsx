@@ -69,6 +69,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const [previewUrl, setPreviewUrl] = useState<string | null>(defaultValues?.receipt_url ?? null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -385,22 +386,49 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
         <FormField
           control={form.control}
           name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description</FormLabel>
-              <FormControl>
-                <>
-                  <datalist id="description-suggestions">
-                    {descriptionSuggestions.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                  <Input placeholder="e.g. Grocery run" list="description-suggestions" {...field} />
-                </>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
+          render={({ field }) => {
+            const inputVal = field.value ?? ''
+            const filtered = inputVal.length > 0
+              ? descriptionSuggestions
+                  .filter((s) => s.toLowerCase().includes(inputVal.toLowerCase()) && s.toLowerCase() !== inputVal.toLowerCase())
+                  .slice(0, 8)
+              : []
+            return (
+              <FormItem>
+                <FormLabel>Description</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input
+                      placeholder="e.g. Grocery run"
+                      autoComplete="off"
+                      {...field}
+                      onFocus={() => setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                    />
+                    {showSuggestions && filtered.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 max-h-52 overflow-y-auto rounded-lg border bg-popover text-popover-foreground shadow-md">
+                        {filtered.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors first:rounded-t-lg last:rounded-b-lg truncate"
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              field.onChange(s)
+                              setShowSuggestions(false)
+                            }}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )
+          }}
         />
 
         <FormField
@@ -453,25 +481,41 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             <FormField
               control={form.control}
               name="recurrence_interval"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Interval</FormLabel>
-                  <Select
-                    onValueChange={(v) => field.onChange(v === UNCATEGORIZED_VALUE ? null : v)}
-                    value={field.value ?? UNCATEGORIZED_VALUE}
-                  >
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="biweekly">Bi-weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const intervalLabels: Record<string, string> = {
+                  daily: 'Daily',
+                  weekly: 'Weekly',
+                  biweekly: 'Bi-weekly',
+                  monthly: 'Monthly',
+                  quarterly: 'Quarterly',
+                  yearly: 'Yearly',
+                }
+                return (
+                  <FormItem>
+                    <FormLabel>Interval</FormLabel>
+                    <Select
+                      onValueChange={(v) => field.onChange(v === UNCATEGORIZED_VALUE ? null : v)}
+                      value={field.value ?? UNCATEGORIZED_VALUE}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select interval">
+                            {field.value ? intervalLabels[field.value] : 'Select interval'}
+                          </SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )
+              }}
             />
             <FormField
               control={form.control}

@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/tooltip'
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { to: '/', label: 'Home', icon: LayoutDashboard, exact: true },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
   { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { to: '/categories', label: 'Categories', icon: Tag },

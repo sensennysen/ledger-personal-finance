@@ -24,7 +24,7 @@ type RouteMetaEntry = {
 const routeMeta: RouteMetaEntry[] = [
   {
     test: (pathname) => pathname === '/',
-    title: 'Dashboard',
+    title: 'Home',
     description: 'Get a quick overview of balances, spending trends, and your latest activity.',
   },
   {

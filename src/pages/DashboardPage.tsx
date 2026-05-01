@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight, ChevronLeft } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight, ChevronLeft, Bell, BarChart3, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -141,6 +141,28 @@ function addMonths(key: string, delta: number) {
   return getMonthKey(d)
 }
 
+// ─── Recurring-transaction helpers ───────────────────────────────────────────
+function addInterval(d: Date, interval: string): Date {
+  const nd = new Date(d)
+  switch (interval) {
+    case 'daily':     nd.setDate(nd.getDate() + 1); break
+    case 'weekly':    nd.setDate(nd.getDate() + 7); break
+    case 'biweekly':  nd.setDate(nd.getDate() + 14); break
+    case 'monthly':   nd.setMonth(nd.getMonth() + 1); break
+    case 'quarterly': nd.setMonth(nd.getMonth() + 3); break
+    case 'yearly':    nd.setFullYear(nd.getFullYear() + 1); break
+  }
+  return nd
+}
+
+/** Returns the first occurrence of a recurring series on or after `floor`. */
+function computeNextDueDate(lastDateStr: string, interval: string, floor: Date): Date {
+  let d = new Date(lastDateStr + 'T00:00:00')
+  d = addInterval(d, interval)
+  while (d < floor) d = addInterval(d, interval)
+  return d
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate()
   const { profile } = useAuth()
@@ -206,6 +228,90 @@ export default function DashboardPage() {
     () => transactions.filter((t) => t.date >= monthStart && t.date <= monthEnd).slice(0, 5),
     [transactions, monthStart, monthEnd]
   )
+
+  // ---- Upcoming bills (selected billing cycle) ----
+  const upcomingBills = useMemo(() => {
+    const todayLocal = new Date()
+    todayLocal.setHours(0, 0, 0, 0)
+    const cycleStart = new Date(monthStart + 'T00:00:00')
+    const cycleEnd = new Date(monthEnd + 'T00:00:00')
+    // Floor: for the current cycle show from today; for past/future show full cycle
+    const floor = isCurrentMonth ? todayLocal : cycleStart
+
+    const recurringExp = transactions.filter(
+      (t) => t.is_recurring && t.recurrence_interval && t.type === 'expense'
+    )
+    // Keep latest occurrence per series
+    const seriesMap = new Map<string, typeof recurringExp[0]>()
+    for (const tx of recurringExp) {
+      const k = `${tx.description}|${tx.account_id}|${tx.recurrence_interval}`
+      const ex = seriesMap.get(k)
+      if (!ex || tx.date > ex.date) seriesMap.set(k, tx)
+    }
+
+    const bills: Array<{ key: string; tx: typeof recurringExp[0]; nextDue: Date; daysUntil: number | null }> = []
+    for (const [key, tx] of seriesMap.entries()) {
+      const interval = tx.recurrence_interval!
+      const nextDue = computeNextDueDate(tx.date, interval, floor)
+      if (nextDue > cycleEnd) continue
+      if (nextDue < cycleStart) continue
+      if (tx.recurrence_end_date && nextDue > new Date(tx.recurrence_end_date + 'T00:00:00')) continue
+      const daysUntil = isCurrentMonth
+        ? Math.round((nextDue.getTime() - todayLocal.getTime()) / 86400000)
+        : null
+      bills.push({ key, tx, nextDue, daysUntil })
+    }
+    return bills.sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
+  }, [transactions, monthStart, monthEnd, isCurrentMonth])
+
+  // ---- Cash flow forecast (selected billing cycle) ----
+  const cashFlowForecast = useMemo(() => {
+    const todayLocal = new Date()
+    todayLocal.setHours(0, 0, 0, 0)
+    const cycleStart = new Date(monthStart + 'T00:00:00')
+    const cycleEnd = new Date(monthEnd + 'T00:00:00')
+    // For current month forecast remaining items from tomorrow; for other months use full cycle
+    const floor = isCurrentMonth
+      ? (() => { const t = new Date(todayLocal); t.setDate(t.getDate() + 1); return t })()
+      : cycleStart
+
+    const recurringTx = transactions.filter(
+      (t) => t.is_recurring && t.recurrence_interval && (t.type === 'income' || t.type === 'expense')
+    )
+    const seriesMap = new Map<string, typeof recurringTx[0]>()
+    for (const tx of recurringTx) {
+      const k = `${tx.description}|${tx.account_id}|${tx.recurrence_interval}`
+      const ex = seriesMap.get(k)
+      if (!ex || tx.date > ex.date) seriesMap.set(k, tx)
+    }
+
+    let projectedIncome = 0
+    let projectedExpenses = 0
+    const forecastItems: Array<{ tx: typeof recurringTx[0]; occurrences: number; total: number }> = []
+    for (const tx of seriesMap.values()) {
+      const interval = tx.recurrence_interval!
+      let d = computeNextDueDate(tx.date, interval, floor)
+      let count = 0
+      while (d <= cycleEnd) {
+        if (d >= cycleStart) {
+          if (!tx.recurrence_end_date || d <= new Date(tx.recurrence_end_date + 'T00:00:00')) count++
+        }
+        d = addInterval(d, interval)
+      }
+      if (count === 0) continue
+      const total = count * tx.amount
+      if (tx.type === 'income') projectedIncome += total
+      else projectedExpenses += total
+      forecastItems.push({ tx, occurrences: count, total })
+    }
+    forecastItems.sort((a, b) => b.total - a.total)
+    return {
+      projectedIncome,
+      projectedExpenses,
+      projectedBalance: stats.totalBalance + projectedIncome - projectedExpenses,
+      forecastItems,
+    }
+  }, [transactions, monthStart, monthEnd, isCurrentMonth, stats.totalBalance])
 
   const loading = accountsLoading || txLoading
 
@@ -485,6 +591,170 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+      </div>
+
+      {/* ─── Upcoming Bills + Cash Flow Forecast ──────────────────────────────── */}
+      <div className="grid gap-4 lg:grid-cols-2">
+
+        {/* Upcoming Bills */}
+        <div className="rounded-xl border border-border/60 p-5 bg-card">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="font-semibold text-[15px]">Upcoming Bills</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                {isCurrentMonth ? 'Recurring expenses this cycle' : `Recurring expenses · ${monthLabel}`}
+              </p>
+            </div>
+            <div className="w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border">
+              <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+            </div>
+          </div>
+          {loading ? (
+            <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
+          ) : upcomingBills.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No upcoming bills this cycle</p>
+          ) : (
+            <div className="space-y-0.5">
+              {upcomingBills.slice(0, 6).map(({ key, tx, nextDue, daysUntil }) => (
+                <div key={key} className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-white/3 transition-colors">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0"
+                    style={{ backgroundColor: (tx.category?.color ?? '#6b7280') + '22' }}
+                  >
+                    {tx.category?.icon ?? '📅'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium truncate text-foreground/90">{tx.description}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {tx.recurrence_interval && (
+                        <span className="ml-1.5 capitalize opacity-60">· {tx.recurrence_interval}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="money text-[13px] font-semibold" style={{ color: CORAL }}>
+                      −{formatCurrency(tx.amount, tx.currency)}
+                    </p>
+                    {daysUntil !== null && (
+                      <p
+                        className="text-[10px] font-medium"
+                        style={{
+                          color:
+                            daysUntil === 0 ? CORAL
+                            : daysUntil <= 3 ? 'oklch(0.750 0.140 75)'
+                            : 'oklch(0.570 0.015 290)',
+                        }}
+                      >
+                        {daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `in ${daysUntil}d`}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Cash Flow Forecast */}
+        <div className="rounded-xl border border-border/60 p-5 bg-card">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="font-semibold text-[15px]">Cash Flow Forecast</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5">
+                {isCurrentMonth ? 'Projected end-of-cycle balance' : `Full cycle · ${monthLabel}`}
+              </p>
+            </div>
+            <div className="w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border">
+              <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />
+            </div>
+          </div>
+          {loading ? (
+            <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8" />)}</div>
+          ) : (
+            <div className="space-y-4">
+              {/* Current → Projected balance */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 rounded-lg bg-muted/40 border border-border/40 px-3 py-2.5 text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Current</p>
+                  <p className="money text-[15px] font-bold balance-gradient">{formatCurrency(stats.totalBalance, currency)}</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+                <div className="flex-1 rounded-lg bg-muted/40 border border-border/40 px-3 py-2.5 text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Projected</p>
+                  <p
+                    className="money text-[15px] font-bold"
+                    style={{ color: cashFlowForecast.projectedBalance >= stats.totalBalance ? EMERALD : CORAL }}
+                  >
+                    {formatCurrency(cashFlowForecast.projectedBalance, currency)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Income / Expense breakdown */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: EMERALD }} />
+                    Expected income
+                  </span>
+                  <span className="money font-medium" style={{ color: EMERALD }}>
+                    +{formatCurrency(cashFlowForecast.projectedIncome, currency)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <TrendingDown className="w-3.5 h-3.5 shrink-0" style={{ color: CORAL }} />
+                    Expected expenses
+                  </span>
+                  <span className="money font-medium" style={{ color: CORAL }}>
+                    −{formatCurrency(cashFlowForecast.projectedExpenses, currency)}
+                  </span>
+                </div>
+                <div className="h-px bg-border/40" />
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="text-muted-foreground">Net change</span>
+                  <span
+                    className="money font-semibold"
+                    style={{
+                      color: cashFlowForecast.projectedIncome - cashFlowForecast.projectedExpenses >= 0 ? EMERALD : CORAL,
+                    }}
+                  >
+                    {cashFlowForecast.projectedIncome - cashFlowForecast.projectedExpenses >= 0 ? '+' : ''}
+                    {formatCurrency(cashFlowForecast.projectedIncome - cashFlowForecast.projectedExpenses, currency)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Top recurring items */}
+              {cashFlowForecast.forecastItems.length > 0 ? (
+                <div className="pt-1 border-t border-border/30 space-y-1">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Recurring items</p>
+                  {cashFlowForecast.forecastItems.slice(0, 4).map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 py-1 text-[12px]">
+                      <span className="text-[13px] shrink-0">{item.tx.category?.icon ?? '🔄'}</span>
+                      <span className="flex-1 truncate text-muted-foreground">{item.tx.description}</span>
+                      {item.occurrences > 1 && (
+                        <span className="text-[10px] text-muted-foreground/50 shrink-0">×{item.occurrences}</span>
+                      )}
+                      <span
+                        className="money font-medium shrink-0"
+                        style={{ color: item.tx.type === 'income' ? EMERALD : CORAL }}
+                      >
+                        {item.tx.type === 'income' ? '+' : '−'}{formatCurrency(item.total, currency)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[12px] text-muted-foreground text-center pt-2">
+                  No recurring transactions found
+                </p>
+              )}
+            </div>
+          )}
+        </div>
 
       </div>
 

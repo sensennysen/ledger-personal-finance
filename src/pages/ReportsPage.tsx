@@ -154,6 +154,12 @@ function exportToPdf(
   merchantBreakdown: { displayName: string; amount: number; count: number }[],
   filenameLabel: string,
 ) {
+  // jsPDF's built-in Helvetica font only covers Latin-1, so Unicode currency
+  // symbols (₱, €, £, ¥, …) render as garbled characters. Use the ISO currency
+  // code display ("PHP 1,234.56") which is pure ASCII and always readable.
+  const pdfFmt = (amount: number, code: string) =>
+    formatCurrency(amount, code, { currencyDisplay: 'code' })
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 14
@@ -175,9 +181,9 @@ function exportToPdf(
   const boxWidth = (pageWidth - margin * 2 - 8) / 3
   const boxY = 42
   const summaryItems = [
-    { label: 'Total Income', value: formatCurrency(totalIncome, currency), r: 34, g: 197, b: 94 },
-    { label: 'Total Expenses', value: formatCurrency(totalExpenses, currency), r: 239, g: 68, b: 68 },
-    { label: 'Net Change', value: formatCurrency(netChange, currency), r: netChange >= 0 ? 34 : 239, g: netChange >= 0 ? 197 : 68, b: netChange >= 0 ? 94 : 68 },
+    { label: 'Total Income', value: pdfFmt(totalIncome, currency), r: 34, g: 197, b: 94 },
+    { label: 'Total Expenses', value: pdfFmt(totalExpenses, currency), r: 239, g: 68, b: 68 },
+    { label: 'Net Change', value: pdfFmt(netChange, currency), r: netChange >= 0 ? 34 : 239, g: netChange >= 0 ? 197 : 68, b: netChange >= 0 ? 94 : 68 },
   ]
   summaryItems.forEach((item, i) => {
     const x = margin + i * (boxWidth + 4)
@@ -208,8 +214,8 @@ function exportToPdf(
       head: [['Category', 'Amount', '% of Total']],
       body: categoryBreakdown.slice(0, 8).map((cat) => [
         cat.name,
-        formatCurrency(cat.amount, currency),
-        totalExpenses > 0 ? `${((cat.amount / totalExpenses) * 100).toFixed(1)}%` : '—',
+        pdfFmt(cat.amount, currency),
+        totalExpenses > 0 ? `${((cat.amount / totalExpenses) * 100).toFixed(1)}%` : '-',
       ]),
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [45, 45, 45], textColor: 255, fontStyle: 'bold' },
@@ -232,7 +238,7 @@ function exportToPdf(
       head: [['Merchant', 'Amount', 'Transactions']],
       body: merchantBreakdown.slice(0, 10).map((m) => [
         m.displayName,
-        formatCurrency(m.amount, currency),
+        pdfFmt(m.amount, currency),
         String(m.count),
       ]),
       styles: { fontSize: 8, cellPadding: 2 },
@@ -258,7 +264,8 @@ function exportToPdf(
       t.description,
       t.category?.name ?? '—',
       t.account?.name ?? '—',
-      `${t.type === 'income' ? '+' : t.type === 'transfer' ? '~' : '-'} ${formatCurrency(t.amount, t.currency)}`,
+      `${t.type === 'income' ? '+' : t.type === 'transfer' ? '~' : '-'} ${pdfFmt(t.amount, t.currency)}`,
+
     ]),
     styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak' },
     headStyles: { fillColor: [45, 45, 45], textColor: 255, fontStyle: 'bold' },

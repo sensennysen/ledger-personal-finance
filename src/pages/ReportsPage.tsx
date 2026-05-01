@@ -19,8 +19,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EMERALD, CORAL, GOLD } from '@/constants/colors'
 import type { Transaction } from '@/types'
+import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
 
@@ -312,40 +314,47 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 md:pb-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div
-            className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
-            style={{
-              background: `${GOLD.replace(')', ' / 0.12)')}`,
-              boxShadow: `0 0 0 1px ${GOLD.replace(')', ' / 0.20)')}`,
-            }}
-          >
-            <FileBarChart2 className="w-4 h-4" style={{ color: GOLD }} />
+      <Tabs defaultValue="overview">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
+              style={{
+                background: `${GOLD.replace(')', ' / 0.12)')}`,
+                boxShadow: `0 0 0 1px ${GOLD.replace(')', ' / 0.20)')}`,
+              }}
+            >
+              <FileBarChart2 className="w-4 h-4" style={{ color: GOLD }} />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight">Reports</h1>
+              <p className="text-[12px] text-muted-foreground">{presetLabel}</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">Reports</h1>
-            <p className="text-[12px] text-muted-foreground">{presetLabel}</p>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <TabsList className="h-8">
+              <TabsTrigger value="overview" className="text-[12px] h-7 px-3">Overview</TabsTrigger>
+              <TabsTrigger value="thirteenth" className="text-[12px] h-7 px-3">13th Month</TabsTrigger>
+            </TabsList>
+            <Button
+              onClick={handleExport}
+              disabled={loading || filtered.length === 0}
+              size="sm"
+              className="gap-2 text-[12px] font-medium shrink-0"
+              style={{
+                background: 'linear-gradient(135deg, oklch(0.700 0.115 72 / 0.15), oklch(0.700 0.115 72 / 0.08))',
+                border: '1px solid oklch(0.700 0.115 72 / 0.30)',
+                color: GOLD,
+              }}
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export CSV
+            </Button>
           </div>
         </div>
 
-        <Button
-          onClick={handleExport}
-          disabled={loading || filtered.length === 0}
-          size="sm"
-          className="gap-2 text-[12px] font-medium shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, oklch(0.700 0.115 72 / 0.15), oklch(0.700 0.115 72 / 0.08))',
-            border: '1px solid oklch(0.700 0.115 72 / 0.30)',
-            color: GOLD,
-          }}
-        >
-          <Download className="w-3.5 h-3.5" />
-          Export CSV
-        </Button>
-      </div>
-
+        <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
       {/* Date controls */}
       <div
         className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-4"
@@ -632,6 +641,12 @@ export default function ReportsPage() {
           </ScrollArea>
         )}
       </div>
+        </TabsContent>
+
+        <TabsContent value="thirteenth" className="mt-0 -mx-4 md:-mx-6">
+          <ThirteenthMonthPage />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

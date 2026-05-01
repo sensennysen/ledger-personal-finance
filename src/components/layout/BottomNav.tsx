@@ -23,7 +23,7 @@ export default function BottomNav() {
         className="absolute top-0 left-0 right-0 h-px"
         style={{ background: 'linear-gradient(90deg, transparent, oklch(0.700 0.115 72 / 0.3), transparent)' }}
       />
-      <div className="flex items-center h-15">
+      <div className="flex items-center h-16">
         {navItems.map(({ to, label, icon: Icon, exact }) => {
           const active = exact ? location.pathname === to : location.pathname.startsWith(to)
           return (
@@ -32,14 +32,25 @@ export default function BottomNav() {
               to={to}
               end={exact}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-medium tracking-wide transition-all duration-200 min-w-0',
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-all duration-200 min-w-0',
                 active
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Icon className={cn('w-4.5 h-4.5 transition-transform duration-200', active && 'scale-110')} />
-              <span className="uppercase tracking-[0.06em]">{label}</span>
+              <div className={cn(
+                'flex items-center justify-center rounded-full transition-all duration-200',
+                active ? 'bg-primary/10 w-10 h-6' : 'w-6 h-6'
+              )}>
+                <Icon className={cn(
+                  'transition-all duration-200',
+                  active ? 'w-4 h-4' : 'w-5 h-5'
+                )} />
+              </div>
+              <span className={cn(
+                'uppercase tracking-[0.06em] font-medium transition-all duration-200 leading-none',
+                active ? 'text-[10px] opacity-100 max-h-4' : 'text-[0px] opacity-0 max-h-0 overflow-hidden'
+              )}>{label}</span>
             </NavLink>
           )
         })}

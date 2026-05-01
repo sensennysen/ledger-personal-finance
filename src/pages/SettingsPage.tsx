@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays } from 'lucide-react'
+import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useTheme } from '@/contexts/ThemeContext'
+import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
@@ -29,7 +29,7 @@ type ProfileValues = z.infer<typeof profileSchema>
 
 export default function SettingsPage() {
   const { user, profile, signOut, refreshProfile } = useAuth()
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, fontSize, setFontSize } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
   const [saved, setSaved] = useState(false)
 
@@ -138,7 +138,10 @@ export default function SettingsPage() {
           <CardDescription>Choose your preferred colour scheme</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-3">
+          <div className="space-y-5">
+          <div>
+            <p className="text-sm font-medium mb-2 flex items-center gap-2"><Sun className="w-4 h-4" /> Colour Scheme</p>
+            <div className="flex gap-3">
             <button
               onClick={() => setTheme('light')}
               className={cn(
@@ -163,6 +166,30 @@ export default function SettingsPage() {
               <Moon className={cn('w-5 h-5', theme === 'dark' ? 'text-primary' : 'text-muted-foreground')} />
               <span className={cn('text-sm font-medium', theme === 'dark' ? 'text-primary' : 'text-muted-foreground')}>Dark</span>
             </button>
+          </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2 flex items-center gap-2"><ALargeSmall className="w-4 h-4" /> Font Size</p>
+            <div className="flex gap-2 flex-wrap">
+              {(['sm', 'md', 'lg', 'xl'] as FontSize[]).map((size) => (
+                <button
+                  key={size}
+                  onClick={() => setFontSize(size)}
+                  className={cn(
+                    'rounded-lg border-2 px-4 py-2 transition-all cursor-pointer',
+                    fontSize === size
+                      ? 'border-primary bg-primary/8 text-primary font-medium'
+                      : 'border-border hover:border-primary/40 hover:bg-accent text-muted-foreground'
+                  )}
+                  style={{ fontSize: size === 'sm' ? '12px' : size === 'md' ? '14px' : size === 'lg' ? '16px' : '18px' }}
+                >
+                  {size === 'sm' ? 'Small' : size === 'md' ? 'Medium' : size === 'lg' ? 'Large' : 'X-Large'}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Adjusts the base font size across the entire app.</p>
+          </div>
           </div>
         </CardContent>
       </Card>

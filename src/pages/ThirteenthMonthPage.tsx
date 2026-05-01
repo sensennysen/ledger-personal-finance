@@ -190,7 +190,7 @@ export default function ThirteenthMonthPage() {
           13th Month Pay Estimator
         </h1>
         <p className="text-sm text-muted-foreground">
-          Computed under PD 851 — Select which income records count as basic salary
+          Computed under PD 851 ï¿½ Select which income records count as basic salary
         </p>
       </div>
 
@@ -236,7 +236,7 @@ export default function ThirteenthMonthPage() {
         <Info className="w-4 h-4 mt-0.5 shrink-0" />
         <p>
           All income transactions for the year are shown below. Check only the records that qualify
-          as <strong className="text-foreground">basic salary</strong> under PD 851 — exclude bonuses,
+          as <strong className="text-foreground">basic salary</strong> under PD 851 ï¿½ exclude bonuses,
           allowances, overtime, and non-covered sources. Your selection is saved locally and never
           affects your account balances.
         </p>
@@ -248,7 +248,7 @@ export default function ThirteenthMonthPage() {
             <div className="min-w-0">
               <CardTitle className="text-base flex items-center gap-2">
                 <CalendarCheck className="w-4 h-4" style={{ color: EMERALD }} />
-                Income Records — {year}
+                Income Records ï¿½ {year}
               </CardTitle>
               <CardDescription>Select the records that count as basic salary</CardDescription>
             </div>
@@ -365,7 +365,7 @@ export default function ThirteenthMonthPage() {
                                   <span>{formatDate(tx.date)}</span>
                                   {tx.category && (
                                     <>
-                                      <span className="text-border">·</span>
+                                      <span className="text-border">ï¿½</span>
                                       <span>{tx.category.icon} {tx.category.name}</span>
                                     </>
                                   )}

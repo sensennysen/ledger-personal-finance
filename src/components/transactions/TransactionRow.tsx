@@ -113,6 +113,9 @@ export function TransactionRow({ tx, onEdit, onDelete, contextAccountId }: Trans
             {tx.category && (
               <Badge variant="secondary" className="text-xs py-0 px-1.5">{tx.category.name}</Badge>
             )}
+            {tx.subcategory && (
+              <Badge variant="outline" className="text-xs py-0 px-1.5">{tx.subcategory.name}</Badge>
+            )}
             {tx.is_recurring && (
               <Badge variant="outline" className="text-xs py-0 px-1.5 gap-1">
                 <RepeatIcon className="w-2.5 h-2.5" />{tx.recurrence_interval}

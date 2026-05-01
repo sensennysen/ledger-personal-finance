@@ -5,7 +5,7 @@ import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { notifyAccountsRefresh } from '@/lib/cacheEvents'
-import type { Transaction, Account, Category } from '@/types'
+import type { Transaction, Account, Category, Subcategory } from '@/types'
 
 interface TransactionFilters {
   accountId?: string
@@ -102,7 +102,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
         *,
         account:accounts!transactions_account_id_fkey(id, name, color, currency),
         to_account:accounts!transactions_to_account_id_fkey(id, name, color, currency),
-        category:categories(id, name, color, icon)
+        category:categories(id, name, color, icon),
+        subcategory:subcategories(id, name)
       `)
       .eq('user_id', user.id)
       .order('date', { ascending: false })
@@ -148,7 +149,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
   // ---------- mutations ----------
 
   const createTransaction = async (
-    values: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'account' | 'to_account' | 'category'>
+    values: Omit<Transaction, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'account' | 'to_account' | 'category' | 'subcategory'>
   ) => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {

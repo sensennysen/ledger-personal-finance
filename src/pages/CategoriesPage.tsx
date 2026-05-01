@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Tag, Smile } from 'lucide-react'
+import { Plus, Pencil, Trash2, Tag, Smile, ChevronDown, ChevronRight, ListTree } from 'lucide-react'
 import EmojiPicker, { Theme } from 'emoji-picker-react'
 import { useCategories } from '@/hooks/useCategories'
+import { useSubcategories } from '@/hooks/useSubcategories'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -15,7 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import type { Category } from '@/types'
+import type { Category, Subcategory } from '@/types'
 
 const CATEGORY_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
@@ -155,11 +156,124 @@ function CategoryForm({
   )
 }
 
+function SubcategoryPanel({ category }: { category: Category }) {
+  const { subcategories, loading, createSubcategory, updateSubcategory, deleteSubcategory } = useSubcategories(category.id)
+  const [addName, setAddName] = useState('')
+  const [addError, setAddError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [editSub, setEditSub] = useState<Subcategory | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
+
+  const handleAdd = async () => {
+    const trimmed = addName.trim()
+    if (!trimmed) { setAddError('Name is required'); return }
+    setAdding(true)
+    const { error } = await createSubcategory(trimmed)
+    setAdding(false)
+    if (error) { setAddError(error); return }
+    setAddName('')
+    setAddError(null)
+  }
+
+  const startEdit = (sub: Subcategory) => {
+    setEditSub(sub)
+    setEditName(sub.name)
+    setEditError(null)
+  }
+
+  const handleEditSave = async () => {
+    if (!editSub) return
+    const trimmed = editName.trim()
+    if (!trimmed) { setEditError('Name is required'); return }
+    const { error } = await updateSubcategory(editSub.id, trimmed)
+    if (error) { setEditError(error); return }
+    setEditSub(null)
+  }
+
+  return (
+    <div className="border-t bg-muted/30 px-3 py-3 space-y-2">
+      <div className="flex items-center gap-1.5 mb-1">
+        <ListTree className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Subcategories</span>
+      </div>
+      {loading ? (
+        <div className="space-y-1">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-8" />)}</div>
+      ) : (
+        <div className="space-y-1">
+          {subcategories.map((sub) => (
+            <div key={sub.id} className="flex items-center gap-2">
+              {editSub?.id === sub.id ? (
+                <>
+                  <Input
+                    className="h-7 text-sm flex-1"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleEditSave(); if (e.key === 'Escape') setEditSub(null) }}
+                    autoFocus
+                  />
+                  {editError && <span className="text-xs text-destructive">{editError}</span>}
+                  <Button size="sm" className="h-7 text-xs px-2" onClick={handleEditSave}>Save</Button>
+                  <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditSub(null)}>Cancel</Button>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm flex-1 pl-1 truncate">{sub.name}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => startEdit(sub)}>
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-destructive hover:text-destructive" />}>
+                      <Trash2 className="w-3 h-3" />
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete subcategory?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will delete "{sub.name}". Transactions using it will lose this subcategory.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={async () => {
+                          const { error } = await deleteSubcategory(sub.id)
+                          if (error) console.error('Failed to delete subcategory:', error)
+                        }}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
+            </div>
+          ))}
+          {subcategories.length === 0 && (
+            <p className="text-xs text-muted-foreground pl-1">No subcategories yet</p>
+          )}
+        </div>
+      )}
+      <div className="flex items-center gap-2 pt-1">
+        <Input
+          className="h-7 text-sm flex-1"
+          placeholder="New subcategory name"
+          value={addName}
+          onChange={(e) => { setAddName(e.target.value); setAddError(null) }}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
+        />
+        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 px-2 shrink-0" onClick={handleAdd} disabled={adding}>
+          <Plus className="w-3 h-3" />{adding ? 'Adding...' : 'Add'}
+        </Button>
+      </div>
+      {addError && <p className="text-xs text-destructive pl-1">{addError}</p>}
+    </div>
+  )
+}
+
 export default function CategoriesPage() {
   const { categories, loading, createCategory, updateCategory, deleteCategory } = useCategories()
   const [createOpen, setCreateOpen] = useState(false)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null)
 
   const handleCreate = async (values: FormValues) => {
     const { error } = await createCategory(values)
@@ -181,52 +295,62 @@ export default function CategoriesPage() {
 
   const renderCategories = (cats: Category[]) =>
     cats.map((cat) => (
-      <div
-        key={cat.id}
-        className="flex items-center justify-between gap-2 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-lg"
-            style={{ backgroundColor: cat.color + '20' }}
+      <div key={cat.id} className="rounded-lg border bg-card overflow-hidden">
+        <div className="flex items-center justify-between gap-2 p-3 hover:bg-accent/50 transition-colors">
+          <button
+            type="button"
+            className="flex items-center gap-3 min-w-0 flex-1 text-left"
+            onClick={() => setExpandedCategoryId(expandedCategoryId === cat.id ? null : cat.id)}
           >
-            {cat.icon}
-          </div>
-          <div className="min-w-0 flex flex-col items-start">
-            <p className="font-medium text-sm truncate">{cat.name}</p>
-            <Badge variant="outline" className="text-xs">
-              {cat.type === 'both' ? 'Income & Expense' : cat.type === 'expense' ? 'Expense' : 'Income'}
-            </Badge>
+            {expandedCategoryId === cat.id
+              ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+              : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+            }
+            <div
+              className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-lg"
+              style={{ backgroundColor: cat.color + '20' }}
+            >
+              {cat.icon}
+            </div>
+            <div className="min-w-0 flex flex-col items-start">
+              <p className="font-medium text-sm truncate">{cat.name}</p>
+              <Badge variant="outline" className="text-xs">
+                {cat.type === 'both' ? 'Income & Expense' : cat.type === 'expense' ? 'Expense' : 'Income'}
+              </Badge>
+            </div>
+          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {cat.is_default && (
+              <Badge variant="secondary" className="text-xs">Default</Badge>
+            )}
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditCategory(cat)}>
+              <Pencil className="w-3 h-3" />
+            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" />}>
+                <Trash2 className="w-3 h-3" />
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete category?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will delete "{cat.name}" and all its subcategories. Transactions using it will become uncategorized.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={async () => {
+                    const { error } = await deleteCategory(cat.id)
+                    if (error) console.error('Failed to delete category:', error)
+                  }}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {cat.is_default && (
-            <Badge variant="secondary" className="text-xs">Default</Badge>
-          )}
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditCategory(cat)}>
-            <Pencil className="w-3 h-3" />
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" />}>
-              <Trash2 className="w-3 h-3" />
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete category?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will delete "{cat.name}". Transactions using it will become uncategorized.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={async () => {
-                  const { error } = await deleteCategory(cat.id)
-                  if (error) console.error('Failed to delete category:', error)
-                }}>Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
+        {expandedCategoryId === cat.id && (
+          <SubcategoryPanel category={cat} />
+        )}
       </div>
     ))
 

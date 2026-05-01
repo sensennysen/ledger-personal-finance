@@ -331,3 +331,32 @@ create policy "Authenticated users can delete their own receipts"
 create policy "Public can read receipts"
   on storage.objects for select
   using (bucket_id = 'receipts');
+
+-- ────────────────────────────────────────────────────────────
+-- SUBCATEGORIES
+-- Run this migration to enable subcategories on categories.
+-- ────────────────────────────────────────────────────────────
+
+create table if not exists public.subcategories (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  category_id uuid not null references public.categories(id) on delete cascade,
+  name        text not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+alter table public.subcategories enable row level security;
+
+create policy "Users can manage own subcategories"
+  on public.subcategories for all using (auth.uid() = user_id);
+
+create index if not exists subcategories_category_idx on public.subcategories(category_id);
+
+create trigger set_subcategories_updated_at
+  before update on public.subcategories
+  for each row execute procedure public.set_updated_at();
+
+-- Add subcategory_id to transactions
+alter table public.transactions
+  add column if not exists subcategory_id uuid references public.subcategories(id) on delete set null;

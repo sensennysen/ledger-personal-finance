@@ -57,12 +57,22 @@ export interface Category {
   updated_at: string
 }
 
+export interface Subcategory {
+  id: string
+  user_id: string
+  category_id: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Transaction {
   id: string
   user_id: string
   account_id: string
   to_account_id: string | null
   category_id: string | null
+  subcategory_id: string | null
   type: TransactionType
   amount: number
   currency: string
@@ -81,6 +91,7 @@ export interface Transaction {
   account?: Account
   to_account?: Account
   category?: Category
+  subcategory?: Subcategory
 }
 
 export interface Budget {

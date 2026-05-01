@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { ImagePlus, X, Loader2 } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
+import { useSubcategories } from '@/hooks/useSubcategories'
 import { useDescriptionSuggestions } from '@/hooks/useDescriptionSuggestions'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -24,6 +25,7 @@ export const transactionSchema = z.object({
   account_id: z.string().min(1, 'Account is required'),
   to_account_id: z.string().nullable(),
   category_id: z.string().nullable(),
+  subcategory_id: z.string().nullable(),
   amount: z.coerce.number().positive('Amount must be positive'),
   currency: z.string().min(1),
   exchange_rate: z.coerce.number().default(1),
@@ -97,6 +99,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
       account_id: lockedAccountId ?? accounts[0]?.id ?? '',
       to_account_id: null,
       category_id: null,
+      subcategory_id: null,
       amount: 0,
       currency:
         accounts.find((a) => a.id === lockedAccountId)?.currency ?? accounts[0]?.currency ?? DEFAULT_CURRENCY,
@@ -154,6 +157,9 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const type = form.watch('type')
   const isRecurring = form.watch('is_recurring')
   const selectedAccount = form.watch('account_id')
+  const selectedCategoryId = form.watch('category_id')
+
+  const { subcategories } = useSubcategories(selectedCategoryId)
 
   const onAccountChange = (id: string | null) => {
     if (!id) return
@@ -262,7 +268,10 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <Select
-                      onValueChange={(v) => field.onChange(v === UNCATEGORIZED_VALUE ? null : v)}
+                      onValueChange={(v) => {
+                        field.onChange(v === UNCATEGORIZED_VALUE ? null : v)
+                        form.setValue('subcategory_id', null)
+                      }}
                       value={field.value ?? UNCATEGORIZED_VALUE}
                     >
                       <FormControl>
@@ -285,6 +294,39 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             />
           )}
         </div>
+
+        {type !== 'transfer' && subcategories.length > 0 && (
+          <FormField
+            control={form.control}
+            name="subcategory_id"
+            render={({ field }) => {
+              const selectedSub = subcategories.find((s) => s.id === field.value)
+              return (
+                <FormItem>
+                  <FormLabel>Subcategory <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                  <Select
+                    onValueChange={(v) => field.onChange(v === UNCATEGORIZED_VALUE ? null : v)}
+                    value={field.value ?? UNCATEGORIZED_VALUE}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select subcategory">
+                          {selectedSub ? selectedSub.name : 'None'}
+                        </SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={UNCATEGORIZED_VALUE}>None</SelectItem>
+                      {subcategories.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )
+            }}
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <FormField

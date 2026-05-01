@@ -5,7 +5,7 @@ import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { notifyAccountsRefresh } from '@/lib/cacheEvents'
-import type { Transaction, Account, Category, Subcategory } from '@/types'
+import type { Transaction, Account, Category } from '@/types'
 
 interface TransactionFilters {
   accountId?: string

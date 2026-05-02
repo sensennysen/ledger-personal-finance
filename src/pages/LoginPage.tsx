@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -141,7 +142,14 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground/50 mt-6 leading-relaxed">
-          By signing in, you agree to our Terms of Service<br />and Privacy Policy.
+          By signing in, you agree to our{' '}
+          <Link to="/terms" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
+            Terms of Service
+          </Link>
+          {' '}and{' '}
+          <Link to="/privacy" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
+            Privacy Policy
+          </Link>.
         </p>
       </div>
     </div>

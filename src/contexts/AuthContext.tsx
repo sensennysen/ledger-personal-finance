@@ -13,6 +13,7 @@ interface AuthContextValue {
   loading: boolean
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
+  deleteAccount: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
 
@@ -96,9 +97,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const deleteAccount = async () => {
+    const { error } = await supabase.rpc('delete_user')
+    if (error) throw error
+    // Clear all local data before signing out
+    if (user) clearCacheByPrefix(user.id)
+    clearOfflineQueue()
+    try {
+      await clearPendingReceipts()
+    } catch (receiptError) {
+      console.error('Failed to clear pending receipts:', receiptError)
+    }
+    // Invalidate the local session (auth row is already gone)
+    await supabase.auth.signOut()
+  }
+
   return (
     <AuthContext.Provider
-      value={{ session, user, profile, loading, signInWithGoogle, signOut, refreshProfile }}
+      value={{ session, user, profile, loading, signInWithGoogle, signOut, deleteAccount, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>

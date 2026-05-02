@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, Trash2, CheckCircle2 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 
-const LAST_UPDATED = 'May 1, 2026'
-const DELETION_WINDOW_DAYS = 30
+const LAST_UPDATED = 'May 2, 2026'
 
 const dataItems = [
   'Your name, email address, and profile picture (received from Google OAuth at sign-in).',
@@ -26,13 +25,13 @@ const steps = [
   },
   {
     number: '03',
-    heading: 'Request account deletion',
-    body: 'In the "Account" section, select "Delete Account". You will be prompted to confirm the action.',
+    heading: 'Select “Delete My Account”',
+    body: 'In the “Account” section, click the “Delete My Account” button. A confirmation dialog will appear.',
   },
   {
     number: '04',
-    heading: 'Confirmation',
-    body: `Your account and all associated data will be permanently and irreversibly deleted within ${DELETION_WINDOW_DAYS} days of your confirmed request. You will receive a confirmation email at the address associated with your account.`,
+    heading: 'Type DELETE to confirm',
+    body: 'Type the word DELETE in the confirmation field and click “Delete Forever”. Your account and all associated data are removed from our database immediately and cannot be recovered.',
   },
 ]
 
@@ -96,8 +95,9 @@ export default function DataDeletionPage() {
             Last updated: <span className="font-medium text-foreground">{LAST_UPDATED}</span>
           </p>
           <p className="mt-4 text-muted-foreground leading-relaxed max-w-2xl">
-            You have the right to request the deletion of all personal data Ledger holds about you.
-            This page describes exactly what data we store and the steps to have it permanently removed.
+            You have the right to delete all personal data Ledger holds about you.
+            This page describes exactly what data we store and how to permanently remove it
+            directly from within the app — no email request needed.
           </p>
         </div>
 
@@ -169,12 +169,11 @@ export default function DataDeletionPage() {
           <div className="space-y-1">
             <p className="text-sm font-semibold text-foreground">What happens after deletion</p>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              All records — including your profile, accounts, transactions, categories, and budgets —
-              are permanently erased from our database within{' '}
-              <span className="font-medium text-foreground">{DELETION_WINDOW_DAYS} days</span> of your
-              confirmed request. Deletion is irreversible and cannot be undone. Anonymised, aggregated
-              data that cannot identify you (e.g., total number of active users) may be retained for
-              analytics.
+              Deletion is <span className="font-medium text-foreground">immediate and permanent</span>.
+              The moment you confirm, your profile, accounts, transactions, categories, and budgets are
+              erased from our database in a single operation. There is no grace period and no way to
+              undo or recover the data. Anonymised, aggregated data that cannot identify you
+              (e.g., total number of active users) may be retained for analytics.
             </p>
           </div>
         </div>

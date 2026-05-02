@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall } from 'lucide-react'
+import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
@@ -19,6 +19,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
 
 const profileSchema = z.object({
   full_name: z.string().min(1, 'Name is required').max(80),
@@ -28,10 +37,25 @@ const profileSchema = z.object({
 type ProfileValues = z.infer<typeof profileSchema>
 
 export default function SettingsPage() {
-  const { user, profile, signOut, refreshProfile } = useAuth()
+  const { user, profile, signOut, deleteAccount, refreshProfile } = useAuth()
   const { theme, setTheme, fontSize, setFontSize } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
   const [saved, setSaved] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteAccount()
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Deletion failed. Please try again.')
+      setDeleting(false)
+    }
+  }
 
   const initials = (profile?.full_name ?? user?.email ?? 'U')
     .split(' ')
@@ -233,12 +257,68 @@ export default function SettingsPage() {
       <Card className="border-destructive/30">
         <CardHeader>
           <CardTitle className="text-destructive">Account</CardTitle>
-          <CardDescription>Sign out or manage your session</CardDescription>
+          <CardDescription>Sign out or permanently delete your account</CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="destructive" onClick={signOut}>Sign Out</Button>
+        <CardContent className="space-y-3">
+          <Button variant="outline" onClick={signOut}>Sign Out</Button>
+          <Separator />
+          <div>
+            <p className="text-sm font-medium text-destructive mb-1">Delete Account</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Permanently removes your account and all associated data. This cannot be undone.
+            </p>
+            <Button
+              variant="destructive"
+              onClick={() => { setDeleteOpen(true); setDeleteConfirm(''); setDeleteError(null) }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete My Account
+            </Button>
+          </div>
         </CardContent>
       </Card>
+
+      {/* Delete account confirmation dialog */}
+      <AlertDialog open={deleteOpen} onOpenChange={(o) => { if (!deleting) setDeleteOpen(o) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+              <AlertDialogTitle>Delete Account Permanently?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="space-y-3">
+              <span className="block">
+                This will immediately and irreversibly delete your account along with every transaction,
+                account, category, and budget you have created.
+              </span>
+              <span className="block font-medium text-foreground">
+                Type <span className="font-bold text-destructive">DELETE</span> to confirm.
+              </span>
+              <Input
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="Type DELETE here"
+                className="mt-1"
+                disabled={deleting}
+                autoComplete="off"
+              />
+              {deleteError && (
+                <span className="block text-sm text-destructive">{deleteError}</span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirm !== 'DELETE' || deleting}
+              onClick={handleDeleteAccount}
+            >
+              {deleting ? 'Deleting…' : 'Delete Forever'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Customization — visible on mobile where BottomNav omits Categories */}
       <Card className="md:hidden">

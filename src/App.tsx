@@ -12,6 +12,7 @@ import BudgetsPage from '@/pages/BudgetsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import AccountTransactionsPage from '@/pages/AccountTransactionsPage'
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage'
+import TermsOfServicePage from '@/pages/TermsOfServicePage'
 import DataDeletionPage from '@/pages/DataDeletionPage'
 import ReportsPage from '@/pages/ReportsPage'
 
@@ -194,6 +195,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPageWrapper />} />
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsOfServicePage />} />
           <Route path="/data-deletion" element={<DataDeletionPage />} />
           <Route path="/*" element={<ProtectedRoutes />} />
         </Routes>

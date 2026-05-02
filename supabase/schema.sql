@@ -73,6 +73,24 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 
 -- ────────────────────────────────────────────────────────────
+-- USER SELF-DELETION
+-- Allows the authenticated user to permanently delete their own
+-- auth.users row (and all cascading data) via supabase.rpc('delete_user').
+-- security definer so the function runs as the postgres superuser.
+-- ────────────────────────────────────────────────────────────
+create or replace function public.delete_user()
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  -- Only delete the row that belongs to the currently authenticated user.
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+-- Revoke public execute and grant only to authenticated users.
+revoke execute on function public.delete_user() from public;
+grant execute on function public.delete_user() to authenticated;
+
+-- ────────────────────────────────────────────────────────────
 -- ACCOUNTS
 -- ────────────────────────────────────────────────────────────
 create table if not exists public.accounts (

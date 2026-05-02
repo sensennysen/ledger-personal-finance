@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, ShieldCheck, Trash2 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 
-const LAST_UPDATED = 'May 1, 2026'
+const LAST_UPDATED = 'May 2, 2026'
 
 interface Section {
   title: string
@@ -47,7 +47,7 @@ const sections: Section[] = [
   {
     title: '6. Data Retention',
     content:
-      'Your data is retained for as long as your account remains active. If you choose to delete your account, all associated personal data and financial records will be permanently removed within 30 days of the deletion request.',
+      'Your data is retained for as long as your account remains active. If you choose to delete your account, all associated personal data and financial records are permanently and immediately removed from our database at the moment you confirm the deletion request.',
   },
   {
     title: '7. Your Rights',

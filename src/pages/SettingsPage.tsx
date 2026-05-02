@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle } from 'lucide-react'
+import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
+import { usePreferences } from '@/hooks/usePreferences'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
 import { cn } from '@/lib/utils'
@@ -19,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { ColorPicker } from '@/components/ui/color-picker'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -38,8 +40,9 @@ type ProfileValues = z.infer<typeof profileSchema>
 
 export default function SettingsPage() {
   const { user, profile, signOut, deleteAccount, refreshProfile } = useAuth()
-  const { theme, setTheme, fontSize, setFontSize } = useTheme()
+  const { theme, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
+  const { prefs, set: setPref } = usePreferences()
   const [saved, setSaved] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
@@ -141,14 +144,14 @@ export default function SettingsPage() {
                   </FormItem>
                 )}
               />
-              <div className="flex items-center gap-2">
-                <Button type="submit" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
-                </Button>
+              <div className="flex items-center justify-end gap-2">
                 {form.formState.errors.root && (
                   <span className="text-sm text-destructive">{form.formState.errors.root.message}</span>
                 )}
                 {saved && <span className="text-sm" style={{ color: EMERALD }}>Saved!</span>}
+                <Button type="submit" disabled={form.formState.isSubmitting}>
+                  {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
+                </Button>
               </div>
             </form>
           </Form>
@@ -195,13 +198,13 @@ export default function SettingsPage() {
 
           <div>
             <p className="text-sm font-medium mb-2 flex items-center gap-2"><ALargeSmall className="w-4 h-4" /> Font Size</p>
-            <div className="flex gap-2 flex-wrap">
+            <div className="grid grid-cols-4 gap-2">
               {(['sm', 'md', 'lg', 'xl'] as FontSize[]).map((size) => (
                 <button
                   key={size}
                   onClick={() => setFontSize(size)}
                   className={cn(
-                    'rounded-lg border-2 px-4 py-2 transition-all cursor-pointer',
+                    'rounded-lg border-2 px-2 py-2 transition-all cursor-pointer text-center',
                     fontSize === size
                       ? 'border-primary bg-primary/8 text-primary font-medium'
                       : 'border-border hover:border-primary/40 hover:bg-accent text-muted-foreground'
@@ -214,6 +217,81 @@ export default function SettingsPage() {
             </div>
             <p className="text-xs text-muted-foreground mt-2">Adjusts the base font size across the entire app.</p>
           </div>
+
+          <div>
+            <p className="text-sm font-medium mb-2 flex items-center gap-2"><Palette className="w-4 h-4" /> Accent Color</p>
+            <ColorPicker
+                value={accentColor}
+                onChange={setAccentColor}
+                palette={['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#06b6d4']}
+              />
+            <p className="text-xs text-muted-foreground mt-2">Customizes the primary action color throughout the app.</p>
+          </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Settings2 className="w-4 h-4" /> Preferences</CardTitle>
+          <CardDescription>Number format, date display, and transaction view</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Number Format</label>
+              <Select value={prefs.numberLocale} onValueChange={(v) => setPref('numberLocale', v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en-US">1,234.56 (English - US)</SelectItem>
+                  <SelectItem value="de-DE">1.234,56 (German)</SelectItem>
+                  <SelectItem value="fr-FR">1 234,56 (French)</SelectItem>
+                  <SelectItem value="ja-JP">1,234.56 (Japanese)</SelectItem>
+                  <SelectItem value="zh-CN">1,234.56 (Chinese)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Date Format</label>
+              <Select value={prefs.dateFormat} onValueChange={(v) => setPref('dateFormat', v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MDY">MM/DD/YYYY</SelectItem>
+                  <SelectItem value="DMY">DD/MM/YYYY</SelectItem>
+                  <SelectItem value="YMD">YYYY-MM-DD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Transaction View</label>
+              <Select value={prefs.txView} onValueChange={(v) => setPref('txView', v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="grouped">Grouped by date</SelectItem>
+                  <SelectItem value="flat">Flat list</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" /> Large Transaction Alert Threshold
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={0}
+                step={10}
+                className="w-40"
+                value={prefs.largeTransactionThreshold}
+                onChange={(e) => setPref('largeTransactionThreshold', Number(e.target.value) || 0)}
+              />
+              <span className="text-sm text-muted-foreground">Transactions above this amount trigger an alert</span>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -253,7 +331,57 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Danger zone */}
+      {/* Customization — visible on mobile where BottomNav omits Categories */}
+      <Card className="md:hidden">
+        <CardHeader>
+          <CardTitle>Customization</CardTitle>
+          <CardDescription>Manage your transaction categories</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Link
+            to="/categories"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors rounded-b-lg"
+          >
+            <div className="flex items-center gap-3">
+              <Tag className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Categories</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+        </CardContent>
+      </Card>
+
+      {/* Legal */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Legal</CardTitle>
+          <CardDescription>Review policies and terms</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Link
+            to="/privacy"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Privacy Policy</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/data-deletion"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors rounded-b-lg"
+          >
+            <div className="flex items-center gap-3">
+              <Trash2 className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Data Deletion Instructions</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+        </CardContent>
+      </Card>
+
+      {/* Account / Danger zone — always last to prevent accidental destructive actions */}
       <Card className="border-destructive/30">
         <CardHeader>
           <CardTitle className="text-destructive">Account</CardTitle>
@@ -319,56 +447,6 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Customization — visible on mobile where BottomNav omits Categories */}
-      <Card className="md:hidden">
-        <CardHeader>
-          <CardTitle>Customization</CardTitle>
-          <CardDescription>Manage your transaction categories</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Link
-            to="/categories"
-            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors rounded-b-lg"
-          >
-            <div className="flex items-center gap-3">
-              <Tag className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">Categories</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </Link>
-        </CardContent>
-      </Card>
-
-      {/* Legal */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Legal</CardTitle>
-          <CardDescription>Review policies and terms</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Link
-            to="/privacy"
-            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors border-b border-border"
-          >
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">Privacy Policy</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </Link>
-          <Link
-            to="/data-deletion"
-            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors rounded-b-lg"
-          >
-            <div className="flex items-center gap-3">
-              <Trash2 className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">Data Deletion Instructions</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </Link>
-        </CardContent>
-      </Card>
     </div>
   )
 }

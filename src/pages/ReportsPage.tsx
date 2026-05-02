@@ -7,6 +7,9 @@ import {
   FileBarChart2,
   CalendarDays,
   Store,
+  Bookmark,
+  BookmarkPlus,
+  Trash2,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -26,6 +29,7 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
+import { useReportPresets } from '@/hooks/useReportPresets'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,6 +39,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EMERALD, CORAL, GOLD } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
@@ -311,7 +316,7 @@ function StatCard({
       />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground mb-1">{title}</p>
+          <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground mb-1">{title}</p>
           {loading ? (
             <Skeleton className="h-7 w-28" />
           ) : (
@@ -320,7 +325,7 @@ function StatCard({
             </p>
           )}
           {sub && !loading && (
-            <p className="text-[11px] text-muted-foreground mt-1 truncate">{sub}</p>
+            <p className="text-[0.6875rem] text-muted-foreground mt-1 truncate">{sub}</p>
           )}
         </div>
         <div
@@ -350,6 +355,11 @@ export default function ReportsPage() {
   const [preset, setPreset] = useState<Preset>('this_month')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
+  const [activeTab, setActiveTab] = useState('overview')
+  const [presetName, setPresetName] = useState('')
+  const { presets: savedPresets, savePreset, deletePreset } = useReportPresets()
+  const [dateRangeOpen, setDateRangeOpen] = useState(false)
+  const [presetsOpen, setPresetsOpen] = useState(false)
 
   const { start, end } = useMemo(() => {
     if (preset === 'custom') {
@@ -571,40 +581,29 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 md:pb-6">
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div
-              className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
-              style={{
-                background: `${GOLD.replace(')', ' / 0.12)')}`,
-                boxShadow: `0 0 0 1px ${GOLD.replace(')', ' / 0.20)')}`,
-              }}
-            >
-              <FileBarChart2 className="w-4 h-4" style={{ color: GOLD }} />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">Reports</h1>
-              <p className="text-[12px] text-muted-foreground">{presetLabel}</p>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold">Reports</h1>
+            <p className="text-xs text-muted-foreground">{presetLabel}</p>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-col items-end gap-2">
             <TabsList className="h-8">
-              <TabsTrigger value="overview" className="text-[12px] h-7 px-3">Overview</TabsTrigger>
-              <TabsTrigger value="analytics" className="text-[12px] h-7 px-3">Analytics</TabsTrigger>
-              <TabsTrigger value="thirteenth" className="text-[12px] h-7 px-3">13th Month</TabsTrigger>
+              <TabsTrigger value="overview" className="text-xs h-7 px-3">Overview</TabsTrigger>
+              <TabsTrigger value="analytics" className="text-xs h-7 px-3">Analytics</TabsTrigger>
+              <TabsTrigger value="thirteenth" className="text-xs h-7 px-3">13th Month</TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
               <Button
                 onClick={handleExport}
                 disabled={loading || filtered.length === 0}
                 size="sm"
-                className="gap-2 text-[12px] font-medium shrink-0"
+                className="gap-2 shrink-0"
                 style={{
-                  background: 'linear-gradient(135deg, oklch(0.700 0.115 72 / 0.15), oklch(0.700 0.115 72 / 0.08))',
-                  border: '1px solid oklch(0.700 0.115 72 / 0.30)',
-                  color: GOLD,
+                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 15%, transparent), color-mix(in srgb, var(--primary) 8%, transparent))',
+                  border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
+                  color: 'var(--primary)',
                 }}
               >
                 <Download className="w-3.5 h-3.5" />
@@ -614,7 +613,7 @@ export default function ReportsPage() {
                 onClick={handleExportPdf}
                 disabled={loading || filtered.length === 0}
                 size="sm"
-                className="gap-2 text-[12px] font-medium shrink-0"
+                className="gap-2 shrink-0"
                 style={{
                   background: 'linear-gradient(135deg, oklch(0.620 0.160 18 / 0.15), oklch(0.620 0.160 18 / 0.08))',
                   border: '1px solid oklch(0.620 0.160 18 / 0.30)',
@@ -629,13 +628,44 @@ export default function ReportsPage() {
         </div>
 
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
+      {/* Mobile-only controls row */}
+      <div className="flex items-end gap-3 md:hidden">
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <span className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground px-0.5">Date Range</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 w-full justify-start"
+            onClick={() => setDateRangeOpen(true)}
+          >
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{presetLabel}</span>
+          </Button>
+        </div>
+        <div className="flex flex-col gap-1 flex-1 min-w-0">
+          <span className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground px-0.5">Saved Presets</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 w-full justify-start"
+            onClick={() => setPresetsOpen(true)}
+          >
+            <Bookmark className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Presets</span>
+            {savedPresets.length > 0 && (
+              <span className="ml-auto text-[0.625rem] bg-muted rounded px-1.5 py-0.5">{savedPresets.length}</span>
+            )}
+          </Button>
+        </div>
+      </div>
+
       {/* Date controls */}
       <div
-        className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-4"
+        className="hidden md:flex rounded-xl border border-border/60 bg-card p-4 flex-col gap-4"
       >
         <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
-          <span className="text-[12px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Date Range</span>
+          <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Date Range</span>
         </div>
         <div className="flex flex-wrap gap-2">
           {([
@@ -651,7 +681,7 @@ export default function ReportsPage() {
               key={p}
               onClick={() => setPreset(p)}
               className={cn(
-                'px-3 py-1.5 rounded-lg text-[11px] font-medium tracking-wide border transition-all duration-150',
+                'px-3 py-1.5 rounded-lg text-[0.6875rem] font-medium tracking-wide border transition-all duration-150',
                 preset === p
                   ? 'border-transparent'
                   : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
@@ -666,21 +696,21 @@ export default function ReportsPage() {
         {preset === 'custom' && (
           <div className="flex flex-wrap gap-4 pt-1">
             <div className="flex flex-col gap-1.5">
-              <Label className="text-[11px] text-muted-foreground">From</Label>
+              <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
               <Input
                 type="date"
                 value={customStart}
                 onChange={(e) => setCustomStart(e.target.value)}
-                className="w-40 text-[13px] h-8"
+                className="w-40 text-[0.8125rem] h-8"
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label className="text-[11px] text-muted-foreground">To</Label>
+              <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
               <Input
                 type="date"
                 value={customEnd}
                 onChange={(e) => setCustomEnd(e.target.value)}
-                className="w-40 text-[13px] h-8"
+                className="w-40 text-[0.8125rem] h-8"
               />
             </div>
             {customStart && customEnd && customStart > customEnd && (
@@ -690,6 +720,56 @@ export default function ReportsPage() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Saved presets */}
+      <div className="hidden md:flex rounded-xl border border-border/60 bg-card p-4 flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Bookmark className="w-4 h-4 text-muted-foreground" />
+          <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Saved Presets</span>
+        </div>
+        {savedPresets.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {savedPresets.map((p) => (
+              <div key={p.id} className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/40 px-2 py-1">
+                <button
+                  className="text-[0.6875rem] font-medium text-foreground hover:text-primary"
+                  onClick={() => {
+                    setPreset(p.preset as Preset)
+                    if (p.preset === 'custom') { setCustomStart(p.startDate ?? ''); setCustomEnd(p.endDate ?? '') }
+                    setActiveTab(p.activeTab ?? 'overview')
+                  }}
+                >{p.name}</button>
+                <button className="ml-1 text-muted-foreground hover:text-destructive" onClick={() => deletePreset(p.id)}>
+                  <Trash2 className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <Input
+            className="h-7 text-xs w-40"
+            placeholder="Preset name…"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && presetName.trim()) {
+                savePreset(presetName.trim(), preset, customStart, customEnd, activeTab)
+                setPresetName('')
+              }
+            }}
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1"
+            disabled={!presetName.trim()}
+            onClick={() => { savePreset(presetName.trim(), preset, customStart, customEnd, activeTab); setPresetName('') }}
+          >
+            <BookmarkPlus className="w-3 h-3" />Save
+          </Button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -729,13 +809,13 @@ export default function ReportsPage() {
       <div className="grid md:grid-cols-2 gap-4">
         {/* Account balances */}
         <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Account Balances</p>
+          <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Account Balances</p>
           {loading ? (
             <div className="flex flex-col gap-2">
               {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : activeAccounts.length === 0 ? (
-            <p className="text-[13px] text-muted-foreground text-center py-4">No accounts</p>
+            <p className="text-[0.8125rem] text-muted-foreground text-center py-4">No accounts</p>
           ) : (
             <div className="flex flex-col gap-1">
               {activeAccounts.map((acc) => (
@@ -748,13 +828,13 @@ export default function ReportsPage() {
                       className="w-2 h-2 rounded-full shrink-0"
                       style={{ background: acc.color }}
                     />
-                    <span className="text-[13px] font-medium truncate">{acc.name}</span>
-                    <Badge variant="outline" className="text-[10px] capitalize shrink-0 px-1.5 py-0">
+                    <span className="text-[0.8125rem] font-medium truncate">{acc.name}</span>
+                    <Badge variant="outline" className="text-[0.625rem] capitalize shrink-0 px-1.5 py-0">
                       {acc.type.replace('_', ' ')}
                     </Badge>
                   </div>
                   <span
-                    className="text-[13px] font-semibold tabular-nums shrink-0"
+                    className="text-[0.8125rem] font-semibold tabular-nums shrink-0"
                     style={{ color: acc.balance < 0 ? CORAL : 'inherit' }}
                   >
                     {formatCurrency(acc.balance, acc.currency)}
@@ -763,8 +843,8 @@ export default function ReportsPage() {
               ))}
               <Separator className="my-1" />
               <div className="flex items-center justify-between px-3 py-1.5">
-                <span className="text-[12px] font-medium text-muted-foreground">Total</span>
-                <span className="text-[13px] font-bold tabular-nums" style={{ color: GOLD }}>
+                <span className="text-xs font-medium text-muted-foreground">Total</span>
+                <span className="text-[0.8125rem] font-bold tabular-nums" style={{ color: GOLD }}>
                   {formatCurrency(totalBalance, currency)}
                 </span>
               </div>
@@ -774,7 +854,7 @@ export default function ReportsPage() {
 
         {/* Category breakdown */}
         <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+          <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
             Expenses by Category
           </p>
           {loading ? (
@@ -782,7 +862,7 @@ export default function ReportsPage() {
               {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
             </div>
           ) : categoryBreakdown.length === 0 ? (
-            <p className="text-[13px] text-muted-foreground text-center py-4">No expenses in this period</p>
+            <p className="text-[0.8125rem] text-muted-foreground text-center py-4">No expenses in this period</p>
           ) : (
             <ScrollArea className="max-h-56">
               <div className="flex flex-col gap-2 pr-3">
@@ -791,9 +871,9 @@ export default function ReportsPage() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <div className="w-2 h-2 rounded-full shrink-0" style={{ background: cat.color }} />
-                        <span className="text-[12px] font-medium truncate">{cat.name}</span>
+                        <span className="text-xs font-medium truncate">{cat.name}</span>
                       </div>
-                      <span className="text-[12px] tabular-nums text-muted-foreground shrink-0">
+                      <span className="text-xs tabular-nums text-muted-foreground shrink-0">
                         {formatCurrency(cat.amount, currency)}
                       </span>
                     </div>
@@ -818,10 +898,10 @@ export default function ReportsPage() {
       {/* Transactions table */}
       <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/60">
-          <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
+          <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
             Transactions
           </p>
-          <span className="text-[11px] text-muted-foreground tabular-nums">
+          <span className="text-[0.6875rem] text-muted-foreground tabular-nums">
             {filtered.length} record{filtered.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -842,19 +922,19 @@ export default function ReportsPage() {
         ) : sortedTransactions.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
             <FileBarChart2 className="w-8 h-8 opacity-30" />
-            <p className="text-[13px]">No transactions in this period</p>
+            <p className="text-[0.8125rem]">No transactions in this period</p>
           </div>
         ) : (
           <ScrollArea className="max-h-120">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-[0.8125rem]">
               <thead className="sticky top-0 bg-card z-10">
                 <tr className="border-b border-border/40">
-                  <th className="text-left px-4 py-2.5 text-[11px] font-medium text-muted-foreground tracking-wide">Date</th>
-                  <th className="text-left px-2 py-2.5 text-[11px] font-medium text-muted-foreground tracking-wide">Description</th>
-                  <th className="hidden sm:table-cell text-left px-2 py-2.5 text-[11px] font-medium text-muted-foreground tracking-wide">Category</th>
-                  <th className="hidden md:table-cell text-left px-2 py-2.5 text-[11px] font-medium text-muted-foreground tracking-wide">Account</th>
-                  <th className="text-right px-2 py-2.5 text-[11px] font-medium text-muted-foreground tracking-wide">Amount</th>
-                  <th className="hidden lg:table-cell text-right px-4 py-2.5 text-[11px] font-medium text-muted-foreground tracking-wide">Balance</th>
+                  <th className="text-left px-4 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Date</th>
+                  <th className="text-left px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Description</th>
+                  <th className="hidden sm:table-cell text-left px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Category</th>
+                  <th className="hidden md:table-cell text-left px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Account</th>
+                  <th className="text-right px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Amount</th>
+                  <th className="hidden lg:table-cell text-right px-4 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Balance</th>
                 </tr>
               </thead>
               <tbody>
@@ -877,7 +957,7 @@ export default function ReportsPage() {
                       <td className="px-2 py-3 max-w-40">
                         <div className="flex flex-col gap-0.5">
                           <span className="font-medium truncate">{t.description}</span>
-                          <span className="text-[11px] text-muted-foreground sm:hidden">
+                          <span className="text-[0.6875rem] text-muted-foreground sm:hidden">
                             {t.category?.name ?? '—'}
                           </span>
                         </div>
@@ -896,7 +976,7 @@ export default function ReportsPage() {
                       <td className="hidden md:table-cell px-2 py-3 text-muted-foreground">
                         {t.account?.name ?? '—'}
                         {t.type === 'transfer' && t.to_account && (
-                          <span className="text-[11px]"> → {t.to_account.name}</span>
+                          <span className="text-[0.6875rem]"> → {t.to_account.name}</span>
                         )}
                       </td>
                       <td className="px-2 py-3 text-right font-semibold tabular-nums whitespace-nowrap" style={{ color: amountColor }}>
@@ -923,7 +1003,7 @@ export default function ReportsPage() {
           <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-3.5 h-3.5" style={{ color: EMERALD }} />
-              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time</p>
+              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time</p>
             </div>
             {loading ? (
               <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
@@ -973,7 +1053,7 @@ export default function ReportsPage() {
           <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
-              <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Monthly Income vs. Expenses — Last 12 Months</p>
+              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Monthly Income vs. Expenses — Last 12 Months</p>
             </div>
             {loading ? (
               <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
@@ -1019,27 +1099,27 @@ export default function ReportsPage() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Store className="w-3.5 h-3.5" style={{ color: CORAL }} />
-                <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Spending by Merchant</p>
+                <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Spending by Merchant</p>
               </div>
-              <span className="text-[11px] text-muted-foreground">{presetLabel}</span>
+              <span className="text-[0.6875rem] text-muted-foreground">{presetLabel}</span>
             </div>
             {loading ? (
               <div className="flex flex-col gap-2">
                 {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-8 rounded-lg bg-muted animate-pulse" />)}
               </div>
             ) : merchantBreakdown.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground text-center py-6">No expense transactions in this period</p>
+              <p className="text-[0.8125rem] text-muted-foreground text-center py-6">No expense transactions in this period</p>
             ) : (
               <div className="flex flex-col gap-2.5">
                 {merchantBreakdown.map((merchant, i) => (
                   <div key={merchant.displayName + i} className="flex flex-col gap-1">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[11px] tabular-nums text-muted-foreground w-4 text-right shrink-0">{i + 1}</span>
-                        <span className="text-[12px] font-medium truncate">{merchant.displayName}</span>
-                        <span className="text-[10px] text-muted-foreground shrink-0 ml-0.5">{merchant.count}×</span>
+                        <span className="text-[0.6875rem] tabular-nums text-muted-foreground w-4 text-right shrink-0">{i + 1}</span>
+                        <span className="text-xs font-medium truncate">{merchant.displayName}</span>
+                        <span className="text-[0.625rem] text-muted-foreground shrink-0 ml-0.5">{merchant.count}×</span>
                       </div>
-                      <span className="text-[12px] tabular-nums shrink-0" style={{ color: CORAL }}>
+                      <span className="text-xs tabular-nums shrink-0" style={{ color: CORAL }}>
                         {formatCurrency(merchant.amount, currency)}
                       </span>
                     </div>
@@ -1065,6 +1145,128 @@ export default function ReportsPage() {
           <ThirteenthMonthPage />
         </TabsContent>
       </Tabs>
+
+      {/* Mobile: Date Range modal */}
+      <Dialog open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Date Range</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-2">
+            {([
+              ['this_month', 'This Month'],
+              ['last_month', 'Last Month'],
+              ['last_3m', 'Last 3 Months'],
+              ['last_6m', 'Last 6 Months'],
+              ['this_year', 'This Year'],
+              ['all_time', 'All Time'],
+              ['custom', 'Custom'],
+            ] as [Preset, string][]).map(([p, label]) => (
+              <button
+                key={p}
+                onClick={() => { setPreset(p); if (p !== 'custom') setDateRangeOpen(false) }}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-[0.6875rem] font-medium tracking-wide border transition-all duration-150',
+                  preset === p
+                    ? 'border-transparent'
+                    : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
+                )}
+                style={preset === p ? { background: GOLD, color: 'oklch(0.15 0 0)' } : {}}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {preset === 'custom' && (
+            <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
+                <Input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="w-40 text-[0.8125rem] h-8"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
+                <Input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="w-40 text-[0.8125rem] h-8"
+                />
+              </div>
+              {customStart && customEnd && customStart > customEnd && (
+                <p className="self-end pb-1 text-xs text-destructive">
+                  Start date must be on or before end date.
+                </p>
+              )}
+            </div>
+          )}
+          <Button size="sm" className="w-full" onClick={() => setDateRangeOpen(false)}>
+            Done
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile: Saved Presets modal */}
+      <Dialog open={presetsOpen} onOpenChange={setPresetsOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Saved Presets</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Save your current date range and active tab as a named preset. Tap a saved preset to instantly restore those settings — useful for reports you check regularly.
+          </p>
+          {savedPresets.length === 0 && (
+            <p className="text-xs text-muted-foreground italic">No presets saved yet.</p>
+          )}
+          {savedPresets.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {savedPresets.map((p) => (
+                <div key={p.id} className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/40 px-2 py-1">
+                  <button
+                    className="text-[0.6875rem] font-medium text-foreground hover:text-primary"
+                    onClick={() => {
+                      setPreset(p.preset as Preset)
+                      if (p.preset === 'custom') { setCustomStart(p.startDate ?? ''); setCustomEnd(p.endDate ?? '') }
+                      setActiveTab(p.activeTab ?? 'overview')
+                      setPresetsOpen(false)
+                    }}
+                  >{p.name}</button>
+                  <button className="ml-1 text-muted-foreground hover:text-destructive" onClick={() => deletePreset(p.id)}>
+                    <Trash2 className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Input
+              className="h-7 text-xs flex-1"
+              placeholder="Preset name…"
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && presetName.trim()) {
+                  savePreset(presetName.trim(), preset, customStart, customEnd, activeTab)
+                  setPresetName('')
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1 shrink-0"
+              disabled={!presetName.trim()}
+              onClick={() => { savePreset(presetName.trim(), preset, customStart, customEnd, activeTab); setPresetName('') }}
+            >
+              <BookmarkPlus className="w-3 h-3" />Save
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

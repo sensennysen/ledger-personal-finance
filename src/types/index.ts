@@ -85,6 +85,8 @@ export interface Transaction {
   recurrence_interval: RecurrenceInterval | null
   recurrence_end_date: string | null
   receipt_url: string | null
+  tags?: string[]
+  goal_id?: string | null
   created_at: string
   updated_at: string
   // joined

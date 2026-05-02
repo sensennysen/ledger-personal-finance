@@ -237,7 +237,7 @@ export default function AccountsPage() {
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger render={<Button className="gap-2" />}>
+          <DialogTrigger render={<Button className="gap-2" size="sm" />}>
             <Plus className="w-4 h-4" />Add Account
           </DialogTrigger>
           <DialogContent>
@@ -319,7 +319,7 @@ export default function AccountsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="money text-[22px] font-bold" style={{ color: GOLD }}>
+                  <p className="money text-[1.375rem] font-bold" style={{ color: GOLD }}>
                     {formatCurrency(account.balance, account.currency)}
                   </p>
                   {account.type === 'credit_card' && account.credit_limit != null && (

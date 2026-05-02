@@ -80,7 +80,7 @@ export default function Sidebar() {
           />
           {!collapsed && (
             <span
-              className="ml-2.5 text-[13px] font-semibold tracking-[0.08em] text-foreground/80 truncate uppercase"
+              className="ml-2.5 text-[0.8125rem] font-semibold tracking-[0.08em] text-foreground/80 truncate uppercase"
               style={{ fontFamily: '"Outfit", sans-serif' }}
             >
               Ledger
@@ -99,7 +99,7 @@ export default function Sidebar() {
                     to={to}
                     end={exact}
                     className={cn(
-                      'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200',
+                      'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[0.8125rem] font-medium transition-all duration-200',
                       active
                         ? 'text-primary bg-primary/8'
                         : 'text-muted-foreground hover:text-foreground hover:bg-white/4',
@@ -134,14 +134,14 @@ export default function Sidebar() {
             )}>
               <Avatar className="w-7 h-7 shrink-0 ring-1 ring-primary/20">
                 <AvatarImage src={profile?.avatar_url ?? undefined} />
-                <AvatarFallback className="text-[10px] bg-primary/10 text-primary">{initials}</AvatarFallback>
+                <AvatarFallback className="text-[0.625rem] bg-primary/10 text-primary">{initials}</AvatarFallback>
               </Avatar>
               {!collapsed && (
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium truncate text-foreground/80">
+                  <p className="text-xs font-medium truncate text-foreground/80">
                     {profile?.full_name ?? 'User'}
                   </p>
-                  <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
+                  <p className="text-[0.6875rem] text-muted-foreground truncate">{user?.email}</p>
                 </div>
               )}
             </TooltipTrigger>
@@ -162,7 +162,7 @@ export default function Sidebar() {
               />
             )}>
               <LogOut className="w-3.5 h-3.5 shrink-0" />
-              {!collapsed && <span className="text-[13px]">Sign out</span>}
+              {!collapsed && <span className="text-[0.8125rem]">Sign out</span>}
             </TooltipTrigger>
             {tooltipsReady && <TooltipContent side="right">Sign out</TooltipContent>}
           </Tooltip>
@@ -182,7 +182,7 @@ export default function Sidebar() {
                 <Moon className="w-3.5 h-3.5 shrink-0" />
               )}
               {!collapsed && (
-                <span className="text-[13px]">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+                <span className="text-[0.8125rem]">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
               )}
             </TooltipTrigger>
             {tooltipsReady && (
@@ -203,7 +203,7 @@ export default function Sidebar() {
             ) : (
               <>
                 <ChevronLeft className="w-3.5 h-3.5" />
-                <span className="text-[13px]">Collapse</span>
+                <span className="text-[0.8125rem]">Collapse</span>
               </>
             )}
           </Button>

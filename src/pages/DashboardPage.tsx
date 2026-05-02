@@ -12,12 +12,15 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight, ChevronLeft, Bell, BarChart3, ArrowRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight, ChevronLeft, Bell, BarChart3, ArrowRight, Settings2, AlertTriangle, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useBudgets } from '@/hooks/useBudgets'
+import { useDashboardPrefs } from '@/hooks/useDashboardPrefs'
+import { useSpendingAlerts } from '@/hooks/useSpendingAlerts'
+import { usePreferences } from '@/hooks/usePreferences'
 import { formatCurrency, getCurrencySymbol, getLast8Quarters, getCurrentWeekDays, getCurrentMonthDays, getLast5Years, getCustomMonthRange, getCurrentCycleMonthKey, groupExpensesByCategory, cn } from '@/lib/utils'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { BUDGET_WARNING_THRESHOLD } from '@/constants/accounts'
@@ -26,8 +29,10 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useNavigate } from 'react-router-dom'
 
 const CHART_TOOLTIP_STYLE = {
@@ -84,7 +89,7 @@ function StatCard({
       />
 
       <div className="flex items-start justify-between mb-4">
-        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest">{title}</p>
+        <p className="text-[0.6875rem] font-medium text-muted-foreground uppercase tracking-widest">{title}</p>
         <div className="flex items-center gap-1.5">
           <div
             className="w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border"
@@ -103,7 +108,7 @@ function StatCard({
         <>
           <p
             className={cn(
-              'text-[28px] font-bold leading-none mb-2',
+              'text-[1.75rem] font-bold leading-none mb-2',
               variant === 'balance' ? 'balance-gradient' : 'money'
             )}
             style={variant !== 'balance' ? { color: accentColor } : undefined}
@@ -112,7 +117,7 @@ function StatCard({
           </p>
           {sub && (
             <p
-              className="text-[11px] font-medium"
+              className="text-[0.6875rem] font-medium"
               style={{
                 color: trend === 'up' ? EMERALD : trend === 'down' ? CORAL : 'oklch(0.570 0.015 290)',
               }}
@@ -315,45 +320,102 @@ export default function DashboardPage() {
 
   const loading = accountsLoading || txLoading
 
+  const { widgets, toggle } = useDashboardPrefs()
+  const { prefs } = usePreferences()
+  const alerts = useSpendingAlerts(budgets, transactions, prefs.largeTransactionThreshold)
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
+  const visibleAlerts = alerts.filter((a) => !dismissedAlerts.has(a.id))
+
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[26px] font-semibold leading-tight">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold leading-tight truncate">
             {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Dashboard'}
           </h1>
-          <p className="text-muted-foreground text-[13px] mt-0.5">
+          <p className="text-muted-foreground text-[0.8125rem] mt-0.5">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
+        <Sheet>
+          <SheetTrigger render={<Button variant="outline" size="sm" className="gap-1.5 shrink-0" />}>
+            <Settings2 className="w-3.5 h-3.5" />
+            <span className="text-[0.8125rem]">Widgets</span>
+          </SheetTrigger>
+          <SheetContent className="w-[280px] sm:max-w-[280px]">
+            <SheetHeader>
+              <SheetTitle>Dashboard Widgets</SheetTitle>
+            </SheetHeader>
+            <div className="px-4 pb-4 space-y-1">
+              {([
+                ['stats', 'Stats Cards'],
+                ['cashflowChart', 'Cash Flow Chart'],
+                ['categoryPie', 'Category Pie'],
+                ['budgets', 'Budget Progress'],
+                ['upcomingBills', 'Upcoming Bills'],
+                ['cashflowForecast', 'Cash Flow Forecast'],
+              ] as const).map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0">
+                  <span className="text-sm">{label}</span>
+                  <Switch checked={widgets[key]} onCheckedChange={() => toggle(key)} />
+                </div>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+      {/* Gold separator */}
+      <div className="h-px" style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }} />
+
+      {/* Spending alerts */}
+      {visibleAlerts.length > 0 && (
+        <div className="space-y-2">
+          {visibleAlerts.map((alert) => (
+            <div
+              key={alert.id}
+              className={cn(
+                'flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm',
+                alert.type === 'budget_exceeded'
+                  ? 'border-destructive/30 bg-destructive/5 text-destructive'
+                  : 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400'
+              )}
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span className="flex-1">{alert.message}</span>
+              <button type="button" onClick={() => setDismissedAlerts((s) => new Set([...s, alert.id]))}>
+                <X className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Month navigation */}
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 bg-muted/40 rounded-xl px-2 py-1.5 flex-1">
+          <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-sm font-semibold flex-1 text-center">{monthLabel}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
+            disabled={isCurrentMonth}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
         <Button
-          className="gap-2 h-9 text-[13px] font-medium"
-          style={{ background: 'oklch(0.700 0.115 72)', color: 'oklch(0.090 0.015 72)' }}
+          className="gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0"
           onClick={() => navigate('/transactions')}
         >
           <Plus className="w-3.5 h-3.5" />Add Transaction
         </Button>
       </div>
-      {/* Gold separator */}
-      <div className="h-px" style={{ background: 'linear-gradient(90deg, oklch(0.700 0.115 72 / 0.35), transparent)' }} />
-
-      {/* Month navigation */}
-      <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2">
-        <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <span className="text-sm font-semibold flex-1 text-center">{monthLabel}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
-          disabled={isCurrentMonth}
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
 
       {/* Stat cards */}
+      {widgets.stats && (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Balance"
@@ -392,16 +454,18 @@ export default function DashboardPage() {
           loading={loading}
         />
       </div>
+      )}
 
       {/* Cash flow chart */}
+      {widgets.cashflowChart && (
       <div
         className="rounded-xl border border-border/60 overflow-hidden bg-card"
       >
         <div className="px-5 pt-5 pb-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-semibold text-[15px]">Cash Flow</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">Income vs expenses over time</p>
+              <p className="font-semibold text-[0.9375rem]">Cash Flow</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Income vs expenses over time</p>
             </div>
             <Tabs value={chartPeriod} onValueChange={(v) => setChartPeriod(v as 'week' | 'month' | 'quarterly' | 'yearly')}>
               <TabsList className="h-8 w-full sm:w-auto">
@@ -445,18 +509,20 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Expenses by category — pie */}
+        {widgets.categoryPie && (
         <div
           className="rounded-xl border border-border/60 p-5 bg-card cursor-pointer transition-shadow duration-300 hover:shadow-[0_4px_24px_oklch(0_0_0/25%)]"
           onClick={() => setDetailView('categories')}
         >
           <div className="flex items-start justify-between mb-0.5">
-            <p className="font-semibold text-[15px]">Expenses by Category</p>
+            <p className="font-semibold text-[0.9375rem]">Expenses by Category</p>
             <ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5" />
           </div>
-          <p className="text-[12px] text-muted-foreground mb-4">{monthLabel} spending breakdown</p>
+          <p className="text-xs text-muted-foreground mb-4">{monthLabel} spending breakdown</p>
           {loading ? (
             <Skeleton className="h-56 w-full" />
           ) : expensesByCategory.length === 0 ? (
@@ -492,14 +558,15 @@ export default function DashboardPage() {
                 {expensesByCategory.map((cat, i) => (
                   <div key={i} className="flex items-center gap-2 text-sm">
                     <span className="text-base">{cat.icon}</span>
-                    <span className="truncate flex-1 text-[12px] text-muted-foreground">{cat.name}</span>
-                    <span className="money text-[12px] font-medium shrink-0" style={{ color: cat.color }}>{formatCurrency(cat.amount, currency)}</span>
+                    <span className="truncate flex-1 text-xs text-muted-foreground">{cat.name}</span>
+                    <span className="money text-xs font-medium shrink-0" style={{ color: cat.color }}>{formatCurrency(cat.amount, currency)}</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
         </div>
+        )}
 
         {/* Recent transactions */}
         <div
@@ -507,14 +574,14 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="font-semibold text-[15px]">Recent Transactions</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">{isCurrentMonth ? 'Latest activity' : monthLabel}</p>
+              <p className="font-semibold text-[0.9375rem]">Recent Transactions</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{isCurrentMonth ? 'Latest activity' : monthLabel}</p>
             </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate('/transactions')}
-              className="text-[12px] text-muted-foreground hover:text-primary h-7 px-2"
+              className="text-xs text-muted-foreground hover:text-primary h-7 px-2"
             >
               View all
             </Button>
@@ -531,17 +598,17 @@ export default function DashboardPage() {
                   className="flex items-center gap-3 py-2.5 px-2 rounded-lg transition-colors hover:bg-white/3"
                 >
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
                     style={{ backgroundColor: (tx.category?.color ?? '#6b7280') + '22' }}
                   >
                     {tx.category?.icon ?? '💸'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium truncate text-foreground/90">{tx.description}</p>
-                    <p className="text-[11px] text-muted-foreground">{tx.date}</p>
+                    <p className="text-[0.8125rem] font-medium truncate text-foreground/90">{tx.description}</p>
+                    <p className="text-[0.6875rem] text-muted-foreground">{tx.date}</p>
                   </div>
                   <p
-                    className="money text-[13px] font-semibold shrink-0"
+                    className="money text-[0.8125rem] font-semibold shrink-0"
                     style={{
                       color: tx.type === 'income' ? EMERALD : tx.type === 'expense' ? CORAL : GOLD,
                     }}
@@ -558,12 +625,12 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Budget progress */}
-        {budgets.length > 0 && (
+        {widgets.budgets && budgets.length > 0 && (
           <div
             className="rounded-xl border border-border/60 p-5 bg-card"
           >
-            <p className="font-semibold text-[15px] mb-0.5">Budget Progress</p>
-            <p className="text-[12px] text-muted-foreground mb-4">Spending vs budget limits · {monthLabel}</p>
+            <p className="font-semibold text-[0.9375rem] mb-0.5">Budget Progress</p>
+            <p className="text-xs text-muted-foreground mb-4">Spending vs budget limits · {monthLabel}</p>
             <div className="space-y-4">
               {budgets.slice(0, 4).map((b) => {
                 const spent = b.spent ?? 0
@@ -572,12 +639,12 @@ export default function DashboardPage() {
                 return (
                   <div key={b.id} className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-[13px]">
+                      <span className="flex items-center gap-1.5 text-[0.8125rem]">
                         <span>{b.category?.icon}</span>
                         <span className="text-foreground/80">{b.name}</span>
                       </span>
                       <span
-                        className="money text-[12px]"
+                        className="money text-xs"
                         style={{ color: over ? CORAL : pct > BUDGET_WARNING_THRESHOLD ? 'oklch(0.750 0.140 75)' : 'oklch(0.570 0.015 290)' }}
                       >
                         {formatCurrency(spent, b.currency)} / {formatCurrency(b.amount, b.currency)}
@@ -600,11 +667,12 @@ export default function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
 
         {/* Upcoming Bills */}
+        {widgets.upcomingBills && (
         <div className="rounded-xl border border-border/60 p-5 bg-card">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <p className="font-semibold text-[15px]">Upcoming Bills</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">
+              <p className="font-semibold text-[0.9375rem]">Upcoming Bills</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {isCurrentMonth ? 'Recurring expenses this cycle' : `Recurring expenses · ${monthLabel}`}
               </p>
             </div>
@@ -621,14 +689,14 @@ export default function DashboardPage() {
               {upcomingBills.slice(0, 6).map(({ key, tx, nextDue, daysUntil }) => (
                 <div key={key} className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-white/3 transition-colors">
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
                     style={{ backgroundColor: (tx.category?.color ?? '#6b7280') + '22' }}
                   >
                     {tx.category?.icon ?? '📅'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium truncate text-foreground/90">{tx.description}</p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[0.8125rem] font-medium truncate text-foreground/90">{tx.description}</p>
+                    <p className="text-[0.6875rem] text-muted-foreground">
                       {nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       {tx.recurrence_interval && (
                         <span className="ml-1.5 capitalize opacity-60">· {tx.recurrence_interval}</span>
@@ -636,12 +704,12 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="money text-[13px] font-semibold" style={{ color: CORAL }}>
+                    <p className="money text-[0.8125rem] font-semibold" style={{ color: CORAL }}>
                       −{formatCurrency(tx.amount, tx.currency)}
                     </p>
                     {daysUntil !== null && (
                       <p
-                        className="text-[10px] font-medium"
+                        className="text-[0.625rem] font-medium"
                         style={{
                           color:
                             daysUntil === 0 ? CORAL
@@ -658,13 +726,15 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Cash Flow Forecast */}
+        {widgets.cashflowForecast && (
         <div className="rounded-xl border border-border/60 p-5 bg-card">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <p className="font-semibold text-[15px]">Cash Flow Forecast</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5">
+              <p className="font-semibold text-[0.9375rem]">Cash Flow Forecast</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {isCurrentMonth ? 'Projected end-of-cycle balance' : `Full cycle · ${monthLabel}`}
               </p>
             </div>
@@ -679,14 +749,14 @@ export default function DashboardPage() {
               {/* Current → Projected balance */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 rounded-lg bg-muted/40 border border-border/40 px-3 py-2.5 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Current</p>
-                  <p className="money text-[15px] font-bold balance-gradient">{formatCurrency(stats.totalBalance, currency)}</p>
+                  <p className="text-[0.625rem] text-muted-foreground uppercase tracking-wider mb-1">Current</p>
+                  <p className="money text-[0.9375rem] font-bold balance-gradient">{formatCurrency(stats.totalBalance, currency)}</p>
                 </div>
                 <ArrowRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />
                 <div className="flex-1 rounded-lg bg-muted/40 border border-border/40 px-3 py-2.5 text-center">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Projected</p>
+                  <p className="text-[0.625rem] text-muted-foreground uppercase tracking-wider mb-1">Projected</p>
                   <p
-                    className="money text-[15px] font-bold"
+                    className="money text-[0.9375rem] font-bold"
                     style={{ color: cashFlowForecast.projectedBalance >= stats.totalBalance ? EMERALD : CORAL }}
                   >
                     {formatCurrency(cashFlowForecast.projectedBalance, currency)}
@@ -696,7 +766,7 @@ export default function DashboardPage() {
 
               {/* Income / Expense breakdown */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-[12px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: EMERALD }} />
                     Expected income
@@ -705,7 +775,7 @@ export default function DashboardPage() {
                     +{formatCurrency(cashFlowForecast.projectedIncome, currency)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-[12px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     <TrendingDown className="w-3.5 h-3.5 shrink-0" style={{ color: CORAL }} />
                     Expected expenses
@@ -715,7 +785,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <div className="h-px bg-border/40" />
-                <div className="flex items-center justify-between text-[12px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">Net change</span>
                   <span
                     className="money font-semibold"
@@ -732,13 +802,13 @@ export default function DashboardPage() {
               {/* Top recurring items */}
               {cashFlowForecast.forecastItems.length > 0 ? (
                 <div className="pt-1 border-t border-border/30 space-y-1">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Recurring items</p>
+                  <p className="text-[0.625rem] text-muted-foreground uppercase tracking-wider mb-2">Recurring items</p>
                   {cashFlowForecast.forecastItems.slice(0, 4).map((item, i) => (
-                    <div key={i} className="flex items-center gap-2 py-1 text-[12px]">
-                      <span className="text-[13px] shrink-0">{item.tx.category?.icon ?? '🔄'}</span>
+                    <div key={i} className="flex items-center gap-2 py-1 text-xs">
+                      <span className="text-[0.8125rem] shrink-0">{item.tx.category?.icon ?? '🔄'}</span>
                       <span className="flex-1 truncate text-muted-foreground">{item.tx.description}</span>
                       {item.occurrences > 1 && (
-                        <span className="text-[10px] text-muted-foreground/50 shrink-0">×{item.occurrences}</span>
+                        <span className="text-[0.625rem] text-muted-foreground/50 shrink-0">×{item.occurrences}</span>
                       )}
                       <span
                         className="money font-medium shrink-0"
@@ -750,13 +820,14 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-[12px] text-muted-foreground text-center pt-2">
+                <p className="text-xs text-muted-foreground text-center pt-2">
                   No recurring transactions found
                 </p>
               )}
             </div>
           )}
         </div>
+        )}
 
       </div>
 
@@ -767,24 +838,24 @@ export default function DashboardPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Total Balance</DialogTitle>
-            <p className="text-[12px] text-muted-foreground">Breakdown by account</p>
+            <p className="text-xs text-muted-foreground">Breakdown by account</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-2 pr-2">
               {accounts.map((acc) => (
                 <div key={acc.id} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 bg-muted/30">
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[16px] shrink-0 border border-border/50"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 border border-border/50"
                     style={{ backgroundColor: acc.color + '22' }}
                   >
                     {acc.icon ?? '🏦'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium truncate">{acc.name}</p>
-                    <p className="text-[11px] text-muted-foreground capitalize">{acc.type.replace('_', ' ')}</p>
+                    <p className="text-[0.8125rem] font-medium truncate">{acc.name}</p>
+                    <p className="text-[0.6875rem] text-muted-foreground capitalize">{acc.type.replace('_', ' ')}</p>
                   </div>
                   <p
-                    className="money text-[14px] font-semibold shrink-0"
+                    className="money text-sm font-semibold shrink-0"
                     style={{ color: acc.balance >= 0 ? EMERALD : CORAL }}
                   >
                     {formatCurrency(acc.balance, acc.currency)}
@@ -798,8 +869,8 @@ export default function DashboardPage() {
           </ScrollArea>
           {accounts.length > 0 && (
             <div className="flex items-center justify-between pt-2 border-t border-border/50">
-              <span className="text-[12px] text-muted-foreground font-medium uppercase tracking-wider">Total</span>
-              <span className="money text-[16px] font-bold balance-gradient">{formatCurrency(stats.totalBalance, currency)}</span>
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total</span>
+              <span className="money text-base font-bold balance-gradient">{formatCurrency(stats.totalBalance, currency)}</span>
             </div>
           )}
         </DialogContent>
@@ -810,23 +881,23 @@ export default function DashboardPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Income — {monthLabel}</DialogTitle>
-            <p className="text-[12px] text-muted-foreground">{monthIncomeTx.length} transaction{monthIncomeTx.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">{monthIncomeTx.length} transaction{monthIncomeTx.length !== 1 ? 's' : ''}</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-1 pr-2">
               {monthIncomeTx.map((tx) => (
                 <div key={tx.id} className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-white/3">
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
                     style={{ backgroundColor: (tx.category?.color ?? '#6b7280') + '22' }}
                   >
                     {tx.category?.icon ?? '💰'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium truncate">{tx.description}</p>
-                    <p className="text-[11px] text-muted-foreground">{tx.category?.name ?? 'Uncategorized'} · {tx.date}</p>
+                    <p className="text-[0.8125rem] font-medium truncate">{tx.description}</p>
+                    <p className="text-[0.6875rem] text-muted-foreground">{tx.category?.name ?? 'Uncategorized'} · {tx.date}</p>
                   </div>
-                  <p className="money text-[13px] font-semibold shrink-0" style={{ color: EMERALD }}>
+                  <p className="money text-[0.8125rem] font-semibold shrink-0" style={{ color: EMERALD }}>
                     +{formatCurrency(tx.amount, tx.currency)}
                   </p>
                 </div>
@@ -838,8 +909,8 @@ export default function DashboardPage() {
           </ScrollArea>
           {monthIncomeTx.length > 0 && (
             <div className="flex items-center justify-between pt-2 border-t border-border/50">
-              <span className="text-[12px] text-muted-foreground font-medium uppercase tracking-wider">Total Income</span>
-              <span className="money text-[16px] font-bold" style={{ color: EMERALD }}>{formatCurrency(stats.income, currency)}</span>
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Income</span>
+              <span className="money text-base font-bold" style={{ color: EMERALD }}>{formatCurrency(stats.income, currency)}</span>
             </div>
           )}
         </DialogContent>
@@ -850,23 +921,23 @@ export default function DashboardPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Expenses — {monthLabel}</DialogTitle>
-            <p className="text-[12px] text-muted-foreground">{monthExpenseTx.length} transaction{monthExpenseTx.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">{monthExpenseTx.length} transaction{monthExpenseTx.length !== 1 ? 's' : ''}</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-1 pr-2">
               {monthExpenseTx.map((tx) => (
                 <div key={tx.id} className="flex items-center gap-3 py-2.5 px-2 rounded-lg hover:bg-white/3">
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[14px] shrink-0"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
                     style={{ backgroundColor: (tx.category?.color ?? '#6b7280') + '22' }}
                   >
                     {tx.category?.icon ?? '💸'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium truncate">{tx.description}</p>
-                    <p className="text-[11px] text-muted-foreground">{tx.category?.name ?? 'Uncategorized'} · {tx.date}</p>
+                    <p className="text-[0.8125rem] font-medium truncate">{tx.description}</p>
+                    <p className="text-[0.6875rem] text-muted-foreground">{tx.category?.name ?? 'Uncategorized'} · {tx.date}</p>
                   </div>
-                  <p className="money text-[13px] font-semibold shrink-0" style={{ color: CORAL }}>
+                  <p className="money text-[0.8125rem] font-semibold shrink-0" style={{ color: CORAL }}>
                     −{formatCurrency(tx.amount, tx.currency)}
                   </p>
                 </div>
@@ -878,8 +949,8 @@ export default function DashboardPage() {
           </ScrollArea>
           {monthExpenseTx.length > 0 && (
             <div className="flex items-center justify-between pt-2 border-t border-border/50">
-              <span className="text-[12px] text-muted-foreground font-medium uppercase tracking-wider">Total Expenses</span>
-              <span className="money text-[16px] font-bold" style={{ color: CORAL }}>{formatCurrency(stats.expenses, currency)}</span>
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total Expenses</span>
+              <span className="money text-base font-bold" style={{ color: CORAL }}>{formatCurrency(stats.expenses, currency)}</span>
             </div>
           )}
         </DialogContent>
@@ -890,7 +961,7 @@ export default function DashboardPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Expenses by Category</DialogTitle>
-            <p className="text-[12px] text-muted-foreground">{monthLabel} spending breakdown</p>
+            <p className="text-xs text-muted-foreground">{monthLabel} spending breakdown</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-3 pr-2">
@@ -903,9 +974,9 @@ export default function DashboardPage() {
                 return (
                   <div key={i} className="rounded-lg border border-border/50 px-3 py-3 bg-muted/20 space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-[18px]">{cat.icon}</span>
-                      <span className="flex-1 text-[13px] font-medium">{cat.name}</span>
-                      <span className="money text-[13px] font-semibold shrink-0" style={{ color: cat.color }}>
+                      <span className="text-lg">{cat.icon}</span>
+                      <span className="flex-1 text-[0.8125rem] font-medium">{cat.name}</span>
+                      <span className="money text-[0.8125rem] font-semibold shrink-0" style={{ color: cat.color }}>
                         {formatCurrency(cat.amount, currency)}
                       </span>
                     </div>
@@ -915,13 +986,13 @@ export default function DashboardPage() {
                         style={{ width: `${pct}%`, backgroundColor: cat.color }}
                       />
                     </div>
-                    <p className="text-[11px] text-muted-foreground">{pct.toFixed(1)}% of total · {catTxs.length} transaction{catTxs.length !== 1 ? 's' : ''}</p>
+                    <p className="text-[0.6875rem] text-muted-foreground">{pct.toFixed(1)}% of total · {catTxs.length} transaction{catTxs.length !== 1 ? 's' : ''}</p>
                     {catTxs.length > 0 && (
                       <div className="space-y-1 pt-1 border-t border-border/30">
                         {catTxs.map((tx) => (
                           <div key={tx.id} className="flex items-center justify-between gap-2 py-1">
-                            <p className="text-[12px] text-muted-foreground truncate flex-1">{tx.description}</p>
-                            <p className="text-[12px] money font-medium shrink-0" style={{ color: CORAL }}>
+                            <p className="text-xs text-muted-foreground truncate flex-1">{tx.description}</p>
+                            <p className="text-xs money font-medium shrink-0" style={{ color: CORAL }}>
                               −{formatCurrency(tx.amount, tx.currency)}
                             </p>
                           </div>

@@ -149,9 +149,9 @@ function ProtectedRoutes() {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
         <div
           className="w-9 h-9 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: 'oklch(0.700 0.115 72 / 0.25)', borderTopColor: 'oklch(0.700 0.115 72)' }}
+          style={{ borderColor: 'color-mix(in srgb, var(--primary) 25%, transparent)', borderTopColor: 'var(--primary)' }}
         />
-        <p className="text-[12px] text-muted-foreground tracking-[0.12em] uppercase">Loading</p>
+        <p className="text-xs text-muted-foreground tracking-[0.12em] uppercase">Loading</p>
       </div>
     )
   }

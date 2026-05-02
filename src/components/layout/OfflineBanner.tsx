@@ -9,10 +9,10 @@ export function OfflineBanner() {
     <div
       role="status"
       aria-live="polite"
-      className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-[11px] font-medium tracking-wide"
+      className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-[0.6875rem] font-medium tracking-wide"
       style={{
-        background: isOnline ? 'oklch(0.700 0.115 72)' : 'oklch(0.45 0.08 40)',
-        color: isOnline ? 'oklch(0.20 0.04 40)' : 'oklch(0.96 0.01 80)',
+        background: isOnline ? 'var(--primary)' : 'oklch(0.45 0.08 40)',
+        color: isOnline ? 'var(--primary-foreground)' : 'oklch(0.96 0.01 80)',
       }}
     >
       {!isOnline && (

@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { CalendarCheck, Calculator, Info, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react'
+import { CalendarCheck, Info, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
@@ -67,12 +67,12 @@ function SummaryCard({
         className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-10 pointer-events-none"
         style={{ background: color, filter: 'blur(28px)', transform: 'translate(30%, -30%)' }}
       />
-      <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
+      <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
       {loading
         ? <Skeleton className="h-7 w-28 mt-1" />
         : <p className="text-2xl font-bold tracking-tight" style={{ color }}>{value}</p>
       }
-      {sub && !loading && <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>}
+      {sub && !loading && <p className="text-[0.6875rem] text-muted-foreground mt-1">{sub}</p>}
     </div>
   )
 }
@@ -185,8 +185,7 @@ export default function ThirteenthMonthPage() {
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Calculator className="w-6 h-6" style={{ color: GOLD }} />
+        <h1 className="text-2xl font-bold">
           13th Month Pay Estimator
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -319,7 +318,7 @@ export default function ThirteenthMonthPage() {
                       </button>
                       <span className="font-semibold text-sm flex-1">{monthName}</span>
                       <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 py-0">
+                        <Badge variant="outline" className="text-[0.625rem] h-4 px-1.5 py-0">
                           {txs.length} record{txs.length !== 1 ? 's' : ''}
                         </Badge>
                         <span
@@ -332,7 +331,7 @@ export default function ThirteenthMonthPage() {
                           }
                         </span>
                         {inclTotal !== total && inclTotal > 0 && (
-                          <span className="text-[11px] text-muted-foreground tabular-nums hidden sm:block">
+                          <span className="text-[0.6875rem] text-muted-foreground tabular-nums hidden sm:block">
                             of {formatCurrency(total, currency)}
                           </span>
                         )}
@@ -361,7 +360,7 @@ export default function ThirteenthMonthPage() {
                                 <p className="text-sm font-medium truncate">
                                   {tx.description || '(no description)'}
                                 </p>
-                                <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                                <p className="text-[0.6875rem] text-muted-foreground flex items-center gap-1.5">
                                   <span>{formatDate(tx.date)}</span>
                                   {tx.category && (
                                     <>
@@ -394,7 +393,7 @@ export default function ThirteenthMonthPage() {
               <div className="flex items-center justify-between px-5 py-4 bg-muted/30">
                 <div>
                   <p className="text-sm font-semibold">Estimated 13th Month Pay</p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[0.6875rem] text-muted-foreground">
                     {formatCurrency(totalIncluded, currency)} total / 12
                   </p>
                 </div>

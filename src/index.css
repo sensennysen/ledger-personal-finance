@@ -41,7 +41,7 @@
   --ring: oklch(0.565 0.115 72);
 
   /* Charts */
-  --chart-1: oklch(0.565 0.115 72);
+  --chart-1: var(--primary);
   --chart-2: oklch(0.620 0.145 155);
   --chart-3: oklch(0.580 0.155 18);
   --chart-4: oklch(0.620 0.165 220);
@@ -60,9 +60,9 @@
   --sidebar-ring: oklch(0.565 0.115 72);
 
   /* Custom design tokens */
-  --gold: oklch(0.565 0.115 72);
-  --gold-bright: oklch(0.650 0.130 72);
-  --gold-dim: oklch(0.480 0.090 72);
+  --gold: var(--primary);
+  --gold-bright: color-mix(in oklch, var(--primary) 80%, white);
+  --gold-dim: color-mix(in oklch, var(--primary) 75%, black);
   --emerald: oklch(0.580 0.145 155);
   --coral: oklch(0.580 0.155 18);
   --surface: oklch(0.958 0.010 72);
@@ -95,7 +95,7 @@
   --secondary-foreground: oklch(0.920 0.010 290);
 
   --muted: oklch(0.140 0.005 265);
-  --muted-foreground: oklch(0.570 0.015 290);
+  --muted-foreground: oklch(0.640 0.015 290);
 
   --accent: oklch(0.160 0.008 265);
   --accent-foreground: oklch(0.920 0.010 290);
@@ -107,7 +107,7 @@
   --ring: oklch(0.700 0.115 72);
 
   /* Charts */
-  --chart-1: oklch(0.700 0.115 72);
+  --chart-1: var(--primary);
   --chart-2: oklch(0.660 0.150 155);
   --chart-3: oklch(0.620 0.160 18);
   --chart-4: oklch(0.680 0.170 220);
@@ -126,9 +126,9 @@
   --sidebar-ring: oklch(0.700 0.115 72);
 
   /* Custom design tokens */
-  --gold: oklch(0.700 0.115 72);
-  --gold-bright: oklch(0.780 0.130 72);
-  --gold-dim: oklch(0.540 0.090 72);
+  --gold: var(--primary);
+  --gold-bright: color-mix(in oklch, var(--primary) 80%, white);
+  --gold-dim: color-mix(in oklch, var(--primary) 75%, black);
   --emerald: oklch(0.660 0.150 155);
   --coral: oklch(0.620 0.160 18);
   --surface: oklch(0.130 0.005 265);

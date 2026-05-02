@@ -2,11 +2,16 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
-import type { SavingsGoal } from '@/types'
+import type { SavingsGoal, Transaction } from '@/types'
+
+export interface GoalWithContributions extends SavingsGoal {
+  linkedTransactions?: Transaction[]
+  totalContributed?: number
+}
 
 export function useSavingsGoals() {
   const { user } = useAuth()
-  const [goals, setGoals] = useState<SavingsGoal[]>([])
+  const [goals, setGoals] = useState<GoalWithContributions[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -16,7 +21,7 @@ export function useSavingsGoals() {
       return
     }
     const cacheKey = `${user.id}:savings_goals`
-    const cached = readCache<SavingsGoal[]>(cacheKey)
+    const cached = readCache<GoalWithContributions[]>(cacheKey)
     if (cached) {
       setGoals(cached)
       setLoading(false)
@@ -37,8 +42,30 @@ export function useSavingsGoals() {
       return
     }
 
-    setGoals(data as SavingsGoal[])
-    writeCache(cacheKey, data)
+    // Fetch linked transactions for each goal
+    const goalIds = (data as SavingsGoal[]).map((g) => g.id)
+    let linkedTxs: Transaction[] = []
+    if (goalIds.length > 0) {
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('*, category:categories(id,name,color,icon), account:accounts!transactions_account_id_fkey(id,name,color,currency)')
+        .eq('user_id', user.id)
+        .in('goal_id', goalIds)
+        .order('date', { ascending: false })
+      linkedTxs = (txData as Transaction[]) ?? []
+    }
+
+    const enriched: GoalWithContributions[] = (data as SavingsGoal[]).map((g) => {
+      const txs = linkedTxs.filter((t) => t.goal_id === g.id)
+      return {
+        ...g,
+        linkedTransactions: txs,
+        totalContributed: txs.reduce((sum, t) => sum + (t.type === 'expense' ? -t.amount : t.amount), 0),
+      }
+    })
+
+    setGoals(enriched)
+    writeCache(cacheKey, enriched)
     setLoading(false)
   }, [user])
 

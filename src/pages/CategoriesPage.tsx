@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Tag, Smile, ChevronDown, ChevronRight, ListTree } from 'lucide-react'
+import { Plus, Pencil, Trash2, Tag, Smile, ChevronDown, ChevronRight, ListTree, Zap } from 'lucide-react'
 import EmojiPicker, { Theme } from 'emoji-picker-react'
 import { useCategories } from '@/hooks/useCategories'
 import { useSubcategories } from '@/hooks/useSubcategories'
+import { useTransactionRules } from '@/hooks/useTransactionRules'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -13,6 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -265,10 +267,17 @@ function SubcategoryPanel({ category }: { category: Category }) {
 
 export default function CategoriesPage() {
   const { categories, loading, createCategory, updateCategory, deleteCategory } = useCategories()
+  const { rules, loading: rulesLoading, createRule, deleteRule } = useTransactionRules()
   const [createOpen, setCreateOpen] = useState(false)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense')
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const [ruleKeyword, setRuleKeyword] = useState('')
+  const [ruleCategoryId, setRuleCategoryId] = useState('')
+  const [ruleTypeHint, setRuleTypeHint] = useState<'any' | 'income' | 'expense' | 'transfer'>('any')
+  const [rulePriority, setRulePriority] = useState(1)
 
   const handleCreate = async (values: FormValues) => {
     const { error } = await createCategory(values)
@@ -351,53 +360,57 @@ export default function CategoriesPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
-      <div className="flex items-center justify-between">
+      <div className="space-y-3">
         <div>
           <h1 className="text-2xl font-bold">Categories</h1>
           <p className="text-muted-foreground text-sm">Customize your transaction categories</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger render={<Button className="gap-2" />}>
-            <Plus className="w-4 h-4" />Add Category
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add Category</DialogTitle></DialogHeader>
-            {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
-            <CategoryForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setRulesOpen(true)}>
+            <Zap className="w-4 h-4" />Rules
+          </Button>
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger render={<Button className="gap-2" size="sm" />}>
+              <Plus className="w-4 h-4" />Add Category
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Add Category</DialogTitle></DialogHeader>
+              {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+              <CategoryForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : (
-        <div className="space-y-6">
-          <div>
-            <h2 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Expense</h2>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'expense' | 'income')}>
+          <TabsList className="w-full">
+            <TabsTrigger value="expense" className="flex-1">
+              Expenses
+              <Badge variant="secondary" className="ml-2 text-xs">{expenseCategories.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="income" className="flex-1">
+              Income
+              <Badge variant="secondary" className="ml-2 text-xs">{incomeCategories.length}</Badge>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="expense" className="mt-4">
             {expenseCategories.length === 0 ? (
               <Card><CardContent className="text-center py-8 text-sm text-muted-foreground">No expense categories</CardContent></Card>
             ) : (
               <div className="space-y-2">{renderCategories(expenseCategories)}</div>
             )}
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Income</h2>
+          </TabsContent>
+          <TabsContent value="income" className="mt-4">
             {incomeCategories.length === 0 ? (
               <Card><CardContent className="text-center py-8 text-sm text-muted-foreground">No income categories</CardContent></Card>
             ) : (
               <div className="space-y-2">{renderCategories(incomeCategories)}</div>
             )}
-          </div>
-          {categories.length === 0 && (
-            <Card className="text-center py-16">
-              <CardContent>
-                <Tag className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="font-medium">No categories yet</p>
-                <p className="text-sm text-muted-foreground">Add categories to organize your transactions</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+          </TabsContent>
+        </Tabs>
       )}
 
       <Dialog open={!!editCategory} onOpenChange={(o) => { if (!o) { setEditCategory(null); setFormError(null) } }}>
@@ -411,6 +424,116 @@ export default function CategoriesPage() {
               onClose={() => { setEditCategory(null); setFormError(null) }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Auto-Categorization Rules Modal */}
+      <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-4 h-4" />
+              Auto-Categorization Rules
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {rulesLoading ? (
+              <Skeleton className="h-10" />
+            ) : rules.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No rules yet. Add a rule to auto-assign categories when entering transactions.</p>
+            ) : (
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {rules.map((rule) => (
+                  <div key={rule.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded border bg-muted/30">
+                    <span className="text-sm font-medium">"{rule.keyword}"</span>
+                    <div className="flex items-center gap-2 flex-1 mx-2">
+                      <span className="text-muted-foreground">→</span>
+                      <span className="text-sm">{rule.category?.name ?? rule.category_id}</span>
+                      {rule.type_hint && (
+                        <Badge variant="outline" className="text-xs">{rule.type_hint}</Badge>
+                      )}
+                      <Badge variant="secondary" className="text-xs ml-auto">p{rule.priority}</Badge>
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive shrink-0" />}>
+                        <Trash2 className="w-3 h-3" />
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete rule?</AlertDialogTitle>
+                          <AlertDialogDescription>Remove auto-categorization rule for "{rule.keyword}".</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteRule(rule.id)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Add rule form */}
+            <div className="flex flex-wrap gap-2 pt-2 border-t">
+              <Input
+                placeholder="Keyword (e.g. Starbucks)"
+                value={ruleKeyword}
+                onChange={(e) => setRuleKeyword(e.target.value)}
+                className="flex-1 min-w-[140px] h-8 text-sm"
+              />
+              <Select value={ruleCategoryId} onValueChange={(v) => setRuleCategoryId(v ?? '')}>
+                <SelectTrigger className="flex-1 min-w-[140px] h-8 text-sm">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.icon} {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={ruleTypeHint} onValueChange={(v) => setRuleTypeHint(v as typeof ruleTypeHint)}>
+                <SelectTrigger className="w-28 h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any type</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={rulePriority}
+                onChange={(e) => setRulePriority(Number(e.target.value))}
+                placeholder="Priority"
+                className="w-20 h-8 text-sm"
+              />
+              <Button
+                size="sm"
+                className="h-8 gap-1"
+                disabled={!ruleKeyword.trim() || !ruleCategoryId}
+                onClick={async () => {
+                  await createRule({
+                    keyword: ruleKeyword.trim(),
+                    category_id: ruleCategoryId,
+                    type_hint: ruleTypeHint === 'any' ? null : ruleTypeHint,
+                    priority: rulePriority,
+                  })
+                  setRuleKeyword('')
+                  setRuleCategoryId('')
+                  setRuleTypeHint('any')
+                  setRulePriority(1)
+                }}
+              >
+                <Plus className="w-3 h-3" />Add Rule
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

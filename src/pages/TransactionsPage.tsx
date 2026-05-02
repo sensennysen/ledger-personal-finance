@@ -1,10 +1,11 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
-import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard } from 'lucide-react'
+import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { useCategories } from '@/hooks/useCategories'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
+import { usePreferences } from '@/hooks/usePreferences'
 import { formatDate, formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -46,6 +47,8 @@ export default function TransactionsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const { prefs, set: setPref } = usePreferences()
+  const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
 
   // ── Bulk select ────────────────────────────────────────────
   const [selectMode, setSelectMode] = useState(false)
@@ -159,6 +162,8 @@ export default function TransactionsPage() {
       recurrence_interval: templateSourceTx.recurrence_interval,
       recurrence_end_date: templateSourceTx.recurrence_end_date,
       receipt_url: null,
+      tags: templateSourceTx.tags ?? [],
+      goal_id: templateSourceTx.goal_id ?? null,
     })
     setTemplateSourceTx(null)
     setTemplateName('')
@@ -179,8 +184,16 @@ export default function TransactionsPage() {
           t.account?.name.toLowerCase().includes(q)
       )
     }
+    if (activeTagFilter) {
+      result = result.filter((t) => t.tags?.includes(activeTagFilter))
+    }
     return result
-  }, [transactions, filterType, search, selectedMonth, startDay])
+  }, [transactions, filterType, search, selectedMonth, startDay, activeTagFilter])
+
+  const allTags = useMemo(
+    () => [...new Set(transactions.flatMap((t) => t.tags ?? []))],
+    [transactions]
+  )
 
   const grouped = useMemo(() => {
     const groups: Record<string, Transaction[]> = {}
@@ -311,28 +324,12 @@ export default function TransactionsPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">
-      {/* Month navigation */}
-      <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2">
-        <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <span className="text-sm font-semibold flex-1 text-center">{formatMonthLabel(selectedMonth)}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
-          disabled={selectedMonth >= getCurrentCycleMonthKey(startDay)}
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold">Transactions</h1>
           <span
-            className="hidden sm:inline-flex items-center gap-1 text-[10px] text-muted-foreground/60 border border-border/40 rounded px-1.5 py-0.5 select-none"
+            className="hidden sm:inline-flex items-center gap-1 text-[0.625rem] text-muted-foreground border border-border rounded px-1.5 py-0.5 select-none"
             title="Keyboard shortcuts: N = new transaction"
           >
             <Keyboard className="w-2.5 h-2.5" />N
@@ -342,24 +339,11 @@ export default function TransactionsPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 text-xs"
+            className="gap-2"
             onClick={() => setImportOpen(true)}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Import</span>
-          </Button>
-          <Button
-            variant={selectMode ? 'secondary' : 'ghost'}
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={toggleSelectMode}
-          >
-            {selectMode ? (
-              <CheckSquare className="w-3.5 h-3.5" />
-            ) : (
-              <Square className="w-3.5 h-3.5" />
-            )}
-            <span className="hidden sm:inline">Select</span>
+            <span>Import</span>
           </Button>
           <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
             <DialogTrigger render={<Button className="gap-2" size="sm" />}>
@@ -421,20 +405,36 @@ export default function TransactionsPage() {
             />
           </div>
           <Tabs value={filterType} onValueChange={setFilterType} className="w-full sm:w-auto">
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="income">Income</TabsTrigger>
-              <TabsTrigger value="expense">Expense</TabsTrigger>
-              <TabsTrigger value="transfer">Transfer</TabsTrigger>
+            <TabsList className="w-full sm:w-auto">
+              <TabsTrigger value="all" className="flex-1 sm:flex-none">All</TabsTrigger>
+              <TabsTrigger value="income" className="flex-1 sm:flex-none">Income</TabsTrigger>
+              <TabsTrigger value="expense" className="flex-1 sm:flex-none">Expense</TabsTrigger>
+              <TabsTrigger value="transfer" className="flex-1 sm:flex-none">Transfer</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
       )}
 
+      {/* Month navigation */}
+      <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2">
+        <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <span className="text-sm font-semibold flex-1 text-center">{formatMonthLabel(selectedMonth)}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
+          disabled={selectedMonth >= getCurrentCycleMonthKey(startDay)}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+
       {/* Templates strip */}
       {templates.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+          <p className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
             <Bookmark className="w-3 h-3" />Templates
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
@@ -446,7 +446,7 @@ export default function TransactionsPage() {
               >
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-medium truncate max-w-30">{tmpl.name}</span>
-                  <span className={`text-[11px] ${TRANSACTION_TYPE_COLOR[tmpl.values.type]}`}>
+                  <span className={`text-[0.6875rem] ${TRANSACTION_TYPE_COLOR[tmpl.values.type]}`}>
                     {tmpl.values.type === 'income' ? '+' : tmpl.values.type === 'expense' ? '-' : ''}
                     {formatCurrency(tmpl.values.amount, tmpl.values.currency)}
                   </span>
@@ -465,6 +465,62 @@ export default function TransactionsPage() {
         </div>
       )}
 
+      {/* View controls row */}
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-xs"
+          onClick={() => setPref('txView', prefs.txView === 'grouped' ? 'flat' : 'grouped')}
+          title={prefs.txView === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
+        >
+          {prefs.txView === 'grouped' ? <LayoutList className="w-3.5 h-3.5" /> : <AlignJustify className="w-3.5 h-3.5" />}
+          <span>{prefs.txView === 'grouped' ? 'Grouped' : 'Flat'}</span>
+        </Button>
+        <Button
+          variant={selectMode ? 'secondary' : 'ghost'}
+          size="sm"
+          className="gap-1.5 text-xs"
+          onClick={toggleSelectMode}
+        >
+          {selectMode ? (
+            <CheckSquare className="w-3.5 h-3.5" />
+          ) : (
+            <Square className="w-3.5 h-3.5" />
+          )}
+          <span>Select</span>
+        </Button>
+      </div>
+
+      {/* Tag filter chips */}
+      {allTags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium transition-colors ${
+                activeTagFilter === tag
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-muted-foreground border-border hover:border-primary/40'
+              }`}
+            >
+              <Tag className="w-2.5 h-2.5" />{tag}
+            </button>
+          ))}
+          {activeTagFilter && (
+            <button
+              type="button"
+              onClick={() => setActiveTagFilter(null)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-3 h-3" />Clear
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Transaction list */}
       {loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
@@ -474,6 +530,22 @@ export default function TransactionsPage() {
           title="No transactions found"
           description={search ? 'Try a different search' : 'Add your first transaction'}
         />
+      ) : prefs.txView === 'flat' ? (
+        <div className="space-y-1">
+          {[...filtered].sort((a, b) => b.date.localeCompare(a.date)).map((tx) => (
+            <TransactionRow
+              key={tx.id}
+              tx={tx}
+              onEdit={setEditingTx}
+              onDelete={handleDelete}
+              onSplit={setSplittingTx}
+              onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
+              selectable={selectMode}
+              selected={selectedIds.has(tx.id)}
+              onSelect={toggleSelect}
+            />
+          ))}
+        </div>
       ) : (
         <div className="space-y-4">
           {grouped.map(([date, txs]) => (

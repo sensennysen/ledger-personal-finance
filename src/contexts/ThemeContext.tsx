@@ -10,18 +10,23 @@ const FONT_SIZE_MAP: Record<FontSize, string> = {
   xl: '20px',
 }
 
+const DEFAULT_ACCENT = '#c79144' // approximate hex for oklch(0.700 0.115 72) — app gold
+
 interface ThemeContextValue {
   theme: Theme
   toggleTheme: () => void
   setTheme: (t: Theme) => void
   fontSize: FontSize
   setFontSize: (size: FontSize) => void
+  accentColor: string
+  setAccentColor: (color: string) => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
 const STORAGE_KEY = 'ledger-theme'
 const FONT_SIZE_KEY = 'ledger-font-size'
+const ACCENT_KEY = 'ledger-accent-color'
 
 function getInitialTheme(): Theme {
   try {
@@ -40,9 +45,28 @@ function getInitialFontSize(): FontSize {
   return 'md'
 }
 
+function getInitialAccent(): string {
+  try {
+    return localStorage.getItem(ACCENT_KEY) ?? DEFAULT_ACCENT
+  } catch {
+    return DEFAULT_ACCENT
+  }
+}
+
+/** Return a contrasting foreground hex (#ffffff or dark) for a given hex color. */
+function contrastForeground(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16) / 255
+  const g = parseInt(hex.slice(3, 5), 16) / 255
+  const b = parseInt(hex.slice(5, 7), 16) / 255
+  // Relative luminance (WCAG formula)
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  return luminance > 0.35 ? '#1a1205' : '#ffffff'
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(getInitialTheme)
   const [fontSize, setFontSizeState] = useState<FontSize>(getInitialFontSize)
+  const [accentColor, setAccentState] = useState<string>(getInitialAccent)
 
   useEffect(() => {
     const root = document.documentElement
@@ -63,12 +87,28 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [fontSize])
 
+  useEffect(() => {
+    if (/^#[0-9a-fA-F]{6}$/.test(accentColor)) {
+      const fg = contrastForeground(accentColor)
+      document.documentElement.style.setProperty('--primary', accentColor)
+      document.documentElement.style.setProperty('--primary-foreground', fg)
+      document.documentElement.style.setProperty('--ring', accentColor)
+      document.documentElement.style.setProperty('--sidebar-primary', accentColor)
+      document.documentElement.style.setProperty('--sidebar-primary-foreground', fg)
+      document.documentElement.style.setProperty('--sidebar-ring', accentColor)
+    }
+    try {
+      localStorage.setItem(ACCENT_KEY, accentColor)
+    } catch {}
+  }, [accentColor])
+
   const setTheme = (t: Theme) => setThemeState(t)
   const toggleTheme = () => setThemeState((t) => (t === 'dark' ? 'light' : 'dark'))
   const setFontSize = (size: FontSize) => setFontSizeState(size)
+  const setAccentColor = (color: string) => setAccentState(color)
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, fontSize, setFontSize }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, fontSize, setFontSize, accentColor, setAccentColor }}>
       {children}
     </ThemeContext.Provider>
   )

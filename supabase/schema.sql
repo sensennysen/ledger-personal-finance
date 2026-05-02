@@ -501,3 +501,43 @@ create policy "Users can manage own savings goals"
 create trigger set_savings_goals_updated_at
   before update on public.savings_goals
   for each row execute procedure public.set_updated_at();
+
+-- ────────────────────────────────────────────────────────────
+-- TAGS
+-- Adds free-form tags to transactions for cross-category labeling.
+-- ────────────────────────────────────────────────────────────
+alter table public.transactions
+  add column if not exists tags text[] not null default '{}';
+
+create index if not exists transactions_tags_idx on public.transactions using gin(tags);
+
+-- ────────────────────────────────────────────────────────────
+-- AUTO-CATEGORIZATION RULES
+-- Keyword-based rules that automatically assign a category
+-- when a transaction description matches.
+-- ────────────────────────────────────────────────────────────
+create table if not exists public.transaction_rules (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  keyword     text not null,
+  category_id uuid references public.categories(id) on delete set null,
+  type_hint   text check (type_hint in ('income','expense','transfer')),
+  priority    integer not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+alter table public.transaction_rules enable row level security;
+
+create policy "Users can manage own rules"
+  on public.transaction_rules for all using (auth.uid() = user_id);
+
+create index if not exists transaction_rules_user_idx on public.transaction_rules(user_id);
+
+-- ────────────────────────────────────────────────────────────
+-- GOAL-LINKED TRANSACTIONS
+-- Links a transaction to a savings goal for contribution tracking.
+-- ────────────────────────────────────────────────────────────
+alter table public.transactions
+  add column if not exists goal_id uuid references public.savings_goals(id) on delete set null;
+
+create index if not exists transactions_goal_idx on public.transactions(goal_id);

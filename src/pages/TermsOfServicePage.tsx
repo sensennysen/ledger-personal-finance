@@ -92,7 +92,7 @@ export default function TermsOfServicePage() {
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-175 h-125 rounded-full"
-          style={{ background: 'radial-gradient(ellipse, oklch(0.700 0.115 72 / 0.04) 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(ellipse, color-mix(in srgb, var(--primary) 4%, transparent) 0%, transparent 70%)' }}
         />
         <div
           className="absolute inset-0 opacity-[0.03]"
@@ -121,9 +121,9 @@ export default function TermsOfServicePage() {
           <div className="flex items-center gap-3 mb-4">
             <div
               className="flex items-center justify-center w-10 h-10 rounded-xl"
-              style={{ background: 'oklch(0.700 0.115 72 / 0.12)' }}
+              style={{ background: 'color-mix(in srgb, var(--primary) 12%, transparent)' }}
             >
-              <ScrollText className="w-5 h-5" style={{ color: 'oklch(0.700 0.115 72)' }} />
+              <ScrollText className="w-5 h-5" style={{ color: 'var(--primary)' }} />
             </div>
             <div>
               <h1
@@ -151,7 +151,7 @@ export default function TermsOfServicePage() {
             <section key={section.title}>
               <h2
                 className="text-base font-semibold mb-3"
-                style={{ color: 'oklch(0.700 0.115 72)' }}
+                style={{ color: 'var(--primary)' }}
               >
                 {section.title}
               </h2>
@@ -161,7 +161,7 @@ export default function TermsOfServicePage() {
                     <li key={i} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
                       <span
                         className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full"
-                        style={{ background: 'oklch(0.700 0.115 72 / 0.6)' }}
+                        style={{ background: 'color-mix(in srgb, var(--primary) 60%, transparent)' }}
                       />
                       {item}
                     </li>
@@ -180,13 +180,13 @@ export default function TermsOfServicePage() {
         <div
           className="rounded-xl border p-5 mb-10 flex gap-4"
           style={{
-            borderColor: 'oklch(0.700 0.115 72 / 0.25)',
-            background: 'oklch(0.700 0.115 72 / 0.04)',
+            borderColor: 'color-mix(in srgb, var(--primary) 25%, transparent)',
+            background: 'color-mix(in srgb, var(--primary) 4%, transparent)',
           }}
         >
           <ScrollText
             className="mt-0.5 shrink-0 w-5 h-5"
-            style={{ color: 'oklch(0.700 0.115 72)' }}
+            style={{ color: 'var(--primary)' }}
           />
           <div>
             <p className="text-sm font-semibold text-foreground mb-1">Also see our Privacy Policy</p>
@@ -201,7 +201,7 @@ export default function TermsOfServicePage() {
         </div>
 
         {/* ── Footer ── */}
-        <p className="text-center text-[11px] text-muted-foreground/50">
+        <p className="text-center text-[0.6875rem] text-muted-foreground/50">
           © {new Date().getFullYear()} Ledger. All rights reserved.
         </p>
       </div>

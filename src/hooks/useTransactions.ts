@@ -159,6 +159,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
       const cachedCategories = readCache<Category[]>(`${user.id}:categories`) ?? []
 
       const optimistic: Transaction = {
+        tags: [],
+        goal_id: null,
         ...values,
         id: tempId,
         user_id: user.id,
@@ -177,10 +179,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       }
 
       optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
-      enqueue({ table: 'transactions', operation: 'insert', payload: { ...values, user_id: user.id }, userId: user.id })
+      enqueue({ table: 'transactions', operation: 'insert', payload: { tags: [], goal_id: null, ...values, user_id: user.id }, userId: user.id })
       return { error: null, queued: true }
     }
-    const { error } = await supabase.from('transactions').insert({ ...values, user_id: user.id })
+    const { error } = await supabase.from('transactions').insert({ tags: [], goal_id: null, ...values, user_id: user.id })
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }
@@ -285,6 +287,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (!navigator.onLine) {
       const now = new Date().toISOString()
       const optimistics: Transaction[] = rows.map((values) => ({
+        tags: [],
+        goal_id: null,
         ...values,
         id: crypto.randomUUID(),
         user_id: user.id,
@@ -300,16 +304,99 @@ export function useTransactions(filters: TransactionFilters = {}) {
       }
       rows.forEach((values) => {
         optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
-        enqueue({ table: 'transactions', operation: 'insert', payload: { ...values, user_id: user.id }, userId: user.id })
+        enqueue({ table: 'transactions', operation: 'insert', payload: { tags: [], goal_id: null, ...values, user_id: user.id }, userId: user.id })
       })
       return { error: null, imported: rows.length }
     }
     const { error } = await supabase
       .from('transactions')
-      .insert(rows.map((r) => ({ ...r, user_id: user.id })))
+      .insert(rows.map((r) => ({ tags: [], goal_id: null, ...r, user_id: user.id })))
     if (!error) await fetch()
     return { error: error?.message ?? null, imported: error ? 0 : rows.length }
   }
+
+  // ---------- generateDueRecurring ----------
+
+  const RECURRING_KEY = 'ledger-recurring-generated'
+
+  function getGeneratedMap(): Record<string, true> {
+    try { return JSON.parse(localStorage.getItem(RECURRING_KEY) ?? '{}') } catch { return {} }
+  }
+  function markGenerated(txId: string, date: string) {
+    const map = getGeneratedMap()
+    map[`${txId}__${date}`] = true
+    try { localStorage.setItem(RECURRING_KEY, JSON.stringify(map)) } catch {}
+  }
+  function wasGenerated(txId: string, date: string): boolean {
+    return getGeneratedMap()[`${txId}__${date}`] === true
+  }
+
+  function addInterval(dateStr: string, interval: string): string {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    let next: Date
+    switch (interval) {
+      case 'daily':     next = new Date(y, m - 1, d + 1); break
+      case 'weekly':    next = new Date(y, m - 1, d + 7); break
+      case 'biweekly':  next = new Date(y, m - 1, d + 14); break
+      case 'quarterly': next = new Date(y, m + 2, d); break
+      case 'yearly':    next = new Date(y + 1, m - 1, d); break
+      case 'monthly':
+      default:          next = new Date(y, m, d); break
+    }
+    const ny = next.getFullYear()
+    const nm = String(next.getMonth() + 1).padStart(2, '0')
+    const nd = String(next.getDate()).padStart(2, '0')
+    return `${ny}-${nm}-${nd}`
+  }
+
+  const generateDueRecurring = useCallback(async (): Promise<number> => {
+    if (!user || !navigator.onLine) return 0
+    const today = new Date().toISOString().split('T')[0]
+    const { data: allRecurring } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_recurring', true)
+      .order('date', { ascending: false })
+    if (!allRecurring?.length) return 0
+
+    let generated = 0
+    for (const tx of allRecurring as Transaction[]) {
+      if (!tx.recurrence_interval) continue
+      const nextDate = addInterval(tx.date, tx.recurrence_interval)
+      if (nextDate > today) continue
+      if (tx.recurrence_end_date && nextDate > tx.recurrence_end_date) continue
+      if (wasGenerated(tx.id, nextDate)) continue
+
+      const { error } = await supabase.from('transactions').insert({
+        user_id: user.id,
+        account_id: tx.account_id,
+        to_account_id: tx.to_account_id,
+        category_id: tx.category_id,
+        subcategory_id: tx.subcategory_id,
+        type: tx.type,
+        amount: tx.amount,
+        currency: tx.currency,
+        exchange_rate: tx.exchange_rate,
+        description: tx.description,
+        notes: tx.notes,
+        date: nextDate,
+        transfer_fee: tx.transfer_fee,
+        is_recurring: true,
+        recurrence_interval: tx.recurrence_interval,
+        recurrence_end_date: tx.recurrence_end_date,
+        receipt_url: null,
+        tags: tx.tags ?? [],
+        goal_id: tx.goal_id ?? null,
+      })
+      if (!error) {
+        markGenerated(tx.id, nextDate)
+        generated++
+      }
+    }
+    if (generated > 0) await fetch()
+    return generated
+  }, [user, fetch])
 
   return {
     transactions,
@@ -322,6 +409,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     bulkDeleteTransactions,
     bulkUpdateCategory,
     bulkCreateTransactions,
+    generateDueRecurring,
     pendingSync: queueSize(),
   }
 }

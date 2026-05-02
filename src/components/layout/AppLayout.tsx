@@ -1,10 +1,25 @@
+import { useEffect, useRef } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import { OfflineBanner } from './OfflineBanner'
 import { PWAInstallBanner } from './PWAInstallBanner'
+import { useTransactions } from '@/hooks/useTransactions'
 
 export default function AppLayout() {
+  const { generateDueRecurring } = useTransactions()
+  const hasGenerated = useRef(false)
+
+  useEffect(() => {
+    if (hasGenerated.current) return
+    hasGenerated.current = true
+    generateDueRecurring().then((count) => {
+      if (count > 0) {
+        console.info(`[Recurring] Created ${count} recurring transaction${count !== 1 ? 's' : ''}.`)
+      }
+    })
+  }, [])
+
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar />

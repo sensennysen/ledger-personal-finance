@@ -158,6 +158,11 @@ export function TransactionRow({
             {tx.subcategory && (
               <Badge variant="outline" className="text-xs py-0 px-1.5">{tx.subcategory.name}</Badge>
             )}
+            {tx.tags && tx.tags.length > 0 && tx.tags.map((tag) => (
+              <Badge key={tag} variant="outline" className="text-[0.625rem] py-0 px-1.5 h-4 text-muted-foreground gap-0.5">
+                # {tag}
+              </Badge>
+            ))}
             {tx.is_recurring && (
               <Badge variant="outline" className="text-xs py-0 px-1.5 gap-1">
                 <RepeatIcon className="w-2.5 h-2.5" />{tx.recurrence_interval}

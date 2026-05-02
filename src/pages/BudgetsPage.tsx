@@ -4,15 +4,15 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   Plus, Pencil, Trash2, Target, History, PiggyBank,
-  RefreshCw, CheckCircle2, CalendarDays,
+  RefreshCw, CheckCircle2, CalendarDays, ChevronDown, ChevronRight as ChevronR,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useBudgets } from '@/hooks/useBudgets'
-import { useSavingsGoals } from '@/hooks/useSavingsGoals'
+import { useSavingsGoals, type GoalWithContributions } from '@/hooks/useSavingsGoals'
 import { useCategories } from '@/hooks/useCategories'
 import { CURRENCIES, ACCOUNT_COLORS } from '@/types'
 import { formatCurrency } from '@/lib/utils'
-import { EMERALD } from '@/constants/colors'
+import { EMERALD, CORAL } from '@/constants/colors'
 import { BUDGET_WARNING_THRESHOLD, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -546,12 +546,13 @@ function SavingsGoalCard({
   onContribute,
   onToggleComplete,
 }: {
-  goal: SavingsGoal
+  goal: GoalWithContributions
   onEdit: () => void
   onDelete: () => void
   onContribute: () => void
   onToggleComplete: () => void
 }) {
+  const [expanded, setExpanded] = useState(false)
   const pct = Math.min((goal.current_amount / goal.target_amount) * 100, 100)
   const remaining = goal.target_amount - goal.current_amount
 
@@ -664,6 +665,36 @@ function SavingsGoalCard({
         {goal.notes && (
           <p className="text-xs text-muted-foreground border-t pt-2">{goal.notes}</p>
         )}
+        {(goal.linkedTransactions?.length ?? 0) > 0 && (
+          <div className="border-t pt-2">
+            <button
+              type="button"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronR className="w-3 h-3" />}
+              {goal.linkedTransactions!.length} linked transaction{goal.linkedTransactions!.length !== 1 ? 's' : ''}
+              {goal.totalContributed !== undefined && (
+                <span className="ml-1 font-medium" style={{ color: goal.totalContributed >= 0 ? EMERALD : CORAL }}>
+                  ({goal.totalContributed >= 0 ? '+' : ''}{formatCurrency(goal.totalContributed, goal.currency)})
+                </span>
+              )}
+            </button>
+            {expanded && (
+              <div className="mt-2 space-y-1">
+                {goal.linkedTransactions!.slice(0, 10).map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/40">
+                    <span className="text-muted-foreground">{tx.date}</span>
+                    <span className="truncate flex-1 mx-2">{tx.description}</span>
+                    <span style={{ color: tx.type === 'income' ? EMERALD : CORAL }}>
+                      {tx.type === 'income' ? '+' : '−'}{formatCurrency(tx.amount, tx.currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -681,9 +712,9 @@ export default function BudgetsPage() {
   const [editBudget, setEditBudget] = useState<Budget | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [createGoalOpen, setCreateGoalOpen] = useState(false)
-  const [editGoal, setEditGoal] = useState<SavingsGoal | null>(null)
+  const [editGoal, setEditGoal] = useState<GoalWithContributions | null>(null)
   const [goalFormError, setGoalFormError] = useState<string | null>(null)
-  const [contributionGoal, setContributionGoal] = useState<SavingsGoal | null>(null)
+  const [contributionGoal, setContributionGoal] = useState<GoalWithContributions | null>(null)
 
   const defaultCurrency = profile?.default_currency ?? 'USD'
 
@@ -733,12 +764,12 @@ export default function BudgetsPage() {
           <p className="text-muted-foreground text-sm">Track spending limits and savings targets</p>
         </div>
         {activeTab === 'budgets' && (
-          <Button className="gap-2" onClick={() => setCreateOpen(true)}>
+          <Button className="gap-2" size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4" />Add Budget
           </Button>
         )}
         {activeTab === 'goals' && (
-          <Button className="gap-2" onClick={() => setCreateGoalOpen(true)}>
+          <Button className="gap-2" size="sm" onClick={() => setCreateGoalOpen(true)}>
             <Plus className="w-4 h-4" />Add Goal
           </Button>
         )}
@@ -796,6 +827,12 @@ export default function BudgetsPage() {
                               <Badge variant="outline" className="text-xs gap-0.5 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
                                 <RefreshCw className="w-2.5 h-2.5" />Rollover
                               </Badge>
+                            )}
+                            {over && (
+                              <Badge variant="destructive" className="text-xs">Over budget</Badge>
+                            )}
+                            {!over && pct >= BUDGET_WARNING_THRESHOLD * 100 && (
+                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700">Warning</Badge>
                             )}
                           </div>
                         </div>

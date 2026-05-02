@@ -18,15 +18,26 @@ function localDateStr(date: Date): string {
 export function formatCurrency(
   amount: number,
   currencyCode: string = 'USD',
-  options?: Intl.NumberFormatOptions
+  options?: Intl.NumberFormatOptions,
+  locale: string = 'en-US',
 ): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currencyCode,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-    ...options,
-  }).format(amount)
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      ...options,
+    }).format(amount)
+  } catch {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+      ...options,
+    }).format(amount)
+  }
 }
 
 export function getCurrencySymbol(currencyCode: string): string {

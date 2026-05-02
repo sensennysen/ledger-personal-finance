@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ImagePlus, X, Loader2 } from 'lucide-react'
+import { ImagePlus, X, Loader2, Tag } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useSubcategories } from '@/hooks/useSubcategories'
 import { useDescriptionSuggestions } from '@/hooks/useDescriptionSuggestions'
+import { useTransactionRules } from '@/hooks/useTransactionRules'
+import { useSavingsGoals } from '@/hooks/useSavingsGoals'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { storePendingReceipt, PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
@@ -38,6 +40,8 @@ export const transactionSchema = z.object({
   recurrence_interval: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).nullable(),
   recurrence_end_date: z.string().nullable(),
   receipt_url: z.string().nullable().default(null),
+  tags: z.array(z.string()).default([]),
+  goal_id: z.string().nullable().default(null),
 }).superRefine((data, ctx) => {
   if (data.type === 'transfer' && !data.to_account_id) {
     ctx.addIssue({
@@ -63,6 +67,8 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const { accounts } = useAccounts()
   const { categories } = useCategories()
   const descriptionSuggestions = useDescriptionSuggestions()
+  const { matchRule } = useTransactionRules()
+  const { goals } = useSavingsGoals()
   const today = new Date().toISOString().split('T')[0]
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -71,6 +77,8 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+  const [autoCatCategoryId, setAutoCatCategoryId] = useState<string | null>(null)
 
   const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
@@ -121,6 +129,8 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
       recurrence_interval: null,
       recurrence_end_date: null,
       receipt_url: null,
+      tags: [],
+      goal_id: null,
       ...defaultValues,
     },
   })
@@ -188,8 +198,37 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const isRecurring = form.watch('is_recurring')
   const selectedAccount = form.watch('account_id')
   const selectedCategoryId = form.watch('category_id')
+  const description = form.watch('description')
+  const tags = form.watch('tags') ?? []
 
   const { subcategories } = useSubcategories(selectedCategoryId)
+
+  // Auto-categorization rule matching
+  useEffect(() => {
+    if (!description) return
+    const rule = matchRule(description)
+    if (!rule?.category_id) return
+    const currentCat = form.getValues('category_id')
+    // Only auto-fill if category is empty or was last set by auto-cat
+    if (!currentCat || currentCat === autoCatCategoryId) {
+      form.setValue('category_id', rule.category_id)
+      setAutoCatCategoryId(rule.category_id)
+      if (rule.type_hint && form.getValues('type') !== rule.type_hint) {
+        form.setValue('type', rule.type_hint)
+      }
+    }
+  }, [description, matchRule, autoCatCategoryId, form])
+
+  const addTag = () => {
+    const t = tagInput.trim().toLowerCase().replace(/,/g, '')
+    if (!t || tags.includes(t)) { setTagInput(''); return }
+    form.setValue('tags', [...tags, t])
+    setTagInput('')
+  }
+
+  const removeTag = (tag: string) => {
+    form.setValue('tags', tags.filter((t) => t !== tag))
+  }
 
   const onAccountChange = (id: string | null) => {
     if (!id) return
@@ -294,11 +333,21 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
               name="category_id"
               render={({ field }) => {
                 const selectedCat = categories.find((c) => c.id === field.value)
+                const isAutoCat = !!autoCatCategoryId && field.value === autoCatCategoryId
                 return (
                   <FormItem>
-                    <FormLabel>Category</FormLabel>
+                    <FormLabel className="flex items-center gap-1.5">
+                      Category
+                      {isAutoCat && (
+                        <span className="inline-flex items-center gap-0.5 text-[0.625rem] font-medium text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full">
+                          <Tag className="w-2.5 h-2.5" />Auto
+                          <button type="button" className="ml-0.5 hover:text-destructive" onClick={() => { setAutoCatCategoryId(null); field.onChange(null) }}><X className="w-2 h-2" /></button>
+                        </span>
+                      )}
+                    </FormLabel>
                     <Select
                       onValueChange={(v) => {
+                        setAutoCatCategoryId(null)
                         field.onChange(v === UNCATEGORIZED_VALUE ? null : v)
                         form.setValue('subcategory_id', null)
                       }}
@@ -488,6 +537,64 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             </FormItem>
           )}
         />
+
+        {/* Tags */}
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium leading-none">Tags</label>
+          <div className="flex flex-wrap items-center gap-1.5 min-h-9 rounded-md border bg-background px-2 py-1.5">
+            {tags.map((tag) => (
+              <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                <Tag className="w-2.5 h-2.5" />
+                {tag}
+                <button type="button" className="ml-0.5 hover:text-destructive" onClick={() => removeTag(tag)}>
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </span>
+            ))}
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() } }}
+              onBlur={addTag}
+              placeholder={tags.length === 0 ? 'Add tags…  Enter or comma to confirm' : ''}
+              className="flex-1 min-w-[140px] bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+        </div>
+
+        {/* Link to savings goal */}
+        {type !== 'transfer' && goals.length > 0 && (
+          <FormField
+            control={form.control}
+            name="goal_id"
+            render={({ field }) => {
+              const selectedGoal = goals.find((g) => g.id === field.value)
+              return (
+                <FormItem>
+                  <FormLabel>Link to Savings Goal <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                  <Select
+                    onValueChange={(v) => field.onChange(v === 'none' ? null : v)}
+                    value={field.value ?? 'none'}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue>
+                          {selectedGoal ? `${selectedGoal.icon ?? '🎯'} ${selectedGoal.name}` : 'No goal'}
+                        </SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">No goal</SelectItem>
+                      {goals.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>{g.icon ?? '🎯'} {g.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )
+            }}
+          />
+        )}
 
         <FormField
           control={form.control}

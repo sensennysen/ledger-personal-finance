@@ -22,7 +22,7 @@ export default function BottomNav() {
     >
       <div
         className="absolute top-0 left-0 right-0 h-px"
-        style={{ background: 'linear-gradient(90deg, transparent, oklch(0.700 0.115 72 / 0.3), transparent)' }}
+        style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 30%, transparent), transparent)' }}
       />
       <div className="flex items-center h-16">
         {navItems.map(({ to, label, icon: Icon, exact }) => {
@@ -50,7 +50,7 @@ export default function BottomNav() {
               </div>
               <span className={cn(
                 'uppercase tracking-[0.06em] font-medium transition-all duration-200 leading-none',
-                active ? 'text-[10px] opacity-100 max-h-4' : 'text-[0px] opacity-0 max-h-0 overflow-hidden'
+                active ? 'text-[0.625rem] opacity-100 max-h-4' : 'text-[0px] opacity-0 max-h-0 overflow-hidden'
               )}>{label}</span>
             </NavLink>
           )

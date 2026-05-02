@@ -99,7 +99,7 @@ export default function Sidebar() {
                     to={to}
                     end={exact}
                     className={cn(
-                      'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[0.8125rem] font-medium transition-all duration-200',
+                      'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[0.8125rem] font-medium transition-all duration-200 press-scale',
                       active
                         ? 'text-primary bg-primary/8'
                         : 'text-muted-foreground hover:text-foreground hover:bg-white/4',

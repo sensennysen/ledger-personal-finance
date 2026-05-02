@@ -53,6 +53,7 @@ function StatCard({
   loading,
   variant = 'default',
   onClick,
+  className,
 }: {
   title: string
   value: string
@@ -62,6 +63,7 @@ function StatCard({
   loading?: boolean
   variant?: 'balance' | 'income' | 'expense' | 'default'
   onClick?: () => void
+  className?: string
 }) {
   const accentColor =
     variant === 'income' ? EMERALD
@@ -71,8 +73,9 @@ function StatCard({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-xl border border-border/60 p-5 transition-all duration-300 group bg-card',
-        onClick && 'cursor-pointer select-none'
+        'relative overflow-hidden rounded-xl border border-border/60 p-5 transition-all duration-300 group bg-card hover-lift press-scale',
+        onClick && 'cursor-pointer select-none',
+        className
       )}
       onClick={onClick}
       onMouseEnter={(e) => {
@@ -424,10 +427,12 @@ export default function DashboardPage() {
           variant="balance"
           loading={loading}
           onClick={() => setDetailView('balance')}
+          className="animate-fade-up"
         />
         <StatCard
           title="Monthly Income"
           value={formatCurrency(stats.income, currency)}
+          className="animate-fade-up anim-delay-1"
           sub={isCurrentMonth ? 'This month' : monthLabel}
           icon={TrendingUp}
           trend="up"
@@ -444,6 +449,7 @@ export default function DashboardPage() {
           variant="expense"
           loading={loading}
           onClick={() => setDetailView('expenses')}
+          className="animate-fade-up anim-delay-2"
         />
         <StatCard
           title="Net Cash Flow"
@@ -452,6 +458,7 @@ export default function DashboardPage() {
           icon={ArrowLeftRight}
           trend={stats.net >= 0 ? 'up' : 'down'}
           loading={loading}
+          className="animate-fade-up anim-delay-3"
         />
       </div>
       )}

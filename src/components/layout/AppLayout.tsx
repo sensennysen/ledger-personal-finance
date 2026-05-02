@@ -1,10 +1,19 @@
 import { useEffect, useRef } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import { OfflineBanner } from './OfflineBanner'
 import { PWAInstallBanner } from './PWAInstallBanner'
 import { useTransactions } from '@/hooks/useTransactions'
+
+function PageTransition() {
+  const location = useLocation()
+  return (
+    <div key={location.key} className="animate-page-in min-h-full">
+      <Outlet />
+    </div>
+  )
+}
 
 export default function AppLayout() {
   const { generateDueRecurring } = useTransactions()
@@ -27,7 +36,7 @@ export default function AppLayout() {
         <PWAInstallBanner />
         <OfflineBanner />
         <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
-          <Outlet />
+          <PageTransition />
         </main>
       </div>
       <BottomNav />

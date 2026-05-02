@@ -33,7 +33,7 @@ export default function BottomNav() {
               to={to}
               end={exact}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-all duration-200 min-w-0',
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-all duration-200 min-w-0 press-scale',
                 active
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'

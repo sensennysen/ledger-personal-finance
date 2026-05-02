@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import React, { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -801,7 +801,7 @@ export default function BudgetsPage() {
               </CardContent>
             </Card>
           ) : (
-            budgets.map((budget) => {
+            budgets.map((budget, idx) => {
               const spent = budget.spent ?? 0
               const effective = budget.effective_amount ?? budget.amount
               const pct = Math.min((spent / (effective || 1)) * 100, 100)
@@ -811,7 +811,7 @@ export default function BudgetsPage() {
               const hasRollover = budget.rollover_enabled && rollover !== 0
 
               return (
-                <Card key={budget.id}>
+                <Card key={budget.id} className="animate-fade-up" style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties}>
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">

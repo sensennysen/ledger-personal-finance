@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -298,8 +298,8 @@ export default function CategoriesPage() {
   const incomeCategories = categories.filter((c) => c.type === 'income' || c.type === 'both')
 
   const renderCategories = (cats: Category[]) =>
-    cats.map((cat) => (
-      <div key={cat.id} className="rounded-lg border bg-card overflow-hidden">
+    cats.map((cat, idx) => (
+      <div key={cat.id} className="rounded-lg border bg-card overflow-hidden animate-fade-up" style={{ '--anim-delay': `${Math.min(idx * 50, 400)}ms` } as React.CSSProperties}>
         <div className="flex items-center justify-between gap-2 p-3 hover:bg-accent/50 transition-colors">
           <button
             type="button"

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -260,10 +260,10 @@ export default function AccountsPage() {
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((account) => {
+          {accounts.map((account, idx) => {
             const Icon = ACCOUNT_ICONS[account.type]
             return (
-              <Card key={account.id} className="relative overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/accounts/${account.id}`)}>
+              <Card key={account.id} className="relative overflow-hidden cursor-pointer hover:shadow-md transition-shadow animate-fade-up hover-lift" style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties} onClick={() => navigate(`/accounts/${account.id}`)}>
                 <div
                   className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
                   style={{ backgroundColor: account.color }}

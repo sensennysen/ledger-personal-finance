@@ -4,7 +4,6 @@ import { Tag, Target, FileBarChart2, ChevronRight, Sun, Moon } from 'lucide-reac
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import { OfflineBanner } from './OfflineBanner'
-import { GuestModeBanner } from './GuestModeBanner'
 import { PWAInstallBanner } from './PWAInstallBanner'
 import { useTransactions } from '@/hooks/useTransactions'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'

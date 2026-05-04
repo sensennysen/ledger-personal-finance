@@ -410,7 +410,7 @@ export default function DashboardPage() {
           </Button>
         </div>
         <Button
-          className="gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0"
+          className="hidden md:inline-flex gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0"
           onClick={() => navigate('/transactions')}
         >
           <Plus className="w-3.5 h-3.5" />Add Transaction

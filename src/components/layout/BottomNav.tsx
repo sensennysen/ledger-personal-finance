@@ -1,58 +1,86 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Wallet, ArrowLeftRight, Tag, Target, Settings, FileBarChart2 } from 'lucide-react'
+import { LayoutDashboard, Wallet, ArrowLeftRight, Menu, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/', label: 'Home', icon: LayoutDashboard, exact: true },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
-  { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { to: '/categories', label: 'Categories', icon: Tag },
-  { to: '/budgets', label: 'Budgets', icon: Target },
-  { to: '/reports', label: 'Reports', icon: FileBarChart2 },
-  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/transactions', label: 'Transact', icon: ArrowLeftRight },
+  { to: '/settings', label: 'More', icon: Menu },
 ]
 
-export default function BottomNav() {
+type BottomNavProps = {
+  onAddTransaction?: () => void
+  addTransactionOpen?: boolean
+  onMoreMenu?: () => void
+  moreMenuOpen?: boolean
+}
+
+export default function BottomNav({
+  onAddTransaction,
+  addTransactionOpen = false,
+  onMoreMenu,
+  moreMenuOpen = false,
+}: BottomNavProps) {
   const location = useLocation()
+  const insertIndex = Math.ceil(navItems.length / 2)
 
   return (
-    <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-sidebar-border bg-sidebar"
-      style={{ backdropFilter: 'blur(12px)' }}
-    >
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-3 pb-2 pt-2">
       <div
-        className="absolute top-0 left-0 right-0 h-px"
-        style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 30%, transparent), transparent)' }}
+        className="absolute inset-0 rounded-t-3xl border border-sidebar-border/70 bg-sidebar/90"
+        style={{ backdropFilter: 'blur(12px)' }}
       />
-      <div className="flex items-center h-16">
-        {navItems.map(({ to, label, icon: Icon, exact }) => {
+      <button
+        type="button"
+        aria-label="Add transaction"
+        onClick={onAddTransaction}
+        className={cn(
+          'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-14 h-14 rounded-2xl border border-primary/40 shadow-md',
+          'bg-primary text-primary-foreground flex items-center justify-center transition-transform duration-200 active:scale-95',
+          addTransactionOpen && 'ring-4 ring-primary/30'
+        )}
+      >
+        <Plus className="w-6 h-6" />
+      </button>
+      <div className="relative flex items-center h-20 px-1">
+        {navItems.map(({ to, label, icon: Icon, exact }, index) => {
+          const isMore = label === 'More'
           const active = exact ? location.pathname === to : location.pathname.startsWith(to)
+          const isActive = isMore ? moreMenuOpen : active
           return (
-            <NavLink
-              key={to}
-              to={to}
-              end={exact}
-              className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-all duration-200 min-w-0 press-scale',
-                active
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
+            <div key={to} className="contents">
+              {index === insertIndex && <div className="w-16 shrink-0" aria-hidden />}
+              {isMore ? (
+                <button
+                  type="button"
+                  onClick={onMoreMenu}
+                  className={cn(
+                    'mx-0.5 flex flex-1 min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[0.625rem] font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-primary/15 text-primary'
+                      : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                  )}
+                >
+                  <Icon className={cn('mb-1 transition-all duration-200', isActive ? 'w-4 h-4' : 'w-[18px] h-[18px]')} />
+                  <span className="leading-none">{label}</span>
+                </button>
+              ) : (
+                <NavLink
+                  to={to}
+                  end={exact}
+                  className={cn(
+                    'mx-0.5 flex flex-1 min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[0.625rem] font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-primary/15 text-primary'
+                      : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                  )}
+                >
+                  <Icon className={cn('mb-1 transition-all duration-200', isActive ? 'w-4 h-4' : 'w-[18px] h-[18px]')} />
+                  <span className="leading-none">{label}</span>
+                </NavLink>
               )}
-            >
-              <div className={cn(
-                'flex items-center justify-center rounded-full transition-all duration-200',
-                active ? 'bg-primary/10 w-10 h-6' : 'w-6 h-6'
-              )}>
-                <Icon className={cn(
-                  'transition-all duration-200',
-                  active ? 'w-4 h-4' : 'w-5 h-5'
-                )} />
-              </div>
-              <span className={cn(
-                'uppercase tracking-[0.06em] font-medium transition-all duration-200 leading-none',
-                active ? 'text-[0.625rem] opacity-100 max-h-4' : 'text-[0px] opacity-0 max-h-0 overflow-hidden'
-              )}>{label}</span>
-            </NavLink>
+            </div>
           )
         })}
       </div>

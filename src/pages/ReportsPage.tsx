@@ -309,27 +309,27 @@ function StatCard({
   loading?: boolean
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border/60 p-5 bg-card">
+    <div className="relative overflow-hidden rounded-xl border border-border/60 p-4 sm:p-5 bg-card">
       <div
         className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 pointer-events-none"
         style={{ background: color, filter: 'blur(32px)', transform: 'translate(30%, -30%)' }}
       />
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
           <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground mb-1">{title}</p>
           {loading ? (
             <Skeleton className="h-7 w-28" />
           ) : (
-            <p className="text-2xl font-bold tracking-tight truncate" style={{ color }}>
+            <p className="text-lg sm:text-2xl font-bold tracking-tight wrap-break-word" style={{ color }}>
               {value}
             </p>
           )}
           {sub && !loading && (
-            <p className="text-[0.6875rem] text-muted-foreground mt-1 truncate">{sub}</p>
+            <p className="text-[0.6875rem] text-muted-foreground mt-1 wrap-break-word">{sub}</p>
           )}
         </div>
         <div
-          className="flex items-center justify-center w-9 h-9 rounded-lg shrink-0"
+          className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0"
           style={{ background: `${color.replace(')', ' / 0.12)')}`, boxShadow: `0 0 0 1px ${color.replace(')', ' / 0.20)')}` }}
         >
           <Icon className="w-4 h-4" style={{ color }} />
@@ -773,7 +773,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
           title="Total Income"
           value={formatCurrency(totalIncome, currency)}

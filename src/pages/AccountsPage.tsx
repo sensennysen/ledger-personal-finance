@@ -18,14 +18,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
-import { getCreditCardNetWorthContribution, daysUntilDayOfMonth } from '@/lib/creditCards'
+import { daysUntilDayOfMonth, getBalanceSummary, getCreditCardSpending, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(50),
@@ -73,7 +73,10 @@ function AccountForm({
   })
   const type = form.watch('type')
   const watchedBalance = form.watch('balance')
-  const balanceChanged = originalBalance !== undefined && Number(watchedBalance) !== originalBalance
+  const normalizedWatchedBalance = type === 'credit_card' && Number(watchedBalance) > 0
+    ? -Number(watchedBalance)
+    : Number(watchedBalance)
+  const balanceChanged = originalBalance !== undefined && normalizedWatchedBalance !== originalBalance
 
   return (
     <Form {...form}>
@@ -132,16 +135,21 @@ function AccountForm({
           name="balance"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Current Balance</FormLabel>
+              <FormLabel>{type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</FormLabel>
               <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
               <FormMessage />
               {balanceChanged && (
                 <div className="flex items-start gap-2 rounded-md border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-950/30 p-2.5 text-sm text-yellow-800 dark:text-yellow-300">
                   <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
                   <span>
-                    Changing the balance will create a <strong>Balance Adjustment</strong> transaction for the difference ({Number(watchedBalance) > originalBalance! ? '+' : ''}{formatCurrency(Number(watchedBalance) - originalBalance!, defaultValues?.currency ?? 'USD')}). This keeps your transaction history accurate.
+                    Changing the balance will create a <strong>Balance Adjustment</strong> transaction for the difference ({normalizedWatchedBalance > originalBalance! ? '+' : ''}{formatCurrency(normalizedWatchedBalance - originalBalance!, defaultValues?.currency ?? 'USD')}). This keeps your transaction history accurate.
                   </span>
                 </div>
+              )}
+              {type === 'credit_card' && (
+                <p className="text-xs text-muted-foreground">
+                  Enter the amount owed. It will reduce net worth instead of increasing total assets.
+                </p>
               )}
             </FormItem>
           )}
@@ -231,7 +239,7 @@ function AccountForm({
                 name="payment_reminder_days"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reminder Days Before Due</FormLabel>
+                    <FormLabel>Remind Days Before Due</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -298,13 +306,14 @@ export default function AccountsPage() {
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Account | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const totalBalance = accounts.reduce((sum, a) => sum + getCreditCardNetWorthContribution(a), 0)
+  const balanceSummary = getBalanceSummary(accounts)
   const defaultCurrency = profile?.default_currency ?? 'USD'
 
   const handleCreate = async (values: FormValues) => {
-    const { error } = await createAccount({ ...values, is_active: true, icon: null })
+    const { error } = await createAccount({ ...normalizeCreditCardBalanceForStorage(values), is_active: true, icon: null })
     if (error) { setFormError(error); return }
     setFormError(null)
     setCreateOpen(false)
@@ -312,7 +321,7 @@ export default function AccountsPage() {
 
   const handleEdit = async (values: FormValues) => {
     if (!editAccount) return
-    const { error } = await updateAccountWithAdjustment(editAccount.id, values, editAccount.balance)
+    const { error } = await updateAccountWithAdjustment(editAccount.id, normalizeCreditCardBalanceForStorage(values), editAccount.balance)
     if (error) { setFormError(error); return }
     setFormError(null)
     setEditAccount(null)
@@ -325,7 +334,10 @@ export default function AccountsPage() {
         <div>
           <h1 className="text-2xl font-bold">Accounts</h1>
           <p className="text-muted-foreground text-sm">
-            Total net worth: <span className="font-semibold text-foreground">{formatCurrency(totalBalance, defaultCurrency)}</span>
+            Total net worth: <span className="font-semibold text-foreground">{formatCurrency(balanceSummary.netWorth, defaultCurrency)}</span>
+            {balanceSummary.totalCreditCardDebt > 0 && (
+              <span className="text-muted-foreground"> after {formatCurrency(balanceSummary.totalCreditCardDebt, defaultCurrency)} credit card debt</span>
+            )}
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -404,41 +416,33 @@ export default function AccountsPage() {
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditAccount(account) }}>
                           <Pencil className="w-4 h-4 mr-2" />Edit
                         </DropdownMenuItem>
-                        <AlertDialog>
-                          <AlertDialogTrigger render={<DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => e.stopPropagation()} className="text-destructive focus:text-destructive" />}>
-                            <Trash2 className="w-4 h-4 mr-2" />Delete
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete account?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will archive "{account.name}". Transactions will be preserved.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={async () => {
-                                const { error } = await deleteAccount(account.id)
-                                if (error) console.error('Failed to delete account:', error)
-                              }}>
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeleteTarget(account)
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />Delete
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="money text-[1.375rem] font-bold" style={{ color: GOLD }}>
-                    {formatCurrency(account.balance, account.currency)}
+                  <p className="money text-[1.375rem] font-bold" style={{ color: account.balance < 0 ? 'var(--destructive)' : GOLD }}>
+                    {formatCurrency(account.type === 'credit_card' ? getCreditCardSpending(account) : account.balance, account.currency)}
                   </p>
-                  {account.type === 'credit_card' && account.credit_limit != null && (
+                  {account.type === 'credit_card' && (
                     <div className="space-y-1.5 mt-1">
+                      <p className="text-xs text-muted-foreground">
+                        {account.balance < 0 ? 'Owed. Subtracted from net worth.' : 'Credit balance. Added to net worth.'}
+                      </p>
+                      {account.credit_limit != null && (
                       <p className="text-xs text-muted-foreground">
                         Limit: {formatCurrency(account.credit_limit, account.currency)}
                       </p>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -455,7 +459,10 @@ export default function AccountsPage() {
           {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editAccount && (
             <AccountForm
-              defaultValues={editAccount}
+              defaultValues={{
+                ...editAccount,
+                balance: editAccount.type === 'credit_card' ? getCreditCardSpending(editAccount) : editAccount.balance,
+              }}
               onSubmit={handleEdit}
               onClose={() => setEditAccount(null)}
               originalBalance={editAccount.balance}
@@ -463,6 +470,29 @@ export default function AccountsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation dialog (kept outside dropdown so it doesn't unmount) */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will archive "{deleteTarget?.name ?? ''}". Transactions will be preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              if (!deleteTarget) return
+              const { error } = await deleteAccount(deleteTarget.id)
+              if (error) console.error('Failed to delete account:', error)
+              setDeleteTarget(null)
+            }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

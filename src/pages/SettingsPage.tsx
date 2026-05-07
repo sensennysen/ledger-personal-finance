@@ -459,7 +459,10 @@ export default function SettingsPage() {
       </Card>
 
       {/* Delete account confirmation dialog */}
-      <AlertDialog open={deleteOpen} onOpenChange={(o) => { if (!deleting) setDeleteOpen(o) }}>
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(o) => { if (!deleting) setDeleteOpen(o) }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <div className="flex items-center gap-2 mb-1">

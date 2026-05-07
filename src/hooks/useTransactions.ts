@@ -18,19 +18,24 @@ interface TransactionFilters {
 
 // ---------- balance helpers ----------
 
-type TxShape = Pick<Transaction, 'account_id' | 'to_account_id' | 'type' | 'amount' | 'transfer_fee'>
+type TxShape = Pick<
+  Transaction,
+  'account_id' | 'to_account_id' | 'type' | 'amount' | 'exchange_rate' | 'transfer_fee'
+>
 
 function applyTxDelta(accounts: Account[], tx: TxShape): Account[] {
   return accounts.map((a) => {
     if (a.id === tx.account_id) {
       const delta =
-        tx.type === 'income' ? tx.amount
-        : tx.type === 'expense' ? -tx.amount
-        : -(tx.amount + (tx.transfer_fee ?? 0))
+        tx.type === 'income'
+          ? tx.amount
+          : tx.type === 'expense'
+            ? -tx.amount
+            : -(tx.amount + (tx.transfer_fee ?? 0))
       return { ...a, balance: a.balance + delta }
     }
     if (tx.type === 'transfer' && a.id === tx.to_account_id) {
-      return { ...a, balance: a.balance + tx.amount }
+      return { ...a, balance: a.balance + tx.amount * (tx.exchange_rate ?? 1) }
     }
     return a
   })
@@ -40,13 +45,15 @@ function reverseTxDelta(accounts: Account[], tx: TxShape): Account[] {
   return accounts.map((a) => {
     if (a.id === tx.account_id) {
       const delta =
-        tx.type === 'income' ? -tx.amount
-        : tx.type === 'expense' ? tx.amount
-        : tx.amount + (tx.transfer_fee ?? 0)
+        tx.type === 'income'
+          ? -tx.amount
+          : tx.type === 'expense'
+            ? tx.amount
+            : tx.amount + (tx.transfer_fee ?? 0)
       return { ...a, balance: a.balance + delta }
     }
     if (tx.type === 'transfer' && a.id === tx.to_account_id) {
-      return { ...a, balance: a.balance - tx.amount }
+      return { ...a, balance: a.balance - tx.amount * (tx.exchange_rate ?? 1) }
     }
     return a
   })

@@ -43,6 +43,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { EMERALD, CORAL, GOLD } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
+import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
 
@@ -447,7 +448,7 @@ export default function ReportsPage() {
   // ── Net Worth Over Time (last 13 months) ──
   const netWorthData = useMemo(() => {
     const now = new Date()
-    const currentNetWorth = accounts.reduce((sum, a) => sum + a.balance, 0)
+    const currentNetWorth = accounts.reduce((sum, a) => sum + getAccountNetWorthContribution(a), 0)
     const boundaries: { date: string; label: string }[] = []
     for (let i = 12; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -528,7 +529,8 @@ export default function ReportsPage() {
   }, [filtered])
 
   const activeAccounts = accounts.filter((a) => a.is_active)
-  const totalBalance = activeAccounts.reduce((sum, a) => sum + a.balance, 0)
+  const balanceSummary = getBalanceSummary(activeAccounts)
+  const totalBalance = balanceSummary.netWorth
 
   const presetLabel = {
     this_month: 'This Month',
@@ -797,9 +799,11 @@ export default function ReportsPage() {
           loading={loading}
         />
         <StatCard
-          title="Total Balance"
+          title="Net Balance"
           value={formatCurrency(totalBalance, currency)}
-          sub={`${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
+          sub={balanceSummary.totalCreditCardDebt > 0
+            ? `Assets minus ${formatCurrency(balanceSummary.totalCreditCardDebt, currency)} card debt`
+            : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
           icon={Wallet}
           color={GOLD}
           loading={loading}
@@ -843,7 +847,7 @@ export default function ReportsPage() {
               ))}
               <Separator className="my-1" />
               <div className="flex items-center justify-between px-3 py-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Total</span>
+                <span className="text-xs font-medium text-muted-foreground">Net</span>
                 <span className="text-[0.8125rem] font-bold tabular-nums" style={{ color: GOLD }}>
                   {formatCurrency(totalBalance, currency)}
                 </span>

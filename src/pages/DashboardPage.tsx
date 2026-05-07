@@ -34,7 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import { getCreditCardNetWorthContribution, getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth } from '@/lib/creditCards'
+import { getAccountNetWorthContribution, getBalanceSummary, getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth } from '@/lib/creditCards'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
 
 const CHART_TOOLTIP_STYLE = {
@@ -194,11 +194,11 @@ export default function DashboardPage() {
 
   // ---- Stats ----
   const stats = useMemo(() => {
-    const totalBalance = accounts.reduce((sum, a) => sum + getCreditCardNetWorthContribution(a), 0)
+    const balanceSummary = getBalanceSummary(accounts)
     const monthTx = transactions.filter((t) => t.date >= monthStart && t.date <= monthEnd)
     const income = monthTx.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
     const expenses = monthTx.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    return { totalBalance, income, expenses, net: income - expenses }
+    return { totalBalance: balanceSummary.netWorth, ...balanceSummary, income, expenses, net: income - expenses }
   }, [accounts, transactions, monthStart, monthEnd])
 
   // ---- Cash flow chart data ----
@@ -480,8 +480,9 @@ export default function DashboardPage() {
       {widgets.stats && (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Balance"
+          title="Net Balance"
           value={formatCurrency(stats.totalBalance, currency)}
+          sub={stats.totalCreditCardDebt > 0 ? `Minus ${formatCurrency(stats.totalCreditCardDebt, currency)} card debt` : 'Assets minus debt'}
           icon={Wallet}
           variant="balance"
           loading={loading}
@@ -987,18 +988,18 @@ export default function DashboardPage() {
 
       {/* ---- Detail Dialogs ---- */}
 
-      {/* Total Balance detail */}
+      {/* Net Balance detail */}
       <Dialog open={detailView === 'balance'} onOpenChange={(o) => !o && setDetailView(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Total Balance</DialogTitle>
-            <p className="text-xs text-muted-foreground">Breakdown by account</p>
+            <DialogTitle>Net Balance</DialogTitle>
+            <p className="text-xs text-muted-foreground">Assets minus credit card debt</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-2 pr-2">
               {accounts.map((acc) => (
                 (() => {
-                  const contribution = getCreditCardNetWorthContribution(acc)
+                  const contribution = getAccountNetWorthContribution(acc)
                   return (
                 <div key={acc.id} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 bg-muted/30">
                   <div
@@ -1027,9 +1028,23 @@ export default function DashboardPage() {
             </div>
           </ScrollArea>
           {accounts.length > 0 && (
-            <div className="flex items-center justify-between pt-2 border-t border-border/50">
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total</span>
-              <span className="money text-base font-bold balance-gradient">{formatCurrency(stats.totalBalance, currency)}</span>
+            <div className="space-y-2 pt-2 border-t border-border/50">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Assets</span>
+                <span className="money text-sm font-semibold">{formatCurrency(stats.totalAssets, currency)}</span>
+              </div>
+              {stats.totalCreditCardDebt > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Credit card debt</span>
+                  <span className="money text-sm font-semibold" style={{ color: CORAL }}>
+                    -{formatCurrency(stats.totalCreditCardDebt, currency)}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Net</span>
+                <span className="money text-base font-bold balance-gradient">{formatCurrency(stats.totalBalance, currency)}</span>
+              </div>
             </div>
           )}
         </DialogContent>

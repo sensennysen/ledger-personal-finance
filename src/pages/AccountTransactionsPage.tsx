@@ -9,7 +9,7 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
 import { ACCOUNT_COLORS, ACCOUNT_TYPE_LABELS, CURRENCIES } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth } from '@/lib/creditCards'
+import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -55,10 +55,15 @@ function EditAccountForm({
   onSubmit: (values: AccountFormValues) => Promise<void>
   onClose: () => void
 }) {
+  // This form is used as a "template" with fairly loose typing from react-hook-form/zodResolver,
+  // and Cursor's current TS/ESLint config tends to over-warn on the explicit generic types.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<AccountFormValues, any, AccountFormValues>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(accountSchema) as any,
     defaultValues: {
       ...account,
+      balance: account.type === 'credit_card' ? getCreditCardSpending(account) : account.balance,
       currency: account.currency || DEFAULT_CURRENCY,
       utilization_target_pct: account.utilization_target_pct ?? 30,
       payment_reminder_days: account.payment_reminder_days ?? 3,
@@ -124,9 +129,14 @@ function EditAccountForm({
           name="balance"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Current Balance</FormLabel>
+              <FormLabel>{type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</FormLabel>
               <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
               <FormMessage />
+              {type === 'credit_card' && (
+                <p className="text-xs text-muted-foreground">
+                  Enter the amount owed. It will reduce net worth instead of increasing total assets.
+                </p>
+              )}
             </FormItem>
           )}
         />
@@ -215,7 +225,7 @@ function EditAccountForm({
                 name="payment_reminder_days"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reminder Days Before Due</FormLabel>
+                    <FormLabel>Remind Days Before Due</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -291,6 +301,7 @@ export default function AccountTransactionsPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
+  const [paymentFromAccountId, setPaymentFromAccountId] = useState<string | null>(null)
   const [paymentHistory, setPaymentHistory] = useState<CreditCardPayment[]>([])
   const [paymentsLoading, setPaymentsLoading] = useState(false)
 
@@ -337,6 +348,18 @@ export default function AccountTransactionsPage() {
 
   const account = accounts.find((a) => a.id === accountId)
   const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet
+  const paymentSourceAccounts = useMemo(
+    () => accounts.filter((a) => a.type !== 'credit_card' && a.id !== accountId),
+    [accounts, accountId]
+  )
+
+  const effectivePaymentFromAccountId = useMemo(() => {
+    if (!paymentSourceAccounts.length) return null
+    if (paymentFromAccountId && paymentSourceAccounts.some((a) => a.id === paymentFromAccountId)) {
+      return paymentFromAccountId
+    }
+    return paymentSourceAccounts[0].id
+  }, [paymentSourceAccounts, paymentFromAccountId])
 
   // Filter to only transactions involving this account (source or destination)
   const accountTransactions = useMemo(() => {
@@ -441,7 +464,32 @@ export default function AccountTransactionsPage() {
   const handleLogPayment = async () => {
     if (!account || account.type !== 'credit_card' || !user) return
     const amount = Number(paymentAmount)
-    if (!amount || amount <= 0) return
+    if (!amount || amount <= 0 || !effectivePaymentFromAccountId) return
+
+    const { error: transferError } = await createTransaction({
+      type: 'transfer',
+      account_id: effectivePaymentFromAccountId,
+      to_account_id: account.id,
+      category_id: null,
+      subcategory_id: null,
+      amount,
+      currency: account.currency,
+      exchange_rate: 1,
+      description: `Credit card payment - ${account.name}`,
+      notes: null,
+      date: paymentDate,
+      transfer_fee: null,
+      is_recurring: false,
+      recurrence_interval: null,
+      recurrence_end_date: null,
+      receipt_url: null,
+      tags: [],
+      goal_id: null,
+    })
+    if (transferError) {
+      setFormError(transferError)
+      return
+    }
 
     const amountToPay = account.statement_balance ?? 0
     const currentPaid = account.statement_paid_amount ?? 0
@@ -479,7 +527,7 @@ export default function AccountTransactionsPage() {
 
   const handleAccountEdit = async (values: AccountFormValues) => {
     if (!account) return
-    const { error } = await updateAccountWithAdjustment(account.id, values, account.balance)
+    const { error } = await updateAccountWithAdjustment(account.id, normalizeCreditCardBalanceForStorage(values), account.balance)
     if (error) {
       setFormError(error)
       return
@@ -536,7 +584,7 @@ export default function AccountTransactionsPage() {
           style={{ background: `linear-gradient(135deg, ${account.color}dd, ${account.color}99)` }}
         >
           <div className="flex items-start justify-between gap-3">
-            <p className="text-sm font-medium opacity-80">Current Balance</p>
+            <p className="text-sm font-medium opacity-80">{account.type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</p>
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-black/15 hover:text-white" />}>
                 <MoreHorizontal className="w-4 h-4" />
@@ -550,7 +598,7 @@ export default function AccountTransactionsPage() {
             </DropdownMenu>
           </div>
           <p className="money text-3xl font-bold mt-1">
-            {formatCurrency(account.balance, account.currency)}
+            {formatCurrency(account.type === 'credit_card' ? getCreditCardSpending(account) : account.balance, account.currency)}
           </p>
           <div className="flex gap-4 mt-3 text-sm opacity-90">
             <div>
@@ -620,7 +668,20 @@ export default function AccountTransactionsPage() {
                   className={getCreditUtilizationPct(account) >= (account.utilization_target_pct ?? 30) ? '[&>div]:bg-[oklch(0.620_0.160_18)]' : '[&>div]:bg-[oklch(0.660_0.150_155)]'}
                 />
               </div>
-              <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_1fr_1fr_auto] gap-2">
+                <Select
+                  value={effectivePaymentFromAccountId ?? ''}
+                  onValueChange={(value) => setPaymentFromAccountId(value)}
+                >
+                  <SelectTrigger className="bg-white/95 text-black">
+                    <SelectValue placeholder="Pay from account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentSourceAccounts.map((source) => (
+                      <SelectItem key={source.id} value={source.id}>{source.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Input
                   type="number"
                   step="0.01"
@@ -635,10 +696,20 @@ export default function AccountTransactionsPage() {
                   onChange={(e) => setPaymentDate(e.target.value)}
                   className="bg-white/95 text-black"
                 />
-                <Button type="button" variant="secondary" onClick={handleLogPayment}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleLogPayment}
+                  disabled={!effectivePaymentFromAccountId}
+                >
                   Log Payment
                 </Button>
               </div>
+              {paymentSourceAccounts.length === 0 && (
+                <p className="text-[0.6875rem] opacity-80">
+                  Add a cash, bank, or wallet account to record credit card payments correctly.
+                </p>
+              )}
               {account.last_payment_date && account.last_payment_amount != null && (
                 <p className="text-[0.6875rem] opacity-80">
                   Last payment: {formatCurrency(account.last_payment_amount, currency)} on {account.last_payment_date}

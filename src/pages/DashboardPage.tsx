@@ -482,7 +482,7 @@ export default function DashboardPage() {
         <StatCard
           title="Net Balance"
           value={formatCurrency(stats.totalBalance, currency)}
-          sub={stats.totalCreditCardDebt > 0 ? `Minus ${formatCurrency(stats.totalCreditCardDebt, currency)} card debt` : 'Assets minus debt'}
+          sub="Assets minus Liabilities"
           icon={Wallet}
           variant="balance"
           loading={loading}

@@ -802,7 +802,7 @@ export default function ReportsPage() {
           title="Net Balance"
           value={formatCurrency(totalBalance, currency)}
           sub={balanceSummary.totalCreditCardDebt > 0
-            ? `Assets minus ${formatCurrency(balanceSummary.totalCreditCardDebt, currency)} card debt`
+            ? `Assets minus Liabilities`
             : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
           icon={Wallet}
           color={GOLD}

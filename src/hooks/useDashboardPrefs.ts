@@ -8,6 +8,7 @@ export interface DashboardWidgets {
   savingsGoals: boolean
   upcomingBills: boolean
   cashflowForecast: boolean
+  creditCards: boolean
   quickAdd: boolean
 }
 
@@ -21,6 +22,7 @@ const DEFAULTS: DashboardWidgets = {
   savingsGoals: true,
   upcomingBills: true,
   cashflowForecast: true,
+  creditCards: true,
   quickAdd: true,
 }
 

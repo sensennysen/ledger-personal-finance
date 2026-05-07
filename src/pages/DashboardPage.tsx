@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AreaChart,
   Area,
@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight, ChevronLeft, Bell, BarChart3, ArrowRight, Settings2, AlertTriangle, X } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight, ChevronLeft, Bell, BarChart3, ArrowRight, Settings2, AlertTriangle, X, CreditCard, CalendarClock } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useNavigate } from 'react-router-dom'
+import { getCreditCardNetWorthContribution, getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth } from '@/lib/creditCards'
 
 const CHART_TOOLTIP_STYLE = {
   backgroundColor: 'var(--popover)',
@@ -176,7 +177,7 @@ export default function DashboardPage() {
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
   const currencySymbol = getCurrencySymbol(currency)
-  const { accounts, loading: accountsLoading } = useAccounts()
+  const { accounts, loading: accountsLoading, updateAccount } = useAccounts()
   const { transactions, loading: txLoading } = useTransactions()
   const { categories } = useCategories()
   const { budgets } = useBudgets()
@@ -191,7 +192,7 @@ export default function DashboardPage() {
 
   // ---- Stats ----
   const stats = useMemo(() => {
-    const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
+    const totalBalance = accounts.reduce((sum, a) => sum + getCreditCardNetWorthContribution(a), 0)
     const monthTx = transactions.filter((t) => t.date >= monthStart && t.date <= monthEnd)
     const income = monthTx.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
     const expenses = monthTx.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
@@ -328,6 +329,61 @@ export default function DashboardPage() {
   const alerts = useSpendingAlerts(budgets, transactions, prefs.largeTransactionThreshold)
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
   const visibleAlerts = alerts.filter((a) => !dismissedAlerts.has(a.id))
+  const creditCards = useMemo(() => accounts.filter((a) => a.type === 'credit_card'), [accounts])
+
+  const creditCardsWithState = useMemo(() => creditCards.map((acc) => {
+    const spending = getCreditCardSpending(acc)
+    const utilizationPct = getCreditUtilizationPct(acc)
+    const targetPct = acc.utilization_target_pct ?? 30
+    const statementCountdown = daysUntilDayOfMonth(acc.statement_day)
+    const dueCountdown = daysUntilDayOfMonth(acc.due_day)
+    const amountToPay = acc.statement_balance ?? 0
+    const paidAmount = acc.statement_paid_amount ?? 0
+    const remainingToPay = Math.max(amountToPay - paidAmount, 0)
+    const reminderDays = acc.payment_reminder_days ?? 3
+    const paymentReminder = dueCountdown !== null && dueCountdown <= reminderDays && remainingToPay > 0
+    const statementReminder = statementCountdown !== null && statementCountdown <= 2
+    return {
+      acc,
+      spending,
+      utilizationPct,
+      targetPct,
+      statementCountdown,
+      dueCountdown,
+      amountToPay,
+      paidAmount,
+      remainingToPay,
+      paymentReminder,
+      statementReminder,
+      nearLimit: utilizationPct >= targetPct,
+    }
+  }), [creditCards])
+
+  useEffect(() => {
+    if (!navigator.onLine || creditCards.length === 0) return
+
+    const today = new Date()
+    const day = today.getDate()
+    const lockStatementBalances = async () => {
+      for (const cc of creditCards) {
+        if (!cc.statement_day || day < cc.statement_day) continue
+
+        const lockMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+        const alreadyLockedThisMonth = cc.statement_balance_locked_at?.startsWith(lockMonthKey)
+        if (alreadyLockedThisMonth) continue
+
+        const spending = getCreditCardSpending(cc)
+        await updateAccount(cc.id, {
+          statement_balance: spending,
+          statement_paid_amount: 0,
+          statement_balance_locked_at: today.toISOString().split('T')[0],
+        })
+      }
+    }
+
+    lockStatementBalances()
+  }, [creditCards, updateAccount])
+
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
@@ -357,6 +413,7 @@ export default function DashboardPage() {
                 ['budgets', 'Budget Progress'],
                 ['upcomingBills', 'Upcoming Bills'],
                 ['cashflowForecast', 'Cash Flow Forecast'],
+                ['creditCards', 'Credit Card Tracker'],
               ] as const).map(([key, label]) => (
                 <div key={key} className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0">
                   <span className="text-sm">{label}</span>
@@ -461,6 +518,94 @@ export default function DashboardPage() {
           className="animate-fade-up anim-delay-3"
         />
       </div>
+      )}
+
+      {widgets.creditCards && creditCards.length > 0 && (
+        <div className="rounded-xl border border-border/60 p-5 bg-card space-y-4">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="font-semibold text-[0.9375rem]">Credit Card Monitor</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Spending, statement, and payment tracking</p>
+            </div>
+            <div className="w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border">
+              <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
+            </div>
+          </div>
+          <div className="space-y-3">
+            {creditCardsWithState.map((cc) => {
+              return (
+                <div key={cc.acc.id} className="rounded-lg border border-border/50 p-3.5 bg-muted/20 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{cc.acc.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Spent {formatCurrency(cc.spending, cc.acc.currency)} of {formatCurrency(cc.acc.credit_limit ?? 0, cc.acc.currency)}
+                      </p>
+                    </div>
+                    <p className="text-xs font-semibold" style={{ color: cc.nearLimit ? CORAL : EMERALD }}>
+                      {cc.utilizationPct.toFixed(1)}% used
+                    </p>
+                  </div>
+                  <Progress
+                    value={Math.min(cc.utilizationPct, 100)}
+                    className={cc.nearLimit ? '[&>div]:bg-[oklch(0.620_0.160_18)]' : '[&>div]:bg-[oklch(0.660_0.150_155)]'}
+                  />
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-md border border-border/40 px-2 py-1.5">
+                      <p className="text-muted-foreground">Statement</p>
+                      <p className="font-medium">
+                        {cc.statementCountdown == null
+                          ? 'Not set'
+                          : cc.statementCountdown === 0
+                            ? 'Today'
+                            : `in ${cc.statementCountdown} ${cc.statementCountdown === 1 ? 'day' : 'days'}`}
+                      </p>
+                    </div>
+                    <div className="rounded-md border border-border/40 px-2 py-1.5">
+                      <p className="text-muted-foreground">Due</p>
+                      <p className="font-medium">
+                        {cc.dueCountdown == null
+                          ? 'Not set'
+                          : cc.dueCountdown === 0
+                            ? 'Today'
+                            : `in ${cc.dueCountdown} ${cc.dueCountdown === 1 ? 'day' : 'days'}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border/40 px-2.5 py-2 text-xs">
+                    <span className="text-muted-foreground">Amount to pay</span>
+                    <span className="money font-semibold">{formatCurrency(cc.amountToPay, cc.acc.currency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border/40 px-2.5 py-2 text-xs">
+                    <span className="text-muted-foreground">Remaining</span>
+                    <span className="money font-semibold" style={{ color: cc.remainingToPay > 0 ? CORAL : EMERALD }}>
+                      {formatCurrency(cc.remainingToPay, cc.acc.currency)}
+                    </span>
+                  </div>
+                  {cc.paymentReminder && (
+                    <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-700 dark:text-amber-400">
+                      <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                      Payment reminder: due in {cc.dueCountdown} day(s)
+                    </div>
+                  )}
+                  {cc.statementReminder && (
+                    <div className="flex items-center gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-2.5 py-2 text-xs text-sky-700 dark:text-sky-300">
+                      <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+                      {cc.statementCountdown === 0
+                        ? 'Statement day is today'
+                        : `Statement day in ${cc.statementCountdown} day(s)`}
+                    </div>
+                  )}
+                  {cc.acc.last_payment_date && cc.acc.last_payment_amount != null && (
+                    <p className="text-[0.6875rem] text-muted-foreground">
+                      Last payment: {formatCurrency(cc.acc.last_payment_amount, cc.acc.currency)} on {cc.acc.last_payment_date}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
 
       {/* Cash flow chart */}
@@ -850,6 +995,9 @@ export default function DashboardPage() {
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-2 pr-2">
               {accounts.map((acc) => (
+                (() => {
+                  const contribution = getCreditCardNetWorthContribution(acc)
+                  return (
                 <div key={acc.id} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 bg-muted/30">
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 border border-border/50"
@@ -863,11 +1011,13 @@ export default function DashboardPage() {
                   </div>
                   <p
                     className="money text-sm font-semibold shrink-0"
-                    style={{ color: acc.balance >= 0 ? EMERALD : CORAL }}
+                    style={{ color: contribution >= 0 ? EMERALD : CORAL }}
                   >
-                    {formatCurrency(acc.balance, acc.currency)}
+                    {formatCurrency(contribution, acc.currency)}
                   </p>
                 </div>
+                  )
+                })()
               ))}
               {accounts.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-8">No accounts yet</p>

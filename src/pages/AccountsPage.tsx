@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
+import { getCreditCardNetWorthContribution, daysUntilDayOfMonth } from '@/lib/creditCards'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(50),
@@ -33,6 +34,10 @@ const schema = z.object({
   balance: z.coerce.number(),
   color: z.string(),
   credit_limit: z.coerce.number().nullable(),
+  statement_day: z.coerce.number().int().min(1).max(31).nullable(),
+  due_day: z.coerce.number().int().min(1).max(31).nullable(),
+  utilization_target_pct: z.coerce.number().min(1).max(100).nullable(),
+  payment_reminder_days: z.coerce.number().int().min(0).max(30).nullable(),
   notes: z.string().nullable(),
 })
 
@@ -58,6 +63,10 @@ function AccountForm({
       balance: 0,
       color: ACCOUNT_COLORS[0],
       credit_limit: null,
+      statement_day: null,
+      due_day: null,
+      utilization_target_pct: 30,
+      payment_reminder_days: 3,
       notes: null,
       ...defaultValues,
     },
@@ -138,24 +147,106 @@ function AccountForm({
           )}
         />
         {type === 'credit_card' && (
-          <FormField
-            control={form.control}
-            name="credit_limit"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Credit Limit</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="space-y-4 rounded-lg border border-border/60 p-3">
+            <FormField
+              control={form.control}
+              name="credit_limit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Credit Limit</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="statement_day"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Statement Day</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="due_day"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Due Day</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="utilization_target_pct"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Utilization Target %</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="payment_reminder_days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reminder Days Before Due</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={30}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
         )}
         <FormField
           control={form.control}
@@ -209,7 +300,7 @@ export default function AccountsPage() {
   const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
+  const totalBalance = accounts.reduce((sum, a) => sum + getCreditCardNetWorthContribution(a), 0)
   const defaultCurrency = profile?.default_currency ?? 'USD'
 
   const handleCreate = async (values: FormValues) => {
@@ -226,6 +317,7 @@ export default function AccountsPage() {
     setFormError(null)
     setEditAccount(null)
   }
+
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
@@ -262,6 +354,16 @@ export default function AccountsPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {accounts.map((account, idx) => {
             const Icon = ACCOUNT_ICONS[account.type]
+            const statementDays = account.type === 'credit_card' ? daysUntilDayOfMonth(account.statement_day) : null
+            const dueDays = account.type === 'credit_card' ? daysUntilDayOfMonth(account.due_day) : null
+            const dueReminderDays = account.payment_reminder_days ?? 3
+            const showStatementReminder = statementDays !== null && statementDays <= 2
+            const showDueReminder = dueDays !== null && dueDays <= dueReminderDays
+            const reminderLabel = showDueReminder
+              ? `Due: ${dueDays === 0 ? 'today' : `${dueDays} ${dueDays === 1 ? 'day' : 'days'}`}`
+              : showStatementReminder
+                ? `Statement: ${statementDays === 0 ? 'today' : `${statementDays} ${statementDays === 1 ? 'day' : 'days'}`}`
+                : null
             return (
               <Card key={account.id} className="relative overflow-hidden cursor-pointer hover:shadow-md transition-shadow animate-fade-up hover-lift" style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties} onClick={() => navigate(`/accounts/${account.id}`)}>
                 <div
@@ -270,19 +372,29 @@ export default function AccountsPage() {
                 />
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <div
-                          className="p-2 rounded-lg shrink-0"
-                          style={{ backgroundColor: account.color + '20', color: account.color }}
-                        >
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <CardTitle className="text-base">{account.name}</CardTitle>
+                    <div className="flex items-stretch gap-2">
+                      <div
+                        className="rounded-lg shrink-0 px-3 flex items-center justify-center"
+                        style={{ backgroundColor: account.color + '20', color: account.color }}
+                      >
+                        <Icon className="w-4 h-4" />
                       </div>
-                      <Badge variant="secondary" className="text-xs ml-10">
-                        {ACCOUNT_TYPE_LABELS[account.type]}
-                      </Badge>
+                      <div className="flex flex-col gap-1">
+                        <CardTitle className="text-base">{account.name}</CardTitle>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="secondary" className="text-xs w-fit">
+                            {ACCOUNT_TYPE_LABELS[account.type]}
+                          </Badge>
+                          {account.type === 'credit_card' && reminderLabel && (
+                            <Badge
+                              variant="outline"
+                              className="text-[0.65rem] px-1.5 py-0.5 h-auto"
+                            >
+                              {reminderLabel}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} />}>
@@ -323,12 +435,12 @@ export default function AccountsPage() {
                     {formatCurrency(account.balance, account.currency)}
                   </p>
                   {account.type === 'credit_card' && account.credit_limit != null && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Limit: {formatCurrency(account.credit_limit, account.currency)}
-                      {' '}· Available: {formatCurrency(account.credit_limit - account.balance, account.currency)}
-                    </p>
+                    <div className="space-y-1.5 mt-1">
+                      <p className="text-xs text-muted-foreground">
+                        Limit: {formatCurrency(account.credit_limit, account.currency)}
+                      </p>
+                    </div>
                   )}
-                  <p className="text-xs text-muted-foreground mt-1">{account.currency}</p>
                 </CardContent>
               </Card>
             )

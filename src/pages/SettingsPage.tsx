@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2 } from 'lucide-react'
+import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
@@ -48,6 +48,7 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>('unsupported')
 
   const handleDeleteAccount = async () => {
     setDeleting(true)
@@ -85,6 +86,20 @@ export default function SettingsPage() {
     await refreshProfile()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  useEffect(() => {
+    if (!('Notification' in window)) {
+      setNotificationPermission('unsupported')
+      return
+    }
+    setNotificationPermission(Notification.permission)
+  }, [])
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return
+    const result = await Notification.requestPermission()
+    setNotificationPermission(result)
   }
 
   return (
@@ -293,6 +308,43 @@ export default function SettingsPage() {
               <span className="text-sm text-muted-foreground">Transactions above this amount trigger an alert</span>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><BellRing className="w-4 h-4" /> Notifications</CardTitle>
+          <CardDescription>Enable mobile/browser reminders for credit card statement and due dates</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Status:{' '}
+            <span className="font-medium text-foreground">
+              {notificationPermission === 'unsupported'
+                ? 'Not supported on this browser'
+                : notificationPermission === 'granted'
+                  ? 'Enabled'
+                  : notificationPermission === 'denied'
+                    ? 'Blocked'
+                    : 'Not enabled'}
+            </span>
+          </p>
+          {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && (
+            <Button onClick={requestNotificationPermission}>
+              Enable Notifications
+            </Button>
+          )}
+          {notificationPermission === 'denied' && (
+            <p className="text-xs text-muted-foreground">
+              Notifications are blocked. Re-enable them from your browser/site settings.
+            </p>
+          )}
+          {notificationPermission === 'granted' && (
+            <p className="text-xs text-muted-foreground">
+              You’ll receive reminders for statement day and payment due dates for credit card accounts.
+            </p>
+          )}
         </CardContent>
       </Card>
 

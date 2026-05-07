@@ -104,6 +104,15 @@ create table if not exists public.accounts (
   icon          text,
   is_active     boolean not null default true,
   credit_limit  numeric(18,2),
+  statement_day integer check (statement_day between 1 and 31),
+  due_day integer check (due_day between 1 and 31),
+  utilization_target_pct numeric(5,2),
+  payment_reminder_days integer default 3,
+  statement_balance numeric(18,2),
+  statement_balance_locked_at date,
+  statement_paid_amount numeric(18,2) default 0,
+  last_payment_amount numeric(18,2),
+  last_payment_date date,
   notes         text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
@@ -166,6 +175,29 @@ create policy "Users can manage own transactions"
 create index if not exists transactions_user_date_idx on public.transactions(user_id, date desc);
 create index if not exists transactions_account_idx   on public.transactions(account_id);
 create index if not exists transactions_category_idx  on public.transactions(category_id);
+
+-- ────────────────────────────────────────────────────────────
+-- CREDIT CARD PAYMENTS
+-- ────────────────────────────────────────────────────────────
+create table if not exists public.credit_card_payments (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references public.profiles(id) on delete cascade,
+  account_id    uuid not null references public.accounts(id) on delete cascade,
+  amount        numeric(18,2) not null check (amount > 0),
+  payment_date  date not null default current_date,
+  notes         text,
+  created_at    timestamptz not null default now()
+);
+
+alter table public.credit_card_payments enable row level security;
+
+create policy "Users can manage own credit card payments"
+  on public.credit_card_payments for all using (auth.uid() = user_id);
+
+create index if not exists credit_card_payments_user_date_idx
+  on public.credit_card_payments(user_id, payment_date desc, created_at desc);
+create index if not exists credit_card_payments_account_idx
+  on public.credit_card_payments(account_id);
 
 -- ────────────────────────────────────────────────────────────
 -- BUDGETS

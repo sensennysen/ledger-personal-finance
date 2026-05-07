@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
@@ -6,9 +6,12 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
 import { ACCOUNT_TYPE_LABELS } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth } from '@/lib/creditCards'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -16,13 +19,13 @@ import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
-import type { Transaction } from '@/types'
+import type { CreditCardPayment, Transaction } from '@/types'
 
 export default function AccountTransactionsPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
-  const { profile } = useAuth()
-  const { accounts, refetch: refetchAccounts } = useAccounts()
+  const { profile, user } = useAuth()
+  const { accounts, refetch: refetchAccounts, updateAccount } = useAccounts()
   const { transactions, loading, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
   const [filterType, setFilterType] = useState<string>('all')
@@ -30,6 +33,10 @@ export default function AccountTransactionsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
+  const [paymentHistory, setPaymentHistory] = useState<CreditCardPayment[]>([])
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
 
   // Undo delete
   type UndoState = { snapshots: Transaction[]; message: string }
@@ -120,6 +127,8 @@ export default function AccountTransactionsPage() {
   }, [accountTransactions, accountId])
 
   const currency = account?.currency ?? profile?.default_currency ?? 'USD'
+  const statementDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.statement_day) : null
+  const dueDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.due_day) : null
 
   const handleCreate = async (values: TransactionFormValues) => {
     const { error } = await createTransaction(values as Parameters<typeof createTransaction>[0])
@@ -144,6 +153,72 @@ export default function AccountTransactionsPage() {
     if (error) { console.error('Failed to delete transaction:', error); return }
     refetchAccounts()
     if (snapshot) showUndo([snapshot], `"${snapshot.description}" deleted`)
+  }
+
+  useEffect(() => {
+    const fetchPaymentHistory = async () => {
+      if (!user || !accountId || account?.type !== 'credit_card') {
+        setPaymentHistory([])
+        return
+      }
+
+      setPaymentsLoading(true)
+      const { data, error } = await supabase
+        .from('credit_card_payments')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('account_id', accountId)
+        .order('payment_date', { ascending: false })
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        setFormError(error.message)
+      } else {
+        setPaymentHistory((data as CreditCardPayment[]) ?? [])
+      }
+      setPaymentsLoading(false)
+    }
+
+    fetchPaymentHistory()
+  }, [user, accountId, account?.type])
+
+  const handleLogPayment = async () => {
+    if (!account || account.type !== 'credit_card' || !user) return
+    const amount = Number(paymentAmount)
+    if (!amount || amount <= 0) return
+
+    const amountToPay = account.statement_balance ?? 0
+    const currentPaid = account.statement_paid_amount ?? 0
+    const nextPaid = Math.min(currentPaid + amount, amountToPay)
+
+    const { data: insertedPayment, error: insertError } = await supabase
+      .from('credit_card_payments')
+      .insert({
+        user_id: user.id,
+        account_id: account.id,
+        amount,
+        payment_date: paymentDate,
+      })
+      .select('*')
+      .single()
+    if (insertError) {
+      setFormError(insertError.message)
+      return
+    }
+
+    const { error } = await updateAccount(account.id, {
+      statement_paid_amount: nextPaid,
+      last_payment_amount: amount,
+      last_payment_date: paymentDate,
+    })
+    if (error) {
+      setFormError(error)
+      return
+    }
+    setFormError(null)
+    setPaymentAmount('')
+    setPaymentHistory((prev) => [insertedPayment as CreditCardPayment, ...prev])
+    refetchAccounts()
   }
 
   return (
@@ -214,6 +289,99 @@ export default function AccountTransactionsPage() {
               <p className="font-semibold">+{formatCurrency(stats.transfersReceived, currency)}</p>
             </div>
           </div>
+          {account.type === 'credit_card' && (
+            <div className="mt-4 rounded-lg bg-black/15 border border-white/20 p-3 space-y-2.5">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="opacity-70">Credit Limit</p>
+                  <p className="font-semibold">{formatCurrency(account.credit_limit ?? 0, currency)}</p>
+                </div>
+                <div>
+                  <p className="opacity-70">Current Spending</p>
+                  <p className="font-semibold">{formatCurrency(getCreditCardSpending(account), currency)}</p>
+                </div>
+                <div>
+                  <p className="opacity-70">Statement Balance</p>
+                  <p className="font-semibold">{formatCurrency(account.statement_balance ?? 0, currency)}</p>
+                </div>
+                <div>
+                  <p className="opacity-70">Remaining to Pay</p>
+                  <p className="font-semibold">
+                    {formatCurrency(Math.max((account.statement_balance ?? 0) - (account.statement_paid_amount ?? 0), 0), currency)}
+                  </p>
+                </div>
+                <div>
+                  <p className="opacity-70">Statement Date</p>
+                  <p className="font-semibold">
+                    {account.statement_day
+                      ? `Day ${account.statement_day}${statementDays !== null ? ` (${statementDays === 0 ? 'today' : `in ${statementDays} ${statementDays === 1 ? 'day' : 'days'}`})` : ''}`
+                      : 'Not set'}
+                  </p>
+                </div>
+                <div>
+                  <p className="opacity-70">Due Date</p>
+                  <p className="font-semibold">
+                    {account.due_day
+                      ? `Day ${account.due_day}${dueDays !== null ? ` (${dueDays === 0 ? 'today' : `in ${dueDays} ${dueDays === 1 ? 'day' : 'days'}`})` : ''}`
+                      : 'Not set'}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <p className="opacity-70">Utilization</p>
+                  <p className="font-semibold">
+                    {getCreditUtilizationPct(account).toFixed(1)}% / target {(account.utilization_target_pct ?? 30)}%
+                  </p>
+                </div>
+                <Progress
+                  value={Math.min(getCreditUtilizationPct(account), 100)}
+                  className={getCreditUtilizationPct(account) >= (account.utilization_target_pct ?? 30) ? '[&>div]:bg-[oklch(0.620_0.160_18)]' : '[&>div]:bg-[oklch(0.660_0.150_155)]'}
+                />
+              </div>
+              <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Payment amount"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  className="bg-white/95 text-black"
+                />
+                <Input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="bg-white/95 text-black"
+                />
+                <Button type="button" variant="secondary" onClick={handleLogPayment}>
+                  Log Payment
+                </Button>
+              </div>
+              {account.last_payment_date && account.last_payment_amount != null && (
+                <p className="text-[0.6875rem] opacity-80">
+                  Last payment: {formatCurrency(account.last_payment_amount, currency)} on {account.last_payment_date}
+                </p>
+              )}
+              <div className="pt-1 border-t border-white/20">
+                <p className="text-[0.6875rem] uppercase tracking-wide opacity-70 mb-1.5">Payment History</p>
+                {paymentsLoading ? (
+                  <p className="text-[0.6875rem] opacity-70">Loading payment history...</p>
+                ) : paymentHistory.length === 0 ? (
+                  <p className="text-[0.6875rem] opacity-70">No logged payments yet.</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                    {paymentHistory.map((p) => (
+                      <div key={p.id} className="flex items-center justify-between text-[0.75rem]">
+                        <span className="opacity-80">{p.payment_date}</span>
+                        <span className="font-semibold">{formatCurrency(p.amount, currency)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

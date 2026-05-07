@@ -40,6 +40,15 @@ export interface Account {
   icon: string | null
   is_active: boolean
   credit_limit: number | null
+  statement_day?: number | null
+  due_day?: number | null
+  utilization_target_pct?: number | null
+  payment_reminder_days?: number | null
+  statement_balance?: number | null
+  statement_balance_locked_at?: string | null
+  statement_paid_amount?: number | null
+  last_payment_amount?: number | null
+  last_payment_date?: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -141,6 +150,16 @@ export interface SavingsGoal {
   is_completed: boolean
   created_at: string
   updated_at: string
+}
+
+export interface CreditCardPayment {
+  id: string
+  user_id: string
+  account_id: string
+  amount: number
+  payment_date: string
+  notes: string | null
+  created_at: string
 }
 
 export interface DashboardStats {

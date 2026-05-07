@@ -11,6 +11,7 @@ import { TransactionForm, type TransactionFormValues } from '@/components/transa
 import { Switch } from '@/components/ui/switch'
 import { useTheme } from '@/contexts/ThemeContext'
 import { cn } from '@/lib/utils'
+import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
 
 function PageTransition() {
   const location = useLocation()
@@ -30,6 +31,8 @@ export default function AppLayout() {
   const [createOpen, setCreateOpen] = useState(false)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  useCreditCardNotifications()
 
   useEffect(() => {
     if (hasGenerated.current) return

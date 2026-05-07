@@ -33,8 +33,9 @@ import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { getCreditCardNetWorthContribution, getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth } from '@/lib/creditCards'
+import type { AppLayoutContext } from '@/components/layout/AppLayout'
 
 const CHART_TOOLTIP_STYLE = {
   backgroundColor: 'var(--popover)',
@@ -174,6 +175,7 @@ function computeNextDueDate(lastDateStr: string, interval: string, floor: Date):
 
 export default function DashboardPage() {
   const navigate = useNavigate()
+  const { openAddTransactionModal } = useOutletContext<AppLayoutContext>()
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
   const currencySymbol = getCurrencySymbol(currency)
@@ -468,7 +470,7 @@ export default function DashboardPage() {
         </div>
         <Button
           className="hidden md:inline-flex gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0"
-          onClick={() => navigate('/transactions')}
+          onClick={openAddTransactionModal}
         >
           <Plus className="w-3.5 h-3.5" />Add Transaction
         </Button>

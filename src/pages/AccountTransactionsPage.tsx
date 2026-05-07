@@ -1,10 +1,13 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
-import { ACCOUNT_TYPE_LABELS } from '@/types'
+import { ACCOUNT_COLORS, ACCOUNT_TYPE_LABELS, CURRENCIES } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth } from '@/lib/creditCards'
 import { supabase } from '@/lib/supabase'
@@ -18,19 +21,272 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
+import { ColorPicker } from '@/components/ui/color-picker'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
-import type { CreditCardPayment, Transaction } from '@/types'
+import { DEFAULT_CURRENCY } from '@/constants/accounts'
+import type { Account, AccountType, CreditCardPayment, Transaction } from '@/types'
+
+const accountSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(50),
+  type: z.enum(['cash', 'digital_wallet', 'credit_card', 'savings', 'checking', 'investment', 'loan', 'other']),
+  currency: z.string().min(1),
+  balance: z.coerce.number(),
+  color: z.string(),
+  credit_limit: z.coerce.number().nullable(),
+  statement_day: z.coerce.number().int().min(1).max(31).nullable(),
+  due_day: z.coerce.number().int().min(1).max(31).nullable(),
+  utilization_target_pct: z.coerce.number().min(1).max(100).nullable(),
+  payment_reminder_days: z.coerce.number().int().min(0).max(30).nullable(),
+  notes: z.string().nullable(),
+})
+
+type AccountFormValues = z.infer<typeof accountSchema>
+
+function EditAccountForm({
+  account,
+  onSubmit,
+  onClose,
+}: {
+  account: Account
+  onSubmit: (values: AccountFormValues) => Promise<void>
+  onClose: () => void
+}) {
+  const form = useForm<AccountFormValues, any, AccountFormValues>({
+    resolver: zodResolver(accountSchema) as any,
+    defaultValues: {
+      ...account,
+      currency: account.currency || DEFAULT_CURRENCY,
+      utilization_target_pct: account.utilization_target_pct ?? 30,
+      payment_reminder_days: account.payment_reminder_days ?? 3,
+    },
+  })
+
+  const type = form.watch('type')
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Account Name</FormLabel>
+              <FormControl><Input placeholder="e.g. My Savings" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Type</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl><SelectTrigger><SelectValue>{(v: string | null) => v ? ACCOUNT_TYPE_LABELS[v as AccountType] : 'Select type'}</SelectValue></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {Object.entries(ACCOUNT_TYPE_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="currency"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Currency</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl><SelectTrigger><SelectValue>{(v: string | null) => v ?? 'Select currency'}</SelectValue></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>{c.code} - {c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <FormField
+          control={form.control}
+          name="balance"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Current Balance</FormLabel>
+              <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        {type === 'credit_card' && (
+          <div className="space-y-4 rounded-lg border border-border/60 p-3">
+            <FormField
+              control={form.control}
+              name="credit_limit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Credit Limit</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={field.value ?? ''}
+                      onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="statement_day"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Statement Day</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="due_day"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Due Day</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={31}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="utilization_target_pct"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Utilization Target %</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="payment_reminder_days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reminder Days Before Due</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={30}
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        )}
+        <FormField
+          control={form.control}
+          name="color"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Color</FormLabel>
+              <FormControl>
+                <ColorPicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  palette={ACCOUNT_COLORS}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes (optional)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder="Any notes about this account..."
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value || null)}
+                  rows={2}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+        <div className="flex gap-2 justify-end pt-2">
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="submit" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? 'Saving...' : 'Save Account'}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  )
+}
 
 export default function AccountTransactionsPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
-  const { accounts, refetch: refetchAccounts, updateAccount } = useAccounts()
+  const { accounts, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment } = useAccounts()
   const { transactions, loading, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
+  const [editAccountOpen, setEditAccountOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
@@ -221,6 +477,18 @@ export default function AccountTransactionsPage() {
     refetchAccounts()
   }
 
+  const handleAccountEdit = async (values: AccountFormValues) => {
+    if (!account) return
+    const { error } = await updateAccountWithAdjustment(account.id, values, account.balance)
+    if (error) {
+      setFormError(error)
+      return
+    }
+    setFormError(null)
+    setEditAccountOpen(false)
+    refetchAccounts()
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">
       {/* Header */}
@@ -267,7 +535,20 @@ export default function AccountTransactionsPage() {
           className="rounded-xl p-4 text-white"
           style={{ background: `linear-gradient(135deg, ${account.color}dd, ${account.color}99)` }}
         >
-          <p className="text-sm font-medium opacity-80">Current Balance</p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-medium opacity-80">Current Balance</p>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-black/15 hover:text-white" />}>
+                <MoreHorizontal className="w-4 h-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setEditAccountOpen(true)}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit account
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <p className="money text-3xl font-bold mt-1">
             {formatCurrency(account.balance, account.currency)}
           </p>
@@ -384,6 +665,20 @@ export default function AccountTransactionsPage() {
           )}
         </div>
       )}
+
+      <Dialog open={editAccountOpen} onOpenChange={setEditAccountOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
+          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {account && (
+            <EditAccountForm
+              account={account}
+              onSubmit={handleAccountEdit}
+              onClose={() => { setEditAccountOpen(false); setFormError(null) }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2">

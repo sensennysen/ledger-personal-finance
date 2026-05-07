@@ -13,11 +13,15 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { cn } from '@/lib/utils'
 import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
 
-function PageTransition() {
+export type AppLayoutContext = {
+  openAddTransactionModal: () => void
+}
+
+function PageTransition({ context }: { context: AppLayoutContext }) {
   const location = useLocation()
   return (
     <div key={location.key} className="animate-page-in min-h-full">
-      <Outlet />
+      <Outlet context={context} />
     </div>
   )
 }
@@ -31,6 +35,11 @@ export default function AppLayout() {
   const [createOpen, setCreateOpen] = useState(false)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const openAddTransactionModal = () => {
+    setMoreMenuOpen(false)
+    setFormError(null)
+    setCreateOpen(true)
+  }
 
   useCreditCardNotifications()
 
@@ -66,14 +75,11 @@ export default function AppLayout() {
         <PWAInstallBanner />
         <OfflineBanner />
         <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
-          <PageTransition />
+          <PageTransition context={{ openAddTransactionModal }} />
         </main>
       </div>
       <BottomNav
-        onAddTransaction={() => {
-          setMoreMenuOpen(false)
-          setCreateOpen(true)
-        }}
+        onAddTransaction={openAddTransactionModal}
         addTransactionOpen={createOpen}
         onMoreMenu={() => setMoreMenuOpen((v) => !v)}
         moreMenuOpen={moreMenuOpen}

@@ -335,9 +335,6 @@ export default function AccountsPage() {
           <h1 className="text-2xl font-bold">Accounts</h1>
           <p className="text-muted-foreground text-sm">
             Total net worth: <span className="font-semibold text-foreground">{formatCurrency(balanceSummary.netWorth, defaultCurrency)}</span>
-            {balanceSummary.totalCreditCardDebt > 0 && (
-              <span className="text-muted-foreground"> after {formatCurrency(balanceSummary.totalCreditCardDebt, defaultCurrency)} credit card debt</span>
-            )}
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>

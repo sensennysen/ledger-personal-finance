@@ -993,7 +993,7 @@ export default function DashboardPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Net Balance</DialogTitle>
-            <p className="text-xs text-muted-foreground">Assets minus credit card debt</p>
+            <p className="text-xs text-muted-foreground">Assets minus Liabilities</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-2 pr-2">

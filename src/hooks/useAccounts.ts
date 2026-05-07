@@ -31,6 +31,7 @@ export function useAccounts() {
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true)
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
     if (error) {
       setError(error.message)
@@ -54,7 +55,11 @@ export function useAccounts() {
 
   const createAccount = async (values: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return { error: 'Not authenticated' }
-    const { error } = await supabase.from('accounts').insert({ ...values, user_id: user.id })
+    const { error } = await supabase.from('accounts').insert({
+      sort_order: accounts.length,
+      ...values,
+      user_id: user.id,
+    })
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }
@@ -125,5 +130,31 @@ export function useAccounts() {
     return { error: error?.message ?? null }
   }
 
-  return { accounts, loading, error, refetch: fetch, createAccount, updateAccount, updateAccountWithAdjustment, deleteAccount }
+  const updateAccountOrder = async (orderedIds: string[]) => {
+    if (!user) return { error: 'Not authenticated' }
+
+    const orderMap = new Map(orderedIds.map((id, index) => [id, index]))
+    const nextAccounts = accounts
+      .map((account) => ({ ...account, sort_order: orderMap.get(account.id) ?? account.sort_order ?? accounts.length }))
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.created_at.localeCompare(b.created_at))
+    setAccounts(nextAccounts)
+    writeCache(`${user.id}:accounts`, nextAccounts)
+
+    const updates = orderedIds.map((id, sort_order) =>
+      supabase
+        .from('accounts')
+        .update({ sort_order })
+        .eq('id', id)
+        .eq('user_id', user.id)
+    )
+    const results = await Promise.all(updates)
+    const failed = results.find((result) => result.error)
+    if (failed?.error) {
+      await fetch()
+      return { error: failed.error.message }
+    }
+    return { error: null }
+  }
+
+  return { accounts, loading, error, refetch: fetch, createAccount, updateAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder }
 }

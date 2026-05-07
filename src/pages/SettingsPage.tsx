@@ -250,7 +250,7 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Settings2 className="w-4 h-4" /> Preferences</CardTitle>
-          <CardDescription>Number format, date display, and transaction view</CardDescription>
+          <CardDescription>Number format, date display, and page views</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -285,6 +285,16 @@ export default function SettingsPage() {
                 <SelectContent>
                   <SelectItem value="grouped">Grouped by date</SelectItem>
                   <SelectItem value="flat">Flat list</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Account View</label>
+              <Select value={prefs.accView} onValueChange={(v) => setPref('accView', v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="grouped">Grouped by type</SelectItem>
+                  <SelectItem value="flat">Flat grid</SelectItem>
                 </SelectContent>
               </Select>
             </div>

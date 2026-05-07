@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import type { AccountType } from '@/types'
 
 export type NumberLocale = 'en-US' | 'de-DE' | 'fr-FR' | 'ja-JP' | 'zh-CN'
 export type DateFormat = 'MDY' | 'DMY' | 'YMD'
@@ -8,6 +9,8 @@ export interface Preferences {
   dateFormat: DateFormat
   largeTransactionThreshold: number
   txView: 'grouped' | 'flat'
+  accView: 'grouped' | 'flat'
+  accGroupOrder: AccountType[]
 }
 
 const STORAGE_KEY = 'ledger-preferences'
@@ -17,6 +20,8 @@ const DEFAULTS: Preferences = {
   dateFormat: 'MDY',
   largeTransactionThreshold: 0,
   txView: 'grouped',
+  accView: 'grouped',
+  accGroupOrder: [],
 }
 
 function load(): Preferences {

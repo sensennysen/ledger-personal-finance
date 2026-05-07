@@ -12,15 +12,16 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight, ChevronLeft, Bell, BarChart3, ArrowRight, Settings2, AlertTriangle, X, CreditCard, CalendarClock } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, ArrowLeftRight, Plus, ChevronRight, ChevronLeft, Bell, BarChart3, ArrowRight, Settings2, AlertTriangle, X, CreditCard, CalendarClock, GripVertical, ArrowUp, ArrowDown } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useBudgets } from '@/hooks/useBudgets'
-import { useDashboardPrefs } from '@/hooks/useDashboardPrefs'
+import { DASHBOARD_WIDGET_LABELS, DEFAULT_WIDGET_ORDER, useDashboardPrefs, type DashboardWidgetKey } from '@/hooks/useDashboardPrefs'
 import { useSpendingAlerts } from '@/hooks/useSpendingAlerts'
 import { usePreferences } from '@/hooks/usePreferences'
+import { useFlipReorder } from '@/hooks/useFlipReorder'
 import { formatCurrency, getCurrencySymbol, getLast8Quarters, getCurrentWeekDays, getCurrentMonthDays, getLast5Years, getCustomMonthRange, getCurrentCycleMonthKey, groupExpensesByCategory, cn } from '@/lib/utils'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { BUDGET_WARNING_THRESHOLD } from '@/constants/accounts'
@@ -326,12 +327,24 @@ export default function DashboardPage() {
 
   const loading = accountsLoading || txLoading
 
-  const { widgets, toggle } = useDashboardPrefs()
+  const { widgets, widgetOrder, toggle, moveWidget, reorderWidget } = useDashboardPrefs()
   const { prefs } = usePreferences()
   const alerts = useSpendingAlerts(budgets, transactions, prefs.largeTransactionThreshold)
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
+  const [draggedWidget, setDraggedWidget] = useState<DashboardWidgetKey | null>(null)
+  const [dropTargetWidget, setDropTargetWidget] = useState<DashboardWidgetKey | null>(null)
+  const [isDesktopDrag, setIsDesktopDrag] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
+  )
   const visibleAlerts = alerts.filter((a) => !dismissedAlerts.has(a.id))
   const creditCards = useMemo(() => accounts.filter((a) => a.type === 'credit_card'), [accounts])
+  const orderedWidgetControls = widgetOrder.filter((key) => DEFAULT_WIDGET_ORDER.includes(key))
+  const setWidgetControlRef = useFlipReorder(orderedWidgetControls)
+  const widgetGridStyle = (key: DashboardWidgetKey) => {
+    const index = widgetOrder.indexOf(key)
+    return { order: 10 + (index === -1 ? DEFAULT_WIDGET_ORDER.length : index) }
+  }
+  const trailingWidgetOrder = { order: 10 + DEFAULT_WIDGET_ORDER.length }
 
   const creditCardsWithState = useMemo(() => creditCards.map((acc) => {
     const spending = getCreditCardSpending(acc)
@@ -362,6 +375,20 @@ export default function DashboardPage() {
   }), [creditCards])
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)')
+    const handleChange = () => {
+      setIsDesktopDrag(mediaQuery.matches)
+      if (!mediaQuery.matches) {
+        setDraggedWidget(null)
+        setDropTargetWidget(null)
+      }
+    }
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  useEffect(() => {
     if (!navigator.onLine || creditCards.length === 0) return
 
     const today = new Date()
@@ -388,8 +415,8 @@ export default function DashboardPage() {
 
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+    <div className="p-4 md:p-6 grid gap-6 lg:grid-cols-2 max-w-7xl mx-auto">
+      <div className="flex items-start justify-between gap-3 flex-wrap lg:col-span-2">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold leading-tight truncate">
             {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Dashboard'}
@@ -408,17 +435,47 @@ export default function DashboardPage() {
               <SheetTitle>Dashboard Widgets</SheetTitle>
             </SheetHeader>
             <div className="px-4 pb-4 space-y-1">
-              {([
-                ['stats', 'Stats Cards'],
-                ['cashflowChart', 'Cash Flow Chart'],
-                ['categoryPie', 'Category Pie'],
-                ['budgets', 'Budget Progress'],
-                ['upcomingBills', 'Upcoming Bills'],
-                ['cashflowForecast', 'Cash Flow Forecast'],
-                ['creditCards', 'Credit Card Tracker'],
-              ] as const).map(([key, label]) => (
-                <div key={key} className="flex items-center justify-between py-2.5 border-b border-border/40 last:border-0">
-                  <span className="text-sm">{label}</span>
+              {orderedWidgetControls.map((key, index) => (
+                <div
+                  key={key}
+                  ref={setWidgetControlRef(key)}
+                  draggable={isDesktopDrag}
+                  onDragStart={() => {
+                    setDraggedWidget(key)
+                    setDropTargetWidget(null)
+                  }}
+                  onDragEnter={() => {
+                    if (draggedWidget && draggedWidget !== key) setDropTargetWidget(key)
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    if (draggedWidget && draggedWidget !== key) setDropTargetWidget(key)
+                  }}
+                  onDrop={() => {
+                    if (draggedWidget) reorderWidget(draggedWidget, key)
+                    setDraggedWidget(null)
+                    setDropTargetWidget(null)
+                  }}
+                  onDragEnd={() => {
+                    setDraggedWidget(null)
+                    setDropTargetWidget(null)
+                  }}
+                  className={cn(
+                    'reorder-motion flex items-center gap-2 py-2.5 px-2 -mx-2 border border-transparent border-b-border/40 last:border-b-transparent rounded-md',
+                    draggedWidget === key && 'is-dragging bg-muted/70',
+                    dropTargetWidget === key && 'is-drop-target'
+                  )}
+                >
+                  <GripVertical className="reorder-handle hidden md:block w-3.5 h-3.5 text-muted-foreground cursor-grab" />
+                  <span className="text-sm flex-1">{DASHBOARD_WIDGET_LABELS[key]}</span>
+                  <div className="flex items-center gap-1 md:hidden">
+                    <Button variant="ghost" size="icon-xs" onClick={() => moveWidget(key, -1)} disabled={index === 0}>
+                      <ArrowUp className="w-3 h-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon-xs" onClick={() => moveWidget(key, 1)} disabled={index === orderedWidgetControls.length - 1}>
+                      <ArrowDown className="w-3 h-3" />
+                    </Button>
+                  </div>
                   <Switch checked={widgets[key]} onCheckedChange={() => toggle(key)} />
                 </div>
               ))}
@@ -427,11 +484,11 @@ export default function DashboardPage() {
         </Sheet>
       </div>
       {/* Gold separator */}
-      <div className="h-px" style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }} />
+      <div className="h-px lg:col-span-2" style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }} />
 
       {/* Spending alerts */}
       {visibleAlerts.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2 lg:col-span-2">
           {visibleAlerts.map((alert) => (
             <div
               key={alert.id}
@@ -453,7 +510,7 @@ export default function DashboardPage() {
       )}
 
       {/* Month navigation */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 lg:col-span-2">
         <div className="flex items-center gap-1 bg-muted/40 rounded-xl px-2 py-1.5 flex-1">
           <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
             <ChevronLeft className="w-4 h-4" />
@@ -478,7 +535,7 @@ export default function DashboardPage() {
 
       {/* Stat cards */}
       {widgets.stats && (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:col-span-2" style={widgetGridStyle('stats')}>
         <StatCard
           title="Net Balance"
           value={formatCurrency(stats.totalBalance, currency)}
@@ -524,7 +581,7 @@ export default function DashboardPage() {
       )}
 
       {widgets.creditCards && creditCards.length > 0 && (
-        <div className="rounded-xl border border-border/60 p-5 bg-card space-y-4">
+        <div className="rounded-xl border border-border/60 p-5 bg-card space-y-4 lg:col-span-2" style={widgetGridStyle('creditCards')}>
           <div className="flex items-start justify-between">
             <div>
               <p className="font-semibold text-[0.9375rem]">Credit Card Monitor</p>
@@ -614,7 +671,8 @@ export default function DashboardPage() {
       {/* Cash flow chart */}
       {widgets.cashflowChart && (
       <div
-        className="rounded-xl border border-border/60 overflow-hidden bg-card"
+        className="rounded-xl border border-border/60 overflow-hidden bg-card lg:col-span-2"
+        style={widgetGridStyle('cashflowChart')}
       >
         <div className="px-5 pt-5 pb-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -666,11 +724,12 @@ export default function DashboardPage() {
       </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="contents">
         {/* Expenses by category — pie */}
         {widgets.categoryPie && (
         <div
           className="rounded-xl border border-border/60 p-5 bg-card cursor-pointer transition-shadow duration-300 hover:shadow-[0_4px_24px_oklch(0_0_0/25%)]"
+          style={widgetGridStyle('categoryPie')}
           onClick={() => setDetailView('categories')}
         >
           <div className="flex items-start justify-between mb-0.5">
@@ -726,6 +785,7 @@ export default function DashboardPage() {
         {/* Recent transactions */}
         <div
           className="rounded-xl border border-border/60 p-5 bg-card"
+          style={trailingWidgetOrder}
         >
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -778,11 +838,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="contents">
         {/* Budget progress */}
         {widgets.budgets && budgets.length > 0 && (
           <div
             className="rounded-xl border border-border/60 p-5 bg-card"
+            style={widgetGridStyle('budgets')}
           >
             <p className="font-semibold text-[0.9375rem] mb-0.5">Budget Progress</p>
             <p className="text-xs text-muted-foreground mb-4">Spending vs budget limits · {monthLabel}</p>
@@ -819,11 +880,11 @@ export default function DashboardPage() {
       </div>
 
       {/* ─── Upcoming Bills + Cash Flow Forecast ──────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="contents">
 
         {/* Upcoming Bills */}
         {widgets.upcomingBills && (
-        <div className="rounded-xl border border-border/60 p-5 bg-card">
+        <div className="rounded-xl border border-border/60 p-5 bg-card" style={widgetGridStyle('upcomingBills')}>
           <div className="flex items-start justify-between mb-4">
             <div>
               <p className="font-semibold text-[0.9375rem]">Upcoming Bills</p>
@@ -885,7 +946,7 @@ export default function DashboardPage() {
 
         {/* Cash Flow Forecast */}
         {widgets.cashflowForecast && (
-        <div className="rounded-xl border border-border/60 p-5 bg-card">
+        <div className="rounded-xl border border-border/60 p-5 bg-card" style={widgetGridStyle('cashflowForecast')}>
           <div className="flex items-start justify-between mb-4">
             <div>
               <p className="font-semibold text-[0.9375rem]">Cash Flow Forecast</p>

@@ -25,6 +25,9 @@ export interface Profile {
   avatar_url: string | null
   default_currency: string
   month_start_day: number
+  dashboard_widget_order?: string[] | null
+  account_group_order?: AccountType[] | null
+  account_view_mode?: 'all' | AccountType | null
   created_at: string
   updated_at: string
 }
@@ -49,6 +52,7 @@ export interface Account {
   statement_paid_amount?: number | null
   last_payment_amount?: number | null
   last_payment_date?: string | null
+  sort_order?: number
   notes: string | null
   created_at: string
   updated_at: string

@@ -16,6 +16,10 @@ create table if not exists public.profiles (
   avatar_url      text,
   default_currency text not null default 'USD',
   month_start_day  integer not null default 1 check (month_start_day between 1 and 28),
+  dashboard_widget_order jsonb not null default '["stats","creditCards","cashflowChart","categoryPie","budgets","upcomingBills","cashflowForecast"]'::jsonb,
+  account_group_order jsonb not null default '["cash","digital_wallet","credit_card","savings","checking","investment","loan","other"]'::jsonb,
+  account_view_mode text not null default 'all'
+    check (account_view_mode in ('all','cash','digital_wallet','credit_card','savings','checking','investment','loan','other')),
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
@@ -113,6 +117,7 @@ create table if not exists public.accounts (
   statement_paid_amount numeric(18,2) default 0,
   last_payment_amount numeric(18,2),
   last_payment_date date,
+  sort_order    integer not null default 0,
   notes         text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
@@ -122,6 +127,9 @@ alter table public.accounts enable row level security;
 
 create policy "Users can manage own accounts"
   on public.accounts for all using (auth.uid() = user_id);
+
+create index if not exists accounts_user_sort_order_idx
+  on public.accounts(user_id, sort_order, created_at);
 
 -- ────────────────────────────────────────────────────────────
 -- CATEGORIES

@@ -140,6 +140,20 @@ function RouteMeta() {
   return null
 }
 
+function OrientationLock() {
+  useEffect(() => {
+    const orientation = screen.orientation
+
+    if (!orientation?.lock) return
+
+    void orientation.lock('portrait').catch(() => {
+      // Some browsers only honor this for installed PWAs or user-initiated flows.
+    })
+  }, [])
+
+  return null
+}
+
 function ProtectedRoutes() {
   const { session, loading } = useAuth()
   const location = useLocation()
@@ -191,6 +205,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <OrientationLock />
         <RouteMeta />
         <Routes>
           <Route path="/login" element={<LoginPageWrapper />} />
@@ -203,5 +218,4 @@ export default function App() {
     </BrowserRouter>
   )
 }
-
 

@@ -1,20 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { startTransition, useEffect, useState } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { ImagePlus, X, Loader2, Tag } from 'lucide-react'
+import { Loader2, Tag, X } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
-import { useSubcategories } from '@/hooks/useSubcategories'
 import { useDescriptionSuggestions } from '@/hooks/useDescriptionSuggestions'
-import { useTransactionRules } from '@/hooks/useTransactionRules'
+import { useReceiptAttachment } from '@/hooks/useReceiptAttachment'
 import { useSavingsGoals } from '@/hooks/useSavingsGoals'
-import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase'
-import { storePendingReceipt, PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
-import { buildReceiptObjectPath, isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
-import { CURRENCIES } from '@/types'
+import { useSubcategories } from '@/hooks/useSubcategories'
+import { useTransactionRules } from '@/hooks/useTransactionRules'
+import {
+  transactionSchema,
+  type TransactionFormInput,
+  type TransactionFormValues,
+} from '@/components/transactions/transactionFormSchema'
+import { TransactionDescriptionField } from '@/components/transactions/TransactionDescriptionField'
+import { TransactionTagsField } from '@/components/transactions/TransactionTagsField'
+import { TransactionGoalField } from '@/components/transactions/TransactionGoalField'
+import { TransactionRecurringFields } from '@/components/transactions/TransactionRecurringFields'
+import { TransactionReceiptField } from '@/components/transactions/TransactionReceiptField'
 import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
+import { CURRENCIES } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -23,42 +30,12 @@ import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 
-export const transactionSchema = z.object({
-  type: z.enum(['income', 'expense', 'transfer']),
-  account_id: z.string().min(1, 'Account is required'),
-  to_account_id: z.string().nullable(),
-  category_id: z.string().nullable(),
-  subcategory_id: z.string().nullable(),
-  amount: z.coerce.number().positive('Amount must be positive'),
-  currency: z.string().min(1),
-  exchange_rate: z.coerce.number().default(1),
-  description: z.string().min(1, 'Description is required'),
-  notes: z.string().nullable(),
-  date: z.string().min(1),
-  transfer_fee: z.coerce.number().min(0).nullable(),
-  is_recurring: z.boolean().default(false),
-  recurrence_interval: z.enum(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']).nullable(),
-  recurrence_end_date: z.string().nullable(),
-  receipt_url: z.string().nullable().default(null),
-  tags: z.array(z.string()).default([]),
-  goal_id: z.string().nullable().default(null),
-}).superRefine((data, ctx) => {
-  if (data.type === 'transfer' && !data.to_account_id) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Destination account is required for transfers',
-      path: ['to_account_id'],
-    })
-  }
-})
-
-export type TransactionFormValues = z.infer<typeof transactionSchema>
+export type { TransactionFormValues } from '@/components/transactions/transactionFormSchema'
 
 interface TransactionFormProps {
-  defaultValues?: Partial<TransactionFormValues>
+  defaultValues?: Partial<TransactionFormInput>
   onSubmit: (values: TransactionFormValues) => Promise<void>
   onClose: () => void
-  /** When set, the account selector is locked to this account id for non-transfer types */
   lockedAccountId?: string
 }
 
@@ -66,51 +43,17 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const { user } = useAuth()
   const { accounts } = useAccounts()
   const { categories } = useCategories()
-  const descriptionSuggestions = useDescriptionSuggestions()
-  const { matchRule } = useTransactionRules()
   const { goals } = useSavingsGoals()
+  const { matchRule } = useTransactionRules()
+  const descriptionSuggestions = useDescriptionSuggestions()
   const today = new Date().toISOString().split('T')[0]
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(defaultValues?.receipt_url ?? null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [autoCatCategoryId, setAutoCatCategoryId] = useState<string | null>(null)
 
-  const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      setUploadError('Invalid file type. Only JPEG, PNG, WebP, and GIF images are allowed.')
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      return
-    }
-    const MAX_SIZE = 5 * 1024 * 1024
-    if (file.size > MAX_SIZE) {
-      setUploadError('File too large. Maximum size is 5 MB.')
-      return
-    }
-    setPendingFile(file)
-    const reader = new FileReader()
-    reader.onload = (ev) => setPreviewUrl(ev.target?.result as string)
-    reader.readAsDataURL(file)
-    setUploadError(null)
-  }
-
-  const removeReceipt = () => {
-    setPendingFile(null)
-    setPreviewUrl(null)
-    form.setValue('receipt_url', null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  const form = useForm<TransactionFormValues, any, TransactionFormValues>({
-    resolver: zodResolver(transactionSchema) as any,
+  const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
+    resolver: zodResolver(transactionSchema),
     defaultValues: {
       type: 'expense',
       account_id: lockedAccountId ?? accounts[0]?.id ?? '',
@@ -119,7 +62,9 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
       subcategory_id: null,
       amount: 0,
       currency:
-        accounts.find((a) => a.id === lockedAccountId)?.currency ?? accounts[0]?.currency ?? DEFAULT_CURRENCY,
+        accounts.find((account) => account.id === lockedAccountId)?.currency ??
+        accounts[0]?.currency ??
+        DEFAULT_CURRENCY,
       exchange_rate: 1,
       description: '',
       notes: null,
@@ -135,109 +80,81 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
     },
   })
 
-  const receiptReference = form.watch('receipt_url')
-  const hasReceipt = !!pendingFile || !!receiptReference || !!previewUrl
-
-  useEffect(() => {
-    if (pendingFile) return
-
-    let cancelled = false
-    const reference = defaultValues?.receipt_url ?? null
-
-    if (!reference || isPendingReceiptReference(reference)) {
-      setPreviewUrl(null)
-      return
-    }
-
-    resolveReceiptUrl(reference).then((url) => {
-      if (!cancelled) setPreviewUrl(url)
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [defaultValues?.receipt_url, pendingFile])
-
-  const handleSubmitWithUpload = async (values: TransactionFormValues) => {
-    if (pendingFile && user) {
-      if (!navigator.onLine) {
-        // Definitely offline — store the file locally and let the sync queue upload it later
-        try {
-          const tempId = crypto.randomUUID()
-          await storePendingReceipt(tempId, pendingFile)
-          values.receipt_url = `${PENDING_RECEIPT_PREFIX}${tempId}`
-        } catch {
-          setUploadError('Could not save receipt locally. It will not be attached.')
-        }
-      } else {
-        // Try to upload; if it fails for any reason (network hiccup, captive portal, etc.)
-        // fall back to the same offline path so the transaction still saves with the image.
-        setUploading(true)
-        const path = buildReceiptObjectPath(user.id, pendingFile.name)
-        const { error } = await supabase.storage
-          .from('receipts')
-          .upload(path, pendingFile)
-        setUploading(false)
-        if (error) {
-          try {
-            const tempId = crypto.randomUUID()
-            await storePendingReceipt(tempId, pendingFile)
-            values.receipt_url = `${PENDING_RECEIPT_PREFIX}${tempId}`
-          } catch {
-            setUploadError('Upload failed and receipt could not be saved locally.')
-          }
-        } else {
-          values.receipt_url = path
-        }
-      }
-    }
-    await onSubmit(values)
-  }
-
-  const type = form.watch('type')
-  const isRecurring = form.watch('is_recurring')
-  const selectedAccount = form.watch('account_id')
-  const selectedCategoryId = form.watch('category_id')
-  const description = form.watch('description')
-  const tags = form.watch('tags') ?? []
+  const receiptReference = useWatch({ control: form.control, name: 'receipt_url' })
+  const type = useWatch({ control: form.control, name: 'type' })
+  const isRecurring = useWatch({ control: form.control, name: 'is_recurring' })
+  const selectedAccount = useWatch({ control: form.control, name: 'account_id' })
+  const selectedCategoryId = useWatch({ control: form.control, name: 'category_id' })
+  const description = useWatch({ control: form.control, name: 'description' })
+  const tags = useWatch({ control: form.control, name: 'tags' }) ?? []
 
   const { subcategories } = useSubcategories(selectedCategoryId)
+  const filteredCategories = categories.filter((category) => category.type === type || category.type === 'both')
 
-  // Auto-categorization rule matching
+  const {
+    fileInputRef,
+    previewUrl,
+    uploading,
+    uploadError,
+    hasReceipt,
+    handleFileChange,
+    clearReceipt,
+    prepareReceiptForSubmit,
+  } = useReceiptAttachment({
+    initialReceiptUrl: defaultValues?.receipt_url,
+    userId: user?.id,
+  })
+
   useEffect(() => {
     if (!description) return
+
     const rule = matchRule(description)
     if (!rule?.category_id) return
-    const currentCat = form.getValues('category_id')
-    // Only auto-fill if category is empty or was last set by auto-cat
-    if (!currentCat || currentCat === autoCatCategoryId) {
+
+    const currentCategoryId = form.getValues('category_id')
+    if (!currentCategoryId || currentCategoryId === autoCatCategoryId) {
       form.setValue('category_id', rule.category_id)
-      setAutoCatCategoryId(rule.category_id)
+      startTransition(() => {
+        setAutoCatCategoryId(rule.category_id)
+      })
+
       if (rule.type_hint && form.getValues('type') !== rule.type_hint) {
         form.setValue('type', rule.type_hint)
       }
     }
-  }, [description, matchRule, autoCatCategoryId, form])
+  }, [autoCatCategoryId, description, form, matchRule])
 
   const addTag = () => {
-    const t = tagInput.trim().toLowerCase().replace(/,/g, '')
-    if (!t || tags.includes(t)) { setTagInput(''); return }
-    form.setValue('tags', [...tags, t])
+    const normalizedTag = tagInput.trim().toLowerCase().replace(/,/g, '')
+
+    if (!normalizedTag || tags.includes(normalizedTag)) {
+      setTagInput('')
+      return
+    }
+
+    form.setValue('tags', [...tags, normalizedTag])
     setTagInput('')
   }
 
   const removeTag = (tag: string) => {
-    form.setValue('tags', tags.filter((t) => t !== tag))
+    form.setValue('tags', tags.filter((currentTag) => currentTag !== tag))
   }
 
-  const onAccountChange = (id: string | null) => {
-    if (!id) return
-    const acc = accounts.find((a) => a.id === id)
-    if (acc) form.setValue('currency', acc.currency)
-    form.setValue('account_id', id)
+  const handleAccountChange = (accountId: string | null) => {
+    if (!accountId) return
+
+    const selectedAccountRecord = accounts.find((account) => account.id === accountId)
+    if (selectedAccountRecord) {
+      form.setValue('currency', selectedAccountRecord.currency)
+    }
+
+    form.setValue('account_id', accountId)
   }
 
-  const filteredCategories = categories.filter((c) => c.type === type || c.type === 'both')
+  const handleSubmitWithUpload = async (values: TransactionFormValues) => {
+    const receipt_url = await prepareReceiptForSubmit(values.receipt_url)
+    await onSubmit({ ...values, receipt_url })
+  }
 
   return (
     <Form {...form}>
@@ -250,9 +167,11 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
               <FormLabel>Type</FormLabel>
               <Tabs
                 value={field.value}
-                onValueChange={(v) => {
-                  field.onChange(v)
-                  if (v !== 'transfer') form.setValue('to_account_id', null)
+                onValueChange={(value) => {
+                  field.onChange(value)
+                  if (value !== 'transfer') {
+                    form.setValue('to_account_id', null)
+                  }
                 }}
               >
                 <TabsList className="w-full">
@@ -270,25 +189,28 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             control={form.control}
             name="account_id"
             render={({ field }) => {
-              const selectedAcc = accounts.find((a) => a.id === field.value)
+              const selectedAccountRecord = accounts.find((account) => account.id === field.value)
+
               return (
                 <FormItem>
                   <FormLabel>{type === 'transfer' ? 'From Account' : 'Account'}</FormLabel>
                   <Select
-                    onValueChange={onAccountChange}
+                    onValueChange={handleAccountChange}
                     value={field.value}
-                    disabled={!!lockedAccountId && type !== 'transfer'}
+                    disabled={Boolean(lockedAccountId) && type !== 'transfer'}
                   >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select account">
-                          {selectedAcc ? selectedAcc.name : 'Select account'}
+                          {selectedAccountRecord ? selectedAccountRecord.name : 'Select account'}
                         </SelectValue>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {accounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -297,12 +219,14 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
               )
             }}
           />
+
           {type === 'transfer' ? (
             <FormField
               control={form.control}
               name="to_account_id"
               render={({ field }) => {
-                const selectedToAcc = accounts.find((a) => a.id === field.value)
+                const selectedToAccount = accounts.find((account) => account.id === field.value)
+
                 return (
                   <FormItem>
                     <FormLabel>To Account</FormLabel>
@@ -310,15 +234,17 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select account">
-                            {selectedToAcc ? selectedToAcc.name : 'Select account'}
+                            {selectedToAccount ? selectedToAccount.name : 'Select account'}
                           </SelectValue>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         {accounts
-                          .filter((a) => a.id !== selectedAccount)
-                          .map((a) => (
-                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          .filter((account) => account.id !== selectedAccount)
+                          .map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.name}
+                            </SelectItem>
                           ))}
                       </SelectContent>
                     </Select>
@@ -332,23 +258,34 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
               control={form.control}
               name="category_id"
               render={({ field }) => {
-                const selectedCat = categories.find((c) => c.id === field.value)
-                const isAutoCat = !!autoCatCategoryId && field.value === autoCatCategoryId
+                const selectedCategory = categories.find((category) => category.id === field.value)
+                const isAutoCategory = Boolean(autoCatCategoryId) && field.value === autoCatCategoryId
+
                 return (
                   <FormItem>
                     <FormLabel className="flex items-center gap-1.5">
                       Category
-                      {isAutoCat && (
-                        <span className="inline-flex items-center gap-0.5 text-[0.625rem] font-medium text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full">
-                          <Tag className="w-2.5 h-2.5" />Auto
-                          <button type="button" className="ml-0.5 hover:text-destructive" onClick={() => { setAutoCatCategoryId(null); field.onChange(null) }}><X className="w-2 h-2" /></button>
+                      {isAutoCategory && (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[0.625rem] font-medium text-primary/80">
+                          <Tag className="h-2.5 w-2.5" />
+                          Auto
+                          <button
+                            type="button"
+                            className="ml-0.5 hover:text-destructive"
+                            onClick={() => {
+                              setAutoCatCategoryId(null)
+                              field.onChange(null)
+                            }}
+                          >
+                            <X className="h-2 w-2" />
+                          </button>
                         </span>
                       )}
                     </FormLabel>
                     <Select
-                      onValueChange={(v) => {
+                      onValueChange={(value) => {
                         setAutoCatCategoryId(null)
-                        field.onChange(v === UNCATEGORIZED_VALUE ? null : v)
+                        field.onChange(value === UNCATEGORIZED_VALUE ? null : value)
                         form.setValue('subcategory_id', null)
                       }}
                       value={field.value ?? UNCATEGORIZED_VALUE}
@@ -356,14 +293,16 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select category">
-                            {selectedCat ? `${selectedCat.icon} ${selectedCat.name}` : 'Uncategorized'}
+                            {selectedCategory ? `${selectedCategory.icon} ${selectedCategory.name}` : 'Uncategorized'}
                           </SelectValue>
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value={UNCATEGORIZED_VALUE}>Uncategorized</SelectItem>
-                        {filteredCategories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>
+                        {filteredCategories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.icon} {category.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -379,25 +318,30 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             control={form.control}
             name="subcategory_id"
             render={({ field }) => {
-              const selectedSub = subcategories.find((s) => s.id === field.value)
+              const selectedSubcategory = subcategories.find((subcategory) => subcategory.id === field.value)
+
               return (
                 <FormItem>
-                  <FormLabel>Subcategory <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                  <FormLabel>
+                    Subcategory <span className="font-normal text-muted-foreground">(optional)</span>
+                  </FormLabel>
                   <Select
-                    onValueChange={(v) => field.onChange(v === UNCATEGORIZED_VALUE ? null : v)}
+                    onValueChange={(value) => field.onChange(value === UNCATEGORIZED_VALUE ? null : value)}
                     value={field.value ?? UNCATEGORIZED_VALUE}
                   >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select subcategory">
-                          {selectedSub ? selectedSub.name : 'None'}
+                          {selectedSubcategory ? selectedSubcategory.name : 'None'}
                         </SelectValue>
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value={UNCATEGORIZED_VALUE}>None</SelectItem>
-                      {subcategories.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      {subcategories.map((subcategory) => (
+                        <SelectItem key={subcategory.id} value={subcategory.id}>
+                          {subcategory.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -414,11 +358,22 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Amount</FormLabel>
-                <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                    onChange={(event) => field.onChange(event.target.value)}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
             name="currency"
@@ -426,10 +381,16 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
               <FormItem>
                 <FormLabel>Currency</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
                   <SelectContent>
-                    {CURRENCIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
+                    {CURRENCIES.map((currency) => (
+                      <SelectItem key={currency.code} value={currency.code}>
+                        {currency.code}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -451,8 +412,8 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                     step="0.01"
                     min="0"
                     placeholder="0.00"
-                    value={field.value ?? ''}
-                    onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)}
+                    value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                    onChange={(event) => field.onChange(event.target.value === '' ? null : event.target.value)}
                   />
                 </FormControl>
                 <FormMessage />
@@ -461,52 +422,11 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           />
         )}
 
-        <FormField
+        <TransactionDescriptionField
           control={form.control}
-          name="description"
-          render={({ field }) => {
-            const inputVal = field.value ?? ''
-            const filtered = inputVal.length > 0
-              ? descriptionSuggestions
-                  .filter((s) => s.toLowerCase().includes(inputVal.toLowerCase()) && s.toLowerCase() !== inputVal.toLowerCase())
-                  .slice(0, 8)
-              : []
-            return (
-              <FormItem>
-                <FormLabel>Description</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Input
-                      placeholder="e.g. Grocery run"
-                      autoComplete="off"
-                      {...field}
-                      onFocus={() => setShowSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                    />
-                    {showSuggestions && filtered.length > 0 && (
-                      <div className="absolute z-50 w-full mt-1 max-h-52 overflow-y-auto rounded-lg border bg-popover text-popover-foreground shadow-md">
-                        {filtered.map((s) => (
-                          <button
-                            key={s}
-                            type="button"
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors first:rounded-t-lg last:rounded-b-lg truncate"
-                            onMouseDown={(e) => {
-                              e.preventDefault()
-                              field.onChange(s)
-                              setShowSuggestions(false)
-                            }}
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )
-          }}
+          descriptionSuggestions={descriptionSuggestions}
+          showSuggestions={showSuggestions}
+          setShowSuggestions={setShowSuggestions}
         />
 
         <FormField
@@ -515,7 +435,9 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           render={({ field }) => (
             <FormItem>
               <FormLabel>Date</FormLabel>
-              <FormControl><Input type="date" {...field} /></FormControl>
+              <FormControl>
+                <Input type="date" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -530,7 +452,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
               <FormControl>
                 <Textarea
                   value={field.value ?? ''}
-                  onChange={(e) => field.onChange(e.target.value || null)}
+                  onChange={(event) => field.onChange(event.target.value || null)}
                   rows={2}
                 />
               </FormControl>
@@ -538,62 +460,16 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           )}
         />
 
-        {/* Tags */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium leading-none">Tags</label>
-          <div className="flex flex-wrap items-center gap-1.5 min-h-9 rounded-md border bg-background px-2 py-1.5">
-            {tags.map((tag) => (
-              <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                <Tag className="w-2.5 h-2.5" />
-                {tag}
-                <button type="button" className="ml-0.5 hover:text-destructive" onClick={() => removeTag(tag)}>
-                  <X className="w-2.5 h-2.5" />
-                </button>
-              </span>
-            ))}
-            <input
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag() } }}
-              onBlur={addTag}
-              placeholder={tags.length === 0 ? 'Add tags…  Enter or comma to confirm' : ''}
-              className="flex-1 min-w-[140px] bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
-        </div>
+        <TransactionTagsField
+          tags={tags}
+          tagInput={tagInput}
+          setTagInput={setTagInput}
+          addTag={addTag}
+          removeTag={removeTag}
+        />
 
-        {/* Link to savings goal */}
         {type !== 'transfer' && goals.length > 0 && (
-          <FormField
-            control={form.control}
-            name="goal_id"
-            render={({ field }) => {
-              const selectedGoal = goals.find((g) => g.id === field.value)
-              return (
-                <FormItem>
-                  <FormLabel>Link to Savings Goal <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
-                  <Select
-                    onValueChange={(v) => field.onChange(v === 'none' ? null : v)}
-                    value={field.value ?? 'none'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue>
-                          {selectedGoal ? `${selectedGoal.icon ?? '🎯'} ${selectedGoal.name}` : 'No goal'}
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">No goal</SelectItem>
-                      {goals.map((g) => (
-                        <SelectItem key={g.id} value={g.id}>{g.icon ?? '🎯'} {g.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )
-            }}
-          />
+          <TransactionGoalField control={form.control} goals={goals} />
         )}
 
         <FormField
@@ -612,119 +488,28 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           )}
         />
 
-        {isRecurring && (
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="recurrence_interval"
-              render={({ field }) => {
-                const intervalLabels: Record<string, string> = {
-                  daily: 'Daily',
-                  weekly: 'Weekly',
-                  biweekly: 'Bi-weekly',
-                  monthly: 'Monthly',
-                  quarterly: 'Quarterly',
-                  yearly: 'Yearly',
-                }
-                return (
-                  <FormItem>
-                    <FormLabel>Interval</FormLabel>
-                    <Select
-                      onValueChange={(v) => field.onChange(v === UNCATEGORIZED_VALUE ? null : v)}
-                      value={field.value ?? UNCATEGORIZED_VALUE}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select interval">
-                            {field.value ? intervalLabels[field.value] : 'Select interval'}
-                          </SelectValue>
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="biweekly">Bi-weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly</SelectItem>
-                        <SelectItem value="yearly">Yearly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )
-              }}
-            />
-            <FormField
-              control={form.control}
-              name="recurrence_end_date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>End Date</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value || null)}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          </div>
-        )}
+        {isRecurring && <TransactionRecurringFields control={form.control} />}
 
-        {/* Receipt Attachment */}
-        <div className="space-y-2">
-          <p className="text-sm font-medium leading-none">Receipt / Proof</p>
-          <input
-            id="receipt-file-input"
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            aria-label="Attach receipt image"
-            className="sr-only"
-            onChange={handleFileChange}
-          />
-          {hasReceipt ? (
-            <div className="relative w-full rounded-lg overflow-hidden border bg-muted">
-              {previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt="Receipt preview"
-                  className="w-full max-h-48 object-contain"
-                />
-              ) : (
-                <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
-                  <ImagePlus className="w-4 h-4 shrink-0" />
-                  {receiptReference?.startsWith(PENDING_RECEIPT_PREFIX)
-                    ? 'Receipt saved for sync.'
-                    : 'Receipt attached.'}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={removeReceipt}
-                className="absolute top-1.5 right-1.5 bg-background/80 hover:bg-background rounded-full p-1 shadow"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <label
-              htmlFor="receipt-file-input"
-              className="flex items-center gap-2 w-full rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors cursor-pointer"
-            >
-              <ImagePlus className="w-4 h-4 shrink-0" />
-              Attach receipt image (JPEG, PNG, WebP — max 5 MB)
-            </label>
-          )}
-          {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
-        </div>
+        <TransactionReceiptField
+          fileInputRef={fileInputRef}
+          previewUrl={previewUrl}
+          uploadError={uploadError}
+          receiptReference={receiptReference}
+          hasReceipt={hasReceipt}
+          handleFileChange={handleFileChange}
+          clearReceipt={clearReceipt}
+          onReceiptRemove={() => form.setValue('receipt_url', null)}
+        />
 
-        <div className="flex gap-2 justify-end pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
           <Button type="submit" disabled={form.formState.isSubmitting || uploading}>
             {uploading ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading...</>
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading...
+              </>
             ) : form.formState.isSubmitting ? (
               'Saving...'
             ) : (

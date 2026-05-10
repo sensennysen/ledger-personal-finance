@@ -39,7 +39,11 @@ export function useCategories() {
     setLoading(false)
   }, [user])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetch()
+    })
+  }, [fetch])
 
   const createCategory = async (
     values: Omit<Category, 'id' | 'user_id' | 'is_default' | 'created_at' | 'updated_at'>

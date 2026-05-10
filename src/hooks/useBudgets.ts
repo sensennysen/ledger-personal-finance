@@ -168,7 +168,11 @@ export function useBudgets() {
     setLoading(false)
   }, [user])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetch()
+    })
+  }, [fetch])
 
   const createBudget = async (
     values: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'spent' | 'rollover_amount' | 'effective_amount' | 'history'>

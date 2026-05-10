@@ -23,7 +23,9 @@ function load(): ReportPreset[] {
 function persist(presets: ReportPreset[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
-  } catch {}
+  } catch {
+    // Ignore storage access failures and keep the current in-memory preset list.
+  }
 }
 
 export function useReportPresets() {

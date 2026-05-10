@@ -20,6 +20,9 @@ const QUEUE_KEY = 'ledger_offline_queue'
 /** Queue items older than this are dropped on drain to avoid stale mutations. */
 const MAX_QUEUE_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
+// localStorage is used here only for resilient device-local sync state.
+// Queue contents should be treated as local user data, not secure storage.
+
 function readQueue(): QueueItem[] {
   try {
     const raw = localStorage.getItem(QUEUE_KEY)

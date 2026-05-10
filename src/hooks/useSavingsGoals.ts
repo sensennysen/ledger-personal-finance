@@ -69,7 +69,11 @@ export function useSavingsGoals() {
     setLoading(false)
   }, [user])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetch()
+    })
+  }, [fetch])
 
   const createGoal = async (
     values: Omit<SavingsGoal, 'id' | 'user_id' | 'created_at' | 'updated_at'>

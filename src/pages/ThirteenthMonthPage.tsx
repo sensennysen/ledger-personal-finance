@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { CalendarCheck, Info, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
@@ -27,12 +27,12 @@ function selectionKey(userId: string, year: number) {
   return `13th-month-selection:${userId}:${year}`
 }
 
-function loadSelection(userId: string, year: number): Set<string> {
+function loadSelection(userId: string, year: number): Set<string> | null {
   try {
     const raw = localStorage.getItem(selectionKey(userId, year))
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set()
+    return raw ? new Set(JSON.parse(raw) as string[]) : null
   } catch {
-    return new Set()
+    return null
   }
 }
 
@@ -85,7 +85,7 @@ export default function ThirteenthMonthPage() {
   const userId = user?.id ?? ''
 
   const [year, setYear] = useState(CURRENT_YEAR)
-  const [included, setIncluded] = useState<Set<string>>(() => loadSelection(userId, CURRENT_YEAR))
+  const [included, setIncluded] = useState<Set<string> | null>(() => loadSelection(userId, CURRENT_YEAR))
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const startDate = `${year}-01-01`
@@ -100,19 +100,10 @@ export default function ThirteenthMonthPage() {
     setIncluded(loadSelection(userId, y))
   }
 
-  // Auto-include all transactions when loading a year with no saved selection
-  useEffect(() => {
-    if (loading || transactions.length === 0) return
-    const saved = loadSelection(userId, year)
-    if (saved.size === 0) {
-      const all = new Set(transactions.map((t) => t.id))
-      setIncluded(all)
-      persistSelection(userId, year, all)
-    } else {
-      setIncluded(saved)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, year])
+  const effectiveIncluded = useMemo(
+    () => included ?? new Set(transactions.map((transaction) => transaction.id)),
+    [included, transactions]
+  )
 
   const updateIncluded = (next: Set<string>) => {
     setIncluded(next)
@@ -136,12 +127,12 @@ export default function ThirteenthMonthPage() {
     let totalIncluded = 0
     const monthsSet = new Set<string>()
     for (const tx of transactions) {
-      if (!included.has(tx.id)) continue
+      if (!effectiveIncluded.has(tx.id)) continue
       totalIncluded += txAmt(tx)
       monthsSet.add(monthKey(tx.date))
     }
     return { totalIncluded, monthsWithIncome: monthsSet.size }
-  }, [transactions, included])
+  }, [transactions, effectiveIncluded])
 
   const thirteenthMonthPay = totalIncluded / 12
 
@@ -150,13 +141,13 @@ export default function ThirteenthMonthPage() {
   const monthsElapsed = isCurrentYear ? currentMonth + 1 : 12
 
   const monthIncludedTotal = (txs: Transaction[]) =>
-    txs.filter((t) => included.has(t.id)).reduce((s, t) => s + txAmt(t), 0)
-  const monthAllChecked = (txs: Transaction[]) => txs.every((t) => included.has(t.id))
-  const monthSomeChecked = (txs: Transaction[]) => txs.some((t) => included.has(t.id))
+    txs.filter((t) => effectiveIncluded.has(t.id)).reduce((s, t) => s + txAmt(t), 0)
+  const monthAllChecked = (txs: Transaction[]) => txs.every((t) => effectiveIncluded.has(t.id))
+  const monthSomeChecked = (txs: Transaction[]) => txs.some((t) => effectiveIncluded.has(t.id))
 
   const toggleMonth = (txs: Transaction[]) => {
     const allOn = monthAllChecked(txs)
-    const next = new Set(included)
+    const next = new Set(effectiveIncluded)
     for (const t of txs) {
       if (allOn) next.delete(t.id)
       else next.add(t.id)
@@ -165,7 +156,7 @@ export default function ThirteenthMonthPage() {
   }
 
   const toggleTx = (id: string) => {
-    const next = new Set(included)
+    const next = new Set(effectiveIncluded)
     if (next.has(id)) next.delete(id)
     else next.add(id)
     updateIncluded(next)
@@ -180,7 +171,7 @@ export default function ThirteenthMonthPage() {
     })
   }
 
-  const allChecked = transactions.length > 0 && transactions.every((t) => included.has(t.id))
+  const allChecked = transactions.length > 0 && transactions.every((t) => effectiveIncluded.has(t.id))
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
@@ -224,7 +215,7 @@ export default function ThirteenthMonthPage() {
         />
         <SummaryCard
           label="Records Included"
-          value={loading ? '-' : `${included.size} / ${transactions.length}`}
+          value={loading ? '-' : `${effectiveIncluded.size} / ${transactions.length}`}
           sub="Tap rows below to toggle"
           color={CORAL}
           loading={loading}
@@ -341,7 +332,7 @@ export default function ThirteenthMonthPage() {
                     {isOpen && (
                       <div className="divide-y divide-border/30">
                         {txs.map((tx) => {
-                          const isOn = included.has(tx.id)
+                          const isOn = effectiveIncluded.has(tx.id)
                           return (
                             <label
                               key={tx.id}
@@ -352,7 +343,7 @@ export default function ThirteenthMonthPage() {
                             >
                               <input
                                 type="checkbox"
-                                checked={isOn}
+                              checked={isOn}
                                 onChange={() => toggleTx(tx.id)}
                                 className="w-4 h-4 accent-primary rounded shrink-0"
                               />

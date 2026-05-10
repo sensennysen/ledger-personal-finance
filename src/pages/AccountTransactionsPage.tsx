@@ -674,11 +674,16 @@ export default function AccountTransactionsPage() {
                   onValueChange={(value) => setPaymentFromAccountId(value)}
                 >
                   <SelectTrigger className="bg-white/95 text-black">
-                    <SelectValue placeholder="Pay from account" />
+                    <SelectValue>
+                      {(value) => {
+                        const account = paymentSourceAccounts.find(a => a.id === value);
+                        return account ? (account.name && account.name !== account.id ? account.name : 'Unnamed Account') : 'Pay from account';
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {paymentSourceAccounts.map((source) => (
-                      <SelectItem key={source.id} value={source.id}>{source.name}</SelectItem>
+                      <SelectItem key={source.id} value={source.id}>{source.name && source.name !== source.id ? source.name : 'Unnamed Account'}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

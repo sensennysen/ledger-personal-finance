@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { Budget, Transaction } from '@/types'
 
 export type AlertType = 'budget_warning' | 'budget_exceeded' | 'large_transaction'
@@ -19,6 +19,8 @@ export function useSpendingAlerts(
   transactions: Transaction[],
   largeTransactionThreshold: number = 0,
 ): SpendingAlert[] {
+  const [referenceDate] = useState(() => new Date())
+
   return useMemo(() => {
     const alerts: SpendingAlert[] = []
 
@@ -52,8 +54,10 @@ export function useSpendingAlerts(
 
     // Large transaction alerts (last 24 hours)
     if (largeTransactionThreshold > 0) {
-      const today = new Date().toISOString().split('T')[0]
-      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+      const today = referenceDate.toISOString().split('T')[0]
+      const yesterdayDate = new Date(referenceDate)
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+      const yesterday = yesterdayDate.toISOString().split('T')[0]
       const recent = transactions.filter(
         (t) => t.type === 'expense' && t.date >= yesterday && t.date <= today && t.amount >= largeTransactionThreshold,
       )
@@ -67,5 +71,5 @@ export function useSpendingAlerts(
     }
 
     return alerts
-  }, [budgets, transactions, largeTransactionThreshold])
+  }, [budgets, transactions, largeTransactionThreshold, referenceDate])
 }

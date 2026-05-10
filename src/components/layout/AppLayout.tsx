@@ -34,7 +34,9 @@ export default function AppLayout() {
   const hasGenerated = useRef(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  const [moreMenuPath, setMoreMenuPath] = useState(location.pathname)
   const [formError, setFormError] = useState<string | null>(null)
+  const moreMenuVisible = moreMenuOpen && moreMenuPath === location.pathname
   const openAddTransactionModal = () => {
     setMoreMenuOpen(false)
     setFormError(null)
@@ -46,16 +48,12 @@ export default function AppLayout() {
   useEffect(() => {
     if (hasGenerated.current) return
     hasGenerated.current = true
-    generateDueRecurring().then((count) => {
+    void generateDueRecurring().then((count) => {
       if (count > 0) {
         console.info(`[Recurring] Created ${count} recurring transaction${count !== 1 ? 's' : ''}.`)
       }
     })
-  }, [])
-
-  useEffect(() => {
-    setMoreMenuOpen(false)
-  }, [location.pathname])
+  }, [generateDueRecurring])
 
   const handleCreate = async (values: TransactionFormValues) => {
     const { error } = await createTransaction(values as Parameters<typeof createTransaction>[0])
@@ -81,10 +79,13 @@ export default function AppLayout() {
       <BottomNav
         onAddTransaction={openAddTransactionModal}
         addTransactionOpen={createOpen}
-        onMoreMenu={() => setMoreMenuOpen((v) => !v)}
-        moreMenuOpen={moreMenuOpen}
+        onMoreMenu={() => {
+          setMoreMenuPath(location.pathname)
+          setMoreMenuOpen((value) => !value)
+        }}
+        moreMenuOpen={moreMenuVisible}
       />
-      {moreMenuOpen && (
+      {moreMenuVisible && (
         <>
           <button
             type="button"
@@ -105,6 +106,7 @@ export default function AppLayout() {
                   type="button"
                   onClick={() => {
                     setMoreMenuOpen(false)
+                    setMoreMenuPath(to)
                     navigate(to)
                   }}
                   className="rounded-xl border border-border/40 bg-white/3 px-3 py-2.5 text-left transition-colors hover:bg-white/6"
@@ -127,6 +129,7 @@ export default function AppLayout() {
               type="button"
               onClick={() => {
                 setMoreMenuOpen(false)
+                setMoreMenuPath('/settings')
                 navigate('/settings')
               }}
               className="flex w-full items-center justify-between rounded-lg px-1.5 py-2.5 text-left transition-colors hover:bg-white/4"

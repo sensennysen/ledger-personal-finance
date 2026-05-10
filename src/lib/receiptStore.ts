@@ -4,6 +4,9 @@ const DB_NAME = 'ledger_receipts'
 const STORE = 'pending'
 const DB_VERSION = 1
 
+// IndexedDB is used only as best-effort device-local staging for offline uploads.
+// It should be treated as user-device storage, not as secure storage for secrets.
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION)

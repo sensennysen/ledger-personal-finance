@@ -1,8 +1,8 @@
 import { CORAL, EMERALD } from '@/constants/colors'
 import { getAccountNetWorthContribution } from '@/lib/creditCards'
 import { formatCurrency } from '@/lib/utils'
-import type { DashboardExpenseCategoryBreakdown, DashboardStatsSummary } from '@/hooks/useDashboardData'
-import type { Account, Category, Transaction } from '@/types'
+import type { DashboardExpenseCategoryDetail, DashboardStatsSummary } from '@/hooks/useDashboardData'
+import type { Account, Transaction } from '@/types'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { DashboardSummaryValueRow } from '@/components/dashboard/DashboardSummaryValueRow'
@@ -14,11 +14,10 @@ interface DashboardDetailDialogsProps {
   detailView: DashboardDetailView
   setDetailView: (view: DashboardDetailView) => void
   accounts: Account[]
-  categories: Category[]
   monthLabel: string
   monthIncomeTx: Transaction[]
   monthExpenseTx: Transaction[]
-  expensesByCategory: DashboardExpenseCategoryBreakdown[]
+  expenseCategoryDetails: DashboardExpenseCategoryDetail[]
   stats: DashboardStatsSummary
   currency: string
 }
@@ -96,11 +95,10 @@ export function DashboardDetailDialogs({
   detailView,
   setDetailView,
   accounts,
-  categories,
   monthLabel,
   monthIncomeTx,
   monthExpenseTx,
-  expensesByCategory,
+  expenseCategoryDetails,
   stats,
   currency,
 }: DashboardDetailDialogsProps) {
@@ -194,13 +192,7 @@ export function DashboardDetailDialogs({
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-3 pr-2">
-              {expensesByCategory.map((categoryBreakdown, index) => {
-                const pct = stats.expenses > 0 ? (categoryBreakdown.amount / stats.expenses) * 100 : 0
-                const categoryMatch = categories.find((category) => category.name === categoryBreakdown.name)
-                const categoryTransactions = monthExpenseTx.filter((tx) => {
-                  return categoryMatch ? tx.category_id === categoryMatch.id : false
-                })
-
+              {expenseCategoryDetails.map((categoryBreakdown, index) => {
                 return (
                   <div key={index} className="rounded-lg border border-border/50 px-3 py-3 bg-muted/20 space-y-2">
                     <div className="flex items-center gap-2">
@@ -213,15 +205,15 @@ export function DashboardDetailDialogs({
                     <div className="h-1.5 rounded-full bg-border overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
-                        style={{ width: `${pct}%`, backgroundColor: categoryBreakdown.color }}
+                        style={{ width: `${categoryBreakdown.percentage}%`, backgroundColor: categoryBreakdown.color }}
                       />
                     </div>
                     <p className="text-[0.6875rem] text-muted-foreground">
-                      {pct.toFixed(1)}% of total - {categoryTransactions.length} transaction{categoryTransactions.length !== 1 ? 's' : ''}
+                      {categoryBreakdown.percentage.toFixed(1)}% of total - {categoryBreakdown.transactions.length} transaction{categoryBreakdown.transactions.length !== 1 ? 's' : ''}
                     </p>
-                    {categoryTransactions.length > 0 && (
+                    {categoryBreakdown.transactions.length > 0 && (
                       <div className="space-y-1 pt-1 border-t border-border/30">
-                        {categoryTransactions.map((tx) => (
+                        {categoryBreakdown.transactions.map((tx) => (
                           <div key={tx.id} className="flex items-center justify-between gap-2 py-1">
                             <p className="text-xs text-muted-foreground truncate flex-1">{tx.description}</p>
                             <p className="text-xs money font-medium shrink-0" style={{ color: CORAL }}>
@@ -234,7 +226,7 @@ export function DashboardDetailDialogs({
                   </div>
                 )
               })}
-              {expensesByCategory.length === 0 && (
+              {expenseCategoryDetails.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-8">No expenses this month</p>
               )}
             </div>

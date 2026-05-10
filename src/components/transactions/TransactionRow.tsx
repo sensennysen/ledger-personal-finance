@@ -57,16 +57,12 @@ export function TransactionRow({
   const Icon = TRANSACTION_TYPE_ICON[tx.type]
   const isIncoming = tx.type === 'transfer' && tx.to_account_id === contextAccountId
   const hasReceipt = !!tx.receipt_url && !isPendingReceiptReference(tx.receipt_url)
+  const displayedReceiptUrl = receiptOpen ? resolvedReceiptUrl : null
 
   useEffect(() => {
-    if (!receiptOpen || !tx.receipt_url || isPendingReceiptReference(tx.receipt_url)) {
-      setResolvedReceiptUrl(null)
-      setReceiptLoading(false)
-      return
-    }
+    if (!receiptOpen || !tx.receipt_url || isPendingReceiptReference(tx.receipt_url)) return
 
     let cancelled = false
-    setReceiptLoading(true)
 
     resolveReceiptUrl(tx.receipt_url)
       .then((url) => {
@@ -181,7 +177,10 @@ export function TransactionRow({
               ) : hasReceipt ? (
                 <button
                   type="button"
-                  onClick={() => setReceiptOpen(true)}
+                  onClick={() => {
+                    setReceiptLoading(true)
+                    setReceiptOpen(true)
+                  }}
                   className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                 >
                   <ImageIcon className="w-3 h-3" />Receipt
@@ -282,9 +281,9 @@ export function TransactionRow({
             <DialogHeader>
               <DialogTitle>Receipt — {tx.description}</DialogTitle>
             </DialogHeader>
-            {resolvedReceiptUrl ? (
+            {displayedReceiptUrl ? (
               <img
-                src={resolvedReceiptUrl}
+                src={displayedReceiptUrl}
                 alt={`Receipt for ${tx.description}`}
                 className="w-full rounded-lg object-contain max-h-[70vh]"
               />

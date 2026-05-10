@@ -42,7 +42,11 @@ export function useAccounts() {
     setLoading(false)
   }, [user])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetch()
+    })
+  }, [fetch])
 
   // Re-read cache when an offline transaction mutation updates account balances
   const reloadFromCache = useCallback(() => {

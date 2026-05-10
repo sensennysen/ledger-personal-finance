@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -7,7 +7,7 @@ import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALarge
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
-import { usePreferences } from '@/hooks/usePreferences'
+import { usePreferences, type DateFormat, type NumberLocale, type Preferences } from '@/hooks/usePreferences'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
 import { cn } from '@/lib/utils'
@@ -48,7 +48,12 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>('unsupported')
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return 'unsupported'
+    }
+    return Notification.permission
+  })
 
   const handleDeleteAccount = async () => {
     setDeleting(true)
@@ -87,14 +92,6 @@ export default function SettingsPage() {
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
-
-  useEffect(() => {
-    if (!('Notification' in window)) {
-      setNotificationPermission('unsupported')
-      return
-    }
-    setNotificationPermission(Notification.permission)
-  }, [])
 
   const requestNotificationPermission = async () => {
     if (!('Notification' in window)) return
@@ -256,7 +253,7 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Number Format</label>
-              <Select value={prefs.numberLocale} onValueChange={(v) => setPref('numberLocale', v as any)}>
+              <Select value={prefs.numberLocale} onValueChange={(value) => setPref('numberLocale', value as NumberLocale)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="en-US">1,234.56 (English - US)</SelectItem>
@@ -269,7 +266,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Date Format</label>
-              <Select value={prefs.dateFormat} onValueChange={(v) => setPref('dateFormat', v as any)}>
+              <Select value={prefs.dateFormat} onValueChange={(value) => setPref('dateFormat', value as DateFormat)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MDY">MM/DD/YYYY</SelectItem>
@@ -280,7 +277,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Transaction View</label>
-              <Select value={prefs.txView} onValueChange={(v) => setPref('txView', v as any)}>
+              <Select value={prefs.txView} onValueChange={(value) => setPref('txView', value as Preferences['txView'])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="grouped">Grouped by date</SelectItem>
@@ -290,7 +287,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Account View</label>
-              <Select value={prefs.accView} onValueChange={(v) => setPref('accView', v as any)}>
+              <Select value={prefs.accView} onValueChange={(value) => setPref('accView', value as Preferences['accView'])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="grouped">Grouped by type</SelectItem>

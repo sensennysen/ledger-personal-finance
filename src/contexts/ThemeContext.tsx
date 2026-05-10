@@ -32,7 +32,9 @@ function getInitialTheme(): Theme {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored === 'light' || stored === 'dark') return stored
-  } catch {}
+  } catch {
+    // Ignore storage access failures and fall back to defaults.
+  }
   // Default to dark (Obsidian Ledger experience)
   return 'dark'
 }
@@ -41,7 +43,9 @@ function getInitialFontSize(): FontSize {
   try {
     const stored = localStorage.getItem(FONT_SIZE_KEY)
     if (stored === 'sm' || stored === 'md' || stored === 'lg' || stored === 'xl') return stored
-  } catch {}
+  } catch {
+    // Ignore storage access failures and fall back to defaults.
+  }
   return 'md'
 }
 
@@ -77,14 +81,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       localStorage.setItem(STORAGE_KEY, theme)
-    } catch {}
+    } catch {
+      // Ignore storage access failures and keep the in-memory preference.
+    }
   }, [theme])
 
   useEffect(() => {
     document.documentElement.style.fontSize = FONT_SIZE_MAP[fontSize]
     try {
       localStorage.setItem(FONT_SIZE_KEY, fontSize)
-    } catch {}
+    } catch {
+      // Ignore storage access failures and keep the in-memory preference.
+    }
   }, [fontSize])
 
   useEffect(() => {
@@ -99,7 +107,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       localStorage.setItem(ACCENT_KEY, accentColor)
-    } catch {}
+    } catch {
+      // Ignore storage access failures and keep the in-memory preference.
+    }
   }, [accentColor])
 
   const setTheme = (t: Theme) => setThemeState(t)

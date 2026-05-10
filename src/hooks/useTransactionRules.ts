@@ -21,7 +21,11 @@ export function useTransactionRules() {
   const [loading, setLoading] = useState(true)
 
   const fetchRules = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      setRules([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     const { data } = await supabase
       .from('transaction_rules')
@@ -34,7 +38,9 @@ export function useTransactionRules() {
   }, [user])
 
   useEffect(() => {
-    fetchRules()
+    queueMicrotask(() => {
+      void fetchRules()
+    })
   }, [fetchRules])
 
   const createRule = useCallback(
@@ -55,20 +61,23 @@ export function useTransactionRules() {
 
   const updateRule = useCallback(
     async (id: string, values: Partial<Omit<TransactionRule, 'id' | 'user_id' | 'created_at' | 'category'>>) => {
+      if (!user) return { error: 'Not authenticated' }
       const { error } = await supabase.from('transaction_rules').update(values).eq('id', id)
+        .eq('user_id', user.id)
       if (!error) await fetchRules()
       return { error: error?.message ?? null }
     },
-    [fetchRules],
+    [fetchRules, user],
   )
 
   const deleteRule = useCallback(
     async (id: string) => {
-      const { error } = await supabase.from('transaction_rules').delete().eq('id', id)
+      if (!user) return { error: 'Not authenticated' }
+      const { error } = await supabase.from('transaction_rules').delete().eq('id', id).eq('user_id', user.id)
       if (!error) setRules((prev) => prev.filter((r) => r.id !== id))
       return { error: error?.message ?? null }
     },
-    [],
+    [user],
   )
 
   /** Given a description string, return the best matching rule (highest priority, first match). */

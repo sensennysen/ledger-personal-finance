@@ -37,7 +37,9 @@ function load(): Preferences {
 function save(prefs: Preferences) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs))
-  } catch {}
+  } catch {
+    // Ignore storage access failures and keep the in-memory preference.
+  }
 }
 
 let _prefs: Preferences = load()

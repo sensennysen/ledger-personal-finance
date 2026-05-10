@@ -385,6 +385,16 @@ export default function ReportsPage() {
     })
   }, [transactions, start, end])
 
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category])),
+    [categories]
+  )
+
+  const allTransactionsSorted = useMemo(
+    () => [...transactions].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)),
+    [transactions]
+  )
+
   // Summary stats
   const { totalIncome, totalExpenses, netChange } = useMemo(() => {
     let totalIncome = 0
@@ -402,7 +412,7 @@ export default function ReportsPage() {
     for (const t of filtered) {
       if (t.type !== 'expense') continue
       const key = t.category_id ?? '__none__'
-      const cat = categories.find((c) => c.id === t.category_id)
+      const cat = t.category_id ? categoryById.get(t.category_id) : undefined
       const existing = map.get(key)
       if (existing) {
         existing.amount += t.amount * (t.exchange_rate ?? 1)
@@ -415,7 +425,7 @@ export default function ReportsPage() {
       }
     }
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount)
-  }, [filtered, categories])
+  }, [filtered, categoryById])
 
   const maxCategoryAmount = categoryBreakdown[0]?.amount ?? 1
 
@@ -460,16 +470,13 @@ export default function ReportsPage() {
         : monthStart.toLocaleDateString('en-US', { month: 'short' })
       boundaries.push({ date: localDateStr(monthEnd), label })
     }
-    const allSorted = [...transactions].sort(
-      (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at),
-    )
     let netWorth = currentNetWorth
     let txIdx = 0
     const data: { month: string; netWorth: number }[] = []
     for (let i = 12; i >= 0; i--) {
       const boundary = boundaries[i].date
-      while (txIdx < allSorted.length && allSorted[txIdx].date > boundary) {
-        const tx = allSorted[txIdx]
+      while (txIdx < allTransactionsSorted.length && allTransactionsSorted[txIdx].date > boundary) {
+        const tx = allTransactionsSorted[txIdx]
         if (tx.type === 'income') netWorth -= tx.amount
         else if (tx.type === 'expense') netWorth += tx.amount
         else if (tx.type === 'transfer') netWorth += (tx.transfer_fee ?? 0)
@@ -478,7 +485,7 @@ export default function ReportsPage() {
       data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
     }
     return data
-  }, [accounts, transactions])
+  }, [accounts, allTransactionsSorted])
 
   // ── Monthly Income vs Expenses (last 12 months) ──
   const monthlyData = useMemo(() => {
@@ -511,7 +518,7 @@ export default function ReportsPage() {
   }, [transactions])
 
   // ── Spending by Merchant (top 10 from filtered period) ──
-  const merchantBreakdown = useMemo(() => {
+  const merchantBreakdown = (() => {
     const map = new Map<string, { displayName: string; amount: number; count: number }>()
     for (const t of filtered) {
       if (t.type !== 'expense') continue
@@ -526,7 +533,7 @@ export default function ReportsPage() {
       }
     }
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount).slice(0, 10)
-  }, [filtered])
+  })()
 
   const activeAccounts = accounts.filter((a) => a.is_active)
   const balanceSummary = getBalanceSummary(activeAccounts)
@@ -543,25 +550,19 @@ export default function ReportsPage() {
   }[preset]
 
   // Sorted transactions for table (newest first)
-  const sortedTransactions = useMemo(
-    () => [...filtered].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)),
-    [filtered]
+  const sortedTransactions = [...filtered].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)
   )
 
   // Running balance per account, derived by unwinding all transactions newest→oldest
   // starting from each account's current live balance.
-  const txBalanceMap = useMemo(() => {
+  const txBalanceMap = (() => {
     // Build a mutable balance register from current account balances
     const register = new Map<string, number>()
     for (const acc of accounts) register.set(acc.id, acc.balance)
 
-    // Sort ALL transactions newest first to unwind correctly
-    const allSorted = [...transactions].sort(
-      (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)
-    )
-
     const map = new Map<string, number>()
-    for (const tx of allSorted) {
+    for (const tx of allTransactionsSorted) {
       // Record the account balance *after* this transaction
       if (register.has(tx.account_id)) {
         map.set(tx.id, register.get(tx.account_id)!)
@@ -579,7 +580,7 @@ export default function ReportsPage() {
       }
     }
     return map
-  }, [transactions, accounts])
+  })()
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 md:pb-6">

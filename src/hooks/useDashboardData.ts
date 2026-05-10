@@ -31,6 +31,12 @@ export type DashboardExpenseCategoryBreakdown = {
   amount: number
 }
 
+export type DashboardExpenseCategoryDetail = DashboardExpenseCategoryBreakdown & {
+  categoryId: string | null
+  percentage: number
+  transactions: Transaction[]
+}
+
 export type DashboardStatsSummary = {
   totalBalance: number
   totalAssets: number
@@ -207,6 +213,41 @@ export function useDashboardData({
     [transactions, monthStart, monthEnd]
   )
 
+  const categoryIdByName = useMemo(
+    () => new Map(categories.map((category) => [category.name, category.id])),
+    [categories]
+  )
+
+  const monthTransactionGroups = useMemo(() => {
+    const income: Transaction[] = []
+    const expenses: Transaction[] = []
+    const expenseByCategory = new Map<string, Transaction[]>()
+
+    for (const tx of monthTransactions) {
+      if (tx.type === 'income') {
+        income.push(tx)
+        continue
+      }
+
+      if (tx.type === 'expense') {
+        expenses.push(tx)
+        const categoryKey = tx.category_id ?? '__uncategorized__'
+        const existing = expenseByCategory.get(categoryKey)
+        if (existing) {
+          existing.push(tx)
+        } else {
+          expenseByCategory.set(categoryKey, [tx])
+        }
+      }
+    }
+
+    return {
+      income,
+      expenses,
+      expenseByCategory,
+    }
+  }, [monthTransactions])
+
   const stats = useMemo<DashboardStatsSummary>(() => {
     const balanceSummary = getBalanceSummary(accounts)
     const income = sumTransactionsByType(monthTransactions, 'income')
@@ -232,23 +273,31 @@ export function useDashboardData({
             : getLast5Years()
 
     return periods.map(({ label, start, end }) => {
-      const periodTransactions = transactions.filter((tx) => tx.date >= start && tx.date <= end)
+      let income = 0
+      let expenses = 0
+
+      for (const tx of transactions) {
+        if (tx.date < start || tx.date > end) continue
+        if (tx.type === 'income') income += tx.amount
+        else if (tx.type === 'expense') expenses += tx.amount
+      }
+
       return {
         label,
-        income: sumTransactionsByType(periodTransactions, 'income'),
-        expenses: sumTransactionsByType(periodTransactions, 'expense'),
+        income,
+        expenses,
       }
     })
   }, [transactions, chartPeriod])
 
   const monthIncomeTx = useMemo(
-    () => monthTransactions.filter((tx) => tx.type === 'income'),
-    [monthTransactions]
+    () => monthTransactionGroups.income,
+    [monthTransactionGroups]
   )
 
   const monthExpenseTx = useMemo(
-    () => monthTransactions.filter((tx) => tx.type === 'expense'),
-    [monthTransactions]
+    () => monthTransactionGroups.expenses,
+    [monthTransactionGroups]
   )
 
   const expensesByCategory = useMemo<DashboardExpenseCategoryBreakdown[]>(
@@ -257,6 +306,21 @@ export function useDashboardData({
   )
 
   const recentTx = useMemo(() => monthTransactions.slice(0, 5), [monthTransactions])
+
+  const expenseCategoryDetails = useMemo<DashboardExpenseCategoryDetail[]>(() => {
+    return expensesByCategory.map((breakdown) => {
+      const categoryId = categoryIdByName.get(breakdown.name) ?? null
+      const categoryTransactions = monthTransactionGroups.expenseByCategory.get(categoryId ?? '__uncategorized__') ?? []
+      const percentage = stats.expenses > 0 ? (breakdown.amount / stats.expenses) * 100 : 0
+
+      return {
+        ...breakdown,
+        categoryId,
+        percentage,
+        transactions: categoryTransactions,
+      }
+    })
+  }, [categoryIdByName, expensesByCategory, monthTransactionGroups, stats.expenses])
 
   const upcomingBills = useMemo(() => {
     const today = new Date()
@@ -340,6 +404,7 @@ export function useDashboardData({
     monthIncomeTx,
     monthExpenseTx,
     expensesByCategory,
+    expenseCategoryDetails,
     recentTx,
     upcomingBills,
     cashFlowForecast,

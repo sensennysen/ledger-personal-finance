@@ -24,7 +24,11 @@ export function useSubcategories(categoryId: string | null) {
     setLoading(false)
   }, [user, categoryId])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetch()
+    })
+  }, [fetch])
 
   const createSubcategory = async (name: string) => {
     if (!user || !categoryId) return { error: 'Not authenticated' }
@@ -85,7 +89,11 @@ export function useAllSubcategories() {
     setLoading(false)
   }, [user])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetch()
+    })
+  }, [fetch])
 
   return { subcategoriesByCategoryId, loading, refetch: fetch }
 }

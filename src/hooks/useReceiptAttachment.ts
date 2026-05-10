@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { storePendingReceipt, PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
-import { buildReceiptObjectPath, isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
+import {
+  buildReceiptObjectPath,
+  isPendingReceiptReference,
+  normalizeReceiptFile,
+  resolveReceiptUrl,
+} from '@/lib/receiptUrls'
 
 const ALLOWED_RECEIPT_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const MAX_RECEIPT_SIZE_BYTES = 5 * 1024 * 1024
@@ -52,6 +57,11 @@ export function useReceiptAttachment({ initialReceiptUrl, userId }: UseReceiptAt
     const file = event.target.files?.[0]
 
     if (!file) return
+    if (file.size === 0) {
+      setUploadError('Empty files cannot be attached as receipts.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
 
     if (!ALLOWED_RECEIPT_MIME_TYPES.includes(file.type)) {
       setUploadError('Invalid file type. Only JPEG, PNG, WebP, and GIF images are allowed.')
@@ -65,12 +75,14 @@ export function useReceiptAttachment({ initialReceiptUrl, userId }: UseReceiptAt
       return
     }
 
-    setPendingFile(file)
+    const normalizedFile = normalizeReceiptFile(file)
+
+    setPendingFile(normalizedFile)
     setUploadError(null)
 
     const reader = new FileReader()
     reader.onload = (loadEvent) => setPendingPreviewUrl(loadEvent.target?.result as string)
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(normalizedFile)
   }
 
   const clearReceipt = () => {
@@ -86,9 +98,11 @@ export function useReceiptAttachment({ initialReceiptUrl, userId }: UseReceiptAt
       return currentReceiptUrl ?? null
     }
 
+    const normalizedFile = normalizeReceiptFile(pendingFile)
+
     if (!navigator.onLine) {
       try {
-        return await saveReceiptForLater(pendingFile)
+        return await saveReceiptForLater(normalizedFile)
       } catch {
         setUploadError('Could not save receipt locally. It will not be attached.')
         return currentReceiptUrl ?? null
@@ -98,17 +112,19 @@ export function useReceiptAttachment({ initialReceiptUrl, userId }: UseReceiptAt
     setUploading(true)
 
     try {
-      const path = buildReceiptObjectPath(userId, pendingFile.name)
-      const { error } = await supabase.storage.from('receipts').upload(path, pendingFile)
+      const path = buildReceiptObjectPath(userId, normalizedFile.name)
+      const { error } = await supabase.storage.from('receipts').upload(path, normalizedFile)
 
       if (!error) {
         return path
       }
 
+      setUploadError(`Receipt upload failed (${error.message}). Saving a local pending copy instead.`)
+
       try {
-        return await saveReceiptForLater(pendingFile)
+        return await saveReceiptForLater(normalizedFile)
       } catch {
-        setUploadError('Upload failed and receipt could not be saved locally.')
+        setUploadError('Receipt upload failed and the offline backup copy could not be saved locally.')
         return currentReceiptUrl ?? null
       }
     } finally {

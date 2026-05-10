@@ -161,6 +161,7 @@ export default function DashboardPage() {
     monthIncomeTx,
     monthExpenseTx,
     expensesByCategory,
+    expenseCategoryDetails,
     recentTx,
     upcomingBills,
     cashFlowForecast,
@@ -445,11 +446,10 @@ export default function DashboardPage() {
         detailView={detailView}
         setDetailView={setDetailView}
         accounts={accounts}
-        categories={categories}
         monthLabel={monthLabel}
         monthIncomeTx={monthIncomeTx}
         monthExpenseTx={monthExpenseTx}
-        expensesByCategory={expensesByCategory}
+        expenseCategoryDetails={expenseCategoryDetails}
         stats={stats}
         currency={currency}
       />

@@ -18,7 +18,9 @@ function loadSentMap(userId: string): NotifMemory {
 function saveSentMap(userId: string, map: NotifMemory) {
   try {
     localStorage.setItem(`${userId}:cc-notifs-sent`, JSON.stringify(map))
-  } catch {}
+  } catch {
+    // Ignore storage access failures and skip persisting this run.
+  }
 }
 
 async function showPushStyleNotification(title: string, body: string, tag: string) {
@@ -112,4 +114,3 @@ export function useCreditCardNotifications() {
     }
   }, [user, accounts])
 }
-

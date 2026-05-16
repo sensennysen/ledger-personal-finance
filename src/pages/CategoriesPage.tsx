@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, Trash2, Smile, ChevronDown, ChevronRight, ListTree, Zap } from 'lucide-react'
-import EmojiPicker, { Theme } from 'emoji-picker-react'
+import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useCategories } from '@/hooks/useCategories'
 import { useSubcategories } from '@/hooks/useSubcategories'
 import { useTransactionRules } from '@/hooks/useTransactionRules'
@@ -45,6 +45,8 @@ function CategoryForm({
   onSubmit: (values: FormValues) => Promise<void>
   onClose: () => void
 }) {
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+
   const form = useForm<FormValues, any, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -55,6 +57,13 @@ function CategoryForm({
       ...defaultValues,
     },
   })
+
+  React.useEffect(() => {
+    const currentIcon = form.getValues('icon')
+    if (!currentIcon || currentIcon.includes('ðŸ')) {
+      form.setValue('icon', '🏷️', { shouldDirty: false, shouldTouch: false })
+    }
+  }, [form])
 
   return (
     <Form {...form}>
@@ -102,21 +111,32 @@ function CategoryForm({
               <FormLabel>Icon</FormLabel>
               <FormControl>
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl border-2 border-border flex items-center justify-center text-2xl bg-muted/50">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-border bg-muted/50 text-2xl">
                     {field.value || '😀'}
                   </div>
-                  <Popover>
+                  <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
                     <PopoverTrigger render={
                       <Button type="button" variant="outline" className="gap-2">
                         <Smile className="w-4 h-4" />
                         Choose Emoji
                       </Button>
                     } />
-                    <PopoverContent className="w-auto p-0 border-0 shadow-xl" align="start">
+                    <PopoverContent
+                      align="start"
+                      sideOffset={8}
+                      className="w-[min(calc(100vw-2rem),20rem)] max-w-[calc(100vw-2rem)] overflow-hidden border-0 p-0 shadow-xl"
+                    >
                       <EmojiPicker
-                        onEmojiClick={(e) => field.onChange(e.emoji)}
+                        onEmojiClick={(emoji) => {
+                          field.onChange(emoji.emoji)
+                          setEmojiPickerOpen(false)
+                        }}
+                        emojiStyle={EmojiStyle.NATIVE}
                         theme={Theme.AUTO}
+                        width="100%"
+                        height={380}
                         skinTonesDisabled
+                        previewConfig={{ showPreview: false }}
                         searchPlaceholder="Search emoji..."
                       />
                     </PopoverContent>
@@ -267,13 +287,13 @@ function SubcategoryPanel({ category }: { category: Category }) {
 
 export default function CategoriesPage() {
   const { categories, loading, createCategory, updateCategory, deleteCategory } = useCategories()
-  const { rules, loading: rulesLoading, createRule, deleteRule } = useTransactionRules()
   const [createOpen, setCreateOpen] = useState(false)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense')
   const [rulesOpen, setRulesOpen] = useState(false)
+  const { rules, loading: rulesLoading, createRule, deleteRule } = useTransactionRules(rulesOpen)
   const [ruleKeyword, setRuleKeyword] = useState('')
   const [ruleCategoryId, setRuleCategoryId] = useState('')
   const [ruleTypeHint, setRuleTypeHint] = useState<'any' | 'income' | 'expense' | 'transfer'>('any')
@@ -373,7 +393,7 @@ export default function CategoriesPage() {
             <DialogTrigger render={<Button className="gap-2" size="sm" />}>
               <Plus className="w-4 h-4" />Add Category
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle>Add Category</DialogTitle></DialogHeader>
               {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
               <CategoryForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} />
@@ -414,7 +434,7 @@ export default function CategoriesPage() {
       )}
 
       <Dialog open={!!editCategory} onOpenChange={(o) => { if (!o) { setEditCategory(null); setFormError(null) } }}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Edit Category</DialogTitle></DialogHeader>
           {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editCategory && (

@@ -66,6 +66,7 @@ export interface Category {
   color: string
   icon: string
   is_default: boolean
+  sort_order?: number
   created_at: string
   updated_at: string
 }
@@ -75,6 +76,7 @@ export interface Subcategory {
   user_id: string
   category_id: string
   name: string
+  sort_order?: number
   created_at: string
   updated_at: string
 }

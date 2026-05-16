@@ -1,11 +1,25 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Smile, ChevronDown, ChevronRight, ListTree, Zap } from 'lucide-react'
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Smile,
+  ChevronDown,
+  ChevronRight,
+  ListTree,
+  Zap,
+  GripVertical,
+  ArrowUp,
+  ArrowDown,
+  Check,
+} from 'lucide-react'
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useCategories } from '@/hooks/useCategories'
 import { useSubcategories } from '@/hooks/useSubcategories'
+import { useFlipReorder } from '@/hooks/useFlipReorder'
 import { useTransactionRules } from '@/hooks/useTransactionRules'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,10 +29,21 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ColorPicker } from '@/components/ui/color-picker'
+import { cn } from '@/lib/utils'
 import type { Category, Subcategory } from '@/types'
 
 const CATEGORY_COLORS = [
@@ -26,6 +51,8 @@ const CATEGORY_COLORS = [
   '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#06b6d4',
   '#a855f7', '#f43f5e', '#84cc16', '#f59e0b', '#10b981',
 ]
+const DEFAULT_CATEGORY_ICON = '\u{1F3F7}\uFE0F'
+const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(40),
@@ -35,6 +62,33 @@ const schema = z.object({
 })
 
 type FormValues = z.infer<typeof schema>
+
+function reorderIds(ids: string[], fromId: string, toId: string) {
+  const from = ids.indexOf(fromId)
+  const to = ids.indexOf(toId)
+  if (from < 0 || to < 0 || from === to) return ids
+  const next = [...ids]
+  const [moved] = next.splice(from, 1)
+  next.splice(to, 0, moved)
+  return next
+}
+
+function moveId(ids: string[], id: string, direction: -1 | 1) {
+  const index = ids.indexOf(id)
+  const targetIndex = index + direction
+  if (index < 0 || targetIndex < 0 || targetIndex >= ids.length) return ids
+  const next = [...ids]
+  const current = next[index]
+  next[index] = next[targetIndex]
+  next[targetIndex] = current
+  return next
+}
+
+function mergeSubsetOrder(allIds: string[], subsetIds: string[]) {
+  const subset = new Set(subsetIds)
+  let pointer = 0
+  return allIds.map((id) => (subset.has(id) ? subsetIds[pointer++] : id))
+}
 
 function CategoryForm({
   defaultValues,
@@ -53,15 +107,15 @@ function CategoryForm({
       name: '',
       type: 'expense',
       color: CATEGORY_COLORS[0],
-      icon: '🏷️',
+      icon: DEFAULT_CATEGORY_ICON,
       ...defaultValues,
     },
   })
 
   React.useEffect(() => {
     const currentIcon = form.getValues('icon')
-    if (!currentIcon || currentIcon.includes('ðŸ')) {
-      form.setValue('icon', '🏷️', { shouldDirty: false, shouldTouch: false })
+    if (!currentIcon) {
+      form.setValue('icon', DEFAULT_CATEGORY_ICON, { shouldDirty: false, shouldTouch: false })
     }
   }, [form])
 
@@ -112,7 +166,7 @@ function CategoryForm({
               <FormControl>
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-border bg-muted/50 text-2xl">
-                    {field.value || '😀'}
+                    {field.value || DEFAULT_EMOJI_PLACEHOLDER}
                   </div>
                   <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
                     <PopoverTrigger render={
@@ -174,13 +228,35 @@ function CategoryForm({
 }
 
 function SubcategoryPanel({ category }: { category: Category }) {
-  const { subcategories, loading, createSubcategory, updateSubcategory, deleteSubcategory } = useSubcategories(category.id)
+  const { subcategories, loading, createSubcategory, updateSubcategory, deleteSubcategory, updateSubcategoryOrder } = useSubcategories(category.id)
   const [addName, setAddName] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [editSub, setEditSub] = useState<Subcategory | null>(null)
   const [editName, setEditName] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
+  const [rearrangeMode, setRearrangeMode] = useState(false)
+  const [draggedSubcategoryId, setDraggedSubcategoryId] = useState<string | null>(null)
+  const [dropTargetSubcategoryId, setDropTargetSubcategoryId] = useState<string | null>(null)
+  const [isDesktopDrag, setIsDesktopDrag] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
+  )
+  const subcategoryIds = useMemo(() => subcategories.map((sub) => sub.id), [subcategories])
+  const setSubcategoryRef = useFlipReorder(subcategoryIds, rearrangeMode)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)')
+    const handleChange = () => {
+      setIsDesktopDrag(mediaQuery.matches)
+      if (!mediaQuery.matches) {
+        setDraggedSubcategoryId(null)
+        setDropTargetSubcategoryId(null)
+      }
+    }
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
 
   const handleAdd = async () => {
     const trimmed = addName.trim()
@@ -203,23 +279,95 @@ function SubcategoryPanel({ category }: { category: Category }) {
     if (!editSub) return
     const trimmed = editName.trim()
     if (!trimmed) { setEditError('Name is required'); return }
-    const { error } = await updateSubcategory(editSub.id, trimmed)
+    const { error } = await updateSubcategory(editSub.id, { name: trimmed })
     if (error) { setEditError(error); return }
     setEditSub(null)
   }
 
+  const persistSubcategoryOrder = async (nextIds: string[]) => {
+    const { error } = await updateSubcategoryOrder(nextIds)
+    if (error) console.error('Failed to update subcategory order:', error)
+  }
+
+  const reorderSubcategory = (fromId: string, toId: string) => {
+    const nextIds = reorderIds(subcategoryIds, fromId, toId)
+    if (nextIds !== subcategoryIds) void persistSubcategoryOrder(nextIds)
+  }
+
+  const moveSubcategory = (id: string, direction: -1 | 1) => {
+    const nextIds = moveId(subcategoryIds, id, direction)
+    if (nextIds !== subcategoryIds) void persistSubcategoryOrder(nextIds)
+  }
+
   return (
     <div className="border-t bg-muted/30 px-3 py-3 space-y-2">
-      <div className="flex items-center gap-1.5 mb-1">
-        <ListTree className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Subcategories</span>
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <div className="flex items-center gap-1.5">
+          <ListTree className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Subcategories</span>
+        </div>
+        {subcategories.length > 1 && (
+          <Button
+            variant={rearrangeMode ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 gap-1.5 px-2 text-xs"
+            onClick={() => {
+              setRearrangeMode((current) => !current)
+              setDraggedSubcategoryId(null)
+              setDropTargetSubcategoryId(null)
+            }}
+          >
+            {rearrangeMode ? <Check className="w-3 h-3" /> : <GripVertical className="w-3 h-3" />}
+            {rearrangeMode ? 'Done' : 'Rearrange'}
+          </Button>
+        )}
       </div>
       {loading ? (
         <div className="space-y-1">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-8" />)}</div>
       ) : (
         <div className="space-y-1">
-          {subcategories.map((sub) => (
-            <div key={sub.id} className="flex items-center gap-2">
+          {subcategories.map((sub, idx) => (
+            <div
+              key={sub.id}
+              ref={setSubcategoryRef(sub.id)}
+              draggable={isDesktopDrag && rearrangeMode}
+              onDragStart={() => {
+                if (rearrangeMode) {
+                  setDraggedSubcategoryId(sub.id)
+                  setDropTargetSubcategoryId(null)
+                }
+              }}
+              onDragEnter={() => {
+                if (rearrangeMode && draggedSubcategoryId && draggedSubcategoryId !== sub.id) {
+                  setDropTargetSubcategoryId(sub.id)
+                }
+              }}
+              onDragOver={(event) => {
+                if (rearrangeMode) {
+                  event.preventDefault()
+                  if (draggedSubcategoryId && draggedSubcategoryId !== sub.id) {
+                    setDropTargetSubcategoryId(sub.id)
+                  }
+                }
+              }}
+              onDrop={(event) => {
+                if (!rearrangeMode) return
+                event.preventDefault()
+                if (draggedSubcategoryId) reorderSubcategory(draggedSubcategoryId, sub.id)
+                setDraggedSubcategoryId(null)
+                setDropTargetSubcategoryId(null)
+              }}
+              onDragEnd={() => {
+                setDraggedSubcategoryId(null)
+                setDropTargetSubcategoryId(null)
+              }}
+              className={cn(
+                'reorder-motion flex items-center gap-2 rounded-md px-1 py-1',
+                rearrangeMode && 'cursor-grab border border-transparent',
+                draggedSubcategoryId === sub.id && 'is-dragging',
+                dropTargetSubcategoryId === sub.id && 'is-drop-target'
+              )}
+            >
               {editSub?.id === sub.id ? (
                 <>
                   <Input
@@ -235,7 +383,34 @@ function SubcategoryPanel({ category }: { category: Category }) {
                 </>
               ) : (
                 <>
+                  <span
+                    className={cn(
+                      'reorder-handle hidden text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted',
+                      rearrangeMode && 'md:inline-flex'
+                    )}
+                    aria-label={`Drag to rearrange ${sub.name}`}
+                  >
+                    <GripVertical className="w-3 h-3" />
+                  </span>
                   <span className="text-sm flex-1 pl-1 truncate">{sub.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className={rearrangeMode ? 'md:hidden' : 'hidden'}
+                    onClick={() => moveSubcategory(sub.id, -1)}
+                    disabled={idx === 0}
+                  >
+                    <ArrowUp className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className={rearrangeMode ? 'md:hidden' : 'hidden'}
+                    onClick={() => moveSubcategory(sub.id, 1)}
+                    disabled={idx === subcategories.length - 1}
+                  >
+                    <ArrowDown className="w-3 h-3" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => startEdit(sub)}>
                     <Pencil className="w-3 h-3" />
                   </Button>
@@ -286,18 +461,38 @@ function SubcategoryPanel({ category }: { category: Category }) {
 }
 
 export default function CategoriesPage() {
-  const { categories, loading, createCategory, updateCategory, deleteCategory } = useCategories()
+  const { categories, loading, createCategory, updateCategory, deleteCategory, updateCategoryOrder } = useCategories()
   const [createOpen, setCreateOpen] = useState(false)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense')
+  const [rearrangeMode, setRearrangeMode] = useState(false)
+  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null)
+  const [dropTargetCategoryId, setDropTargetCategoryId] = useState<string | null>(null)
+  const [isDesktopDrag, setIsDesktopDrag] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
+  )
   const [rulesOpen, setRulesOpen] = useState(false)
   const { rules, loading: rulesLoading, createRule, deleteRule } = useTransactionRules(rulesOpen)
   const [ruleKeyword, setRuleKeyword] = useState('')
   const [ruleCategoryId, setRuleCategoryId] = useState('')
   const [ruleTypeHint, setRuleTypeHint] = useState<'any' | 'income' | 'expense' | 'transfer'>('any')
   const [rulePriority, setRulePriority] = useState(1)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)')
+    const handleChange = () => {
+      setIsDesktopDrag(mediaQuery.matches)
+      if (!mediaQuery.matches) {
+        setDraggedCategoryId(null)
+        setDropTargetCategoryId(null)
+      }
+    }
+    handleChange()
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
 
   const handleCreate = async (values: FormValues) => {
     const { error } = await createCategory(values)
@@ -316,16 +511,86 @@ export default function CategoriesPage() {
 
   const expenseCategories = categories.filter((c) => c.type === 'expense' || c.type === 'both')
   const incomeCategories = categories.filter((c) => c.type === 'income' || c.type === 'both')
+  const visibleCategoryIds = useMemo(
+    () => (activeTab === 'expense' ? expenseCategories : incomeCategories).map((category) => category.id),
+    [activeTab, expenseCategories, incomeCategories]
+  )
+  const setCategoryRef = useFlipReorder(visibleCategoryIds, rearrangeMode)
+
+  const persistCategoryOrder = async (nextVisibleIds: string[]) => {
+    const nextIds = mergeSubsetOrder(
+      categories.map((category) => category.id),
+      nextVisibleIds
+    )
+    const { error } = await updateCategoryOrder(nextIds)
+    if (error) console.error('Failed to update category order:', error)
+  }
+
+  const reorderCategory = (fromId: string, toId: string) => {
+    const nextIds = reorderIds(visibleCategoryIds, fromId, toId)
+    if (nextIds !== visibleCategoryIds) void persistCategoryOrder(nextIds)
+  }
+
+  const moveCategory = (id: string, direction: -1 | 1) => {
+    const nextIds = moveId(visibleCategoryIds, id, direction)
+    if (nextIds !== visibleCategoryIds) void persistCategoryOrder(nextIds)
+  }
 
   const renderCategories = (cats: Category[]) =>
     cats.map((cat, idx) => (
-      <div key={cat.id} className="rounded-lg border bg-card overflow-hidden animate-fade-up" style={{ '--anim-delay': `${Math.min(idx * 50, 400)}ms` } as React.CSSProperties}>
+      <div
+        key={cat.id}
+        ref={setCategoryRef(cat.id)}
+        draggable={isDesktopDrag && rearrangeMode}
+        onDragStart={() => {
+          if (rearrangeMode) {
+            setDraggedCategoryId(cat.id)
+            setDropTargetCategoryId(null)
+          }
+        }}
+        onDragEnter={() => {
+          if (rearrangeMode && draggedCategoryId && draggedCategoryId !== cat.id) setDropTargetCategoryId(cat.id)
+        }}
+        onDragOver={(event) => {
+          if (rearrangeMode) {
+            event.preventDefault()
+            if (draggedCategoryId && draggedCategoryId !== cat.id) setDropTargetCategoryId(cat.id)
+          }
+        }}
+        onDrop={(event) => {
+          if (!rearrangeMode) return
+          event.preventDefault()
+          if (draggedCategoryId) reorderCategory(draggedCategoryId, cat.id)
+          setDraggedCategoryId(null)
+          setDropTargetCategoryId(null)
+        }}
+        onDragEnd={() => {
+          setDraggedCategoryId(null)
+          setDropTargetCategoryId(null)
+        }}
+        className={cn(
+          'reorder-motion rounded-lg border bg-card overflow-hidden animate-fade-up',
+          rearrangeMode && 'cursor-grab',
+          draggedCategoryId === cat.id && 'is-dragging',
+          dropTargetCategoryId === cat.id && 'is-drop-target'
+        )}
+        style={{ '--anim-delay': `${Math.min(idx * 50, 400)}ms` } as React.CSSProperties}
+      >
         <div className="flex items-center justify-between gap-2 p-3 hover:bg-accent/50 transition-colors">
           <button
             type="button"
             className="flex items-center gap-3 min-w-0 flex-1 text-left"
             onClick={() => setExpandedCategoryId(expandedCategoryId === cat.id ? null : cat.id)}
           >
+            <span
+              className={cn(
+                'reorder-handle hidden text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted',
+                rearrangeMode && 'md:inline-flex'
+              )}
+              aria-label={`Drag to rearrange ${cat.name}`}
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </span>
             {expandedCategoryId === cat.id
               ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
               : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
@@ -344,6 +609,24 @@ export default function CategoriesPage() {
             </div>
           </button>
           <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className={rearrangeMode ? 'md:hidden' : 'hidden'}
+              onClick={() => moveCategory(cat.id, -1)}
+              disabled={idx === 0}
+            >
+              <ArrowUp className="w-3 h-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className={rearrangeMode ? 'md:hidden' : 'hidden'}
+              onClick={() => moveCategory(cat.id, 1)}
+              disabled={idx === cats.length - 1}
+            >
+              <ArrowDown className="w-3 h-3" />
+            </Button>
             {cat.is_default && (
               <Badge variant="secondary" className="text-xs">Default</Badge>
             )}
@@ -386,6 +669,21 @@ export default function CategoriesPage() {
           <p className="text-muted-foreground text-sm">Customize your transaction categories</p>
         </div>
         <div className="flex items-center justify-end gap-2">
+          {categories.length > 1 && (
+            <Button
+              variant={rearrangeMode ? 'secondary' : 'outline'}
+              size="sm"
+              className="gap-2"
+              onClick={() => {
+                setRearrangeMode((current) => !current)
+                setDraggedCategoryId(null)
+                setDropTargetCategoryId(null)
+              }}
+            >
+              {rearrangeMode ? <Check className="w-4 h-4" /> : <GripVertical className="w-4 h-4" />}
+              {rearrangeMode ? 'Done' : 'Rearrange'}
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setRulesOpen(true)}>
             <Zap className="w-4 h-4" />Rules
           </Button>
@@ -447,7 +745,6 @@ export default function CategoriesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Auto-Categorization Rules Modal */}
       <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
         <DialogContent>
           <DialogHeader>
@@ -467,7 +764,7 @@ export default function CategoriesPage() {
                   <div key={rule.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded border bg-muted/30">
                     <span className="text-sm font-medium">"{rule.keyword}"</span>
                     <div className="flex items-center gap-2 flex-1 mx-2">
-                      <span className="text-muted-foreground">→</span>
+                      <span className="text-muted-foreground">-&gt;</span>
                       <span className="text-sm">{rule.category?.name ?? rule.category_id}</span>
                       {rule.type_hint && (
                         <Badge variant="outline" className="text-xs">{rule.type_hint}</Badge>
@@ -493,7 +790,6 @@ export default function CategoriesPage() {
                 ))}
               </div>
             )}
-            {/* Add rule form */}
             <div className="flex flex-wrap gap-2 pt-2 border-t">
               <Input
                 placeholder="Keyword (e.g. Starbucks)"

@@ -142,6 +142,7 @@ create table if not exists public.categories (
   color       text not null default '#6366f1',
   icon        text not null default '📦',
   is_default  boolean not null default false,
+  sort_order  integer not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -150,6 +151,8 @@ alter table public.categories enable row level security;
 
 create policy "Users can manage own categories"
   on public.categories for all using (auth.uid() = user_id);
+
+create index if not exists categories_user_sort_order_idx on public.categories(user_id, sort_order, created_at);
 
 -- ────────────────────────────────────────────────────────────
 -- TRANSACTIONS
@@ -477,6 +480,7 @@ create table if not exists public.subcategories (
   user_id     uuid not null references public.profiles(id) on delete cascade,
   category_id uuid not null references public.categories(id) on delete cascade,
   name        text not null,
+  sort_order  integer not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -487,6 +491,7 @@ create policy "Users can manage own subcategories"
   on public.subcategories for all using (auth.uid() = user_id);
 
 create index if not exists subcategories_category_idx on public.subcategories(category_id);
+create index if not exists subcategories_category_sort_order_idx on public.subcategories(category_id, sort_order, created_at);
 
 drop trigger if exists trg_subcategories_reference_ownership on public.subcategories;
 create trigger trg_subcategories_reference_ownership

@@ -28,8 +28,10 @@ export function useCategories() {
       .from('categories')
       .select('*')
       .eq('user_id', user.id)
+      .order('sort_order', { ascending: true })
       .order('is_default', { ascending: false })
       .order('name', { ascending: true })
+      .order('created_at', { ascending: true })
     if (error) {
       setError(error.message)
     } else {
@@ -51,7 +53,7 @@ export function useCategories() {
     if (!user) return { error: 'Not authenticated' }
     const { error } = await supabase
       .from('categories')
-      .insert({ ...values, user_id: user.id, is_default: false })
+      .insert({ ...values, user_id: user.id, is_default: false, sort_order: categories.length })
     if (!error) await fetch()
     return { error: error?.message ?? null }
   }
@@ -70,5 +72,41 @@ export function useCategories() {
     return { error: error?.message ?? null }
   }
 
-  return { categories, loading, error, refetch: fetch, createCategory, updateCategory, deleteCategory }
+  const updateCategoryOrder = async (orderedIds: string[]) => {
+    if (!user) return { error: 'Not authenticated' }
+
+    const orderMap = new Map(orderedIds.map((id, index) => [id, index]))
+    const nextCategories = categories
+      .map((category) => ({
+        ...category,
+        sort_order: orderMap.get(category.id) ?? category.sort_order ?? categories.length,
+      }))
+      .sort(
+        (a, b) =>
+          (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
+          a.name.localeCompare(b.name) ||
+          a.created_at.localeCompare(b.created_at)
+      )
+
+    setCategories(nextCategories)
+    writeCache(`${user.id}:categories`, nextCategories)
+
+    const results = await Promise.all(
+      orderedIds.map((id, sort_order) =>
+        supabase
+          .from('categories')
+          .update({ sort_order })
+          .eq('id', id)
+          .eq('user_id', user.id)
+      )
+    )
+    const failed = results.find((result) => result.error)
+    if (failed?.error) {
+      await fetch()
+      return { error: failed.error.message }
+    }
+    return { error: null }
+  }
+
+  return { categories, loading, error, refetch: fetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder }
 }

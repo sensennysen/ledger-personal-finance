@@ -15,10 +15,10 @@ export interface TransactionRule {
   category?: Category
 }
 
-export function useTransactionRules() {
+export function useTransactionRules(enabled = false) {
   const { user } = useAuth()
   const [rules, setRules] = useState<TransactionRule[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(enabled)
 
   const fetchRules = useCallback(async () => {
     if (!user) {
@@ -26,6 +26,12 @@ export function useTransactionRules() {
       setLoading(false)
       return
     }
+
+    if (!enabled) {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     const { data } = await supabase
       .from('transaction_rules')
@@ -35,13 +41,18 @@ export function useTransactionRules() {
       .order('created_at', { ascending: true })
     setRules((data as TransactionRule[]) ?? [])
     setLoading(false)
-  }, [user])
+  }, [enabled, user])
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false)
+      return
+    }
+
     queueMicrotask(() => {
       void fetchRules()
     })
-  }, [fetchRules])
+  }, [enabled, fetchRules])
 
   const createRule = useCallback(
     async (values: { keyword: string; category_id: string | null; type_hint: TransactionRule['type_hint']; priority?: number }) => {

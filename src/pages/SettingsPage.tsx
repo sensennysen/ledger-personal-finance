@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -20,6 +20,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { ColorPicker } from '@/components/ui/color-picker'
 import {
   AlertDialog,
@@ -38,6 +40,30 @@ const profileSchema = z.object({
 
 type ProfileValues = z.infer<typeof profileSchema>
 
+const NUMBER_LOCALE_LABELS: Record<NumberLocale, string> = {
+  'en-US': 'English (United States): 1,234.56',
+  'de-DE': 'German (Germany): 1.234,56',
+  'fr-FR': 'French (France): 1 234,56',
+  'ja-JP': 'Japanese (Japan): 1,234.56',
+  'zh-CN': 'Chinese (China): 1,234.56',
+}
+
+const DATE_FORMAT_LABELS: Record<DateFormat, string> = {
+  MDY: 'Month/Day/Year (MM/DD/YYYY)',
+  DMY: 'Day/Month/Year (DD/MM/YYYY)',
+  YMD: 'Year-Month-Day (YYYY-MM-DD)',
+}
+
+const TRANSACTION_VIEW_LABELS: Record<Preferences['txView'], string> = {
+  grouped: 'Grouped by Date',
+  flat: 'Flat List',
+}
+
+const ACCOUNT_VIEW_LABELS: Record<Preferences['accView'], string> = {
+  grouped: 'Grouped by Type',
+  flat: 'Flat Grid',
+}
+
 export default function SettingsPage() {
   const { user, profile, signOut, deleteAccount, refreshProfile } = useAuth()
   const { theme, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
@@ -54,6 +80,26 @@ export default function SettingsPage() {
     }
     return Notification.permission
   })
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setNotificationPermission('unsupported')
+      return
+    }
+
+    const syncNotificationPermission = () => {
+      setNotificationPermission(Notification.permission)
+    }
+
+    syncNotificationPermission()
+    window.addEventListener('focus', syncNotificationPermission)
+    document.addEventListener('visibilitychange', syncNotificationPermission)
+
+    return () => {
+      window.removeEventListener('focus', syncNotificationPermission)
+      document.removeEventListener('visibilitychange', syncNotificationPermission)
+    }
+  }, [])
 
   const handleDeleteAccount = async () => {
     setDeleting(true)
@@ -97,6 +143,24 @@ export default function SettingsPage() {
     if (!('Notification' in window)) return
     const result = await Notification.requestPermission()
     setNotificationPermission(result)
+  }
+
+  const handleNotificationToggle = async (checked: boolean) => {
+    if (!checked) {
+      setPref('creditCardNotificationsEnabled', false)
+      return
+    }
+
+    if (notificationPermission === 'unsupported') return
+
+    if (notificationPermission === 'granted') {
+      setPref('creditCardNotificationsEnabled', true)
+      return
+    }
+
+    const result = await Notification.requestPermission()
+    setNotificationPermission(result)
+    setPref('creditCardNotificationsEnabled', result === 'granted')
   }
 
   return (
@@ -148,7 +212,7 @@ export default function SettingsPage() {
                       <SelectContent>
                         {CURRENCIES.map((c) => (
                           <SelectItem key={c.code} value={c.code}>
-                            {c.symbol} {c.code} — {c.name}
+                            {c.symbol} {c.code} â€” {c.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -252,46 +316,54 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Number Format</label>
+              <Label htmlFor="preferences-number-format">Number Format</Label>
               <Select value={prefs.numberLocale} onValueChange={(value) => setPref('numberLocale', value as NumberLocale)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="preferences-number-format">
+                  <SelectValue>{(value: string | null) => value ? NUMBER_LOCALE_LABELS[value as NumberLocale] : 'Select number format'}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="en-US">1,234.56 (English - US)</SelectItem>
-                  <SelectItem value="de-DE">1.234,56 (German)</SelectItem>
-                  <SelectItem value="fr-FR">1 234,56 (French)</SelectItem>
-                  <SelectItem value="ja-JP">1,234.56 (Japanese)</SelectItem>
-                  <SelectItem value="zh-CN">1,234.56 (Chinese)</SelectItem>
+                  <SelectItem value="en-US">{NUMBER_LOCALE_LABELS['en-US']}</SelectItem>
+                  <SelectItem value="de-DE">{NUMBER_LOCALE_LABELS['de-DE']}</SelectItem>
+                  <SelectItem value="fr-FR">{NUMBER_LOCALE_LABELS['fr-FR']}</SelectItem>
+                  <SelectItem value="ja-JP">{NUMBER_LOCALE_LABELS['ja-JP']}</SelectItem>
+                  <SelectItem value="zh-CN">{NUMBER_LOCALE_LABELS['zh-CN']}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Date Format</label>
+              <Label htmlFor="preferences-date-format">Date Format</Label>
               <Select value={prefs.dateFormat} onValueChange={(value) => setPref('dateFormat', value as DateFormat)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="preferences-date-format">
+                  <SelectValue>{(value: string | null) => value ? DATE_FORMAT_LABELS[value as DateFormat] : 'Select date format'}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MDY">MM/DD/YYYY</SelectItem>
-                  <SelectItem value="DMY">DD/MM/YYYY</SelectItem>
-                  <SelectItem value="YMD">YYYY-MM-DD</SelectItem>
+                  <SelectItem value="MDY">{DATE_FORMAT_LABELS.MDY}</SelectItem>
+                  <SelectItem value="DMY">{DATE_FORMAT_LABELS.DMY}</SelectItem>
+                  <SelectItem value="YMD">{DATE_FORMAT_LABELS.YMD}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Transaction View</label>
+              <Label htmlFor="preferences-transaction-view">Transaction View</Label>
               <Select value={prefs.txView} onValueChange={(value) => setPref('txView', value as Preferences['txView'])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="preferences-transaction-view">
+                  <SelectValue>{(value: string | null) => value ? TRANSACTION_VIEW_LABELS[value as Preferences['txView']] : 'Select transaction view'}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="grouped">Grouped by date</SelectItem>
-                  <SelectItem value="flat">Flat list</SelectItem>
+                  <SelectItem value="grouped">{TRANSACTION_VIEW_LABELS.grouped}</SelectItem>
+                  <SelectItem value="flat">{TRANSACTION_VIEW_LABELS.flat}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Account View</label>
+              <Label htmlFor="preferences-account-view">Account View</Label>
               <Select value={prefs.accView} onValueChange={(value) => setPref('accView', value as Preferences['accView'])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="preferences-account-view">
+                  <SelectValue>{(value: string | null) => value ? ACCOUNT_VIEW_LABELS[value as Preferences['accView']] : 'Select account view'}</SelectValue>
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="grouped">Grouped by type</SelectItem>
-                  <SelectItem value="flat">Flat grid</SelectItem>
+                  <SelectItem value="grouped">{ACCOUNT_VIEW_LABELS.grouped}</SelectItem>
+                  <SelectItem value="flat">{ACCOUNT_VIEW_LABELS.flat}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -300,11 +372,12 @@ export default function SettingsPage() {
           <Separator />
 
           <div className="space-y-1.5">
-            <label className="text-sm font-medium flex items-center gap-2">
+            <Label htmlFor="preferences-large-transaction-threshold">
               <AlertTriangle className="w-4 h-4 text-amber-500" /> Large Transaction Alert Threshold
-            </label>
+            </Label>
             <div className="flex items-center gap-2">
               <Input
+                id="preferences-large-transaction-threshold"
                 type="number"
                 min={0}
                 step={10}
@@ -325,19 +398,37 @@ export default function SettingsPage() {
           <CardDescription>Enable mobile/browser reminders for credit card statement and due dates</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Credit card reminders</p>
+              <p className="text-xs text-muted-foreground">
+                Receive alerts for statement day and payment due dates.
+              </p>
+            </div>
+            <Switch
+              aria-label="Toggle credit card reminder notifications"
+              checked={prefs.creditCardNotificationsEnabled && notificationPermission === 'granted'}
+              disabled={notificationPermission === 'unsupported'}
+              onCheckedChange={(checked) => {
+                void handleNotificationToggle(checked)
+              }}
+            />
+          </div>
           <p className="text-sm text-muted-foreground">
             Status:{' '}
             <span className="font-medium text-foreground">
               {notificationPermission === 'unsupported'
                 ? 'Not supported on this browser'
                 : notificationPermission === 'granted'
-                  ? 'Enabled'
+                  ? prefs.creditCardNotificationsEnabled
+                    ? 'Enabled'
+                    : 'Available but turned off'
                   : notificationPermission === 'denied'
                     ? 'Blocked'
                     : 'Not enabled'}
             </span>
           </p>
-          {notificationPermission !== 'granted' && notificationPermission !== 'unsupported' && (
+          {notificationPermission === 'default' && (
             <Button onClick={requestNotificationPermission}>
               Enable Notifications
             </Button>
@@ -347,9 +438,16 @@ export default function SettingsPage() {
               Notifications are blocked. Re-enable them from your browser/site settings.
             </p>
           )}
+          {notificationPermission === 'unsupported' && (
+            <p className="text-xs text-muted-foreground">
+              This browser does not support notifications.
+            </p>
+          )}
           {notificationPermission === 'granted' && (
             <p className="text-xs text-muted-foreground">
-              You’ll receive reminders for statement day and payment due dates for credit card accounts.
+              {prefs.creditCardNotificationsEnabled
+                ? 'You’ll receive reminders for statement day and payment due dates for credit card accounts.'
+                : 'Notification permission is available, but reminders are currently turned off in the app.'}
             </p>
           )}
         </CardContent>
@@ -390,7 +488,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Customization — visible on mobile where BottomNav omits Categories */}
+      {/* Customization â€” visible on mobile where BottomNav omits Categories */}
       <Card className="md:hidden">
         <CardHeader>
           <CardTitle>Customization</CardTitle>
@@ -440,7 +538,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Account / Danger zone — always last to prevent accidental destructive actions */}
+      {/* Account / Danger zone â€” always last to prevent accidental destructive actions */}
       <Card className="border-destructive/30">
         <CardHeader>
           <CardTitle className="text-destructive">Account</CardTitle>
@@ -504,7 +602,7 @@ export default function SettingsPage() {
               disabled={deleteConfirm !== 'DELETE' || deleting}
               onClick={handleDeleteAccount}
             >
-              {deleting ? 'Deleting…' : 'Delete Forever'}
+              {deleting ? 'Deletingâ€¦' : 'Delete Forever'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

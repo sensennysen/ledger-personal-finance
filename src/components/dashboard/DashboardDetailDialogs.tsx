@@ -1,4 +1,5 @@
 import { CORAL, EMERALD } from '@/constants/colors'
+import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { getAccountNetWorthContribution } from '@/lib/creditCards'
 import { formatCurrency } from '@/lib/utils'
 import type { DashboardExpenseCategoryDetail, DashboardStatsSummary } from '@/hooks/useDashboardData'
@@ -114,13 +115,14 @@ export function DashboardDetailDialogs({
             <div className="space-y-2 pr-2">
               {accounts.map((account) => {
                 const contribution = getAccountNetWorthContribution(account)
+                const AccountIcon = ACCOUNT_ICONS[account.type]
                 return (
                   <div key={account.id} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 bg-muted/30">
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 border border-border/50"
                       style={{ backgroundColor: account.color + '22' }}
                     >
-                      {account.icon ?? 'Bank'}
+                      <AccountIcon className="w-4 h-4" style={{ color: account.color }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[0.8125rem] font-medium truncate">{account.name}</p>

@@ -6,6 +6,7 @@ export interface DashboardWidgets {
   stats: boolean
   cashflowChart: boolean
   categoryPie: boolean
+  recentTransactions: boolean
   budgets: boolean
   savingsGoals: boolean
   upcomingBills: boolean
@@ -23,6 +24,7 @@ export const DASHBOARD_WIDGET_LABELS: Record<DashboardWidgetKey, string> = {
   stats: 'Stats Cards',
   cashflowChart: 'Cash Flow Chart',
   categoryPie: 'Category Pie',
+  recentTransactions: 'Recent Transactions',
   budgets: 'Budget Progress',
   savingsGoals: 'Savings Goals',
   upcomingBills: 'Upcoming Bills',
@@ -36,6 +38,7 @@ export const DEFAULT_WIDGET_ORDER: DashboardWidgetKey[] = [
   'creditCards',
   'cashflowChart',
   'categoryPie',
+  'recentTransactions',
   'budgets',
   'upcomingBills',
   'cashflowForecast',
@@ -45,6 +48,7 @@ const DEFAULTS: DashboardWidgets = {
   stats: true,
   cashflowChart: true,
   categoryPie: true,
+  recentTransactions: true,
   budgets: true,
   savingsGoals: true,
   upcomingBills: true,

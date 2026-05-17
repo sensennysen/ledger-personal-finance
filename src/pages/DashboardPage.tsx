@@ -197,8 +197,6 @@ export default function DashboardPage() {
     return { order: 10 + (index === -1 ? DEFAULT_WIDGET_ORDER.length : index) }
   }
 
-  const trailingWidgetOrder = { order: 10 + DEFAULT_WIDGET_ORDER.length }
-
   useEffect(() => {
     const mediaQuery = window.matchMedia('(min-width: 768px)')
     const handleChange = () => {
@@ -399,13 +397,15 @@ export default function DashboardPage() {
           />
         )}
 
-        <DashboardRecentTransactionsCard
-          recentTransactions={recentTx}
-          isCurrentMonth={isCurrentMonth}
-          monthLabel={monthLabel}
-          loading={loading}
-          style={trailingWidgetOrder}
-        />
+        {widgets.recentTransactions && (
+          <DashboardRecentTransactionsCard
+            recentTransactions={recentTx}
+            isCurrentMonth={isCurrentMonth}
+            monthLabel={monthLabel}
+            loading={loading}
+            style={widgetGridStyle('recentTransactions')}
+          />
+        )}
       </div>
 
       <div className="contents">

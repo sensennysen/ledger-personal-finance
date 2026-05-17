@@ -4,14 +4,16 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   Plus, Pencil, Trash2, Target, History, PiggyBank,
-  RefreshCw, CheckCircle2, CalendarDays, ChevronDown, ChevronRight as ChevronR,
+  RefreshCw, CheckCircle2, CalendarDays, ChevronDown, ChevronRight as ChevronR, Smile,
 } from 'lucide-react'
+import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useBudgets } from '@/hooks/useBudgets'
+import { useTransactions } from '@/hooks/useTransactions'
 import { useSavingsGoals, type GoalWithContributions } from '@/hooks/useSavingsGoals'
 import { useCategories } from '@/hooks/useCategories'
 import { CURRENCIES, ACCOUNT_COLORS } from '@/types'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { EMERALD, CORAL } from '@/constants/colors'
 import { BUDGET_WARNING_THRESHOLD, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
@@ -32,6 +34,8 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { ColorPicker } from '@/components/ui/color-picker'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Budget, SavingsGoal } from '@/types'
 
 // --- Budget form ---
@@ -48,6 +52,50 @@ const budgetSchema = z.object({
 })
 
 type BudgetFormValues = z.infer<typeof budgetSchema>
+
+const BUDGET_PERIOD_LABELS: Record<BudgetFormValues['period'], string> = {
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  yearly: 'Yearly',
+}
+
+const getCurrencyLabel = (value: string | null | undefined) => value ?? 'Select currency'
+const DEFAULT_GOAL_ICON = '\u{1F3AF}'
+const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
+
+function localDateStr(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function getBudgetPeriodRange(period: Budget['period']): { start: string; end: string } {
+  const now = new Date()
+
+  if (period === 'weekly') {
+    const dayOfWeek = now.getDay()
+    const monday = new Date(now)
+    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7))
+    monday.setHours(0, 0, 0, 0)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    return { start: localDateStr(monday), end: localDateStr(sunday) }
+  }
+
+  if (period === 'quarterly') {
+    const quarter = Math.floor(now.getMonth() / 3)
+    const start = new Date(now.getFullYear(), quarter * 3, 1)
+    const end = new Date(now.getFullYear(), quarter * 3 + 3, 0)
+    return { start: localDateStr(start), end: localDateStr(end) }
+  }
+
+  if (period === 'yearly') {
+    return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` }
+  }
+
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  return { start: localDateStr(start), end: localDateStr(end) }
+}
 
 function BudgetForm({
   defaultValues,
@@ -140,7 +188,11 @@ function BudgetForm({
               <FormItem>
                 <FormLabel>Currency</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue>{getCurrencyLabel(field.value)}</SelectValue>
+                    </SelectTrigger>
+                  </FormControl>
                   <SelectContent>
                     {CURRENCIES.map((c) => (
                       <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
@@ -158,12 +210,15 @@ function BudgetForm({
             <FormItem>
               <FormLabel>Period</FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue>{BUDGET_PERIOD_LABELS[field.value]}</SelectValue>
+                  </SelectTrigger>
+                </FormControl>
                 <SelectContent>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
+                  {Object.entries(BUDGET_PERIOD_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </FormItem>
@@ -256,6 +311,8 @@ function GoalForm({
   onSubmit: (values: GoalFormValues) => Promise<void>
   onClose: () => void
 }) {
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+
   const form = useForm<GoalFormValues, any, GoalFormValues>({
     resolver: zodResolver(goalSchema) as any,
     defaultValues: {
@@ -265,12 +322,19 @@ function GoalForm({
       currency: DEFAULT_CURRENCY,
       deadline: null,
       color: '#6366f1',
-      icon: '\U0001F3AF',
+      icon: DEFAULT_GOAL_ICON,
       notes: null,
       is_completed: false,
       ...defaultValues,
     },
   })
+
+  React.useEffect(() => {
+    const currentIcon = form.getValues('icon')
+    if (!currentIcon) {
+      form.setValue('icon', DEFAULT_GOAL_ICON, { shouldDirty: false, shouldTouch: false })
+    }
+  }, [form])
 
   return (
     <Form {...form}>
@@ -294,7 +358,38 @@ function GoalForm({
               <FormItem>
                 <FormLabel>Icon</FormLabel>
                 <FormControl>
-                  <Input className="w-16 text-center text-lg" maxLength={2} {...field} />
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-xl">
+                      {field.value || DEFAULT_EMOJI_PLACEHOLDER}
+                    </div>
+                    <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                      <PopoverTrigger render={
+                        <Button type="button" variant="outline" className="h-10 gap-2 px-3">
+                          <Smile className="h-4 w-4" />
+                          Select
+                        </Button>
+                      } />
+                      <PopoverContent
+                        align="end"
+                        sideOffset={8}
+                        className="w-[min(calc(100vw-2rem),20rem)] max-w-[calc(100vw-2rem)] overflow-hidden border-0 p-0 shadow-xl"
+                      >
+                        <EmojiPicker
+                          onEmojiClick={(emoji) => {
+                            field.onChange(emoji.emoji)
+                            setEmojiPickerOpen(false)
+                          }}
+                          emojiStyle={EmojiStyle.NATIVE}
+                          theme={Theme.AUTO}
+                          width="100%"
+                          height={380}
+                          skinTonesDisabled
+                          previewConfig={{ showPreview: false }}
+                          searchPlaceholder="Search emoji..."
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </FormControl>
               </FormItem>
             )}
@@ -332,7 +427,11 @@ function GoalForm({
               <FormItem>
                 <FormLabel>Currency</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue>{getCurrencyLabel(field.value)}</SelectValue>
+                    </SelectTrigger>
+                  </FormControl>
                   <SelectContent>
                     {CURRENCIES.map((c) => (
                       <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
@@ -537,6 +636,122 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
   )
 }
 
+function BudgetTransactionsDialog({
+  budget,
+  transactions,
+  loading,
+  periodRange,
+}: {
+  budget: Budget
+  transactions: ReturnType<typeof useTransactions>['transactions']
+  loading: boolean
+  periodRange: { start: string; end: string }
+}) {
+  const total = transactions.reduce((sum, tx) => {
+    const txAmount = tx.currency === budget.currency
+      ? tx.amount
+      : tx.amount * (tx.exchange_rate ?? 1)
+    return sum + txAmount
+  }, 0)
+  const effective = budget.effective_amount ?? budget.amount
+  const remaining = effective - total
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-muted/30 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {budget.category?.icon} {budget.category?.name ?? 'Budget category'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {formatDate(periodRange.start)} - {formatDate(periodRange.end)}
+            </p>
+          </div>
+          <Badge variant={remaining < 0 ? 'destructive' : 'secondary'} className="shrink-0">
+            {transactions.length} transaction{transactions.length === 1 ? '' : 's'}
+          </Badge>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground">Spent</p>
+            <p className="font-semibold">{formatCurrency(total, budget.currency)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Budget</p>
+            <p className="font-semibold">{formatCurrency(effective, budget.currency)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">{remaining < 0 ? 'Over' : 'Left'}</p>
+            <p className={remaining < 0 ? 'font-semibold text-destructive' : 'font-semibold text-emerald-600 dark:text-emerald-400'}>
+              {formatCurrency(Math.abs(remaining), budget.currency)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14" />)}
+        </div>
+      ) : transactions.length === 0 ? (
+        <div className="rounded-lg border border-dashed px-4 py-8 text-center">
+          <p className="text-sm font-medium">No matching transactions</p>
+          <p className="text-xs text-muted-foreground">
+            Expenses in this category and period will appear here.
+          </p>
+        </div>
+      ) : (
+        <ScrollArea className="max-h-[50vh] pr-3">
+          <div className="space-y-2">
+            {transactions.map((tx) => {
+              const converted = tx.currency === budget.currency
+                ? tx.amount
+                : tx.amount * (tx.exchange_rate ?? 1)
+
+              return (
+                <div key={tx.id} className="rounded-lg border bg-card p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{tx.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(tx.date)}
+                        {tx.account?.name ? ` · ${tx.account.name}` : ''}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-semibold text-destructive">
+                        -{formatCurrency(converted, budget.currency)}
+                      </p>
+                      {tx.currency !== budget.currency && (
+                        <p className="text-xs text-muted-foreground">
+                          {formatCurrency(tx.amount, tx.currency)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {(tx.subcategory || (tx.tags?.length ?? 0) > 0) && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {tx.subcategory && (
+                        <Badge variant="outline" className="text-xs py-0 px-1.5">{tx.subcategory.name}</Badge>
+                      )}
+                      {tx.tags?.map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-[0.625rem] py-0 px-1.5 h-4 text-muted-foreground">
+                          # {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </ScrollArea>
+      )}
+    </div>
+  )
+}
+
 // --- Savings goal card ---
 
 function SavingsGoalCard({
@@ -715,8 +930,22 @@ export default function BudgetsPage() {
   const [editGoal, setEditGoal] = useState<GoalWithContributions | null>(null)
   const [goalFormError, setGoalFormError] = useState<string | null>(null)
   const [contributionGoal, setContributionGoal] = useState<GoalWithContributions | null>(null)
+  const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null)
 
   const defaultCurrency = profile?.default_currency ?? 'USD'
+  const selectedBudgetRange = React.useMemo(
+    () => selectedBudget ? getBudgetPeriodRange(selectedBudget.period) : null,
+    [selectedBudget]
+  )
+  const {
+    transactions: selectedBudgetTransactions,
+    loading: selectedBudgetTransactionsLoading,
+  } = useTransactions({
+    categoryId: selectedBudget?.category_id ?? '__no_budget_selected__',
+    type: 'expense',
+    startDate: selectedBudgetRange?.start,
+    endDate: selectedBudgetRange?.end,
+  })
 
   const handleCreateBudget = async (values: BudgetFormValues) => {
     const { error } = await createBudget({ ...values, is_active: true })
@@ -811,7 +1040,20 @@ export default function BudgetsPage() {
               const hasRollover = budget.rollover_enabled && rollover !== 0
 
               return (
-                <Card key={budget.id} className="animate-fade-up" style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties}>
+                <Card
+                  key={budget.id}
+                  role="button"
+                  tabIndex={0}
+                  className="animate-fade-up cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties}
+                  onClick={() => setSelectedBudget(budget)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setSelectedBudget(budget)
+                    }
+                  }}
+                >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
@@ -819,7 +1061,7 @@ export default function BudgetsPage() {
                         <div>
                           <CardTitle className="text-base">{budget.name}</CardTitle>
                           <div className="flex gap-1 mt-0.5 flex-wrap">
-                            <Badge variant="outline" className="text-xs">{budget.period}</Badge>
+                            <Badge variant="outline" className="text-xs">{BUDGET_PERIOD_LABELS[budget.period]}</Badge>
                             {budget.category && (
                               <Badge variant="secondary" className="text-xs">{budget.category.name}</Badge>
                             )}
@@ -838,11 +1080,26 @@ export default function BudgetsPage() {
                         </div>
                       </div>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditBudget(budget)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setEditBudget(budget)
+                          }}
+                        >
                           <Pencil className="w-3 h-3" />
                         </Button>
                         <AlertDialog>
-                          <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" />}>
+                          <AlertDialogTrigger render={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={(event) => event.stopPropagation()}
+                            />
+                          }>
                             <Trash2 className="w-3 h-3" />
                           </AlertDialogTrigger>
                           <AlertDialogContent>
@@ -906,6 +1163,10 @@ export default function BudgetsPage() {
                       {hasRollover
                         ? `Effective: ${formatCurrency(effective, budget.currency)}`
                         : `Budget: ${formatCurrency(budget.amount, budget.currency)}`}
+                    </p>
+                    <p className="flex items-center justify-end gap-1 text-xs text-primary">
+                      <CalendarDays className="h-3 w-3" />
+                      View covered transactions
                     </p>
                   </CardContent>
                 </Card>
@@ -1003,6 +1264,24 @@ export default function BudgetsPage() {
       </Tabs>
 
       {/* Budget dialogs */}
+      <Dialog open={!!selectedBudget} onOpenChange={(open) => { if (!open) setSelectedBudget(null) }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedBudget?.name ?? 'Budget'} transactions
+            </DialogTitle>
+          </DialogHeader>
+          {selectedBudget && selectedBudgetRange && (
+            <BudgetTransactionsDialog
+              budget={selectedBudget}
+              transactions={selectedBudgetTransactions}
+              loading={selectedBudgetTransactionsLoading}
+              periodRange={selectedBudgetRange}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Budget</DialogTitle></DialogHeader>

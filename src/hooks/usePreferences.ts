@@ -8,6 +8,7 @@ export interface Preferences {
   numberLocale: NumberLocale
   dateFormat: DateFormat
   largeTransactionThreshold: number
+  creditCardNotificationsEnabled: boolean
   txView: 'grouped' | 'flat'
   accView: 'grouped' | 'flat'
   accGroupOrder: AccountType[]
@@ -19,6 +20,7 @@ const DEFAULTS: Preferences = {
   numberLocale: 'en-US',
   dateFormat: 'MDY',
   largeTransactionThreshold: 0,
+  creditCardNotificationsEnabled: false,
   txView: 'grouped',
   accView: 'grouped',
   accGroupOrder: [],

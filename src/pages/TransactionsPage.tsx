@@ -6,7 +6,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { usePreferences } from '@/hooks/usePreferences'
-import { formatDate, formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey } from '@/lib/utils'
+import { formatDate, formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -138,7 +138,7 @@ export default function TransactionsPage() {
     if (!t) return
     setTemplateDefaults({
       ...t.values,
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateString(),
     })
     setCreateOpen(true)
   }

@@ -101,7 +101,7 @@ function CategoryForm({
 }) {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
 
-  const form = useForm<FormValues, any, FormValues>({
+  const form = useForm<FormValues, unknown, FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: '',

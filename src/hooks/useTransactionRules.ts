@@ -45,7 +45,9 @@ export function useTransactionRules(enabled = false) {
 
   useEffect(() => {
     if (!enabled) {
-      setLoading(false)
+      queueMicrotask(() => {
+        setLoading(false)
+      })
       return
     }
 

@@ -1,14 +1,14 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
 import { ACCOUNT_COLORS, ACCOUNT_TYPE_LABELS, CURRENCIES } from '@/types'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -70,7 +70,7 @@ function EditAccountForm({
     },
   })
 
-  const type = form.watch('type')
+  const type = useWatch({ control: form.control, name: 'type' })
 
   return (
     <Form {...form}>
@@ -300,7 +300,7 @@ export default function AccountTransactionsPage() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
+  const [paymentDate, setPaymentDate] = useState(getLocalDateString)
   const [paymentFromAccountId, setPaymentFromAccountId] = useState<string | null>(null)
   const [paymentHistory, setPaymentHistory] = useState<CreditCardPayment[]>([])
   const [paymentsLoading, setPaymentsLoading] = useState(false)

@@ -21,7 +21,7 @@ import { DEFAULT_WIDGET_ORDER, useDashboardPrefs, type DashboardWidgetKey } from
 import { useSpendingAlerts } from '@/hooks/useSpendingAlerts'
 import { usePreferences } from '@/hooks/usePreferences'
 import { useFlipReorder } from '@/hooks/useFlipReorder'
-import { formatCurrency, getCurrencySymbol, getCurrentCycleMonthKey, cn } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol, getCurrentCycleMonthKey, getLocalDateString, cn } from '@/lib/utils'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { EMERALD, CORAL, GOLD } from '@/constants/colors'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -230,7 +230,7 @@ export default function DashboardPage() {
         await updateAccount(creditCard.id, {
           statement_balance: spending,
           statement_paid_amount: 0,
-          statement_balance_locked_at: today.toISOString().split('T')[0],
+          statement_balance_locked_at: getLocalDateString(today),
         })
       }
     }

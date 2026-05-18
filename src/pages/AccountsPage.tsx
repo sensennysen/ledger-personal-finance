@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, Trash2, Wallet, MoreHorizontal, TriangleAlert, GripVertical, ArrowUp, ArrowDown, Check, LayoutList, AlignJustify } from 'lucide-react'
@@ -76,8 +76,8 @@ function AccountForm({
       ...defaultValues,
     },
   })
-  const type = form.watch('type')
-  const watchedBalance = form.watch('balance')
+  const type = useWatch({ control: form.control, name: 'type' })
+  const watchedBalance = useWatch({ control: form.control, name: 'balance' })
   const normalizedWatchedBalance = type === 'credit_card' && Number(watchedBalance) > 0
     ? -Number(watchedBalance)
     : Number(watchedBalance)

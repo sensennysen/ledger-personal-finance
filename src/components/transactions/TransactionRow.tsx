@@ -3,7 +3,8 @@ import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark,
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
 import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,

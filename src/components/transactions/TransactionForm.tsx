@@ -22,6 +22,7 @@ import { TransactionReceiptField } from '@/components/transactions/TransactionRe
 import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { CURRENCIES } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
+import { getLocalDateString } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -46,7 +47,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const { goals } = useSavingsGoals()
   const { matchRule } = useTransactionRules()
   const descriptionSuggestions = useDescriptionSuggestions()
-  const today = new Date().toISOString().split('T')[0]
+  const today = getLocalDateString()
 
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [tagInput, setTagInput] = useState('')

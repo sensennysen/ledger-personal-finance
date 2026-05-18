@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
+import { usePreferences } from '@/hooks/usePreferences'
 import { daysUntilDayOfMonth } from '@/lib/creditCards'
 
 type NotifMemory = Record<string, true>
@@ -48,9 +49,11 @@ async function showPushStyleNotification(title: string, body: string, tag: strin
 export function useCreditCardNotifications() {
   const { user } = useAuth()
   const { accounts } = useAccounts()
+  const { prefs } = usePreferences()
 
   useEffect(() => {
     if (!user) return
+    if (!prefs.creditCardNotificationsEnabled) return
     if (!('Notification' in window)) return
     if (Notification.permission !== 'granted') return
 
@@ -112,5 +115,5 @@ export function useCreditCardNotifications() {
       window.removeEventListener('focus', runCheck)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [user, accounts])
+  }, [user, accounts, prefs.creditCardNotificationsEnabled])
 }

@@ -83,7 +83,6 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      setNotificationPermission('unsupported')
       return
     }
 
@@ -91,7 +90,6 @@ export default function SettingsPage() {
       setNotificationPermission(Notification.permission)
     }
 
-    syncNotificationPermission()
     window.addEventListener('focus', syncNotificationPermission)
     document.addEventListener('visibilitychange', syncNotificationPermission)
 

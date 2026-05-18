@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { usePreferences } from '@/hooks/usePreferences'
 import { daysUntilDayOfMonth } from '@/lib/creditCards'
+import { getLocalDateString } from '@/lib/utils'
 
 type NotifMemory = Record<string, true>
 
@@ -59,7 +60,7 @@ export function useCreditCardNotifications() {
 
     const runCheck = async () => {
       const sentMap = loadSentMap(user.id)
-      const today = new Date().toISOString().split('T')[0]
+      const today = getLocalDateString()
       let changed = false
 
       for (const account of accounts) {

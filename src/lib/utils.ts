@@ -8,11 +8,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /** Format a Date as "YYYY-MM-DD" using the user's LOCAL timezone, not UTC. */
-function localDateStr(date: Date): string {
+export function getLocalDateString(date: Date = new Date()): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+function parseDateOnlyAsLocal(dateString: string): Date {
+  const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return new Date(dateString)
+
+  const [, year, month, day] = match
+  return new Date(Number(year), Number(month) - 1, Number(day))
 }
 
 export function formatCurrency(
@@ -46,7 +54,7 @@ export function getCurrencySymbol(currencyCode: string): string {
 }
 
 export function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  return parseDateOnlyAsLocal(dateString).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -54,7 +62,7 @@ export function formatDate(dateString: string): string {
 }
 
 export function formatDateShort(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  return parseDateOnlyAsLocal(dateString).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
   })
@@ -64,8 +72,8 @@ export function getMonthRange(date: Date = new Date()): { start: string; end: st
   const start = new Date(date.getFullYear(), date.getMonth(), 1)
   const end = new Date(date.getFullYear(), date.getMonth() + 1, 0)
   return {
-    start: localDateStr(start),
-    end: localDateStr(end),
+    start: getLocalDateString(start),
+    end: getLocalDateString(end),
   }
 }
 
@@ -83,8 +91,8 @@ export function getCustomMonthRange(
   // end = one day before the same startDay in the following month
   const end = new Date(year, month, startDay - 1)
   return {
-    start: localDateStr(start),
-    end: localDateStr(end),
+    start: getLocalDateString(start),
+    end: getLocalDateString(end),
   }
 }
 
@@ -114,8 +122,8 @@ export function getLast12Months(): Array<{ label: string; start: string; end: st
     const end = new Date(date.getFullYear(), date.getMonth() + 1, 0)
     months.push({
       label: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-      start: localDateStr(start),
-      end: localDateStr(end),
+      start: getLocalDateString(start),
+      end: getLocalDateString(end),
     })
   }
   return months
@@ -135,8 +143,8 @@ export function getLast8Weeks(): Array<{ label: string; start: string; end: stri
     weekEnd.setDate(weekStart.getDate() + 6)
     weeks.push({
       label: weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      start: localDateStr(weekStart),
-      end: localDateStr(weekEnd),
+      start: getLocalDateString(weekStart),
+      end: getLocalDateString(weekEnd),
     })
   }
   return weeks
@@ -155,8 +163,8 @@ export function getLast8Quarters(): Array<{ label: string; start: string; end: s
     const end = new Date(y, startMonth + 3, 0)
     quarters.push({
       label: `Q${q + 1} '${String(y).slice(2)}`,
-      start: localDateStr(start),
-      end: localDateStr(end),
+      start: getLocalDateString(start),
+      end: getLocalDateString(end),
     })
   }
   return quarters
@@ -172,7 +180,7 @@ export function getCurrentWeekDays(): Array<{ label: string; start: string; end:
   return dayNames.map((label, i) => {
     const day = new Date(monday)
     day.setDate(monday.getDate() + i)
-    const dateStr = localDateStr(day)
+    const dateStr = getLocalDateString(day)
     return { label, start: dateStr, end: dateStr }
   })
 }
@@ -185,7 +193,7 @@ export function getCurrentMonthDays(): Array<{ label: string; start: string; end
   const days = []
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d)
-    const dateStr = localDateStr(date)
+    const dateStr = getLocalDateString(date)
     days.push({ label: String(d), start: dateStr, end: dateStr })
   }
   return days

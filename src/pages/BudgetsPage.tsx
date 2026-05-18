@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
@@ -13,7 +13,7 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useSavingsGoals, type GoalWithContributions } from '@/hooks/useSavingsGoals'
 import { useCategories } from '@/hooks/useCategories'
 import { CURRENCIES, ACCOUNT_COLORS } from '@/types'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
 import { EMERALD, CORAL } from '@/constants/colors'
 import { BUDGET_WARNING_THRESHOLD, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
@@ -51,7 +51,8 @@ const budgetSchema = z.object({
   rollover_enabled: z.boolean().default(false),
 })
 
-type BudgetFormValues = z.infer<typeof budgetSchema>
+type BudgetFormInput = z.input<typeof budgetSchema>
+type BudgetFormValues = z.output<typeof budgetSchema>
 
 const BUDGET_PERIOD_LABELS: Record<BudgetFormValues['period'], string> = {
   weekly: 'Weekly',
@@ -107,10 +108,10 @@ function BudgetForm({
   onClose: () => void
 }) {
   const { categories } = useCategories()
-  const today = new Date().toISOString().split('T')[0]
+  const today = getLocalDateString()
 
-  const form = useForm<BudgetFormValues, any, BudgetFormValues>({
-    resolver: zodResolver(budgetSchema) as any,
+  const form = useForm<BudgetFormInput, unknown, BudgetFormValues>({
+    resolver: zodResolver(budgetSchema),
     defaultValues: {
       name: '',
       category_id: '',
@@ -124,7 +125,7 @@ function BudgetForm({
     },
   })
 
-  const period = form.watch('period')
+  const period = useWatch({ control: form.control, name: 'period' })
 
   return (
     <Form {...form}>
@@ -176,7 +177,17 @@ function BudgetForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Budget Amount</FormLabel>
-                <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                    onChange={(event) => field.onChange(event.target.value)}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -300,7 +311,8 @@ const goalSchema = z.object({
   is_completed: z.boolean().default(false),
 })
 
-type GoalFormValues = z.infer<typeof goalSchema>
+type GoalFormInput = z.input<typeof goalSchema>
+type GoalFormValues = z.output<typeof goalSchema>
 
 function GoalForm({
   defaultValues,
@@ -313,8 +325,8 @@ function GoalForm({
 }) {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
 
-  const form = useForm<GoalFormValues, any, GoalFormValues>({
-    resolver: zodResolver(goalSchema) as any,
+  const form = useForm<GoalFormInput, unknown, GoalFormValues>({
+    resolver: zodResolver(goalSchema),
     defaultValues: {
       name: '',
       target_amount: 0,
@@ -402,7 +414,17 @@ function GoalForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Target Amount</FormLabel>
-                <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                    onChange={(event) => field.onChange(event.target.value)}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -413,7 +435,17 @@ function GoalForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Current Savings</FormLabel>
-                <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                    onChange={(event) => field.onChange(event.target.value)}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -506,7 +538,8 @@ const contributionSchema = z.object({
   amount: z.coerce.number().positive('Amount must be positive'),
 })
 
-type ContributionValues = z.infer<typeof contributionSchema>
+type ContributionInput = z.input<typeof contributionSchema>
+type ContributionValues = z.output<typeof contributionSchema>
 
 function ContributionDialog({
   goal,
@@ -517,8 +550,8 @@ function ContributionDialog({
   onClose: () => void
   onSubmit: (amount: number) => Promise<void>
 }) {
-  const form = useForm<ContributionValues, any, ContributionValues>({
-    resolver: zodResolver(contributionSchema) as any,
+  const form = useForm<ContributionInput, unknown, ContributionValues>({
+    resolver: zodResolver(contributionSchema),
     defaultValues: { amount: 0 },
   })
 
@@ -535,7 +568,18 @@ function ContributionDialog({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Contribution Amount ({goal.currency})</FormLabel>
-              <FormControl><Input type="number" step="0.01" autoFocus {...field} /></FormControl>
+              <FormControl>
+                <Input
+                  type="number"
+                  step="0.01"
+                  autoFocus
+                  name={field.name}
+                  ref={field.ref}
+                  onBlur={field.onBlur}
+                  value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                  onChange={(event) => field.onChange(event.target.value)}
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

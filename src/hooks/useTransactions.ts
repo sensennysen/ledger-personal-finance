@@ -6,6 +6,7 @@ import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { notifyAccountsRefresh } from '@/lib/cacheEvents'
 import { addRecurringIntervalToDateString } from '@/lib/recurringTransactions'
+import { getLocalDateString } from '@/lib/utils'
 import type { Transaction, Account, Category } from '@/types'
 import {
   applyTxDelta,
@@ -267,7 +268,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
 
   const generateDueRecurring = useCallback(async (): Promise<number> => {
     if (!user || !navigator.onLine) return 0
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDateString()
     const { data: allRecurring } = await supabase
       .from('transactions')
       .select('*')

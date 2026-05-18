@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { registerAccountsListener } from '@/lib/cacheEvents'
+import { getLocalDateString } from '@/lib/utils'
 import type { Account } from '@/types'
 
 export function useAccounts() {
@@ -99,7 +100,7 @@ export function useAccounts() {
         currency: account?.currency ?? values.currency ?? DEFAULT_CURRENCY,
         exchange_rate: 1,
         description: BALANCE_ADJUSTMENT_DESCRIPTION,
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
       })
       if (txError) return { error: txError.message }
     }

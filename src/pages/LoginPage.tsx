@@ -14,7 +14,12 @@ export default function LoginPage() {
     params.has('error') && params.has('error_description')
       ? (params.get('error_description') ?? '')
           .replace(/\+/g, ' ')
-          .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // strip control / C1 chars
+          .split('')
+          .filter((char) => {
+            const code = char.charCodeAt(0)
+            return !(code <= 31 || (code >= 127 && code <= 159))
+          })
+          .join('')
           .slice(0, 200)
       : null
 

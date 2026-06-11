@@ -349,7 +349,7 @@ export default function TransactionsPage() {
             <DialogTrigger render={<Button className="gap-2" size="sm" />}>
               <Plus className="w-4 h-4" />Add
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[calc(100dvh-0.75rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
               <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
               {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
               <TransactionForm
@@ -580,7 +580,7 @@ export default function TransactionsPage() {
 
       {/* Edit dialog */}
       <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[calc(100dvh-0.75rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
           {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editingTx && (

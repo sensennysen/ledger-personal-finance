@@ -5,6 +5,7 @@ import type { TransactionFormInput } from '@/components/transactions/transaction
 
 interface TransactionDescriptionFieldProps {
   control: Control<TransactionFormInput>
+  isOptional?: boolean
   descriptionSuggestions: string[]
   showSuggestions: boolean
   setShowSuggestions: (show: boolean) => void
@@ -12,6 +13,7 @@ interface TransactionDescriptionFieldProps {
 
 export function TransactionDescriptionField({
   control,
+  isOptional = false,
   descriptionSuggestions,
   showSuggestions,
   setShowSuggestions,
@@ -35,11 +37,14 @@ export function TransactionDescriptionField({
 
         return (
           <FormItem>
-            <FormLabel>Description</FormLabel>
+            <FormLabel>
+              Description
+              {isOptional ? <span className="font-normal text-muted-foreground"> (optional)</span> : null}
+            </FormLabel>
             <FormControl>
               <div className="relative">
                 <Input
-                  placeholder="e.g. Grocery run"
+                  placeholder={isOptional ? 'e.g. Move money to savings' : 'e.g. Grocery run'}
                   autoComplete="off"
                   {...field}
                   onFocus={() => setShowSuggestions(true)}

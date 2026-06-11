@@ -425,6 +425,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
 
         <TransactionDescriptionField
           control={form.control}
+          isOptional={type === 'transfer'}
           descriptionSuggestions={descriptionSuggestions}
           showSuggestions={showSuggestions}
           setShowSuggestions={setShowSuggestions}

@@ -10,7 +10,7 @@ export const transactionSchema = z.object({
   amount: z.coerce.number().positive('Amount must be positive'),
   currency: z.string().min(1),
   exchange_rate: z.coerce.number().default(1),
-  description: z.string().min(1, 'Description is required'),
+  description: z.string(),
   notes: z.string().nullable(),
   date: z.string().min(1),
   transfer_fee: z.coerce.number().min(0).nullable(),
@@ -21,6 +21,14 @@ export const transactionSchema = z.object({
   tags: z.array(z.string()).default([]),
   goal_id: z.string().nullable().default(null),
 }).superRefine((data, ctx) => {
+  if (data.type !== 'transfer' && data.description.trim().length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Description is required',
+      path: ['description'],
+    })
+  }
+
   if (data.type === 'transfer' && !data.to_account_id) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

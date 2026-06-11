@@ -539,7 +539,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           )}
         </div>
 
-        <div className="sticky bottom-0 -mx-4 -mb-4 flex justify-end gap-2 border-t bg-popover/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-popover/80 sm:static sm:m-0 sm:border-0 sm:bg-transparent sm:p-0">
+        <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-popover/95 px-0 py-3 backdrop-blur supports-backdrop-filter:bg-popover/80 sm:static sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-0">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>

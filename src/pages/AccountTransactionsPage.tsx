@@ -564,7 +564,7 @@ export default function AccountTransactionsPage() {
           <DialogTrigger render={<Button className="gap-2 shrink-0" />}>
             <Plus className="w-4 h-4" />Add
           </DialogTrigger>
-          <DialogContent className="max-h-[calc(100dvh-0.75rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+            <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
             <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
             {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
             <TransactionForm
@@ -768,11 +768,11 @@ export default function AccountTransactionsPage() {
           />
         </div>
         <Tabs value={filterType} onValueChange={setFilterType} className="w-full sm:w-auto">
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="income">Income</TabsTrigger>
-            <TabsTrigger value="expense">Expense</TabsTrigger>
-            <TabsTrigger value="transfer">Transfer</TabsTrigger>
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="all" className="flex-1 sm:flex-none">All</TabsTrigger>
+            <TabsTrigger value="income" className="flex-1 sm:flex-none">Income</TabsTrigger>
+            <TabsTrigger value="expense" className="flex-1 sm:flex-none">Expense</TabsTrigger>
+            <TabsTrigger value="transfer" className="flex-1 sm:flex-none">Transfer</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -816,7 +816,7 @@ export default function AccountTransactionsPage() {
 
       {/* Edit dialog */}
       <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
-        <DialogContent className="max-h-[calc(100dvh-0.75rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
           {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editingTx && (

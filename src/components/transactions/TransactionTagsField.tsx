@@ -41,8 +41,8 @@ export function TransactionTagsField({
             }
           }}
           onBlur={addTag}
-          placeholder={tags.length === 0 ? 'Add tags... Enter or comma to confirm' : ''}
-          className="min-w-[140px] flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          placeholder={tags.length === 0 ? 'Add tags' : ''}
+          className="min-w-0 basis-full bg-transparent text-sm outline-none placeholder:text-muted-foreground sm:min-w-[140px] sm:flex-1 sm:basis-auto"
         />
       </div>
     </div>

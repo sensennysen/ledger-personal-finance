@@ -150,7 +150,7 @@ export default function AppLayout() {
           if (!open) setFormError(null)
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[calc(100dvh-0.75rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader>
             <DialogTitle>Add Transaction</DialogTitle>
           </DialogHeader>

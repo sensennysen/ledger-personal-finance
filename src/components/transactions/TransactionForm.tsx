@@ -52,6 +52,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [autoCatCategoryId, setAutoCatCategoryId] = useState<string | null>(null)
+  const [showMoreDetails, setShowMoreDetails] = useState(false)
 
   const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -88,6 +89,8 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const selectedCategoryId = useWatch({ control: form.control, name: 'category_id' })
   const description = useWatch({ control: form.control, name: 'description' })
   const tags = useWatch({ control: form.control, name: 'tags' }) ?? []
+  const notes = useWatch({ control: form.control, name: 'notes' })
+  const goalId = useWatch({ control: form.control, name: 'goal_id' })
 
   const { subcategories } = useSubcategories(selectedCategoryId)
   const filteredCategories = categories.filter((category) => category.type === type || category.type === 'both')
@@ -157,9 +160,16 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
     await onSubmit({ ...values, receipt_url })
   }
 
+  const hasExtraDetails =
+    Boolean(notes?.trim()) ||
+    tags.length > 0 ||
+    Boolean(goalId) ||
+    isRecurring ||
+    hasReceipt(receiptReference)
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmitWithUpload)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleSubmitWithUpload)} className="space-y-3 sm:space-y-4">
         <FormField
           control={form.control}
           name="type"
@@ -185,7 +195,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           )}
         />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           <FormField
             control={form.control}
             name="account_id"
@@ -352,7 +362,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           />
         )}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <FormField
             control={form.control}
             name="amount"
@@ -423,87 +433,113 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           />
         )}
 
-        <TransactionDescriptionField
-          control={form.control}
-          isOptional={type === 'transfer'}
-          descriptionSuggestions={descriptionSuggestions}
-          showSuggestions={showSuggestions}
-          setShowSuggestions={setShowSuggestions}
-        />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_10.5rem] sm:items-start sm:gap-4">
+          <TransactionDescriptionField
+            control={form.control}
+            isOptional={type === 'transfer'}
+            descriptionSuggestions={descriptionSuggestions}
+            showSuggestions={showSuggestions}
+            setShowSuggestions={setShowSuggestions}
+          />
 
-        <FormField
-          control={form.control}
-          name="date"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Date</FormLabel>
-              <FormControl>
-                <Input type="date" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
+          <FormField
+            control={form.control}
+            name="date"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Date</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="rounded-lg border border-border/70 bg-muted/20">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+            onClick={() => setShowMoreDetails((value) => !value)}
+            aria-expanded={showMoreDetails}
+          >
+            <div>
+              <p className="text-sm font-medium leading-none">More details</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Notes, tags, goals, recurring settings, and receipt
+                {hasExtraDetails ? ' included' : ' optional'}
+              </p>
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">
+              {showMoreDetails ? 'Hide' : hasExtraDetails ? 'Review' : 'Add'}
+            </span>
+          </button>
+
+          {showMoreDetails && (
+            <div className="space-y-3 border-t border-border/70 px-3 py-3 sm:space-y-4">
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        value={field.value ?? ''}
+                        onChange={(event) => field.onChange(event.target.value || null)}
+                        rows={2}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <TransactionTagsField
+                tags={tags}
+                tagInput={tagInput}
+                setTagInput={setTagInput}
+                addTag={addTag}
+                removeTag={removeTag}
+              />
+
+              {type !== 'transfer' && goals.length > 0 && (
+                <TransactionGoalField control={form.control} goals={goals} />
+              )}
+
+              <FormField
+                control={form.control}
+                name="is_recurring"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <FormLabel className="text-sm font-medium">Recurring transaction</FormLabel>
+                      <p className="text-xs text-muted-foreground">Repeat this transaction automatically</p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {isRecurring && <TransactionRecurringFields control={form.control} />}
+
+              <TransactionReceiptField
+                fileInputRef={fileInputRef}
+                previewUrl={previewUrl}
+                uploadError={uploadError}
+                receiptReference={receiptReference}
+                hasReceipt={hasReceipt}
+                handleFileChange={handleFileChange}
+                clearReceipt={clearReceipt}
+                onReceiptRemove={() => form.setValue('receipt_url', null)}
+              />
+            </div>
           )}
-        />
+        </div>
 
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes (optional)</FormLabel>
-              <FormControl>
-                <Textarea
-                  value={field.value ?? ''}
-                  onChange={(event) => field.onChange(event.target.value || null)}
-                  rows={2}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-
-        <TransactionTagsField
-          tags={tags}
-          tagInput={tagInput}
-          setTagInput={setTagInput}
-          addTag={addTag}
-          removeTag={removeTag}
-        />
-
-        {type !== 'transfer' && goals.length > 0 && (
-          <TransactionGoalField control={form.control} goals={goals} />
-        )}
-
-        <FormField
-          control={form.control}
-          name="is_recurring"
-          render={({ field }) => (
-            <FormItem className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <FormLabel className="text-sm font-medium">Recurring transaction</FormLabel>
-                <p className="text-xs text-muted-foreground">Repeat this transaction automatically</p>
-              </div>
-              <FormControl>
-                <Switch checked={field.value} onCheckedChange={field.onChange} />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-
-        {isRecurring && <TransactionRecurringFields control={form.control} />}
-
-        <TransactionReceiptField
-          fileInputRef={fileInputRef}
-          previewUrl={previewUrl}
-          uploadError={uploadError}
-          receiptReference={receiptReference}
-          hasReceipt={hasReceipt}
-          handleFileChange={handleFileChange}
-          clearReceipt={clearReceipt}
-          onReceiptRemove={() => form.setValue('receipt_url', null)}
-        />
-
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="sticky bottom-0 -mx-4 -mb-4 flex justify-end gap-2 border-t bg-popover/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-popover/80 sm:static sm:m-0 sm:border-0 sm:bg-transparent sm:p-0">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>

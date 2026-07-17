@@ -209,6 +209,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                     onValueChange={handleAccountChange}
                     value={field.value}
                     disabled={Boolean(lockedAccountId) && type !== 'transfer'}
+                    modal={false}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -241,7 +242,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                 return (
                   <FormItem>
                     <FormLabel>To Account</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                    <Select onValueChange={field.onChange} value={field.value ?? ''} modal={false}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select account">

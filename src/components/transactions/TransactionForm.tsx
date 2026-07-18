@@ -218,7 +218,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                         </SelectValue>
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent alignItemWithTrigger={false}>
                       {accounts.map((account) => (
                         <SelectItem key={account.id} value={account.id}>
                           {account.name}
@@ -250,7 +250,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                           </SelectValue>
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent alignItemWithTrigger={false}>
                         {accounts
                           .filter((account) => account.id !== selectedAccount)
                           .map((account) => (

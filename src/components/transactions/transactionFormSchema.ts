@@ -36,6 +36,22 @@ export const transactionSchema = z.object({
       path: ['to_account_id'],
     })
   }
+
+  if (data.type !== 'expense' && data.type !== 'transfer' && data.to_account_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Only expenses and transfers can have a destination account',
+      path: ['to_account_id'],
+    })
+  }
+
+  if (data.type === 'expense' && data.to_account_id && !data.category_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Choose an expense category for this loan repayment',
+      path: ['category_id'],
+    })
+  }
 })
 
 export type TransactionFormInput = z.input<typeof transactionSchema>

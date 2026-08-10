@@ -7,6 +7,7 @@
 type Listener = () => void
 
 const accountsListeners = new Set<Listener>()
+const loanPurchasesListeners = new Set<Listener>()
 
 export function registerAccountsListener(cb: Listener): () => void {
   accountsListeners.add(cb)
@@ -15,4 +16,13 @@ export function registerAccountsListener(cb: Listener): () => void {
 
 export function notifyAccountsRefresh(): void {
   accountsListeners.forEach((cb) => cb())
+}
+
+export function registerLoanPurchasesListener(cb: Listener): () => void {
+  loanPurchasesListeners.add(cb)
+  return () => loanPurchasesListeners.delete(cb)
+}
+
+export function notifyLoanPurchasesRefresh(): void {
+  loanPurchasesListeners.forEach((cb) => cb())
 }

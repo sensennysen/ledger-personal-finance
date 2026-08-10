@@ -34,8 +34,9 @@ export function applyTxDelta(accounts: Account[], tx: TxShape): Account[] {
       return { ...account, balance: account.balance + delta }
     }
 
-    if (tx.type === 'transfer' && account.id === tx.to_account_id) {
-      return { ...account, balance: account.balance + tx.amount * (tx.exchange_rate ?? 1) }
+    if ((tx.type === 'transfer' || tx.type === 'expense') && account.id === tx.to_account_id) {
+      const destinationAmount = tx.type === 'transfer' ? tx.amount * (tx.exchange_rate ?? 1) : tx.amount
+      return { ...account, balance: account.balance + destinationAmount }
     }
 
     return account
@@ -55,8 +56,9 @@ export function reverseTxDelta(accounts: Account[], tx: TxShape): Account[] {
       return { ...account, balance: account.balance + delta }
     }
 
-    if (tx.type === 'transfer' && account.id === tx.to_account_id) {
-      return { ...account, balance: account.balance - tx.amount * (tx.exchange_rate ?? 1) }
+    if ((tx.type === 'transfer' || tx.type === 'expense') && account.id === tx.to_account_id) {
+      const destinationAmount = tx.type === 'transfer' ? tx.amount * (tx.exchange_rate ?? 1) : tx.amount
+      return { ...account, balance: account.balance - destinationAmount }
     }
 
     return account
@@ -64,7 +66,7 @@ export function reverseTxDelta(accounts: Account[], tx: TxShape): Account[] {
 }
 
 export function txMatchesFilters(tx: Transaction, filters: TransactionFilters): boolean {
-  if (filters.accountId && tx.account_id !== filters.accountId) return false
+  if (filters.accountId && tx.account_id !== filters.accountId && tx.to_account_id !== filters.accountId) return false
   if (filters.categoryId && tx.category_id !== filters.categoryId) return false
   if (filters.type && tx.type !== filters.type) return false
   if (filters.startDate && tx.date < filters.startDate) return false

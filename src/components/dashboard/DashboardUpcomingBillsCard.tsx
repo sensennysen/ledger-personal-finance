@@ -1,4 +1,4 @@
-import { Bell } from 'lucide-react'
+import { Bell, CircleDollarSign } from 'lucide-react'
 import { CORAL } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { UpcomingBill } from '@/hooks/useDashboardData'
@@ -31,7 +31,7 @@ export function DashboardUpcomingBillsCard({
     <div className="rounded-xl border border-border/60 p-5 bg-card" style={style}>
       <DashboardCardHeader
         title="Upcoming Bills"
-        subtitle={isCurrentMonth ? 'Recurring expenses this cycle' : `Recurring expenses · ${monthLabel}`}
+        subtitle={isCurrentMonth ? 'Bills due this cycle' : `Bills due · ${monthLabel}`}
         icon={<Bell className="w-3.5 h-3.5 text-muted-foreground" />}
       />
       {loading ? (
@@ -40,23 +40,23 @@ export function DashboardUpcomingBillsCard({
         <p className="text-sm text-muted-foreground text-center py-8">No upcoming bills this cycle</p>
       ) : (
         <div className="space-y-0.5">
-          {bills.slice(0, 6).map(({ key, tx, nextDue, daysUntil }) => (
+          {bills.slice(0, 6).map(({ key, source, title, icon, color, amount, currency, detail, nextDue, daysUntil }) => (
             <DashboardTransactionRow
               key={key}
-              icon={tx.category?.icon ?? 'Bill'}
-              iconBackgroundColor={`${tx.category?.color ?? '#6b7280'}22`}
-              title={tx.description}
+              icon={source === 'loan' && !icon ? <CircleDollarSign className="h-4 w-4" /> : icon ?? 'Bill'}
+              iconBackgroundColor={`${color}22`}
+              title={title}
               subtitle={
                 <>
                   {nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  {tx.recurrence_interval && (
-                    <span className="ml-1.5 capitalize opacity-60">· {tx.recurrence_interval}</span>
+                  {detail && (
+                    <span className="ml-1.5 capitalize opacity-60">· {detail.replaceAll('_', ' ')}</span>
                   )}
                 </>
               }
               amount={
                 <span style={{ color: CORAL }}>
-                  -{formatCurrency(tx.amount, tx.currency)}
+                  -{formatCurrency(amount, currency)}
                 </span>
               }
               rightDetail={

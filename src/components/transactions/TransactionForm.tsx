@@ -23,6 +23,7 @@ import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { CURRENCIES } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { getLocalDateString } from '@/lib/utils'
+import { getLoanAmountOwed } from '@/lib/loans'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -91,6 +92,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const tags = useWatch({ control: form.control, name: 'tags' }) ?? []
   const notes = useWatch({ control: form.control, name: 'notes' })
   const goalId = useWatch({ control: form.control, name: 'goal_id' })
+  const loanAccounts = accounts.filter((account) => account.type === 'loan')
 
   const { subcategories } = useSubcategories(selectedCategoryId)
   const filteredCategories = categories.filter((category) => category.type === type || category.type === 'both')
@@ -150,12 +152,27 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
     const selectedAccountRecord = accounts.find((account) => account.id === accountId)
     if (selectedAccountRecord) {
       form.setValue('currency', selectedAccountRecord.currency)
+      const repaymentLoan = accounts.find((account) => account.id === form.getValues('to_account_id'))
+      if (repaymentLoan && repaymentLoan.currency !== selectedAccountRecord.currency) {
+        form.setValue('to_account_id', null)
+      }
     }
 
     form.setValue('account_id', accountId)
   }
 
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
+    const repaymentLoan = loanAccounts.find((account) => account.id === values.to_account_id)
+    if (repaymentLoan) {
+      if (values.account_id === repaymentLoan.id) {
+        form.setError('account_id', { message: 'Choose a different account to repay this loan' })
+        return
+      }
+      if (values.amount > getLoanAmountOwed(repaymentLoan)) {
+        form.setError('amount', { message: 'Payment cannot exceed the outstanding loan amount' })
+        return
+      }
+    }
     const receipt_url = await prepareReceiptForSubmit(values.receipt_url)
     await onSubmit({ ...values, receipt_url })
   }
@@ -179,10 +196,10 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
               <Tabs
                 value={field.value}
                 onValueChange={(value) => {
-                  field.onChange(value)
-                  if (value !== 'transfer') {
+                  if (value !== field.value) {
                     form.setValue('to_account_id', null)
                   }
+                  field.onChange(value)
                 }}
               >
                 <TabsList className="w-full">
@@ -318,12 +335,62 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )
               }}
             />
           )}
         </div>
+
+        {type === 'expense' && loanAccounts.length > 0 && (
+          <FormField
+            control={form.control}
+            name="to_account_id"
+            render={({ field }) => {
+              const selectedLoan = loanAccounts.find((account) => account.id === field.value)
+              return (
+                <FormItem>
+                  <FormLabel>
+                    Repay Loan <span className="font-normal text-muted-foreground">(optional)</span>
+                  </FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      const loanId = value === UNCATEGORIZED_VALUE ? null : value
+                      field.onChange(loanId)
+                      const loan = loanAccounts.find((account) => account.id === loanId)
+                      if (loan && !form.getValues('description').trim()) {
+                        form.setValue('description', `Loan payment - ${loan.name}`)
+                      }
+                    }}
+                    value={field.value ?? UNCATEGORIZED_VALUE}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Not a loan repayment">
+                          {selectedLoan ? selectedLoan.name : 'Not a loan repayment'}
+                        </SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={UNCATEGORIZED_VALUE}>Not a loan repayment</SelectItem>
+                      {loanAccounts
+                        .filter((loan) => {
+                          const source = accounts.find((account) => account.id === selectedAccount)
+                          return loan.id !== selectedAccount && (!source || loan.currency === source.currency)
+                        })
+                        .map((loan) => <SelectItem key={loan.id} value={loan.id}>{loan.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    The payment reduces this expense account and the outstanding loan balance.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )
+            }}
+          />
+        )}
 
         {type !== 'transfer' && subcategories.length > 0 && (
           <FormField

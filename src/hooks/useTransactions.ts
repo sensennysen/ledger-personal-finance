@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
-import { notifyAccountsRefresh } from '@/lib/cacheEvents'
+import { notifyAccountsRefresh, notifyLoanPurchasesRefresh } from '@/lib/cacheEvents'
 import { addRecurringIntervalToDateString } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
 import type { Transaction, Account, Category } from '@/types'
@@ -75,7 +75,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
 
-    if (filters.accountId) query = query.eq('account_id', filters.accountId)
+    if (filters.accountId) query = query.or(`account_id.eq.${filters.accountId},to_account_id.eq.${filters.accountId}`)
     if (filters.categoryId) query = query.eq('category_id', filters.categoryId)
     if (filters.type) query = query.eq('type', filters.type)
     if (filters.startDate) query = query.gte('date', filters.startDate)
@@ -153,7 +153,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').insert({ ...withTransactionDefaults(values), user_id: user.id })
-    if (!error) await fetch()
+    if (!error) {
+      await fetch()
+      notifyLoanPurchasesRefresh()
+    }
     return { error: error?.message ?? null }
   }
 
@@ -174,7 +177,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').update(values).eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) {
+      await fetch()
+      notifyLoanPurchasesRefresh()
+    }
     return { error: error?.message ?? null }
   }
 
@@ -190,7 +196,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) {
+      await fetch()
+      notifyLoanPurchasesRefresh()
+    }
     return { error: error?.message ?? null }
   }
 
@@ -210,7 +219,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       .delete()
       .in('id', ids)
       .eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) {
+      await fetch()
+      notifyLoanPurchasesRefresh()
+    }
     return { error: error?.message ?? null }
   }
 

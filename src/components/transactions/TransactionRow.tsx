@@ -56,7 +56,8 @@ export function TransactionRow({
   const [resolvedReceiptUrl, setResolvedReceiptUrl] = useState<string | null>(null)
   const [receiptLoading, setReceiptLoading] = useState(false)
   const Icon = TRANSACTION_TYPE_ICON[tx.type]
-  const isIncoming = tx.type === 'transfer' && tx.to_account_id === contextAccountId
+  const isIncoming = (tx.type === 'transfer' || tx.type === 'expense') && tx.to_account_id === contextAccountId
+  const isLoanRepayment = tx.type === 'expense' && Boolean(tx.to_account_id)
   const hasReceipt = !!tx.receipt_url && !isPendingReceiptReference(tx.receipt_url)
   const displayedReceiptUrl = receiptOpen ? resolvedReceiptUrl : null
 
@@ -132,7 +133,7 @@ export function TransactionRow({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             {contextAccountId !== undefined ? (
-              tx.type === 'transfer' && (
+              (tx.type === 'transfer' || isLoanRepayment) && (
                 <span className="text-xs text-muted-foreground">
                   {isIncoming
                     ? `← from ${tx.account?.name ?? ''}`
@@ -144,7 +145,7 @@ export function TransactionRow({
                 {tx.account && (
                   <span className="text-xs text-muted-foreground">{tx.account.name}</span>
                 )}
-                {tx.type === 'transfer' && tx.to_account && (
+                {(tx.type === 'transfer' || isLoanRepayment) && tx.to_account && (
                   <span className="text-xs text-muted-foreground">→ {tx.to_account.name}</span>
                 )}
               </>
@@ -207,7 +208,7 @@ export function TransactionRow({
 
         {/* Split — always reserves space when onSplit is provided */}
         {onSplit && (
-          tx.type !== 'transfer' ? (
+          tx.type !== 'transfer' && !isLoanRepayment ? (
             <Button
               variant="ghost"
               size="icon"
@@ -255,7 +256,7 @@ export function TransactionRow({
               <Pencil className="w-4 h-4" />
               Edit
             </DropdownMenuItem>
-            {onSplit && tx.type !== 'transfer' && (
+            {onSplit && tx.type !== 'transfer' && !isLoanRepayment && (
               <DropdownMenuItem onClick={() => onSplit(tx)}>
                 <Scissors className="w-4 h-4" />
                 Split

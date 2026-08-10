@@ -29,6 +29,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
 import { daysUntilDayOfMonth, getBalanceSummary, getCreditCardSpending, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
+import { formatLoanSchedule, getLoanAmountOwed, LOAN_PAY_PERIOD_LABELS, WEEKDAY_LABELS } from '@/lib/loans'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(50),
@@ -41,7 +42,24 @@ const schema = z.object({
   due_day: z.coerce.number().int().min(1).max(31).nullable(),
   utilization_target_pct: z.coerce.number().min(1).max(100).nullable(),
   payment_reminder_days: z.coerce.number().int().min(0).max(30).nullable(),
+  loan_pay_period: z.enum(['monthly', 'twice_monthly', 'weekly', 'daily', 'quarterly', 'bi_yearly', 'yearly']).nullable(),
+  loan_due_days: z.array(z.number().int().min(1).max(31)).nullable(),
+  loan_due_weekday: z.number().int().min(0).max(6).nullable(),
   notes: z.string().nullable(),
+}).superRefine((data, ctx) => {
+  if (data.type !== 'loan') return
+  if (data.loan_pay_period === 'twice_monthly' && data.loan_due_days?.length !== 2) {
+    ctx.addIssue({ code: 'custom', message: 'Enter both monthly due days', path: ['loan_due_days'] })
+  }
+  if (data.loan_pay_period === 'twice_monthly' && data.loan_due_days?.[0] === data.loan_due_days?.[1]) {
+    ctx.addIssue({ code: 'custom', message: 'Choose two different due days', path: ['loan_due_days'] })
+  }
+  if (data.loan_pay_period === 'weekly' && data.loan_due_weekday == null) {
+    ctx.addIssue({ code: 'custom', message: 'Select a due weekday', path: ['loan_due_weekday'] })
+  }
+  if (data.loan_pay_period && !['daily', 'weekly', 'twice_monthly'].includes(data.loan_pay_period) && !data.loan_due_days?.[0]) {
+    ctx.addIssue({ code: 'custom', message: 'Enter a due day', path: ['loan_due_days'] })
+  }
 })
 
 type FormValues = z.output<typeof schema>
@@ -72,13 +90,17 @@ function AccountForm({
       due_day: null,
       utilization_target_pct: 30,
       payment_reminder_days: 3,
+      loan_pay_period: null,
+      loan_due_days: null,
+      loan_due_weekday: null,
       notes: null,
       ...defaultValues,
     },
   })
   const type = useWatch({ control: form.control, name: 'type' })
+  const loanPayPeriod = useWatch({ control: form.control, name: 'loan_pay_period' })
   const watchedBalance = useWatch({ control: form.control, name: 'balance' })
-  const normalizedWatchedBalance = type === 'credit_card' && Number(watchedBalance) > 0
+  const normalizedWatchedBalance = (type === 'credit_card' || type === 'loan') && Number(watchedBalance) > 0
     ? -Number(watchedBalance)
     : Number(watchedBalance)
   const balanceChanged = originalBalance !== undefined && normalizedWatchedBalance !== originalBalance
@@ -91,8 +113,8 @@ function AccountForm({
           name="name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Account Name</FormLabel>
-              <FormControl><Input placeholder="e.g. My Savings" {...field} /></FormControl>
+              <FormLabel>{type === 'loan' ? 'Loan Name' : 'Account Name'}</FormLabel>
+              <FormControl><Input placeholder={type === 'loan' ? 'e.g. Home loan' : 'e.g. My Savings'} {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -140,7 +162,7 @@ function AccountForm({
           name="balance"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</FormLabel>
+              <FormLabel>{type === 'loan' ? 'Loan Amount' : type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</FormLabel>
               <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
               <FormMessage />
               {balanceChanged && (
@@ -151,9 +173,11 @@ function AccountForm({
                   </span>
                 </div>
               )}
-              {type === 'credit_card' && (
+              {(type === 'credit_card' || type === 'loan') && (
                 <p className="text-xs text-muted-foreground">
-                  Enter the amount owed. It will reduce net worth instead of increasing total assets.
+                  {type === 'loan'
+                    ? 'Use 0 when you will add financed purchases separately. Any amount entered here is treated as additional unitemized opening debt.'
+                    : 'Enter the amount owed. It will reduce net worth instead of increasing total assets.'}
                 </p>
               )}
             </FormItem>
@@ -259,6 +283,113 @@ function AccountForm({
                 )}
               />
             </div>
+          </div>
+        )}
+        {type === 'loan' && (
+          <div className="space-y-4 rounded-lg border border-border/60 p-3">
+            <FormField
+              control={form.control}
+              name="loan_pay_period"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Pay Period <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      field.onChange(value === 'no_schedule' ? null : value)
+                      form.setValue('loan_due_days', null)
+                      form.setValue('loan_due_weekday', null)
+                    }}
+                    value={field.value ?? 'no_schedule'}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue>
+                          {field.value ? LOAN_PAY_PERIOD_LABELS[field.value] : 'No shared schedule'}
+                        </SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="no_schedule">No shared schedule</SelectItem>
+                      {Object.entries(LOAN_PAY_PERIOD_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                  {!loanPayPeriod && (
+                    <p className="text-xs text-muted-foreground">Each financed purchase can keep its own first due date and repayment term.</p>
+                  )}
+                </FormItem>
+              )}
+            />
+            {loanPayPeriod === 'weekly' && (
+              <FormField
+                control={form.control}
+                name="loan_due_weekday"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Due</FormLabel>
+                    <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value == null ? '' : String(field.value)}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select weekday">
+                            {field.value == null ? 'Select weekday' : WEEKDAY_LABELS[field.value]}
+                          </SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {WEEKDAY_LABELS.map((day, index) => <SelectItem key={day} value={String(index)}>{day}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {loanPayPeriod === 'twice_monthly' && (
+              <FormField
+                control={form.control}
+                name="loan_due_days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payments Due</FormLabel>
+                    <div className="grid grid-cols-2 gap-4">
+                      {[0, 1].map((index) => (
+                        <Input
+                          key={index}
+                          type="number"
+                          min={1}
+                          max={31}
+                          placeholder={index === 0 ? 'First day' : 'Second day'}
+                          value={field.value?.[index] || ''}
+                          onChange={(event) => {
+                            const next = [...(field.value ?? [])]
+                            next[index] = event.target.value ? Number(event.target.value) : 0
+                            field.onChange(next)
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            {loanPayPeriod && !['daily', 'weekly', 'twice_monthly'].includes(loanPayPeriod) && (
+              <FormField
+                control={form.control}
+                name="loan_due_days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Due Day</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={1} max={31} placeholder="Day of month" value={field.value?.[0] ?? ''} onChange={(event) => field.onChange(event.target.value ? [Number(event.target.value)] : null)} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
           </div>
         )}
         <FormField
@@ -576,7 +707,14 @@ export default function AccountsPage() {
         </CardHeader>
         <CardContent>
           <p className="money text-[1.375rem] font-bold" style={{ color: account.balance < 0 ? 'var(--destructive)' : GOLD }}>
-            {formatCurrency(account.type === 'credit_card' ? getCreditCardSpending(account) : account.balance, account.currency)}
+            {formatCurrency(
+              account.type === 'credit_card'
+                ? getCreditCardSpending(account)
+                : account.type === 'loan'
+                  ? getLoanAmountOwed(account)
+                  : account.balance,
+              account.currency
+            )}
           </p>
           {account.type === 'credit_card' && (
             <div className="space-y-1.5 mt-1">
@@ -587,6 +725,14 @@ export default function AccountsPage() {
                 <p className="text-xs text-muted-foreground">
                   Limit: {formatCurrency(account.credit_limit, account.currency)}
                 </p>
+              )}
+            </div>
+          )}
+          {account.type === 'loan' && (
+            <div className="space-y-1.5 mt-1">
+              <p className="text-xs text-muted-foreground">Outstanding. Subtracted from net worth.</p>
+              {formatLoanSchedule(account) && (
+                <p className="text-xs text-muted-foreground">{formatLoanSchedule(account)}</p>
               )}
             </div>
           )}
@@ -609,7 +755,7 @@ export default function AccountsPage() {
           <DialogTrigger render={<Button className="gap-2" size="sm" />}>
             <Plus className="w-4 h-4" />Add Account
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
             <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
             {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
             <AccountForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} defaultValues={{ currency: defaultCurrency }} />
@@ -749,14 +895,18 @@ export default function AccountsPage() {
 
       {/* Edit dialog */}
       <Dialog open={!!editAccount} onOpenChange={(o) => { if (!o) { setEditAccount(null); setFormError(null) } }}>
-        <DialogContent>
+        <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
           {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editAccount && (
             <AccountForm
               defaultValues={{
                 ...editAccount,
-                balance: editAccount.type === 'credit_card' ? getCreditCardSpending(editAccount) : editAccount.balance,
+                balance: editAccount.type === 'credit_card'
+                  ? getCreditCardSpending(editAccount)
+                  : editAccount.type === 'loan'
+                    ? getLoanAmountOwed(editAccount)
+                    : editAccount.balance,
               }}
               onSubmit={handleEdit}
               onClose={() => setEditAccount(null)}

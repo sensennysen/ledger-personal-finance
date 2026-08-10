@@ -1,8 +1,10 @@
 import type { Account } from '@/types'
+import { getLoanAmountOwed, normalizeLiabilityBalanceForStorage } from '@/lib/loans'
 
 export interface BalanceSummary {
   totalAssets: number
   totalCreditCardDebt: number
+  totalLoanDebt: number
   netWorth: number
 }
 
@@ -22,7 +24,7 @@ export function getCreditCardNetWorthContribution(account: Account): number {
 }
 
 export function getAccountAssetBalance(account: Account): number {
-  if (account.type === 'credit_card') {
+  if (account.type === 'credit_card' || account.type === 'loan') {
     // A positive credit-card balance means an overpayment/statement credit.
     // Debt is tracked separately so it never inflates the asset total.
     return Math.max(0, account.balance)
@@ -31,7 +33,7 @@ export function getAccountAssetBalance(account: Account): number {
 }
 
 export function getAccountNetWorthContribution(account: Account): number {
-  return account.type === 'credit_card'
+  return account.type === 'credit_card' || account.type === 'loan'
     ? getCreditCardNetWorthContribution(account)
     : account.balance
 }
@@ -41,16 +43,16 @@ export function getBalanceSummary(accounts: Account[]): BalanceSummary {
     (summary, account) => {
       summary.totalAssets += getAccountAssetBalance(account)
       summary.totalCreditCardDebt += getCreditCardSpending(account)
+      summary.totalLoanDebt += getLoanAmountOwed(account)
       summary.netWorth += getAccountNetWorthContribution(account)
       return summary
     },
-    { totalAssets: 0, totalCreditCardDebt: 0, netWorth: 0 },
+    { totalAssets: 0, totalCreditCardDebt: 0, totalLoanDebt: 0, netWorth: 0 },
   )
 }
 
 export function normalizeCreditCardBalanceForStorage<T extends { type: string; balance: number }>(values: T): T {
-  if (values.type !== 'credit_card' || values.balance <= 0) return values
-  return { ...values, balance: -values.balance }
+  return normalizeLiabilityBalanceForStorage(values)
 }
 
 export function getCreditCardAvailableCredit(account: Account): number {

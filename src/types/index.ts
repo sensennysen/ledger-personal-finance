@@ -10,6 +10,15 @@ export type AccountType =
 
 export type TransactionType = 'income' | 'expense' | 'transfer'
 
+export type LoanPayPeriod =
+  | 'monthly'
+  | 'twice_monthly'
+  | 'weekly'
+  | 'daily'
+  | 'quarterly'
+  | 'bi_yearly'
+  | 'yearly'
+
 export type RecurrenceInterval =
   | 'daily'
   | 'weekly'
@@ -52,6 +61,9 @@ export interface Account {
   statement_paid_amount?: number | null
   last_payment_amount?: number | null
   last_payment_date?: string | null
+  loan_pay_period?: LoanPayPeriod | null
+  loan_due_days?: number[] | null
+  loan_due_weekday?: number | null
   sort_order?: number
   notes: string | null
   created_at: string
@@ -166,6 +178,38 @@ export interface CreditCardPayment {
   payment_date: string
   notes: string | null
   created_at: string
+}
+
+export interface LoanPurchase {
+  id: string
+  user_id: string
+  account_id: string
+  category_id: string | null
+  name: string
+  principal_amount: number
+  term_months: number
+  monthly_interest_rate: number
+  monthly_installment: number
+  total_payable: number
+  opening_installments_paid: number
+  opening_paid_amount: number
+  first_due_date: string
+  notes: string | null
+  created_at: string
+  updated_at: string
+  paid_amount?: number
+  remaining_balance?: number
+  category?: Category
+}
+
+export interface LoanPaymentAllocation {
+  id: string
+  user_id: string
+  transaction_id: string
+  loan_purchase_id: string
+  amount: number
+  created_at: string
+  transaction?: Pick<Transaction, 'id' | 'date' | 'description'>
 }
 
 export interface DashboardStats {

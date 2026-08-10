@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
+import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useDashboardData, type DashboardChartPeriod } from '@/hooks/useDashboardData'
 import { DEFAULT_WIDGET_ORDER, useDashboardPrefs, type DashboardWidgetKey } from '@/hooks/useDashboardPrefs'
@@ -148,6 +149,7 @@ export default function DashboardPage() {
   const { accounts, loading: accountsLoading, updateAccount } = useAccounts()
   const { transactions, loading: txLoading } = useTransactions()
   const { categories } = useCategories()
+  const { purchases: loanPurchases, allocations: loanAllocations, loading: loansLoading } = useLoanPurchases()
   const { budgets } = useBudgets()
   const { startDay } = useMonthCycle()
   const [chartPeriod, setChartPeriod] = useState<DashboardChartPeriod>('month')
@@ -171,13 +173,15 @@ export default function DashboardPage() {
     accounts,
     categories,
     transactions,
+    loanPurchases,
+    loanAllocations,
     chartPeriod,
     selectedMonth,
     startDay,
   })
 
   const monthLabel = formatMonthLabel(selectedMonth)
-  const loading = accountsLoading || txLoading
+  const loading = accountsLoading || txLoading || loansLoading
   const { widgets, widgetOrder, toggle, moveWidget, reorderWidget } = useDashboardPrefs()
   const { prefs } = usePreferences()
   const alerts = useSpendingAlerts(budgets, transactions, prefs.largeTransactionThreshold)

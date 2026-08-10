@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { ACCOUNT_COLORS, ACCOUNT_TYPE_LABELS, CURRENCIES } from '@/types'
 import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
+import { formatLoanSchedule, getLoanAmountOwed } from '@/lib/loans'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +22,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
+import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -63,7 +65,11 @@ function EditAccountForm({
     resolver: zodResolver(accountSchema) as any,
     defaultValues: {
       ...account,
-      balance: account.type === 'credit_card' ? getCreditCardSpending(account) : account.balance,
+      balance: account.type === 'credit_card'
+        ? getCreditCardSpending(account)
+        : account.type === 'loan'
+          ? getLoanAmountOwed(account)
+          : account.balance,
       currency: account.currency || DEFAULT_CURRENCY,
       utilization_target_pct: account.utilization_target_pct ?? 30,
       payment_reminder_days: account.payment_reminder_days ?? 3,
@@ -129,12 +135,14 @@ function EditAccountForm({
           name="balance"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</FormLabel>
+              <FormLabel>{type === 'loan' ? 'Loan Amount' : type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</FormLabel>
               <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
               <FormMessage />
-              {type === 'credit_card' && (
+              {(type === 'credit_card' || type === 'loan') && (
                 <p className="text-xs text-muted-foreground">
-                  Enter the amount owed. It will reduce net worth instead of increasing total assets.
+                  {type === 'loan'
+                    ? 'Use 0 when financed purchases are tracked below. Any amount here is additional unitemized opening debt.'
+                    : 'Enter the amount owed. It will reduce net worth instead of increasing total assets.'}
                 </p>
               )}
             </FormItem>
@@ -570,8 +578,15 @@ export default function AccountTransactionsPage() {
             <TransactionForm
               onSubmit={handleCreate}
               onClose={() => { setCreateOpen(false); setFormError(null) }}
-              lockedAccountId={accountId}
-              defaultValues={{ account_id: accountId }}
+              lockedAccountId={account?.type === 'loan' ? undefined : accountId}
+              defaultValues={account?.type === 'loan'
+                ? {
+                    type: 'expense',
+                    to_account_id: account.id,
+                    category_id: null,
+                    description: `Loan payment - ${account.name}`,
+                  }
+                : { account_id: accountId }}
             />
           </DialogContent>
         </Dialog>
@@ -584,7 +599,7 @@ export default function AccountTransactionsPage() {
           style={{ background: `linear-gradient(135deg, ${account.color}dd, ${account.color}99)` }}
         >
           <div className="flex items-start justify-between gap-3">
-            <p className="text-sm font-medium opacity-80">{account.type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</p>
+            <p className="text-sm font-medium opacity-80">{account.type === 'loan' ? 'Outstanding Loan' : account.type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</p>
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-black/15 hover:text-white" />}>
                 <MoreHorizontal className="w-4 h-4" />
@@ -598,7 +613,7 @@ export default function AccountTransactionsPage() {
             </DropdownMenu>
           </div>
           <p className="money text-3xl font-bold mt-1">
-            {formatCurrency(account.type === 'credit_card' ? getCreditCardSpending(account) : account.balance, account.currency)}
+            {formatCurrency(account.type === 'credit_card' ? getCreditCardSpending(account) : account.type === 'loan' ? getLoanAmountOwed(account) : account.balance, account.currency)}
           </p>
           <div className="flex gap-4 mt-3 text-sm opacity-90">
             <div>
@@ -739,7 +754,18 @@ export default function AccountTransactionsPage() {
               </div>
             </div>
           )}
+          {account.type === 'loan' && formatLoanSchedule(account) && (
+            <div className="mt-4 rounded-lg bg-black/15 border border-white/20 p-3">
+              <p className="text-xs opacity-70">Repayment schedule</p>
+              <p className="text-sm font-semibold mt-0.5">{formatLoanSchedule(account)}</p>
+              <p className="text-xs opacity-70 mt-1">Loan debt is subtracted from net worth.</p>
+            </div>
+          )}
         </div>
+      )}
+
+      {account?.type === 'loan' && (
+        <LoanPurchaseTracker account={account} onAccountChanged={refetchAccounts} />
       )}
 
       <Dialog open={editAccountOpen} onOpenChange={setEditAccountOpen}>

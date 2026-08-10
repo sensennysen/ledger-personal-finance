@@ -478,7 +478,7 @@ export default function ReportsPage() {
       while (txIdx < allTransactionsSorted.length && allTransactionsSorted[txIdx].date > boundary) {
         const tx = allTransactionsSorted[txIdx]
         if (tx.type === 'income') netWorth -= tx.amount
-        else if (tx.type === 'expense') netWorth += tx.amount
+        else if (tx.type === 'expense' && !tx.to_account_id) netWorth += tx.amount
         else if (tx.type === 'transfer') netWorth += (tx.transfer_fee ?? 0)
         txIdx++
       }

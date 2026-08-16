@@ -15,6 +15,7 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
+  MoreHorizontal,
 } from 'lucide-react'
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useCategories } from '@/hooks/useCategories'
@@ -43,6 +44,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ColorPicker } from '@/components/ui/color-picker'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import type { Category, Subcategory } from '@/types'
 
@@ -669,24 +671,25 @@ export default function CategoriesPage() {
           <p className="text-muted-foreground text-sm">Customize your transaction categories</p>
         </div>
         <div className="flex items-center justify-end gap-2">
-          {categories.length > 1 && (
-            <Button
-              variant={rearrangeMode ? 'secondary' : 'outline'}
-              size="sm"
-              className="gap-2"
-              onClick={() => {
-                setRearrangeMode((current) => !current)
-                setDraggedCategoryId(null)
-                setDropTargetCategoryId(null)
-              }}
-            >
-              {rearrangeMode ? <Check className="w-4 h-4" /> : <GripVertical className="w-4 h-4" />}
-              {rearrangeMode ? 'Done' : 'Rearrange'}
-            </Button>
-          )}
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => setRulesOpen(true)}>
-            <Zap className="w-4 h-4" />Rules
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant={rearrangeMode ? 'secondary' : 'outline'} size="icon-sm" aria-label="Category options" />}>
+              {rearrangeMode ? <Check className="w-4 h-4" /> : <MoreHorizontal className="w-4 h-4" />}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setRulesOpen(true)}>
+                <Zap className="mr-2 h-4 w-4" />Auto-categorization rules
+              </DropdownMenuItem>
+              {categories.length > 1 && (
+                <DropdownMenuItem onClick={() => {
+                  setRearrangeMode((current) => !current)
+                  setDraggedCategoryId(null)
+                  setDropTargetCategoryId(null)
+                }}>
+                  <GripVertical className="mr-2 h-4 w-4" />{rearrangeMode ? 'Finish rearranging' : 'Rearrange categories'}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger render={<Button className="gap-2" size="sm" />}>
               <Plus className="w-4 h-4" />Add Category

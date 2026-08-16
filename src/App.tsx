@@ -40,7 +40,7 @@ const routeMeta: RouteMetaEntry[] = [
   },
   {
     test: (pathname) => pathname === '/transactions',
-    title: 'Transactions',
+    title: 'Activity',
     description: 'Track, search, and manage your income and expenses.',
   },
   {
@@ -218,4 +218,3 @@ export default function App() {
     </BrowserRouter>
   )
 }
-

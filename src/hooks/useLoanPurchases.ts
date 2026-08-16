@@ -21,7 +21,7 @@ export interface CreateLoanPurchaseValues {
 
 export type UpdateLoanPurchaseValues = Omit<CreateLoanPurchaseValues, 'account_id'>
 
-export function useLoanPurchases(accountId?: string) {
+export function useLoanPurchases(accountId?: string, enabled = true) {
   const { user } = useAuth()
   const userId = user?.id
   const [purchases, setPurchases] = useState<LoanPurchase[]>([])
@@ -30,7 +30,7 @@ export function useLoanPurchases(accountId?: string) {
   const [error, setError] = useState<string | null>(null)
 
   const fetch = useCallback(async () => {
-    if (!userId) {
+    if (!userId || !enabled) {
       setPurchases([])
       setAllocations([])
       setLoading(false)
@@ -79,7 +79,7 @@ export function useLoanPurchases(accountId?: string) {
     setAllocations(nextAllocations)
     setError(null)
     setLoading(false)
-  }, [accountId, userId])
+  }, [accountId, enabled, userId])
 
   useEffect(() => {
     queueMicrotask(() => { void fetch() })

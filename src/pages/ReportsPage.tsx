@@ -800,7 +800,7 @@ export default function ReportsPage() {
           loading={loading}
         />
         <StatCard
-          title="Net Balance"
+          title="Net Worth"
           value={formatCurrency(totalBalance, currency)}
           sub={balanceSummary.totalCreditCardDebt > 0
             ? `Assets minus Liabilities`

@@ -25,7 +25,7 @@ export function TransactionGoalField({
             <FormLabel>
               Link to Savings Goal <span className="font-normal text-muted-foreground">(optional)</span>
             </FormLabel>
-            <Select onValueChange={(value) => field.onChange(value === 'none' ? null : value)} value={field.value ?? 'none'}>
+            <Select modal={false} onValueChange={(value) => field.onChange(value === 'none' ? null : value)} value={field.value ?? 'none'}>
               <FormControl>
                 <SelectTrigger>
                   <SelectValue>
@@ -33,7 +33,7 @@ export function TransactionGoalField({
                   </SelectValue>
                 </SelectTrigger>
               </FormControl>
-              <SelectContent>
+              <SelectContent alignItemWithTrigger={false} align="start">
                 <SelectItem value="none">No goal</SelectItem>
                 {goals.map((goal) => (
                   <SelectItem key={goal.id} value={goal.id}>

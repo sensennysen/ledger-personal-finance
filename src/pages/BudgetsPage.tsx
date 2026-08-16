@@ -1054,7 +1054,7 @@ export default function BudgetsPage() {
             <Target className="w-3.5 h-3.5" />Budgets
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-1.5">
-            <History className="w-3.5 h-3.5" />History
+            <History className="w-3.5 h-3.5" />Budget history
           </TabsTrigger>
           <TabsTrigger value="goals" className="gap-1.5">
             <PiggyBank className="w-3.5 h-3.5" />Savings Goals
@@ -1229,7 +1229,7 @@ export default function BudgetsPage() {
                 <History className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <p className="font-medium">No monthly budget history</p>
                 <p className="text-sm text-muted-foreground">
-                  History is tracked for monthly budgets. Create one to get started.
+                  Budget history is tracked for monthly budgets. Create one to get started.
                 </p>
               </CardContent>
             </Card>

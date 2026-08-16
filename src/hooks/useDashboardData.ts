@@ -1,11 +1,8 @@
 import { useMemo } from 'react'
 import {
-  getCurrentMonthDays,
-  getCurrentWeekDays,
   getCurrentCycleMonthKey,
   getCustomMonthRange,
-  getLast5Years,
-  getLast8Quarters,
+  getLocalDateString,
   groupExpensesByCategory,
 } from '@/lib/utils'
 import { addRecurringInterval, computeNextDueDate } from '@/lib/recurringTransactions'
@@ -100,6 +97,72 @@ export type CreditCardWithState = {
 
 function createDateAtLocalMidnight(date: string) {
   return new Date(`${date}T00:00:00`)
+}
+
+function addMonthsToKey(monthKey: string, delta: number) {
+  const [year, month] = monthKey.split('-').map(Number)
+  const value = new Date(year, month - 1 + delta, 1)
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}`
+}
+
+function formatShortDate(date: Date) {
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function getCashFlowPeriods(
+  chartPeriod: DashboardChartPeriod,
+  selectedMonth: string,
+  monthStart: string,
+  monthEnd: string,
+  startDay: number,
+) {
+  if (chartPeriod === 'month') {
+    const periods: Array<{ label: string; start: string; end: string }> = []
+    const cursor = createDateAtLocalMidnight(monthStart)
+    const end = createDateAtLocalMidnight(monthEnd)
+
+    while (cursor <= end) {
+      const date = getLocalDateString(cursor)
+      periods.push({ label: String(cursor.getDate()), start: date, end: date })
+      cursor.setDate(cursor.getDate() + 1)
+    }
+
+    return periods
+  }
+
+  if (chartPeriod === 'week') {
+    const periods: Array<{ label: string; start: string; end: string }> = []
+    const cursor = createDateAtLocalMidnight(monthStart)
+    const cycleEnd = createDateAtLocalMidnight(monthEnd)
+
+    while (cursor <= cycleEnd) {
+      const rangeStart = new Date(cursor)
+      const rangeEnd = new Date(cursor)
+      rangeEnd.setDate(rangeEnd.getDate() + 6)
+      if (rangeEnd > cycleEnd) rangeEnd.setTime(cycleEnd.getTime())
+
+      periods.push({
+        label: `${formatShortDate(rangeStart)}-${rangeEnd.getDate()}`,
+        start: getLocalDateString(rangeStart),
+        end: getLocalDateString(rangeEnd),
+      })
+      cursor.setDate(cursor.getDate() + 7)
+    }
+
+    return periods
+  }
+
+  const monthCount = chartPeriod === 'quarterly' ? 3 : 12
+  return Array.from({ length: monthCount }, (_, index) => {
+    const key = addMonthsToKey(selectedMonth, index - monthCount + 1)
+    const range = getCustomMonthRange(key, startDay)
+    const [year, month] = key.split('-').map(Number)
+    return {
+      label: new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'short' }),
+      start: range.start,
+      end: range.end,
+    }
+  })
 }
 
 function groupLatestRecurringSeries(transactions: Transaction[], predicate: (tx: Transaction) => boolean) {
@@ -344,14 +407,7 @@ export function useDashboardData({
   }, [accounts, monthTransactions])
 
   const cashFlowData = useMemo<DashboardCashFlowPoint[]>(() => {
-    const periods =
-      chartPeriod === 'week'
-        ? getCurrentWeekDays()
-        : chartPeriod === 'month'
-          ? getCurrentMonthDays()
-          : chartPeriod === 'quarterly'
-            ? getLast8Quarters()
-            : getLast5Years()
+    const periods = getCashFlowPeriods(chartPeriod, selectedMonth, monthStart, monthEnd, startDay)
 
     return periods.map(({ label, start, end }) => {
       let income = 0
@@ -369,7 +425,7 @@ export function useDashboardData({
         expenses,
       }
     })
-  }, [transactions, chartPeriod])
+  }, [transactions, chartPeriod, selectedMonth, monthStart, monthEnd, startDay])
 
   const monthIncomeTx = useMemo(
     () => monthTransactionGroups.income,

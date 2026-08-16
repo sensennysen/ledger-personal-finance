@@ -31,6 +31,7 @@ export function TransactionRecurringFields({
           <FormItem>
             <FormLabel>Interval</FormLabel>
             <Select
+              modal={false}
               onValueChange={(value) => field.onChange(value === UNCATEGORIZED_VALUE ? null : value)}
               value={field.value ?? UNCATEGORIZED_VALUE}
             >
@@ -41,7 +42,7 @@ export function TransactionRecurringFields({
                   </SelectValue>
                 </SelectTrigger>
               </FormControl>
-              <SelectContent>
+              <SelectContent alignItemWithTrigger={false} align="start">
                 {RECURRING_INTERVALS.map((interval) => (
                   <SelectItem key={interval} value={interval}>
                     {INTERVAL_LABELS[interval]}

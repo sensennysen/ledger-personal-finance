@@ -28,7 +28,7 @@ export function DashboardUpcomingBillsCard({
   style,
 }: DashboardUpcomingBillsCardProps) {
   return (
-    <div className="rounded-xl border border-border/60 p-5 bg-card" style={style}>
+    <div className="min-w-0 max-w-full rounded-xl border border-border/60 p-5 bg-card" style={style}>
       <DashboardCardHeader
         title="Upcoming Bills"
         subtitle={isCurrentMonth ? 'Bills due this cycle' : `Bills due · ${monthLabel}`}

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Tag, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
+import { ChevronRight, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
@@ -487,25 +487,6 @@ export default function SettingsPage() {
       </Card>
 
       {/* Customization â€” visible on mobile where BottomNav omits Categories */}
-      <Card className="md:hidden">
-        <CardHeader>
-          <CardTitle>Customization</CardTitle>
-          <CardDescription>Manage your transaction categories</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Link
-            to="/categories"
-            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors rounded-b-lg"
-          >
-            <div className="flex items-center gap-3">
-              <Tag className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm font-medium">Categories</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </Link>
-        </CardContent>
-      </Card>
-
       {/* Legal */}
       <Card>
         <CardHeader>

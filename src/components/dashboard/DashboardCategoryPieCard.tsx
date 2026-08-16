@@ -25,9 +25,18 @@ export function DashboardCategoryPieCard({
 }: DashboardCategoryPieCardProps) {
   return (
     <div
-      className="rounded-xl border border-border/60 p-5 bg-card cursor-pointer transition-shadow duration-300 hover:shadow-[0_4px_24px_oklch(0_0_0/25%)]"
+      role="button"
+      tabIndex={0}
+      aria-label={`View expenses by category for ${monthLabel}`}
+      className="rounded-xl border border-border/60 p-5 bg-card cursor-pointer transition-shadow duration-300 hover:shadow-[0_4px_24px_oklch(0_0_0/25%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       style={style}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onClick()
+        }
+      }}
     >
       <DashboardCardHeader
         title="Expenses by Category"

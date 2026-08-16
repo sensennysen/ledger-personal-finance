@@ -38,6 +38,7 @@ import { DashboardUpcomingBillsCard } from '@/components/dashboard/DashboardUpco
 import { DashboardCashFlowForecastCard } from '@/components/dashboard/DashboardCashFlowForecastCard'
 import { getCreditCardSpending } from '@/lib/creditCards'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
+import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 
 function StatCard({
   title,
@@ -67,12 +68,21 @@ function StatCard({
 
   return (
     <div
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `View ${title.toLowerCase()} details` : undefined}
       className={cn(
-        'relative overflow-hidden rounded-xl border border-border/60 p-5 transition-all duration-300 group bg-card hover-lift press-scale',
+        'relative overflow-hidden rounded-xl border border-border/60 p-5 transition-all duration-300 group bg-card hover-lift press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         onClick && 'cursor-pointer select-none',
         className
       )}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault()
+          onClick()
+        }
+      }}
       onMouseEnter={(event) => {
         event.currentTarget.style.boxShadow = '0 4px 24px oklch(0 0 0 / 25%)'
       }}
@@ -243,7 +253,7 @@ export default function DashboardPage() {
   }, [creditCards, updateAccount])
 
   return (
-    <div className="p-4 md:p-6 grid gap-6 lg:grid-cols-2 max-w-7xl mx-auto">
+    <div className="mx-auto grid w-full min-w-0 max-w-7xl gap-6 overflow-x-hidden p-4 md:p-6 lg:grid-cols-2">
       <div className="flex items-start justify-between gap-3 flex-wrap lg:col-span-2">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold leading-tight truncate">
@@ -278,8 +288,42 @@ export default function DashboardPage() {
         style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }}
       />
 
+      <div className="flex items-center gap-2 lg:col-span-2">
+        <div className="flex items-center gap-1 bg-muted/40 rounded-xl px-2 py-1.5 flex-1">
+          <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => setSelectedMonth((month) => addMonths(month, -1))}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-sm font-semibold flex-1 text-center">{monthLabel}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Next month"
+            onClick={() => setSelectedMonth((month) => addMonths(month, 1))}
+            disabled={isCurrentMonth}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+        <TransactionKindMenu
+          onSelect={openAddTransactionModal}
+          trigger={
+            <Button className="hidden md:inline-flex gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0">
+              <Plus className="w-3.5 h-3.5" />
+              Add Transaction
+            </Button>
+          }
+        />
+      </div>
+
+      {(visibleAlerts.length > 0 || widgets.upcomingBills) && (
+        <div className="lg:col-span-2" style={{ order: 1 }}>
+          <h2 className="text-sm font-semibold">Needs attention</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Warnings and commitments for {monthLabel}</p>
+        </div>
+      )}
+
       {visibleAlerts.length > 0 && (
-        <div className="space-y-2 lg:col-span-2">
+        <div className="space-y-2 lg:col-span-2" style={{ order: 2 }}>
           {visibleAlerts.map((alert) => (
             <div
               key={alert.id}
@@ -292,7 +336,11 @@ export default function DashboardPage() {
             >
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span className="flex-1">{alert.message}</span>
-              <button type="button" onClick={() => setDismissedAlerts((state) => new Set([...state, alert.id]))}>
+              <button
+                type="button"
+                aria-label="Dismiss warning"
+                onClick={() => setDismissedAlerts((state) => new Set([...state, alert.id]))}
+              >
                 <X className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
               </button>
             </div>
@@ -300,34 +348,20 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="flex items-center gap-2 lg:col-span-2">
-        <div className="flex items-center gap-1 bg-muted/40 rounded-xl px-2 py-1.5 flex-1">
-          <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((month) => addMonths(month, -1))}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-sm font-semibold flex-1 text-center">{monthLabel}</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSelectedMonth((month) => addMonths(month, 1))}
-            disabled={isCurrentMonth}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-        <Button
-          className="hidden md:inline-flex gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0"
-          onClick={openAddTransactionModal}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add Transaction
-        </Button>
-      </div>
+      {widgets.upcomingBills && (
+        <DashboardUpcomingBillsCard
+          bills={upcomingBills}
+          isCurrentMonth={isCurrentMonth}
+          monthLabel={monthLabel}
+          loading={loading}
+          style={widgetGridStyle('upcomingBills')}
+        />
+      )}
 
       {widgets.stats && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:col-span-2" style={widgetGridStyle('stats')}>
           <StatCard
-            title="Net Balance"
+            title="Net Worth"
             value={formatCurrency(stats.totalBalance, currency)}
             sub="Assets minus Liabilities"
             icon={Wallet}
@@ -385,6 +419,7 @@ export default function DashboardPage() {
           currency={currency}
           currencySymbol={currencySymbol}
           loading={loading}
+          monthLabel={monthLabel}
           style={widgetGridStyle('cashflowChart')}
         />
       )}
@@ -423,16 +458,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="contents">
-        {widgets.upcomingBills && (
-          <DashboardUpcomingBillsCard
-            bills={upcomingBills}
-            isCurrentMonth={isCurrentMonth}
-            monthLabel={monthLabel}
-            loading={loading}
-            style={widgetGridStyle('upcomingBills')}
-          />
-        )}
-
         {widgets.cashflowForecast && (
           <DashboardCashFlowForecastCard
             forecast={cashFlowForecast}

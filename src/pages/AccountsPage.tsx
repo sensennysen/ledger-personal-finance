@@ -587,6 +587,9 @@ export default function AccountsPage() {
     return (
       <Card
         key={account.id}
+        role={flatRearrange ? undefined : 'link'}
+        tabIndex={flatRearrange ? undefined : 0}
+        aria-label={flatRearrange ? undefined : `Open ${account.name}`}
         draggable={isDesktopDrag && flatRearrange}
         onDragStart={() => {
           if (flatRearrange) {
@@ -616,7 +619,7 @@ export default function AccountsPage() {
         }}
         ref={flatRearrange ? setAccountCardRef(account.id) : undefined}
         className={cn(
-          'reorder-motion relative overflow-hidden cursor-pointer hover:shadow-md transition-shadow animate-fade-up hover-lift',
+          'reorder-motion relative overflow-hidden cursor-pointer hover:shadow-md transition-shadow animate-fade-up hover-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           flatRearrange && 'cursor-grab',
           draggedAccountId === account.id && 'is-dragging',
           dropTargetAccountId === account.id && 'is-drop-target'
@@ -624,6 +627,11 @@ export default function AccountsPage() {
         style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties}
         onClick={() => {
           if (!flatRearrange) navigate(`/accounts/${account.id}`)
+        }}
+        onKeyDown={(event) => {
+          if (!flatRearrange && event.target === event.currentTarget && event.key === 'Enter') {
+            navigate(`/accounts/${account.id}`)
+          }
         }}
       >
         <div
@@ -684,7 +692,7 @@ export default function AccountsPage() {
                 <ArrowDown className="w-3 h-3" />
               </Button>
               <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} />}>
+                <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Actions for ${account.name}`} onClick={(e) => e.stopPropagation()} />}>
                   <MoreHorizontal className="w-4 h-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -764,39 +772,37 @@ export default function AccountsPage() {
       </div>
 
       {accounts.length > 0 && (
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => {
-              setPref('accView', prefs.accView === 'grouped' ? 'flat' : 'grouped')
-              setRearrangeMode(false)
-              setDraggedAccountId(null)
-              setDropTargetAccountId(null)
-              setDraggedGroupType(null)
-              setDropTargetGroupType(null)
-            }}
-            title={prefs.accView === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
-          >
-            {prefs.accView === 'grouped' ? <LayoutList className="w-3.5 h-3.5" /> : <AlignJustify className="w-3.5 h-3.5" />}
-            <span>{prefs.accView === 'grouped' ? 'Grouped' : 'Flat'}</span>
-          </Button>
-          <Button
-            variant={rearrangeMode ? 'secondary' : 'outline'}
-            size="sm"
-            className="gap-1.5"
-            onClick={() => {
-              setRearrangeMode((value) => !value)
-              setDraggedAccountId(null)
-              setDropTargetAccountId(null)
-              setDraggedGroupType(null)
-              setDropTargetGroupType(null)
-            }}
-          >
-            {rearrangeMode ? <Check className="w-3.5 h-3.5" /> : <GripVertical className="w-3.5 h-3.5" />}
-            {rearrangeMode ? 'Done' : 'Rearrange'}
-          </Button>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">{prefs.accView === 'grouped' ? 'Grouped by account type' : 'Flat account view'}</p>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant={rearrangeMode ? 'secondary' : 'outline'} size="sm" className="gap-1.5" />}>
+              {rearrangeMode ? <Check className="w-3.5 h-3.5" /> : <MoreHorizontal className="w-3.5 h-3.5" />}
+              {rearrangeMode ? 'Done arranging' : 'View options'}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => {
+                setPref('accView', prefs.accView === 'grouped' ? 'flat' : 'grouped')
+                setRearrangeMode(false)
+                setDraggedAccountId(null)
+                setDropTargetAccountId(null)
+                setDraggedGroupType(null)
+                setDropTargetGroupType(null)
+              }}>
+                {prefs.accView === 'grouped' ? <AlignJustify className="mr-2 h-4 w-4" /> : <LayoutList className="mr-2 h-4 w-4" />}
+                Switch to {prefs.accView === 'grouped' ? 'flat' : 'grouped'} view
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                setRearrangeMode((value) => !value)
+                setDraggedAccountId(null)
+                setDropTargetAccountId(null)
+                setDraggedGroupType(null)
+                setDropTargetGroupType(null)
+              }}>
+                <GripVertical className="mr-2 h-4 w-4" />
+                {rearrangeMode ? 'Finish arranging' : 'Rearrange accounts'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )}
 

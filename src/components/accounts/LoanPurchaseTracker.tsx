@@ -17,11 +17,12 @@ import type { Account, LoanPurchase } from '@/types'
 interface LoanPurchaseTrackerProps {
   account: Account
   onAccountChanged: () => void
+  loanData?: ReturnType<typeof useLoanPurchases>
 }
 
 const DEADLINES_PAGE_SIZE = 4
 
-export function LoanPurchaseTracker({ account, onAccountChanged }: LoanPurchaseTrackerProps) {
+export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: LoanPurchaseTrackerProps) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editPurchase, setEditPurchase] = useState<LoanPurchase | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<LoanPurchase | null>(null)
@@ -29,7 +30,8 @@ export function LoanPurchaseTracker({ account, onAccountChanged }: LoanPurchaseT
   const [deadlinePage, setDeadlinePage] = useState(0)
   const [expandedDeadline, setExpandedDeadline] = useState<string | null>(null)
   const { categories } = useCategories()
-  const { purchases, allocations, deadlines, loading, error, createPurchase, updatePurchase, deletePurchase } = useLoanPurchases(account.id)
+  const internalLoanData = useLoanPurchases(account.id, !loanData)
+  const { purchases, allocations, deadlines, loading, error, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
   const expenseCategories = categories.filter((category) => category.type === 'expense' || category.type === 'both')
   const purchaseById = useMemo(() => new Map(purchases.map((purchase) => [purchase.id, purchase])), [purchases])
   const recentAllocations = useMemo(

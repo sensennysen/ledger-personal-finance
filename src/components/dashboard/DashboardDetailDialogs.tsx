@@ -108,7 +108,7 @@ export function DashboardDetailDialogs({
       <Dialog open={detailView === 'balance'} onOpenChange={(open) => !open && setDetailView(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Net Balance</DialogTitle>
+            <DialogTitle>Net Worth</DialogTitle>
             <p className="text-xs text-muted-foreground">Assets minus liabilities</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">

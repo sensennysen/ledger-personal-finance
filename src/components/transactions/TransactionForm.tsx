@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, Tag, X } from 'lucide-react'
@@ -15,6 +15,8 @@ import {
   type TransactionFormValues,
 } from '@/components/transactions/transactionFormSchema'
 import { TransactionDescriptionField } from '@/components/transactions/TransactionDescriptionField'
+import { AccountCombobox } from '@/components/transactions/AccountCombobox'
+import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionTagsField } from '@/components/transactions/TransactionTagsField'
 import { TransactionGoalField } from '@/components/transactions/TransactionGoalField'
 import { TransactionRecurringFields } from '@/components/transactions/TransactionRecurringFields'
@@ -29,7 +31,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 
 export type { TransactionFormValues } from '@/components/transactions/transactionFormSchema'
@@ -39,9 +40,20 @@ interface TransactionFormProps {
   onSubmit: (values: TransactionFormValues) => Promise<void>
   onClose: () => void
   lockedAccountId?: string
+  lockedLoanAccountId?: string
+  submitLabel?: string
+  entryKind?: TransactionKind
 }
 
-export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccountId }: TransactionFormProps) {
+export function TransactionForm({
+  defaultValues,
+  onSubmit,
+  onClose,
+  lockedAccountId,
+  lockedLoanAccountId,
+  submitLabel = 'Save Transaction',
+  entryKind,
+}: TransactionFormProps) {
   const { user } = useAuth()
   const { accounts } = useAccounts()
   const { categories } = useCategories()
@@ -58,9 +70,9 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
-      type: 'expense',
+      type: entryKind && entryKind !== 'loan-repayment' ? entryKind : 'expense',
       account_id: lockedAccountId ?? accounts[0]?.id ?? '',
-      to_account_id: null,
+      to_account_id: lockedLoanAccountId ?? null,
       category_id: null,
       subcategory_id: null,
       amount: 0,
@@ -87,12 +99,25 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
   const type = useWatch({ control: form.control, name: 'type' })
   const isRecurring = useWatch({ control: form.control, name: 'is_recurring' })
   const selectedAccount = useWatch({ control: form.control, name: 'account_id' })
+  const selectedLoanId = useWatch({ control: form.control, name: 'to_account_id' })
   const selectedCategoryId = useWatch({ control: form.control, name: 'category_id' })
   const description = useWatch({ control: form.control, name: 'description' })
   const tags = useWatch({ control: form.control, name: 'tags' }) ?? []
   const notes = useWatch({ control: form.control, name: 'notes' })
   const goalId = useWatch({ control: form.control, name: 'goal_id' })
-  const loanAccounts = accounts.filter((account) => account.type === 'loan')
+  const loanAccounts = useMemo(() => accounts.filter((account) => account.type === 'loan'), [accounts])
+  const isLoanRepayment =
+    entryKind === 'loan-repayment' ||
+    Boolean(lockedLoanAccountId) ||
+    (defaultValues?.type === 'expense' && Boolean(defaultValues.to_account_id))
+  const selectedLoan = loanAccounts.find((account) => account.id === selectedLoanId)
+  const paymentSourceAccounts = accounts.filter(
+    (account) =>
+      account.type !== 'loan' &&
+      account.type !== 'credit_card' &&
+      account.id !== selectedLoan?.id &&
+      (!selectedLoan || account.currency === selectedLoan.currency)
+  )
 
   const { subcategories } = useSubcategories(selectedCategoryId)
   const filteredCategories = categories.filter((category) => category.type === type || category.type === 'both')
@@ -161,8 +186,43 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
     form.setValue('account_id', accountId)
   }
 
+  const handleLoanChange = useCallback((loanId: string) => {
+    const loan = loanAccounts.find((account) => account.id === loanId)
+    if (!loan) return
+
+    const currentDescription = form.getValues('description').trim()
+    const currentAccountId = form.getValues('account_id')
+    const compatibleSources = accounts.filter(
+      (account) =>
+        account.type !== 'loan' &&
+        account.type !== 'credit_card' &&
+        account.id !== loan.id &&
+        account.currency === loan.currency
+    )
+
+    form.setValue('type', 'expense')
+    form.setValue('to_account_id', loan.id)
+    form.setValue('currency', loan.currency)
+    if (!compatibleSources.some((account) => account.id === currentAccountId)) {
+      form.setValue('account_id', compatibleSources[0]?.id ?? '')
+    }
+    if (!currentDescription || currentDescription.startsWith('Loan payment - ')) {
+      form.setValue('description', `Loan payment - ${loan.name}`)
+    }
+    form.clearErrors(['account_id', 'to_account_id', 'amount'])
+  }, [accounts, form, loanAccounts])
+
+  useEffect(() => {
+    if (!isLoanRepayment || selectedLoanId || loanAccounts.length === 0) return
+    handleLoanChange(loanAccounts[0].id)
+  }, [handleLoanChange, isLoanRepayment, loanAccounts, selectedLoanId])
+
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
     const repaymentLoan = loanAccounts.find((account) => account.id === values.to_account_id)
+    if (isLoanRepayment && !repaymentLoan) {
+      form.setError('to_account_id', { message: 'Choose the loan you are repaying' })
+      return
+    }
     if (repaymentLoan) {
       if (values.account_id === repaymentLoan.id) {
         form.setError('account_id', { message: 'Choose a different account to repay this loan' })
@@ -183,66 +243,54 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
     Boolean(goalId) ||
     isRecurring ||
     hasReceipt(receiptReference)
+  const effectiveSubmitLabel = isLoanRepayment && submitLabel === 'Save Transaction' ? 'Record Payment' : submitLabel
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmitWithUpload)} className="space-y-3 sm:space-y-4">
-        <FormField
-          control={form.control}
-          name="type"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Type</FormLabel>
-              <Tabs
-                value={field.value}
-                onValueChange={(value) => {
-                  if (value !== field.value) {
-                    form.setValue('to_account_id', null)
-                  }
-                  field.onChange(value)
-                }}
-              >
-                <TabsList className="w-full">
-                  <TabsTrigger value="expense" className="flex-1">Expense</TabsTrigger>
-                  <TabsTrigger value="income" className="flex-1">Income</TabsTrigger>
-                  <TabsTrigger value="transfer" className="flex-1">Transfer</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </FormItem>
-          )}
-        />
+        {isLoanRepayment && (
+          <FormField
+            control={form.control}
+            name="to_account_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Loan to repay</FormLabel>
+                <FormControl>
+                  <AccountCombobox
+                    accounts={loanAccounts}
+                    value={field.value}
+                    onValueChange={handleLoanChange}
+                    placeholder="Choose a loan"
+                    searchPlaceholder="Search loans…"
+                    emptyMessage="No loan accounts found."
+                    disabled={Boolean(lockedLoanAccountId)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           <FormField
             control={form.control}
             name="account_id"
             render={({ field }) => {
-              const selectedAccountRecord = accounts.find((account) => account.id === field.value)
-
               return (
                 <FormItem>
-                  <FormLabel>{type === 'transfer' ? 'From Account' : 'Account'}</FormLabel>
-                  <Select
-                    onValueChange={handleAccountChange}
-                    value={field.value}
-                    disabled={Boolean(lockedAccountId) && type !== 'transfer'}
-                    modal={false}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select account">
-                          {selectedAccountRecord ? selectedAccountRecord.name : 'Select account'}
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent alignItemWithTrigger={false}>
-                      {accounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>{type === 'transfer' ? 'From account' : isLoanRepayment ? 'Pay from' : 'Account'}</FormLabel>
+                  <FormControl>
+                    <AccountCombobox
+                      accounts={isLoanRepayment ? paymentSourceAccounts : accounts}
+                      value={field.value}
+                      onValueChange={handleAccountChange}
+                      placeholder={isLoanRepayment ? 'Choose payment account' : 'Select account'}
+                      searchPlaceholder="Search accounts…"
+                      emptyMessage={isLoanRepayment ? 'No compatible accounts found.' : 'No accounts found.'}
+                      disabled={Boolean(lockedAccountId) && type !== 'transfer'}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )
@@ -258,25 +306,16 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
 
                 return (
                   <FormItem>
-                    <FormLabel>To Account</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ''} modal={false}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select account">
-                            {selectedToAccount ? selectedToAccount.name : 'Select account'}
-                          </SelectValue>
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent alignItemWithTrigger={false}>
-                        {accounts
-                          .filter((account) => account.id !== selectedAccount)
-                          .map((account) => (
-                            <SelectItem key={account.id} value={account.id}>
-                              {account.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>To account</FormLabel>
+                    <FormControl>
+                      <AccountCombobox
+                        accounts={accounts.filter((account) => account.id !== selectedAccount)}
+                        value={selectedToAccount?.id ?? field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Select account"
+                        searchPlaceholder="Search destination accounts…"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )
@@ -312,6 +351,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                       )}
                     </FormLabel>
                     <Select
+                      modal={false}
                       onValueChange={(value) => {
                         setAutoCatCategoryId(null)
                         field.onChange(value === UNCATEGORIZED_VALUE ? null : value)
@@ -326,7 +366,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                           </SelectValue>
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent alignItemWithTrigger={false} align="start">
                         <SelectItem value={UNCATEGORIZED_VALUE}>Uncategorized</SelectItem>
                         {filteredCategories.map((category) => (
                           <SelectItem key={category.id} value={category.id}>
@@ -343,55 +383,6 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
           )}
         </div>
 
-        {type === 'expense' && loanAccounts.length > 0 && (
-          <FormField
-            control={form.control}
-            name="to_account_id"
-            render={({ field }) => {
-              const selectedLoan = loanAccounts.find((account) => account.id === field.value)
-              return (
-                <FormItem>
-                  <FormLabel>
-                    Repay Loan <span className="font-normal text-muted-foreground">(optional)</span>
-                  </FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      const loanId = value === UNCATEGORIZED_VALUE ? null : value
-                      field.onChange(loanId)
-                      const loan = loanAccounts.find((account) => account.id === loanId)
-                      if (loan && !form.getValues('description').trim()) {
-                        form.setValue('description', `Loan payment - ${loan.name}`)
-                      }
-                    }}
-                    value={field.value ?? UNCATEGORIZED_VALUE}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Not a loan repayment">
-                          {selectedLoan ? selectedLoan.name : 'Not a loan repayment'}
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value={UNCATEGORIZED_VALUE}>Not a loan repayment</SelectItem>
-                      {loanAccounts
-                        .filter((loan) => {
-                          const source = accounts.find((account) => account.id === selectedAccount)
-                          return loan.id !== selectedAccount && (!source || loan.currency === source.currency)
-                        })
-                        .map((loan) => <SelectItem key={loan.id} value={loan.id}>{loan.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    The payment reduces this expense account and the outstanding loan balance.
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )
-            }}
-          />
-        )}
-
         {type !== 'transfer' && subcategories.length > 0 && (
           <FormField
             control={form.control}
@@ -405,6 +396,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                     Subcategory <span className="font-normal text-muted-foreground">(optional)</span>
                   </FormLabel>
                   <Select
+                    modal={false}
                     onValueChange={(value) => field.onChange(value === UNCATEGORIZED_VALUE ? null : value)}
                     value={field.value ?? UNCATEGORIZED_VALUE}
                   >
@@ -415,7 +407,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
                         </SelectValue>
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent alignItemWithTrigger={false} align="start">
                       <SelectItem value={UNCATEGORIZED_VALUE}>None</SelectItem>
                       {subcategories.map((subcategory) => (
                         <SelectItem key={subcategory.id} value={subcategory.id}>
@@ -459,13 +451,13 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Currency</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select modal={false} onValueChange={field.onChange} value={field.value} disabled={isLoanRepayment}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent>
+                  <SelectContent alignItemWithTrigger={false} align="start">
                     {CURRENCIES.map((currency) => (
                       <SelectItem key={currency.code} value={currency.code}>
                         {currency.code}
@@ -619,7 +611,7 @@ export function TransactionForm({ defaultValues, onSubmit, onClose, lockedAccoun
             ) : form.formState.isSubmitting ? (
               'Saving...'
             ) : (
-              'Save Transaction'
+              effectiveSubmitLabel
             )}
           </Button>
         </div>

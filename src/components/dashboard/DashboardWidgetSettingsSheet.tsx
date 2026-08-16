@@ -36,9 +36,8 @@ export function DashboardWidgetSettingsSheet({
 
   return (
     <Sheet>
-      <SheetTrigger render={<Button variant="outline" size="sm" className="gap-1.5 shrink-0" />}>
+      <SheetTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label="Customize dashboard" title="Customize dashboard" />}>
         <Settings2 className="w-3.5 h-3.5" />
-        <span className="text-[0.8125rem]">Widgets</span>
       </SheetTrigger>
       <SheetContent className="w-[280px] sm:max-w-[280px]">
         <SheetHeader>

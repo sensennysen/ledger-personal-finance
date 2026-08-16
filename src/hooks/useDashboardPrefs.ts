@@ -34,13 +34,13 @@ export const DASHBOARD_WIDGET_LABELS: Record<DashboardWidgetKey, string> = {
 }
 
 export const DEFAULT_WIDGET_ORDER: DashboardWidgetKey[] = [
+  'upcomingBills',
   'stats',
   'creditCards',
+  'budgets',
+  'recentTransactions',
   'cashflowChart',
   'categoryPie',
-  'recentTransactions',
-  'budgets',
-  'upcomingBills',
   'cashflowForecast',
 ]
 

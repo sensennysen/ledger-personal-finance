@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
-import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify } from 'lucide-react'
+import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { useCategories } from '@/hooks/useCategories'
@@ -8,15 +8,18 @@ import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { usePreferences } from '@/hooks/usePreferences'
 import { formatDate, formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
+import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
+import { inferTransactionKind, TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
 import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
@@ -45,10 +48,13 @@ export default function TransactionsPage() {
   const { startDay } = useMonthCycle()
   const [selectedMonth, setSelectedMonth] = useState(() => getCurrentCycleMonthKey(startDay))
   const [createOpen, setCreateOpen] = useState(false)
+  const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const { prefs, set: setPref } = usePreferences()
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [templatesOpen, setTemplatesOpen] = useState(false)
 
   // ── Bulk select ────────────────────────────────────────────
   const [selectMode, setSelectMode] = useState(false)
@@ -128,6 +134,7 @@ export default function TransactionsPage() {
   // ── Keyboard shortcuts ─────────────────────────────────────
   useKeyboardShortcut('n', useCallback(() => {
     setTemplateDefaults(undefined)
+    setTransactionKind('expense')
     setCreateOpen(true)
   }, []))
 
@@ -140,6 +147,7 @@ export default function TransactionsPage() {
       ...t.values,
       date: getLocalDateString(),
     })
+    setTransactionKind(inferTransactionKind(t.values.type, t.values.to_account_id))
     setCreateOpen(true)
   }
 
@@ -320,6 +328,11 @@ export default function TransactionsPage() {
     return { imported: result.imported ?? 0, error: result.error ?? null }
   }
 
+  const activeFilterCount =
+    (filterType !== 'all' ? 1 : 0) +
+    (activeTagFilter ? 1 : 0) +
+    (selectedMonth !== getCurrentCycleMonthKey(startDay) ? 1 : 0)
+
   // ── Render ─────────────────────────────────────────────────
 
   return (
@@ -327,7 +340,7 @@ export default function TransactionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">Transactions</h1>
+          <h1 className="text-2xl font-bold">Activity</h1>
           <span
             className="hidden sm:inline-flex items-center gap-1 text-[0.625rem] text-muted-foreground border border-border rounded px-1.5 py-0.5 select-none"
             title="Keyboard shortcuts: N = new transaction"
@@ -339,20 +352,31 @@ export default function TransactionsPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2"
+            className="hidden gap-2 sm:inline-flex"
             onClick={() => setImportOpen(true)}
           >
             <Upload className="w-3.5 h-3.5" />
             <span>Import</span>
           </Button>
+          <TransactionKindMenu
+            onSelect={(kind) => {
+              setTemplateDefaults(undefined)
+              setFormError(null)
+              setTransactionKind(kind)
+              setCreateOpen(true)
+            }}
+            trigger={
+              <Button className="gap-2" size="sm">
+                <Plus className="w-4 h-4" />Add
+              </Button>
+            }
+          />
           <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
-            <DialogTrigger render={<Button className="gap-2" size="sm" />}>
-              <Plus className="w-4 h-4" />Add
-            </DialogTrigger>
             <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-              <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}</DialogTitle></DialogHeader>
               {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
               <TransactionForm
+                entryKind={transactionKind}
                 defaultValues={templateDefaults}
                 onSubmit={handleCreate}
                 onClose={() => { setCreateOpen(false); setTemplateDefaults(undefined); setFormError(null) }}
@@ -394,7 +418,7 @@ export default function TransactionsPage() {
           </Button>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -404,7 +428,22 @@ export default function TransactionsPage() {
               className="pl-9"
             />
           </div>
-          <Tabs value={filterType} onValueChange={setFilterType} className="w-full sm:w-auto">
+          <Button
+            type="button"
+            variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
+            className="relative shrink-0 gap-1.5 sm:hidden"
+            aria-label={`Filter transactions${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
+            onClick={() => setFiltersOpen(true)}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filter
+            {activeFilterCount > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[0.625rem] text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+          <Tabs value={filterType} onValueChange={setFilterType} className="hidden w-auto sm:block">
             <TabsList className="w-full sm:w-auto">
               <TabsTrigger value="all" className="flex-1 sm:flex-none">All</TabsTrigger>
               <TabsTrigger value="income" className="flex-1 sm:flex-none">Income</TabsTrigger>
@@ -416,7 +455,7 @@ export default function TransactionsPage() {
       )}
 
       {/* Month navigation */}
-      <div className="flex items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2">
+      <div className="hidden items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2 sm:flex">
         <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
           <ChevronLeft className="w-4 h-4" />
         </Button>
@@ -434,15 +473,30 @@ export default function TransactionsPage() {
       {/* Templates strip */}
       {templates.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-            <Bookmark className="w-3 h-3" />Templates
-          </p>
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+            aria-expanded={templatesOpen}
+            onClick={() => setTemplatesOpen((open) => !open)}
+          >
+            <span className="flex items-center gap-1.5"><Bookmark className="w-3 h-3" />Quick add</span>
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${templatesOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {templatesOpen && <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
             {templates.map((tmpl) => (
               <div
                 key={tmpl.id}
-                className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none"
+                role="button"
+                tabIndex={0}
+                aria-label={`Use ${tmpl.name} template`}
+                className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => handleUseTemplate(tmpl.id)}
+                onKeyDown={(event) => {
+                  if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault()
+                    handleUseTemplate(tmpl.id)
+                  }
+                }}
               >
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-medium truncate max-w-30">{tmpl.name}</span>
@@ -461,12 +515,12 @@ export default function TransactionsPage() {
                 </button>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       )}
 
       {/* View controls row */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="hidden items-center justify-between gap-2 sm:flex">
         <Button
           variant="ghost"
           size="sm"
@@ -494,7 +548,7 @@ export default function TransactionsPage() {
 
       {/* Tag filter chips */}
       {allTags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="hidden flex-wrap gap-1.5 sm:flex">
           {allTags.map((tag) => (
             <button
               key={tag}
@@ -520,6 +574,85 @@ export default function TransactionsPage() {
           )}
         </div>
       )}
+
+      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <SheetContent side="bottom" className="max-h-[85dvh] rounded-t-xl">
+          <SheetHeader>
+            <SheetTitle>Activity filters</SheetTitle>
+            <SheetDescription>Choose what appears in the transaction list.</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-5 overflow-y-auto px-4 pb-2">
+            <div className="space-y-2">
+              <Label>Period</Label>
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-2 py-1.5">
+                <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => setSelectedMonth((month) => addMonths(month, -1))}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-sm font-semibold">{formatMonthLabel(selectedMonth)}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Next month"
+                  onClick={() => setSelectedMonth((month) => addMonths(month, 1))}
+                  disabled={selectedMonth >= getCurrentCycleMonthKey(startDay)}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Transaction type</Label>
+              <Tabs value={filterType} onValueChange={setFilterType}>
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="income">Income</TabsTrigger>
+                  <TabsTrigger value="expense">Expense</TabsTrigger>
+                  <TabsTrigger value="transfer">Transfer</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {allTags.length > 0 && (
+              <div className="space-y-2">
+                <Label>Tag</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button size="sm" variant={activeTagFilter === null ? 'secondary' : 'outline'} onClick={() => setActiveTagFilter(null)}>All tags</Button>
+                  {allTags.map((tag) => (
+                    <Button key={tag} size="sm" variant={activeTagFilter === tag ? 'secondary' : 'outline'} onClick={() => setActiveTagFilter(tag)}>
+                      {tag}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>List view</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant={prefs.txView === 'grouped' ? 'secondary' : 'outline'} onClick={() => setPref('txView', 'grouped')}>
+                  <LayoutList /> Grouped
+                </Button>
+                <Button variant={prefs.txView === 'flat' ? 'secondary' : 'outline'} onClick={() => setPref('txView', 'flat')}>
+                  <AlignJustify /> Flat
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 border-t pt-4">
+              <Button variant="outline" onClick={() => { setFiltersOpen(false); setImportOpen(true) }}>
+                <Upload /> Import CSV
+              </Button>
+              <Button variant="outline" onClick={() => { setFiltersOpen(false); toggleSelectMode() }}>
+                <CheckSquare /> Select multiple
+              </Button>
+            </div>
+          </div>
+          <SheetFooter>
+            <Button onClick={() => setFiltersOpen(false)}>Show {filtered.length} transaction{filtered.length === 1 ? '' : 's'}</Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* Transaction list */}
       {loading ? (

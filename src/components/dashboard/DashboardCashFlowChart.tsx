@@ -23,6 +23,7 @@ interface DashboardCashFlowChartProps {
   currency: string
   currencySymbol: string
   loading: boolean
+  monthLabel: string
   style?: React.CSSProperties
 }
 
@@ -33,6 +34,7 @@ export function DashboardCashFlowChart({
   currency,
   currencySymbol,
   loading,
+  monthLabel,
   style,
 }: DashboardCashFlowChartProps) {
   return (
@@ -40,14 +42,14 @@ export function DashboardCashFlowChart({
       <div className="px-5 pt-5 pb-3">
         <DashboardCardHeader
           title="Cash Flow"
-          subtitle="Income vs expenses over time"
+          subtitle={`Income vs expenses ending ${monthLabel}`}
           action={(
             <Tabs value={chartPeriod} onValueChange={(value) => setChartPeriod(value as DashboardChartPeriod)}>
               <TabsList className="h-8 w-full sm:w-auto">
-                <TabsTrigger value="week" className="text-xs flex-1 sm:flex-none px-3">This Week</TabsTrigger>
-                <TabsTrigger value="month" className="text-xs flex-1 sm:flex-none px-3">This Month</TabsTrigger>
-                <TabsTrigger value="quarterly" className="text-xs flex-1 sm:flex-none px-3">Quarterly</TabsTrigger>
-                <TabsTrigger value="yearly" className="text-xs flex-1 sm:flex-none px-3">Yearly</TabsTrigger>
+                <TabsTrigger value="week" className="text-xs flex-1 sm:flex-none px-3">Weekly</TabsTrigger>
+                <TabsTrigger value="month" className="text-xs flex-1 sm:flex-none px-3">Daily</TabsTrigger>
+                <TabsTrigger value="quarterly" className="text-xs flex-1 sm:flex-none px-3">3 months</TabsTrigger>
+                <TabsTrigger value="yearly" className="text-xs flex-1 sm:flex-none px-3">12 months</TabsTrigger>
               </TabsList>
             </Tabs>
           )}

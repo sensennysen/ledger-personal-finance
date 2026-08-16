@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Tag, Target, FileBarChart2, ChevronRight, Sun, Moon } from 'lucide-react'
+import { Tag, Target, FileBarChart2, ChevronRight, Settings } from 'lucide-react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import { OfflineBanner } from './OfflineBanner'
@@ -8,19 +8,18 @@ import { PWAInstallBanner } from './PWAInstallBanner'
 import { useTransactions } from '@/hooks/useTransactions'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
-import { Switch } from '@/components/ui/switch'
-import { useTheme } from '@/contexts/ThemeContext'
+import { TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { cn } from '@/lib/utils'
 import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
 
 export type AppLayoutContext = {
-  openAddTransactionModal: () => void
+  openAddTransactionModal: (kind: TransactionKind) => void
 }
 
 function PageTransition({ context }: { context: AppLayoutContext }) {
   const location = useLocation()
   return (
-    <div key={location.key} className="animate-page-in min-h-full">
+    <div key={location.key} className="animate-page-in min-h-full min-w-0 w-full max-w-full overflow-x-hidden">
       <Outlet context={context} />
     </div>
   )
@@ -29,17 +28,18 @@ function PageTransition({ context }: { context: AppLayoutContext }) {
 export default function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { theme, setTheme } = useTheme()
   const { generateDueRecurring, createTransaction } = useTransactions()
   const hasGenerated = useRef(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [moreMenuPath, setMoreMenuPath] = useState(location.pathname)
   const [formError, setFormError] = useState<string | null>(null)
   const moreMenuVisible = moreMenuOpen && moreMenuPath === location.pathname
-  const openAddTransactionModal = () => {
+  const openAddTransactionModal = (kind: TransactionKind) => {
     setMoreMenuOpen(false)
     setFormError(null)
+    setTransactionKind(kind)
     setCreateOpen(true)
   }
 
@@ -67,12 +67,12 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen w-full max-w-full bg-background overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <PWAInstallBanner />
         <OfflineBanner />
-        <main className="flex-1 overflow-y-auto pb-24 md:pb-0">
+        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-24 md:pb-0">
           <PageTransition context={{ openAddTransactionModal }} />
         </main>
       </div>
@@ -97,8 +97,8 @@ export default function AppLayout() {
             <p className="mb-2 px-1 text-[0.625rem] font-semibold tracking-[0.12em] text-muted-foreground uppercase">More</p>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: 'Categories', sub: 'Manage tags', to: '/categories', icon: Tag, color: 'text-teal-400' },
-                { label: 'Budgets', sub: 'Set limits', to: '/budgets', icon: Target, color: 'text-violet-400' },
+                { label: 'Budgets', sub: 'Plan spending', to: '/budgets', icon: Target, color: 'text-violet-400' },
+                { label: 'Categories', sub: 'Organize spending', to: '/categories', icon: Tag, color: 'text-teal-400' },
                 { label: 'Reports', sub: 'View insights', to: '/reports', icon: FileBarChart2, color: 'text-amber-400' },
               ].map(({ label, sub, to, icon: Icon, color }) => (
                 <button
@@ -118,13 +118,6 @@ export default function AppLayout() {
               ))}
             </div>
             <div className="my-3 h-px bg-border/50" />
-            <div className="flex items-center justify-between rounded-lg px-1.5 py-2">
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <Sun className="h-4 w-4 text-muted-foreground" />
-                Light mode
-              </span>
-              <Switch checked={theme === 'light'} onCheckedChange={(checked) => setTheme(checked ? 'light' : 'dark')} />
-            </div>
             <button
               type="button"
               onClick={() => {
@@ -135,7 +128,7 @@ export default function AppLayout() {
               className="flex w-full items-center justify-between rounded-lg px-1.5 py-2.5 text-left transition-colors hover:bg-white/4"
             >
               <span className="flex items-center gap-2 text-sm font-medium">
-                <Moon className="h-4 w-4 text-muted-foreground" />
+                <Settings className="h-4 w-4 text-muted-foreground" />
                 Settings
               </span>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -152,10 +145,11 @@ export default function AppLayout() {
       >
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader>
-            <DialogTitle>Add Transaction</DialogTitle>
+            <DialogTitle>{TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}</DialogTitle>
           </DialogHeader>
           {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           <TransactionForm
+            entryKind={transactionKind}
             onSubmit={handleCreate}
             onClose={() => {
               setCreateOpen(false)

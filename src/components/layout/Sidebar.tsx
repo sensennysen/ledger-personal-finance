@@ -29,7 +29,7 @@ import {
 const navItems = [
   { to: '/', label: 'Home', icon: LayoutDashboard, exact: true },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
-  { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { to: '/transactions', label: 'Activity', icon: ArrowLeftRight },
   { to: '/categories', label: 'Categories', icon: Tag },
   { to: '/budgets', label: 'Budgets', icon: Target },
   { to: '/reports', label: 'Reports', icon: FileBarChart2 },

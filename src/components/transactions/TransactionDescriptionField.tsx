@@ -1,3 +1,4 @@
+import { useId, useState } from 'react'
 import type { Control } from 'react-hook-form'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,9 @@ export function TransactionDescriptionField({
   showSuggestions,
   setShowSuggestions,
 }: TransactionDescriptionFieldProps) {
+  const listboxId = useId()
+  const [activeIndex, setActiveIndex] = useState(0)
+
   return (
     <FormField
       control={control}
@@ -35,6 +39,11 @@ export function TransactionDescriptionField({
                 .slice(0, 8)
             : []
 
+        const selectSuggestion = (suggestion: string) => {
+          field.onChange(suggestion)
+          setShowSuggestions(false)
+        }
+
         return (
           <FormItem>
             <FormLabel>
@@ -46,21 +55,59 @@ export function TransactionDescriptionField({
                 <Input
                   placeholder={isOptional ? 'e.g. Move money to savings' : 'e.g. Grocery run'}
                   autoComplete="off"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  aria-expanded={showSuggestions && filteredSuggestions.length > 0}
+                  aria-controls={listboxId}
+                  aria-activedescendant={
+                    showSuggestions && filteredSuggestions[activeIndex]
+                      ? `${listboxId}-${activeIndex}`
+                      : undefined
+                  }
                   {...field}
+                  onChange={(event) => {
+                    field.onChange(event)
+                    setActiveIndex(0)
+                  }}
                   onFocus={() => setShowSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  onKeyDown={(event) => {
+                    if (!showSuggestions || filteredSuggestions.length === 0) return
+
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault()
+                      setActiveIndex((index) => (index + 1) % filteredSuggestions.length)
+                    } else if (event.key === 'ArrowUp') {
+                      event.preventDefault()
+                      setActiveIndex((index) => (index - 1 + filteredSuggestions.length) % filteredSuggestions.length)
+                    } else if (event.key === 'Enter') {
+                      event.preventDefault()
+                      selectSuggestion(filteredSuggestions[activeIndex])
+                    } else if (event.key === 'Escape') {
+                      event.preventDefault()
+                      setShowSuggestions(false)
+                    }
+                  }}
                 />
                 {showSuggestions && filteredSuggestions.length > 0 && (
-                  <div className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border bg-popover text-popover-foreground shadow-md">
-                    {filteredSuggestions.map((suggestion) => (
+                  <div
+                    id={listboxId}
+                    role="listbox"
+                    aria-label="Previous descriptions"
+                    className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-md"
+                  >
+                    {filteredSuggestions.map((suggestion, index) => (
                       <button
                         key={suggestion}
+                        id={`${listboxId}-${index}`}
                         type="button"
-                        className="w-full truncate px-3 py-2 text-left text-sm transition-colors first:rounded-t-lg last:rounded-b-lg hover:bg-accent hover:text-accent-foreground"
+                        role="option"
+                        aria-selected={index === activeIndex}
+                        className="w-full truncate rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
+                        onMouseEnter={() => setActiveIndex(index)}
                         onMouseDown={(event) => {
                           event.preventDefault()
-                          field.onChange(suggestion)
-                          setShowSuggestions(false)
+                          selectSuggestion(suggestion)
                         }}
                       >
                         {suggestion}

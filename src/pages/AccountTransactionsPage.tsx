@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { useAuth } from '@/contexts/AuthContext'
 import { ACCOUNT_COLORS, ACCOUNT_TYPE_LABELS, CURRENCIES } from '@/types'
 import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
@@ -17,10 +18,12 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
+import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
+import { TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
 import { ColorPicker } from '@/components/ui/color-picker'
@@ -304,6 +307,7 @@ export default function AccountTransactionsPage() {
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
+  const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editAccountOpen, setEditAccountOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
@@ -312,6 +316,7 @@ export default function AccountTransactionsPage() {
   const [paymentFromAccountId, setPaymentFromAccountId] = useState<string | null>(null)
   const [paymentHistory, setPaymentHistory] = useState<CreditCardPayment[]>([])
   const [paymentsLoading, setPaymentsLoading] = useState(false)
+  const [loanSection, setLoanSection] = useState<'summary' | 'purchases' | 'activity'>('summary')
 
   // Undo delete
   type UndoState = { snapshots: Transaction[]; message: string }
@@ -356,10 +361,27 @@ export default function AccountTransactionsPage() {
 
   const account = accounts.find((a) => a.id === accountId)
   const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet
+  const loanData = useLoanPurchases(account?.type === 'loan' ? accountId : undefined, account?.type === 'loan')
   const paymentSourceAccounts = useMemo(
-    () => accounts.filter((a) => a.type !== 'credit_card' && a.id !== accountId),
+    () => accounts.filter((a) => a.type !== 'credit_card' && a.type !== 'loan' && a.id !== accountId),
     [accounts, accountId]
   )
+
+  const loanPaymentSource = useMemo(
+    () => paymentSourceAccounts.find((source) => source.currency === account?.currency) ?? null,
+    [account?.currency, paymentSourceAccounts]
+  )
+
+  const loanSummary = useMemo(() => {
+    const totalPayable = loanData.purchases.reduce((sum, purchase) => sum + purchase.total_payable, 0)
+    const totalPaid = loanData.purchases.reduce((sum, purchase) => sum + (purchase.paid_amount ?? 0), 0)
+    return {
+      totalPayable,
+      totalPaid,
+      progress: totalPayable > 0 ? Math.min(100, (totalPaid / totalPayable) * 100) : 0,
+      nextDeadline: loanData.deadlines[0] ?? null,
+    }
+  }, [loanData.deadlines, loanData.purchases])
 
   const effectivePaymentFromAccountId = useMemo(() => {
     if (!paymentSourceAccounts.length) return null
@@ -549,7 +571,7 @@ export default function AccountTransactionsPage() {
     <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/accounts')} className="shrink-0">
+        <Button variant="ghost" size="icon" aria-label="Back to accounts" onClick={() => navigate('/accounts')} className="shrink-0">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         {account ? (
@@ -568,32 +590,80 @@ export default function AccountTransactionsPage() {
         ) : (
           <h1 className="text-xl font-bold">Account Transactions</h1>
         )}
+        {account?.type === 'loan' ? (
+          <Button
+            className="gap-2 shrink-0"
+            onClick={() => {
+              setTransactionKind('loan-repayment')
+              setCreateOpen(true)
+            }}
+          >
+            <Plus className="w-4 h-4" />Make payment
+          </Button>
+        ) : (
+          <TransactionKindMenu
+            showLoanRepayment={Boolean(
+              account &&
+              account.type !== 'credit_card' &&
+              accounts.some((candidate) => candidate.type === 'loan' && candidate.currency === account.currency)
+            )}
+            onSelect={(kind) => {
+              setFormError(null)
+              setTransactionKind(kind)
+              setCreateOpen(true)
+            }}
+            trigger={
+              <Button className="gap-2 shrink-0">
+                <Plus className="w-4 h-4" />Add
+              </Button>
+            }
+          />
+        )}
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger render={<Button className="gap-2 shrink-0" />}>
-            <Plus className="w-4 h-4" />Add
-          </DialogTrigger>
             <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-            <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>
+                {account?.type === 'loan' ? `Pay ${account.name}` : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}
+              </DialogTitle>
+            </DialogHeader>
             {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
             <TransactionForm
+              entryKind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
               onSubmit={handleCreate}
               onClose={() => { setCreateOpen(false); setFormError(null) }}
               lockedAccountId={account?.type === 'loan' ? undefined : accountId}
+              lockedLoanAccountId={account?.type === 'loan' ? account.id : undefined}
+              submitLabel={account?.type === 'loan' ? 'Record Payment' : 'Save Transaction'}
               defaultValues={account?.type === 'loan'
                 ? {
                     type: 'expense',
+                    account_id: loanPaymentSource?.id ?? '',
                     to_account_id: account.id,
                     category_id: null,
+                    currency: account.currency,
                     description: `Loan payment - ${account.name}`,
                   }
                 : { account_id: accountId }}
             />
+            {account?.type === 'loan' && !loanPaymentSource && (
+              <p className="text-xs text-muted-foreground">Add a cash, wallet, checking, or savings account in {account.currency} to record this payment.</p>
+            )}
           </DialogContent>
         </Dialog>
       </div>
 
+      {account?.type === 'loan' && (
+        <Tabs value={loanSection} onValueChange={(value) => setLoanSection(value as typeof loanSection)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="summary">Summary</TabsTrigger>
+            <TabsTrigger value="purchases">Purchases</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
+
       {/* Account balance card */}
-      {account && (
+      {account && (account.type !== 'loan' || loanSection === 'summary') && (
         <div
           className="rounded-xl p-4 text-white"
           style={{ background: `linear-gradient(135deg, ${account.color}dd, ${account.color}99)` }}
@@ -601,7 +671,7 @@ export default function AccountTransactionsPage() {
           <div className="flex items-start justify-between gap-3">
             <p className="text-sm font-medium opacity-80">{account.type === 'loan' ? 'Outstanding Loan' : account.type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</p>
             <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-black/15 hover:text-white" />}>
+              <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Account actions" className="h-8 w-8 rounded-full text-white hover:bg-black/15 hover:text-white" />}>
                 <MoreHorizontal className="w-4 h-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -615,24 +685,55 @@ export default function AccountTransactionsPage() {
           <p className="money text-3xl font-bold mt-1">
             {formatCurrency(account.type === 'credit_card' ? getCreditCardSpending(account) : account.type === 'loan' ? getLoanAmountOwed(account) : account.balance, account.currency)}
           </p>
-          <div className="flex gap-4 mt-3 text-sm opacity-90">
-            <div>
-              <p className="text-xs opacity-70">Income</p>
-              <p className="font-semibold">+{formatCurrency(stats.income, currency)}</p>
+          {account.type === 'loan' ? (
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+                <div>
+                  <p className="text-xs opacity-70">Next payment</p>
+                  <p className="font-semibold">
+                    {loanSummary.nextDeadline
+                      ? formatCurrency(loanSummary.nextDeadline.total, currency)
+                      : 'No payment due'}
+                  </p>
+                  {loanSummary.nextDeadline && <p className="text-[0.6875rem] opacity-70">{formatDate(loanSummary.nextDeadline.dueDate)}</p>}
+                </div>
+                <div>
+                  <p className="text-xs opacity-70">Repaid</p>
+                  <p className="font-semibold">{formatCurrency(loanSummary.totalPaid, currency)}</p>
+                </div>
+                <div>
+                  <p className="text-xs opacity-70">Financed purchases</p>
+                  <p className="font-semibold">{loanData.purchases.length}</p>
+                </div>
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span className="opacity-70">Repayment progress</span>
+                  <span className="font-semibold">{loanSummary.progress.toFixed(0)}%</span>
+                </div>
+                <Progress value={loanSummary.progress} className="bg-white/20 [&>div]:bg-white" />
+              </div>
             </div>
-            <div>
-              <p className="text-xs opacity-70">Expenses</p>
-              <p className="font-semibold">-{formatCurrency(stats.expenses, currency)}</p>
+          ) : account.type !== 'credit_card' ? (
+            <div className="flex gap-4 mt-3 text-sm opacity-90">
+              <div>
+                <p className="text-xs opacity-70">Income</p>
+                <p className="font-semibold">+{formatCurrency(stats.income, currency)}</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-70">Expenses</p>
+                <p className="font-semibold">-{formatCurrency(stats.expenses, currency)}</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-70">Sent</p>
+                <p className="font-semibold">-{formatCurrency(stats.transfersSent, currency)}</p>
+              </div>
+              <div>
+                <p className="text-xs opacity-70">Received</p>
+                <p className="font-semibold">+{formatCurrency(stats.transfersReceived, currency)}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs opacity-70">Sent</p>
-              <p className="font-semibold">-{formatCurrency(stats.transfersSent, currency)}</p>
-            </div>
-            <div>
-              <p className="text-xs opacity-70">Received</p>
-              <p className="font-semibold">+{formatCurrency(stats.transfersReceived, currency)}</p>
-            </div>
-          </div>
+          ) : null}
           {account.type === 'credit_card' && (
             <div className="mt-4 rounded-lg bg-black/15 border border-white/20 p-3 space-y-2.5">
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -764,8 +865,8 @@ export default function AccountTransactionsPage() {
         </div>
       )}
 
-      {account?.type === 'loan' && (
-        <LoanPurchaseTracker account={account} onAccountChanged={refetchAccounts} />
+      {account?.type === 'loan' && loanSection === 'purchases' && (
+        <LoanPurchaseTracker account={account} onAccountChanged={refetchAccounts} loanData={loanData} />
       )}
 
       <Dialog open={editAccountOpen} onOpenChange={setEditAccountOpen}>
@@ -783,7 +884,7 @@ export default function AccountTransactionsPage() {
       </Dialog>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      {(account?.type !== 'loan' || loanSection === 'activity') && <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -801,10 +902,10 @@ export default function AccountTransactionsPage() {
             <TabsTrigger value="transfer" className="flex-1 sm:flex-none">Transfer</TabsTrigger>
           </TabsList>
         </Tabs>
-      </div>
+      </div>}
 
       {/* Transaction list */}
-      {loading ? (
+      {(account?.type !== 'loan' || loanSection === 'activity') && (loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -838,7 +939,7 @@ export default function AccountTransactionsPage() {
             </div>
           ))}
         </div>
-      )}
+      ))}
 
       {/* Edit dialog */}
       <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>

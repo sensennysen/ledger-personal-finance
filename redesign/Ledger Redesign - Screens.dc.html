@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #0b0b0c; }
+  a { color: #9FC3E8; }
+  a:hover { color: #CFE1F5; }
+</style>
+</helmet>
+<div style="min-height:100vh;padding:56px 48px 96px;font-family:'Roboto',system-ui,sans-serif;color:#E4E7EA;box-sizing:border-box">
+
+  <div style="max-width:860px;margin:0 0 56px">
+    <div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#9FC3E8;font-weight:500;margin-bottom:12px">Ledger — Redesign Proposal</div>
+    <h1 style="font-size:34px;line-height:1.18;font-weight:500;margin:0 0 16px;color:#fff">Navigation &amp; UX redesign, executed as real Material&nbsp;3</h1>
+    <p style="font-size:15px;line-height:1.65;color:#B7C0CA;margin:0 0 22px;max-width:760px">The current build applies M3 <em>colors</em> on top of the old structure — a floating rounded nav bar, a dialog stretched into a bottom sheet, plain bordered inputs — which is why it reads as a reskin rather than a Material app. This pass fixes the structure: correct tonal surfaces and shape scale, a clearer 5-destination navigation model, and — the concrete bug fix — a dedicated full-screen flow for adding a transaction instead of a dialog fighting the mobile keyboard.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <span style="padding:7px 14px;border-radius:999px;background:#1B2027;border:1px solid #262C35;font-size:12px;color:#B7C0CA">Flat bottom nav, no floating card</span>
+      <span style="padding:7px 14px;border-radius:999px;background:#1B2027;border:1px solid #262C35;font-size:12px;color:#B7C0CA">Full-screen add-transaction — no dialog/keyboard fight</span>
+      <span style="padding:7px 14px;border-radius:999px;background:#1B2027;border:1px solid #262C35;font-size:12px;color:#B7C0CA">Reports promoted; Categories &amp; Settings are secondary screens</span>
+      <span style="padding:7px 14px;border-radius:999px;background:#1B2027;border:1px solid #262C35;font-size:12px;color:#B7C0CA">Outlined text fields, full-pill buttons, real state layers</span>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:baseline;gap:12px;margin:0 0 28px">
+    <h2 style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#8D97A3;font-weight:500;margin:0">Mobile</h2>
+    <div style="flex:1;height:1px;background:#262C35"></div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:44px 36px;margin-bottom:64px">
+
+    <!-- MOBILE 1 — HOME -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">1 · Home</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 16px;background:#12151A">
+            <div style="width:36px;height:36px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;flex-shrink:0">JD</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:16px;font-weight:500;color:#E4E7EA;line-height:22px">Good evening, Jordan</div>
+              <div style="font-size:12px;color:#8D97A3;line-height:16px">Your money, at a glance</div>
+            </div>
+            <div style="width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:17px">⌕</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:0 16px 16px">
+            <div style="width:36px;height:36px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:16px;flex-shrink:0">‹</div>
+            <div style="flex:1;height:36px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">Aug 12 – Sep 11</div>
+            <div style="width:36px;height:36px;border-radius:999px;border:1px solid #262C35;display:flex;align-items:center;justify-content:center;color:#414B58;font-size:16px;flex-shrink:0">›</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:0 16px 16px;display:flex;flex-direction:column;gap:16px">
+            <div style="border-radius:28px;background:#232933;padding:22px 20px">
+              <div style="font-size:12px;color:#8D97A3;margin-bottom:6px">Total balance</div>
+              <div style="font-family:'DM Mono',monospace;font-size:34px;color:#E4E7EA;letter-spacing:-0.02em;margin-bottom:16px">$4,218.90</div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1;border-radius:12px;background:#1E3320;padding:10px 12px">
+                  <div style="font-size:11px;color:#9FD9A0;margin-bottom:2px">Income ↓</div>
+                  <div style="font-family:'DM Mono',monospace;font-size:15px;color:#9FD9A0">$6,200.00</div>
+                </div>
+                <div style="flex:1;border-radius:12px;background:#3B1512;padding:10px 12px">
+                  <div style="font-size:11px;color:#FFB4AB;margin-bottom:2px">Expenses ↑</div>
+                  <div style="font-family:'DM Mono',monospace;font-size:15px;color:#FFB4AB">$1,981.10</div>
+                </div>
+              </div>
+            </div>
+            <div style="border-radius:16px;background:#2E4A63;padding:14px 16px;display:flex;align-items:center;gap:12px">
+              <div style="font-size:18px;color:#CFE1F5">◐</div>
+              <div style="flex:1;font-size:13px;color:#CFE1F5;line-height:18px">Chase Sapphire statement closes in 3 days</div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 4px 8px">
+                <div style="font-size:14px;font-weight:500;color:#E4E7EA">Recent activity</div>
+                <div style="font-size:12px;color:#9FC3E8">See all ›</div>
+              </div>
+              <div style="border-radius:16px;background:#1B2027;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #262C35">
+                  <div style="width:38px;height:38px;border-radius:11px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↑</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;color:#E4E7EA;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Whole Foods Market</div>
+                    <div style="font-size:11px;color:#8D97A3;line-height:15px">Groceries · Checking</div>
+                  </div>
+                  <div style="font-family:'DM Mono',monospace;font-size:13px;color:#FFB4AB;flex-shrink:0">−$86.40</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #262C35">
+                  <div style="width:38px;height:38px;border-radius:11px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↓</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;color:#E4E7EA;line-height:18px">Paycheck</div>
+                    <div style="font-size:11px;color:#8D97A3;line-height:15px">Income · Checking</div>
+                  </div>
+                  <div style="font-family:'DM Mono',monospace;font-size:13px;color:#9FD9A0;flex-shrink:0">+$2,600.00</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                  <div style="width:38px;height:38px;border-radius:11px;background:#2C1F3D;color:#C9A8E8;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">⇄</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;color:#E4E7EA;line-height:18px">To Savings</div>
+                    <div style="font-size:11px;color:#8D97A3;line-height:15px">Transfer · Checking</div>
+                  </div>
+                  <div style="font-family:'DM Mono',monospace;font-size:13px;color:#C9A8E8;flex-shrink:0">$500.00</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="position:relative;flex-shrink:0">
+            <div style="position:absolute;right:16px;top:-68px;width:56px;height:56px;border-radius:16px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 14px rgba(0,0,0,.45)">+</div>
+            <div style="height:78px;display:flex;align-items:flex-start;padding-top:12px;background:#171B21;border-top:1px solid #262C35">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:18px">⌂</div>
+                <div style="font-size:12px;font-weight:500;color:#E4E7EA">Home</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">⇄</div>
+                <div style="font-size:12px;color:#8D97A3">Transactions</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">▣</div>
+                <div style="font-size:12px;color:#8D97A3">Accounts</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">◑</div>
+                <div style="font-size:12px;color:#8D97A3">Budgets</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">▥</div>
+                <div style="font-size:12px;color:#8D97A3">Reports</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- MOBILE 2 — TRANSACTIONS -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">2 · Transactions</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:4px;padding:0 8px 0 20px;background:#12151A">
+            <div style="flex:1;font-size:22px;font-weight:400;color:#E4E7EA">Transactions</div>
+            <div style="width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:17px">⌕</div>
+            <div style="width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:18px">⋯</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:0 16px 12px">
+            <div style="width:36px;height:36px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:16px;flex-shrink:0">‹</div>
+            <div style="flex:1;height:36px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">Aug 12 – Sep 11</div>
+            <div style="width:36px;height:36px;border-radius:999px;border:1px solid #262C35;display:flex;align-items:center;justify-content:center;color:#414B58;font-size:16px;flex-shrink:0">›</div>
+          </div>
+          <div style="display:flex;gap:8px;padding:0 16px 12px;overflow-x:auto">
+            <div style="flex-shrink:0;padding:0 16px;height:32px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;font-size:12px;font-weight:500">All</div>
+            <div style="flex-shrink:0;padding:0 16px;height:32px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;font-size:12px;color:#B7C0CA">Income</div>
+            <div style="flex-shrink:0;padding:0 16px;height:32px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;font-size:12px;color:#B7C0CA">Expense</div>
+            <div style="flex-shrink:0;padding:0 16px;height:32px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;font-size:12px;color:#B7C0CA">Transfer</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:0 4px 8px">
+            <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#414B58;padding:12px 16px 6px">Today</div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #262C35">
+              <div style="width:38px;height:38px;border-radius:11px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↑</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;color:#E4E7EA;line-height:18px">Whole Foods Market</div>
+                <div style="font-size:11px;color:#8D97A3;line-height:15px">Groceries · Checking</div>
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:13px;color:#FFB4AB">−$86.40</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #262C35">
+              <div style="width:38px;height:38px;border-radius:11px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↑</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;color:#E4E7EA;line-height:18px">MTA Transit</div>
+                <div style="font-size:11px;color:#8D97A3;line-height:15px">Transport · Checking</div>
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:13px;color:#FFB4AB">−$33.00</div>
+            </div>
+            <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#414B58;padding:14px 16px 6px">Yesterday</div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #262C35">
+              <div style="width:38px;height:38px;border-radius:11px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↓</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;color:#E4E7EA;line-height:18px">Paycheck</div>
+                <div style="font-size:11px;color:#8D97A3;line-height:15px">Income · Checking</div>
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:13px;color:#9FD9A0">+$2,600.00</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+              <div style="width:38px;height:38px;border-radius:11px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↑</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;color:#E4E7EA;line-height:18px">Netflix</div>
+                <div style="font-size:11px;color:#8D97A3;line-height:15px">Subscriptions · Credit card</div>
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:13px;color:#FFB4AB">−$17.99</div>
+            </div>
+          </div>
+          <div style="position:relative;flex-shrink:0">
+            <div style="position:absolute;right:16px;top:-68px;width:56px;height:56px;border-radius:16px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 14px rgba(0,0,0,.45)">+</div>
+            <div style="height:78px;display:flex;align-items:flex-start;padding-top:12px;background:#171B21;border-top:1px solid #262C35">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">⌂</div>
+                <div style="font-size:12px;color:#8D97A3">Home</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:18px">⇄</div>
+                <div style="font-size:12px;font-weight:500;color:#E4E7EA">Transactions</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">▣</div>
+                <div style="font-size:12px;color:#8D97A3">Accounts</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">◑</div>
+                <div style="font-size:12px;color:#8D97A3">Budgets</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">▥</div>
+                <div style="font-size:12px;color:#8D97A3">Reports</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- MOBILE 3 — ACCOUNTS -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">3 · Accounts</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:4px;padding:0 8px 0 20px;background:#12151A">
+            <div style="flex:1;font-size:22px;font-weight:400;color:#E4E7EA">Accounts</div>
+            <div style="width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:20px">+</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:4px 16px 8px;display:flex;flex-direction:column;gap:18px">
+            <div style="border-radius:20px;background:#232933;padding:18px 20px">
+              <div style="font-size:12px;color:#8D97A3;margin-bottom:6px">Net worth</div>
+              <div style="font-family:'DM Mono',monospace;font-size:28px;color:#E4E7EA">$38,940.12</div>
+            </div>
+            <div>
+              <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8D97A3;padding:0 2px 8px">Cash &amp; bank</div>
+              <div style="border-radius:16px;background:#1B2027;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #262C35">
+                  <div style="width:38px;height:38px;border-radius:11px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">▣</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;color:#E4E7EA">Chase Checking</div>
+                    <div style="font-size:11px;color:#8D97A3">Checking</div>
+                  </div>
+                  <div style="font-family:'DM Mono',monospace;font-size:14px;color:#E4E7EA">$12,480.55</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:14px">
+                  <div style="width:38px;height:38px;border-radius:11px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">▣</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;color:#E4E7EA">Ally Savings</div>
+                    <div style="font-size:11px;color:#8D97A3">Savings</div>
+                  </div>
+                  <div style="font-family:'DM Mono',monospace;font-size:14px;color:#E4E7EA">$24,110.00</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8D97A3;padding:0 2px 8px">Credit cards</div>
+              <div style="border-radius:16px;background:#1B2027;padding:14px">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+                  <div style="width:38px;height:38px;border-radius:11px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">▣</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;color:#E4E7EA">Chase Sapphire</div>
+                    <div style="font-size:11px;color:#8D97A3">Due Sep 18</div>
+                  </div>
+                  <div style="font-family:'DM Mono',monospace;font-size:14px;color:#FFB4AB">−$1,246.30</div>
+                </div>
+                <div style="height:6px;border-radius:999px;background:#262C35;overflow:hidden">
+                  <div style="height:100%;width:31%;border-radius:999px;background:#9FC3E8"></div>
+                </div>
+                <div style="font-size:11px;color:#8D97A3;margin-top:6px">31% of $4,000 limit</div>
+              </div>
+            </div>
+          </div>
+          <div style="position:relative;flex-shrink:0">
+            <div style="position:absolute;right:16px;top:-68px;width:56px;height:56px;border-radius:16px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 14px rgba(0,0,0,.45)">+</div>
+            <div style="height:78px;display:flex;align-items:flex-start;padding-top:12px;background:#171B21;border-top:1px solid #262C35">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">⌂</div>
+                <div style="font-size:12px;color:#8D97A3">Home</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">⇄</div>
+                <div style="font-size:12px;color:#8D97A3">Transactions</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:18px">▣</div>
+                <div style="font-size:12px;font-weight:500;color:#E4E7EA">Accounts</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">◑</div>
+                <div style="font-size:12px;color:#8D97A3">Budgets</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">▥</div>
+                <div style="font-size:12px;color:#8D97A3">Reports</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- MOBILE 4 — BUDGETS -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">4 · Budgets</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:4px;padding:0 8px 0 20px;background:#12151A">
+            <div style="flex:1;font-size:22px;font-weight:400;color:#E4E7EA">Budgets</div>
+            <div style="width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:18px">⋯</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:0 16px 14px">
+            <div style="width:36px;height:36px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:16px;flex-shrink:0">‹</div>
+            <div style="flex:1;height:36px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">Aug 12 – Sep 11</div>
+            <div style="width:36px;height:36px;border-radius:999px;border:1px solid #262C35;display:flex;align-items:center;justify-content:center;color:#414B58;font-size:16px;flex-shrink:0">›</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:0 16px 8px;display:flex;flex-direction:column;gap:16px">
+            <div style="border-radius:20px;background:#232933;padding:18px 20px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+                <div style="font-size:13px;color:#8D97A3">Spent this cycle</div>
+                <div style="font-size:12px;color:#8D97A3">73%</div>
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:24px;color:#E4E7EA;margin-bottom:12px">$1,981 <span style="font-size:14px;color:#8D97A3">of $2,700</span></div>
+              <div style="height:8px;border-radius:999px;background:#262C35;overflow:hidden">
+                <div style="height:100%;width:73%;border-radius:999px;background:#9FC3E8"></div>
+              </div>
+            </div>
+            <div style="border-radius:16px;background:#1B2027;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #262C35">
+                <div style="width:36px;height:36px;border-radius:10px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">▣</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;color:#E4E7EA;margin-bottom:6px">Groceries</div>
+                  <div style="height:6px;border-radius:999px;background:#262C35;overflow:hidden"><div style="height:100%;width:88%;border-radius:999px;background:#FFB4AB"></div></div>
+                </div>
+                <div style="font-family:'DM Mono',monospace;font-size:12px;color:#8D97A3;flex-shrink:0">$440/$500</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid #262C35">
+                <div style="width:36px;height:36px;border-radius:10px;background:#2C1F3D;color:#C9A8E8;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">▣</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;color:#E4E7EA;margin-bottom:6px">Transport</div>
+                  <div style="height:6px;border-radius:999px;background:#262C35;overflow:hidden"><div style="height:100%;width:52%;border-radius:999px;background:#C9A8E8"></div></div>
+                </div>
+                <div style="font-family:'DM Mono',monospace;font-size:12px;color:#8D97A3;flex-shrink:0">$104/$200</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px">
+                <div style="width:36px;height:36px;border-radius:10px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">▣</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13px;color:#E4E7EA;margin-bottom:6px">Dining out</div>
+                  <div style="height:6px;border-radius:999px;background:#262C35;overflow:hidden"><div style="height:100%;width:104%;border-radius:999px;background:#FFB4AB"></div></div>
+                </div>
+                <div style="font-family:'DM Mono',monospace;font-size:12px;color:#FFB4AB;flex-shrink:0">$312/$300</div>
+              </div>
+            </div>
+          </div>
+          <div style="position:relative;flex-shrink:0">
+            <div style="position:absolute;right:16px;top:-68px;width:56px;height:56px;border-radius:16px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 14px rgba(0,0,0,.45)">+</div>
+            <div style="height:78px;display:flex;align-items:flex-start;padding-top:12px;background:#171B21;border-top:1px solid #262C35">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">⌂</div>
+                <div style="font-size:12px;color:#8D97A3">Home</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">⇄</div>
+                <div style="font-size:12px;color:#8D97A3">Transactions</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">▣</div>
+                <div style="font-size:12px;color:#8D97A3">Accounts</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:18px">◑</div>
+                <div style="font-size:12px;font-weight:500;color:#E4E7EA">Budgets</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">▥</div>
+                <div style="font-size:12px;color:#8D97A3">Reports</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- MOBILE 5 — REPORTS -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">5 · Reports</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;background:#12151A">
+            <div style="flex:1;font-size:22px;font-weight:400;color:#E4E7EA">Reports</div>
+          </div>
+          <div style="padding:0 16px 14px">
+            <div style="display:flex;border:1px solid #414B58;border-radius:999px;overflow:hidden;height:36px">
+              <div style="flex:1;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500">Overview</div>
+              <div style="flex:1;color:#B7C0CA;display:flex;align-items:center;justify-content:center;font-size:12px">Trends</div>
+              <div style="flex:1;color:#B7C0CA;display:flex;align-items:center;justify-content:center;font-size:12px">Export</div>
+            </div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:0 16px 8px;display:flex;flex-direction:column;gap:16px">
+            <div style="border-radius:20px;background:#232933;padding:18px 20px 8px">
+              <div style="font-size:12px;color:#8D97A3;margin-bottom:14px">Cash flow · last 6 months</div>
+              <div style="display:flex;align-items:flex-end;gap:8px;height:100px">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;border-radius:5px 5px 0 0;background:#9FD9A0;height:58px"></div><div style="font-size:10px;color:#8D97A3">Apr</div></div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;border-radius:5px 5px 0 0;background:#FFB4AB;height:44px"></div><div style="font-size:10px;color:#8D97A3">May</div></div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;border-radius:5px 5px 0 0;background:#9FD9A0;height:70px"></div><div style="font-size:10px;color:#8D97A3">Jun</div></div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;border-radius:5px 5px 0 0;background:#FFB4AB;height:50px"></div><div style="font-size:10px;color:#8D97A3">Jul</div></div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;border-radius:5px 5px 0 0;background:#9FD9A0;height:80px"></div><div style="font-size:10px;color:#8D97A3">Aug</div></div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;border-radius:5px 5px 0 0;background:#FFB4AB;height:36px"></div><div style="font-size:10px;color:#8D97A3">Sep</div></div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:500;color:#E4E7EA;padding:0 2px 10px">By category</div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:80px;font-size:12px;color:#B7C0CA">Groceries</div>
+                  <div style="flex:1;height:8px;border-radius:999px;background:#262C35;overflow:hidden"><div style="height:100%;width:38%;border-radius:999px;background:#9FC3E8"></div></div>
+                  <div style="font-family:'DM Mono',monospace;font-size:11px;color:#8D97A3;width:52px;text-align:right">$440</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:80px;font-size:12px;color:#B7C0CA">Dining</div>
+                  <div style="flex:1;height:8px;border-radius:999px;background:#262C35;overflow:hidden"><div style="height:100%;width:27%;border-radius:999px;background:#9FC3E8"></div></div>
+                  <div style="font-family:'DM Mono',monospace;font-size:11px;color:#8D97A3;width:52px;text-align:right">$312</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="width:80px;font-size:12px;color:#B7C0CA">Transport</div>
+                  <div style="flex:1;height:8px;border-radius:999px;background:#262C35;overflow:hidden"><div style="height:100%;width:9%;border-radius:999px;background:#9FC3E8"></div></div>
+                  <div style="font-family:'DM Mono',monospace;font-size:11px;color:#8D97A3;width:52px;text-align:right">$104</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="position:relative;flex-shrink:0">
+            <div style="position:absolute;right:16px;top:-68px;width:56px;height:56px;border-radius:16px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 14px rgba(0,0,0,.45)">+</div>
+            <div style="height:78px;display:flex;align-items:flex-start;padding-top:12px;background:#171B21;border-top:1px solid #262C35">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">⌂</div>
+                <div style="font-size:12px;color:#8D97A3">Home</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">⇄</div>
+                <div style="font-size:12px;color:#8D97A3">Transactions</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">▣</div>
+                <div style="font-size:12px;color:#8D97A3">Accounts</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#8D97A3">◑</div>
+                <div style="font-size:12px;color:#8D97A3">Budgets</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+                <div style="width:64px;height:32px;border-radius:16px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:18px">▥</div>
+                <div style="font-size:12px;font-weight:500;color:#E4E7EA">Reports</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- MOBILE 6 — CATEGORIES (secondary screen, no bottom nav) -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">6 · Categories <span style="color:#414B58">— reached via avatar menu</span></div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 4px;background:#12151A">
+            <div style="width:48px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#E4E7EA;font-size:20px">←</div>
+            <div style="flex:1;font-size:22px;font-weight:400;color:#E4E7EA">Categories</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:8px 16px 16px;display:flex;flex-direction:column;gap:18px">
+            <div>
+              <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8D97A3;padding:0 2px 8px">Expense</div>
+              <div style="border-radius:16px;background:#1B2027;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid #262C35">
+                  <div style="width:10px;height:10px;border-radius:999px;background:#FFB4AB;flex-shrink:0"></div>
+                  <div style="flex:1;font-size:13px;color:#E4E7EA">Groceries</div>
+                  <div style="font-size:11px;color:#8D97A3">142 entries</div>
+                  <div style="color:#414B58;font-size:16px">⠿</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid #262C35">
+                  <div style="width:10px;height:10px;border-radius:999px;background:#C9A8E8;flex-shrink:0"></div>
+                  <div style="flex:1;font-size:13px;color:#E4E7EA">Transport</div>
+                  <div style="font-size:11px;color:#8D97A3">58 entries</div>
+                  <div style="color:#414B58;font-size:16px">⠿</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:13px 14px">
+                  <div style="width:10px;height:10px;border-radius:999px;background:#9FC3E8;flex-shrink:0"></div>
+                  <div style="flex:1;font-size:13px;color:#E4E7EA">Dining out</div>
+                  <div style="font-size:11px;color:#8D97A3">76 entries</div>
+                  <div style="color:#414B58;font-size:16px">⠿</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#8D97A3;padding:0 2px 8px">Income</div>
+              <div style="border-radius:16px;background:#1B2027;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px;padding:13px 14px">
+                  <div style="width:10px;height:10px;border-radius:999px;background:#9FD9A0;flex-shrink:0"></div>
+                  <div style="flex:1;font-size:13px;color:#E4E7EA">Salary</div>
+                  <div style="font-size:11px;color:#8D97A3">12 entries</div>
+                  <div style="color:#414B58;font-size:16px">⠿</div>
+                </div>
+              </div>
+            </div>
+            <div style="height:44px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;color:#E4E7EA">+ Add category</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- MOBILE 7 — SETTINGS (secondary screen, no bottom nav) -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">7 · Settings <span style="color:#414B58">— reached via avatar menu</span></div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 4px;background:#12151A">
+            <div style="width:48px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#E4E7EA;font-size:20px">←</div>
+            <div style="flex:1;font-size:22px;font-weight:400;color:#E4E7EA">Settings</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:8px 16px 16px;display:flex;flex-direction:column;gap:18px">
+            <div style="display:flex;align-items:center;gap:14px;padding:8px 4px 4px">
+              <div style="width:52px;height:52px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:500">JD</div>
+              <div>
+                <div style="font-size:15px;color:#E4E7EA;font-weight:500">Jordan Diaz</div>
+                <div style="font-size:12px;color:#8D97A3">jordan@example.com</div>
+              </div>
+            </div>
+            <div style="border-radius:16px;background:#1B2027;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid #262C35"><div style="flex:1;font-size:14px;color:#E4E7EA">Profile</div><div style="color:#414B58">›</div></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid #262C35"><div style="flex:1;font-size:14px;color:#E4E7EA">Preferences</div><div style="color:#414B58">›</div></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid #262C35"><div style="flex:1;font-size:14px;color:#E4E7EA">Appearance</div><div style="color:#414B58">›</div></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid #262C35"><div style="flex:1;font-size:14px;color:#E4E7EA">Notifications</div><div style="color:#414B58">›</div></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid #262C35"><div style="flex:1;font-size:14px;color:#E4E7EA">Data &amp; privacy</div><div style="color:#414B58">›</div></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:16px"><div style="flex:1;font-size:14px;color:#E4E7EA">About</div><div style="color:#414B58">›</div></div>
+            </div>
+            <div style="height:44px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;color:#FFB4AB">Sign out</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- MOBILE 8 — ADD TRANSACTION STEP 1 -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">8 · Add transaction — step 1</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px 0 4px;background:#12151A">
+            <div style="width:48px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#E4E7EA;font-size:20px">×</div>
+            <div style="flex:1;font-size:18px;font-weight:500;color:#E4E7EA">New expense</div>
+            <div style="padding:0 18px;height:40px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#16314A;background:#9FC3E8;border-radius:999px">Next</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:8px 20px 16px;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;border-radius:999px;border:1px solid #414B58;overflow:hidden;height:44px">
+              <div style="flex:1;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">Expense</div>
+              <div style="flex:1;color:#B7C0CA;display:flex;align-items:center;justify-content:center;font-size:13px">Income</div>
+              <div style="flex:1;color:#B7C0CA;display:flex;align-items:center;justify-content:center;font-size:13px">Transfer</div>
+            </div>
+            <div style="text-align:center;padding:8px 0">
+              <span style="font-size:20px;color:#FFB4AB;vertical-align:top;margin-right:4px">$</span>
+              <span style="font-family:'DM Mono',monospace;font-size:56px;color:#FFB4AB;letter-spacing:-0.02em">86.40</span>
+            </div>
+            <div style="display:flex;gap:8px;overflow-x:auto">
+              <div style="flex-shrink:0;padding:0 14px;height:36px;border-radius:10px;border:1px solid #2E4A63;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;font-size:12px">Groceries</div>
+              <div style="flex-shrink:0;padding:0 14px;height:36px;border-radius:10px;border:1px solid #414B58;display:flex;align-items:center;font-size:12px;color:#B7C0CA">Dining out</div>
+              <div style="flex-shrink:0;padding:0 14px;height:36px;border-radius:10px;border:1px solid #414B58;display:flex;align-items:center;font-size:12px;color:#B7C0CA">Transport</div>
+              <div style="flex-shrink:0;padding:0 14px;height:36px;border-radius:10px;border:1px solid #414B58;display:flex;align-items:center;font-size:12px;color:#B7C0CA">Utilities</div>
+            </div>
+            <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;align-content:start">
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">1</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">2</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">3</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">4</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">5</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">6</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">7</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">8</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">9</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">.</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#E4E7EA">0</div>
+              <div style="height:52px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#E4E7EA">⌫</div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="max-width:412px;margin-top:10px;padding:12px 14px;border-radius:12px;background:#1B2027;border:1px solid #262C35;font-size:12px;line-height:1.6;color:#B7C0CA">A real page in the router, not a dialog — the keypad is custom, so the OS keyboard never appears here and there's nothing for the viewport-resize bug to fight.</div>
+    </div>
+
+    <!-- MOBILE 9 — ADD TRANSACTION STEP 2 -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">9 · Add transaction — step 2</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px 0 4px;background:#12151A">
+            <div style="width:48px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#E4E7EA;font-size:20px">←</div>
+            <div style="flex:1;font-size:18px;font-weight:500;color:#E4E7EA">Details</div>
+            <div style="padding:0 18px;height:40px;display:flex;align-items:center;font-size:14px;font-weight:500;color:#16314A;background:#9FC3E8;border-radius:999px">Save</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:8px 20px 16px;display:flex;flex-direction:column;gap:16px">
+            <div style="border-radius:14px;background:#1B2027;padding:14px 16px;display:flex;align-items:center;gap:12px">
+              <div style="width:34px;height:34px;border-radius:10px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">↑</div>
+              <div style="flex:1;font-size:13px;color:#E4E7EA">Expense · Groceries</div>
+              <div style="font-family:'DM Mono',monospace;font-size:15px;color:#FFB4AB">$86.40</div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:#8D97A3;margin-bottom:6px;padding-left:2px">Account</div>
+              <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 14px;gap:10px">
+                <div style="flex:1;font-size:14px;color:#E4E7EA">Chase Checking</div>
+                <div style="color:#8D97A3;font-size:14px">⌄</div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:#8D97A3;margin-bottom:6px;padding-left:2px">Date</div>
+              <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 14px;gap:10px">
+                <div style="flex:1;font-size:14px;color:#E4E7EA">Sep 9, 2026</div>
+                <div style="color:#8D97A3;font-size:14px">▦</div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:#8D97A3;margin-bottom:6px;padding-left:2px">Note</div>
+              <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 14px">
+                <div style="flex:1;font-size:14px;color:#626B76">What was it for?</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:4px 2px">
+              <div style="font-size:16px;color:#B7C0CA">▤</div>
+              <div style="flex:1;font-size:14px;color:#B7C0CA">Attach receipt</div>
+              <div style="color:#414B58">›</div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="max-width:412px;margin-top:10px;padding:12px 14px;border-radius:12px;background:#1B2027;border:1px solid #262C35;font-size:12px;line-height:1.6;color:#B7C0CA">Ordinary page scroll — when the Note field is focused, the OS keyboard simply shrinks the layout like any normal form. On save, the app returns to whatever screen you started from with a toast, instead of forcing a redirect to Transactions.</div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;align-items:baseline;gap:12px;margin:0 0 28px">
+    <h2 style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#8D97A3;font-weight:500;margin:0">Desktop</h2>
+    <div style="flex:1;height:1px;background:#262C35"></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:48px;overflow-x:auto;padding-bottom:8px">
+
+    <!-- DESKTOP 1 — HOME -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Home — sidebar grouped Main / Manage</div>
+      <x-import component-from-global-scope="ChromeWindow" from="./browser-window.jsx" width="{{ 1320 }}" height="{{ 840 }}" url="ledger.app/" hint-size="1320,840">
+        <div style="display:flex;height:100%;background:#12151A;font-family:'Roboto',system-ui,sans-serif">
+          <div style="width:236px;flex-shrink:0;background:#171B21;display:flex;flex-direction:column;padding:18px 12px;box-sizing:border-box;border-right:1px solid #262C35">
+            <div style="display:flex;align-items:center;gap:10px;padding:2px 8px 18px">
+              <div style="width:26px;height:26px;border-radius:8px;background:#9FC3E8"></div>
+              <div style="font-size:15px;font-weight:500;color:#fff">Ledger</div>
+            </div>
+            <div style="height:44px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:500;margin-bottom:22px">+ New transaction</div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#414B58;padding:0 12px;margin-bottom:6px">Main</div>
+            <div style="height:44px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;font-weight:500;margin-bottom:4px">⌂ Home</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⇄ Transactions</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">▣ Accounts</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">◑ Budgets</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">▥ Reports</div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#414B58;padding:16px 12px 6px">Manage</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⚑ Categories</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px">⚙ Settings</div>
+            <div style="flex:1"></div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 8px;border-top:1px solid #262C35">
+              <div style="width:32px;height:32px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0">JD</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12px;color:#E4E7EA">Jordan Diaz</div>
+                <div style="font-size:11px;color:#8D97A3">jordan@example.com</div>
+              </div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 28px;border-bottom:1px solid #262C35">
+              <div style="flex:1;font-size:17px;font-weight:500;color:#E4E7EA">Home</div>
+              <div style="width:220px;height:36px;border-radius:999px;border:1px solid #262C35;display:flex;align-items:center;padding:0 14px;font-size:12px;color:#626B76;gap:8px">⌕ Search or ⌘K</div>
+              <div style="width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:15px">◐</div>
+            </div>
+            <div style="flex:1;overflow:auto;padding:28px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:22px">
+                <div style="width:34px;height:34px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:15px">‹</div>
+                <div style="height:34px;padding:0 20px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;font-size:13px;font-weight:500">Aug 12 – Sep 11</div>
+                <div style="width:34px;height:34px;border-radius:999px;border:1px solid #262C35;display:flex;align-items:center;justify-content:center;color:#414B58;font-size:15px">›</div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+                <div style="border-radius:20px;background:#1B2027;padding:18px">
+                  <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8D97A3;margin-bottom:10px">Balance</div>
+                  <div style="font-family:'DM Mono',monospace;font-size:26px;color:#E4E7EA">$4,218.90</div>
+                </div>
+                <div style="border-radius:20px;background:#1B2027;padding:18px">
+                  <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8D97A3;margin-bottom:10px">Income</div>
+                  <div style="font-family:'DM Mono',monospace;font-size:26px;color:#9FD9A0">$6,200.00</div>
+                </div>
+                <div style="border-radius:20px;background:#1B2027;padding:18px">
+                  <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8D97A3;margin-bottom:10px">Expenses</div>
+                  <div style="font-family:'DM Mono',monospace;font-size:26px;color:#FFB4AB">$1,981.10</div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px">
+                <div style="border-radius:20px;background:#1B2027;padding:20px">
+                  <div style="font-size:14px;font-weight:500;color:#E4E7EA;margin-bottom:16px">⠿ Cash flow</div>
+                  <div style="display:flex;align-items:flex-end;gap:10px;height:130px">
+                    <div style="flex:1;border-radius:6px 6px 0 0;background:#9FD9A0;height:70%"></div>
+                    <div style="flex:1;border-radius:6px 6px 0 0;background:#FFB4AB;height:52%"></div>
+                    <div style="flex:1;border-radius:6px 6px 0 0;background:#9FD9A0;height:88%"></div>
+                    <div style="flex:1;border-radius:6px 6px 0 0;background:#FFB4AB;height:60%"></div>
+                    <div style="flex:1;border-radius:6px 6px 0 0;background:#9FD9A0;height:95%"></div>
+                    <div style="flex:1;border-radius:6px 6px 0 0;background:#FFB4AB;height:44%"></div>
+                  </div>
+                </div>
+                <div style="border-radius:20px;background:#1B2027;padding:20px">
+                  <div style="font-size:14px;font-weight:500;color:#E4E7EA;margin-bottom:12px">⠿ Recent activity</div>
+                  <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #262C35">
+                    <div style="width:30px;height:30px;border-radius:9px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">↑</div>
+                    <div style="flex:1;font-size:12px;color:#E4E7EA">Whole Foods</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:12px;color:#FFB4AB">−$86.40</div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px;padding:9px 0">
+                    <div style="width:30px;height:30px;border-radius:9px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">↓</div>
+                    <div style="flex:1;font-size:12px;color:#E4E7EA">Paycheck</div>
+                    <div style="font-family:'DM Mono',monospace;font-size:12px;color:#9FD9A0">+$2,600</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- DESKTOP 2 — TRANSACTIONS + DETAIL PANE -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Transactions — list with a persistent detail pane, no page push</div>
+      <x-import component-from-global-scope="ChromeWindow" from="./browser-window.jsx" width="{{ 1320 }}" height="{{ 840 }}" url="ledger.app/transactions" hint-size="1320,840">
+        <div style="display:flex;height:100%;background:#12151A;font-family:'Roboto',system-ui,sans-serif">
+          <div style="width:236px;flex-shrink:0;background:#171B21;display:flex;flex-direction:column;padding:18px 12px;box-sizing:border-box;border-right:1px solid #262C35">
+            <div style="display:flex;align-items:center;gap:10px;padding:2px 8px 18px">
+              <div style="width:26px;height:26px;border-radius:8px;background:#9FC3E8"></div>
+              <div style="font-size:15px;font-weight:500;color:#fff">Ledger</div>
+            </div>
+            <div style="height:44px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:500;margin-bottom:22px">+ New transaction</div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#414B58;padding:0 12px;margin-bottom:6px">Main</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⌂ Home</div>
+            <div style="height:44px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;font-weight:500;margin-bottom:4px">⇄ Transactions</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">▣ Accounts</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">◑ Budgets</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">▥ Reports</div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#414B58;padding:16px 12px 6px">Manage</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⚑ Categories</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px">⚙ Settings</div>
+            <div style="flex:1"></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 28px;border-bottom:1px solid #262C35">
+              <div style="flex:1;font-size:17px;font-weight:500;color:#E4E7EA">Transactions</div>
+              <div style="width:260px;height:36px;border-radius:999px;border:1px solid #262C35;display:flex;align-items:center;padding:0 14px;font-size:12px;color:#626B76;gap:8px">⌕ Search all months…</div>
+            </div>
+            <div style="flex:1;display:flex;overflow:hidden">
+              <div style="flex:1;overflow:auto;padding:20px 28px">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:#1B2027;margin-bottom:8px">
+                  <div style="width:34px;height:34px;border-radius:10px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">↑</div>
+                  <div style="flex:1;font-size:13px;color:#E4E7EA">Whole Foods Market</div>
+                  <div style="font-size:12px;color:#8D97A3;width:120px">Groceries</div>
+                  <div style="font-size:12px;color:#8D97A3;width:120px">Checking</div>
+                  <div style="font-size:12px;color:#8D97A3;width:90px">Sep 9</div>
+                  <div style="font-family:'DM Mono',monospace;font-size:13px;color:#FFB4AB;width:90px;text-align:right">−$86.40</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;margin-bottom:8px">
+                  <div style="width:34px;height:34px;border-radius:10px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">↑</div>
+                  <div style="flex:1;font-size:13px;color:#E4E7EA">MTA Transit</div>
+                  <div style="font-size:12px;color:#8D97A3;width:120px">Transport</div>
+                  <div style="font-size:12px;color:#8D97A3;width:120px">Checking</div>
+                  <div style="font-size:12px;color:#8D97A3;width:90px">Sep 9</div>
+                  <div style="font-family:'DM Mono',monospace;font-size:13px;color:#FFB4AB;width:90px;text-align:right">−$33.00</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;margin-bottom:8px">
+                  <div style="width:34px;height:34px;border-radius:10px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">↓</div>
+                  <div style="flex:1;font-size:13px;color:#E4E7EA">Paycheck</div>
+                  <div style="font-size:12px;color:#8D97A3;width:120px">Income</div>
+                  <div style="font-size:12px;color:#8D97A3;width:120px">Checking</div>
+                  <div style="font-size:12px;color:#8D97A3;width:90px">Sep 8</div>
+                  <div style="font-family:'DM Mono',monospace;font-size:13px;color:#9FD9A0;width:90px;text-align:right">+$2,600.00</div>
+                </div>
+              </div>
+              <div style="width:340px;flex-shrink:0;border-left:1px solid #262C35;background:#171B21;padding:20px;box-sizing:border-box">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+                  <div style="font-size:14px;font-weight:500;color:#E4E7EA">Entry detail</div>
+                  <div style="color:#B7C0CA;font-size:16px">×</div>
+                </div>
+                <div style="text-align:center;margin-bottom:20px">
+                  <div style="font-family:'DM Mono',monospace;font-size:30px;color:#FFB4AB">−$86.40</div>
+                  <div style="font-size:12px;color:#8D97A3;margin-top:4px">Sep 9, 2026</div>
+                </div>
+                <div style="border-radius:14px;background:#1B2027;padding:4px 0">
+                  <div style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #262C35"><span style="font-size:12px;color:#8D97A3">Category</span><span style="font-size:12px;color:#E4E7EA">Groceries</span></div>
+                  <div style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #262C35"><span style="font-size:12px;color:#8D97A3">Account</span><span style="font-size:12px;color:#E4E7EA">Chase Checking</span></div>
+                  <div style="display:flex;justify-content:space-between;padding:10px 14px"><span style="font-size:12px;color:#8D97A3">Note</span><span style="font-size:12px;color:#E4E7EA">Weekly groceries</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- DESKTOP 3 — BUDGETS -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Budgets — grid overview</div>
+      <x-import component-from-global-scope="ChromeWindow" from="./browser-window.jsx" width="{{ 1320 }}" height="{{ 780 }}" url="ledger.app/budgets" hint-size="1320,780">
+        <div style="display:flex;height:100%;background:#12151A;font-family:'Roboto',system-ui,sans-serif">
+          <div style="width:236px;flex-shrink:0;background:#171B21;display:flex;flex-direction:column;padding:18px 12px;box-sizing:border-box;border-right:1px solid #262C35">
+            <div style="display:flex;align-items:center;gap:10px;padding:2px 8px 18px">
+              <div style="width:26px;height:26px;border-radius:8px;background:#9FC3E8"></div>
+              <div style="font-size:15px;font-weight:500;color:#fff">Ledger</div>
+            </div>
+            <div style="height:44px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:500;margin-bottom:22px">+ New transaction</div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#414B58;padding:0 12px;margin-bottom:6px">Main</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⌂ Home</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⇄ Transactions</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">▣ Accounts</div>
+            <div style="height:44px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;font-weight:500;margin-bottom:4px">◑ Budgets</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">▥ Reports</div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#414B58;padding:16px 12px 6px">Manage</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⚑ Categories</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px">⚙ Settings</div>
+            <div style="flex:1"></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 28px;border-bottom:1px solid #262C35">
+              <div style="flex:1;font-size:17px;font-weight:500;color:#E4E7EA">Budgets</div>
+              <div style="height:34px;padding:0 20px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;font-size:13px;font-weight:500">Aug 12 – Sep 11</div>
+            </div>
+            <div style="flex:1;overflow:auto;padding:24px 28px">
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+                <div style="border-radius:18px;background:#1B2027;padding:18px">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="width:32px;height:32px;border-radius:9px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:13px">▣</div><div style="font-size:13px;color:#E4E7EA">Groceries</div></div>
+                  <div style="height:7px;border-radius:999px;background:#262C35;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:88%;border-radius:999px;background:#FFB4AB"></div></div>
+                  <div style="font-family:'DM Mono',monospace;font-size:12px;color:#8D97A3">$440 / $500</div>
+                </div>
+                <div style="border-radius:18px;background:#1B2027;padding:18px">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="width:32px;height:32px;border-radius:9px;background:#2C1F3D;color:#C9A8E8;display:flex;align-items:center;justify-content:center;font-size:13px">▣</div><div style="font-size:13px;color:#E4E7EA">Transport</div></div>
+                  <div style="height:7px;border-radius:999px;background:#262C35;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:52%;border-radius:999px;background:#C9A8E8"></div></div>
+                  <div style="font-family:'DM Mono',monospace;font-size:12px;color:#8D97A3">$104 / $200</div>
+                </div>
+                <div style="border-radius:18px;background:#1B2027;padding:18px">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><div style="width:32px;height:32px;border-radius:9px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:13px">▣</div><div style="font-size:13px;color:#E4E7EA">Dining out</div></div>
+                  <div style="height:7px;border-radius:999px;background:#262C35;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:100%;border-radius:999px;background:#FFB4AB"></div></div>
+                  <div style="font-family:'DM Mono',monospace;font-size:12px;color:#FFB4AB">$312 / $300</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- DESKTOP 4 — SETTINGS TWO-PANE -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Settings — sectioned two-pane, deep-linkable</div>
+      <x-import component-from-global-scope="ChromeWindow" from="./browser-window.jsx" width="{{ 1320 }}" height="{{ 780 }}" url="ledger.app/settings/appearance" hint-size="1320,780">
+        <div style="display:flex;height:100%;background:#12151A;font-family:'Roboto',system-ui,sans-serif">
+          <div style="width:236px;flex-shrink:0;background:#171B21;display:flex;flex-direction:column;padding:18px 12px;box-sizing:border-box;border-right:1px solid #262C35">
+            <div style="display:flex;align-items:center;gap:10px;padding:2px 8px 18px">
+              <div style="width:26px;height:26px;border-radius:8px;background:#9FC3E8"></div>
+              <div style="font-size:15px;font-weight:500;color:#fff">Ledger</div>
+            </div>
+            <div style="height:44px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:500;margin-bottom:22px">+ New transaction</div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#414B58;padding:0 12px;margin-bottom:6px">Main</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⌂ Home</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⇄ Transactions</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">▣ Accounts</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">◑ Budgets</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">▥ Reports</div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#414B58;padding:16px 12px 6px">Manage</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⚑ Categories</div>
+            <div style="height:44px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;font-weight:500">⚙ Settings</div>
+            <div style="flex:1"></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 28px;border-bottom:1px solid #262C35">
+              <div style="flex:1;font-size:14px;color:#8D97A3">Settings <span style="color:#E4E7EA;font-weight:500">/ Appearance</span></div>
+            </div>
+            <div style="flex:1;display:flex;overflow:hidden">
+              <div style="width:220px;flex-shrink:0;border-right:1px solid #262C35;padding:20px 12px">
+                <div style="height:40px;border-radius:999px;padding:0 14px;display:flex;align-items:center;font-size:13px;color:#B7C0CA;margin-bottom:2px">Profile</div>
+                <div style="height:40px;border-radius:999px;padding:0 14px;display:flex;align-items:center;font-size:13px;color:#B7C0CA;margin-bottom:2px">Preferences</div>
+                <div style="height:40px;border-radius:999px;padding:0 14px;display:flex;align-items:center;font-size:13px;background:#2E4A63;color:#CFE1F5;font-weight:500;margin-bottom:2px">Appearance</div>
+                <div style="height:40px;border-radius:999px;padding:0 14px;display:flex;align-items:center;font-size:13px;color:#B7C0CA;margin-bottom:2px">Notifications</div>
+                <div style="height:40px;border-radius:999px;padding:0 14px;display:flex;align-items:center;font-size:13px;color:#B7C0CA;margin-bottom:2px">Data &amp; privacy</div>
+                <div style="height:40px;border-radius:999px;padding:0 14px;display:flex;align-items:center;font-size:13px;color:#B7C0CA">About</div>
+              </div>
+              <div style="flex:1;overflow:auto;padding:28px 32px;max-width:560px">
+                <div style="font-size:12px;color:#8D97A3;margin-bottom:10px">Color scheme</div>
+                <div style="display:flex;gap:10px;margin-bottom:24px">
+                  <div style="height:44px;padding:0 20px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;font-size:13px;font-weight:500">Dark</div>
+                  <div style="height:44px;padding:0 20px;border-radius:999px;border:1px solid #414B58;color:#B7C0CA;display:flex;align-items:center;font-size:13px">Light</div>
+                  <div style="height:44px;padding:0 20px;border-radius:999px;border:1px solid #414B58;color:#B7C0CA;display:flex;align-items:center;font-size:13px">System</div>
+                </div>
+                <div style="font-size:12px;color:#8D97A3;margin-bottom:10px">Accent color</div>
+                <div style="display:flex;gap:12px;margin-bottom:24px">
+                  <div style="width:32px;height:32px;border-radius:999px;background:#9FC3E8;box-shadow:0 0 0 2px #12151A,0 0 0 4px #9FC3E8"></div>
+                  <div style="width:32px;height:32px;border-radius:999px;background:#C9A8E8"></div>
+                  <div style="width:32px;height:32px;border-radius:999px;background:#9FD9A0"></div>
+                  <div style="width:32px;height:32px;border-radius:999px;background:#FFB4AB"></div>
+                </div>
+                <div style="font-size:12px;color:#8D97A3;margin-bottom:10px">Font size</div>
+                <div style="display:flex;border-radius:999px;border:1px solid #414B58;width:280px;overflow:hidden;height:40px">
+                  <div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:12px;color:#B7C0CA">S</div>
+                  <div style="flex:1;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">M</div>
+                  <div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:15px;color:#B7C0CA">L</div>
+                  <div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:17px;color:#B7C0CA">XL</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <div style="display:flex;align-items:baseline;gap:12px;margin:0 0 28px">
+    <h2 style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#8D97A3;font-weight:500;margin:0">Mobile — additional screens</h2>
+    <div style="flex:1;height:1px;background:#262C35"></div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:44px 36px;margin-bottom:56px">
+
+    <!-- ACCOUNT DETAIL -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Account detail — reached from Accounts, prev/next in top bar on desktop</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:4px;padding:0 8px;background:#12151A">
+            <div style="width:48px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#E4E7EA;font-size:20px">←</div>
+            <div style="flex:1;font-size:22px;font-weight:400;color:#E4E7EA">Chase Sapphire</div>
+            <div style="width:48px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:18px">⋯</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:8px 16px 16px;display:flex;flex-direction:column;gap:16px">
+            <div style="border-radius:28px;background:#232933;padding:20px">
+              <div style="font-size:12px;color:#8D97A3;margin-bottom:8px">Current balance</div>
+              <div style="font-family:'DM Mono',monospace;font-size:34px;color:#FFB4AB;margin-bottom:14px">−$1,246.30</div>
+              <div style="display:flex;gap:8px">
+                <div style="height:36px;padding:0 14px;border-radius:8px;border:1px solid #414B58;display:flex;align-items:center;font-size:12px;color:#E4E7EA">Due Sep 18</div>
+                <div style="height:36px;padding:0 14px;border-radius:8px;border:1px solid #414B58;display:flex;align-items:center;font-size:12px;color:#E4E7EA">31% utilization</div>
+              </div>
+            </div>
+            <div style="border-radius:16px;background:#1B2027;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:56px;box-sizing:border-box;border-bottom:1px solid #262C35">
+                <div style="width:40px;height:40px;border-radius:12px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↑</div>
+                <div style="flex:1;font-size:14px;color:#E4E7EA">Netflix</div>
+                <div style="font-family:'DM Mono',monospace;font-size:14px;color:#FFB4AB">−$17.99</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:56px;box-sizing:border-box;border-bottom:1px solid #262C35">
+                <div style="width:40px;height:40px;border-radius:12px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↑</div>
+                <div style="flex:1;font-size:14px;color:#E4E7EA">Spotify</div>
+                <div style="font-family:'DM Mono',monospace;font-size:14px;color:#FFB4AB">−$11.99</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:56px;box-sizing:border-box">
+                <div style="width:40px;height:40px;border-radius:12px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↑</div>
+                <div style="flex:1;font-size:14px;color:#E4E7EA">Delta Air Lines</div>
+                <div style="font-family:'DM Mono',monospace;font-size:14px;color:#FFB4AB">−$412.00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- LOGIN -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Login</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden;align-items:center;justify-content:center;padding:0 32px;box-sizing:border-box;gap:24px">
+          <div style="width:56px;height:56px;border-radius:16px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:500">L</div>
+          <div style="text-align:center">
+            <div style="font-size:22px;color:#E4E7EA;margin-bottom:6px">Ledger</div>
+            <div style="font-size:14px;color:#8D97A3;line-height:20px">Track spending without the paywall.</div>
+          </div>
+          <div style="width:100%;display:flex;flex-direction:column;gap:12px;margin-top:8px">
+            <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#626B76">Email</div>
+            <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#626B76">Password</div>
+            <div style="height:48px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;margin-top:4px">Sign in</div>
+            <div style="height:48px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;font-size:14px;color:#E4E7EA">Continue with Google</div>
+          </div>
+          <div style="font-size:12px;color:#8D97A3">New here? <span style="color:#9FC3E8">Create an account</span></div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- 13TH MONTH -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">13th Month — result hero</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 4px;background:#12151A">
+            <div style="width:48px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#E4E7EA;font-size:20px">←</div>
+            <div style="flex:1;font-size:22px;font-weight:400;color:#E4E7EA">13th Month</div>
+          </div>
+          <div style="flex:1;overflow:auto;padding:8px 16px 16px;display:flex;flex-direction:column;gap:16px">
+            <div style="border-radius:28px;background:#232933;padding:24px 20px;text-align:center">
+              <div style="font-size:12px;color:#8D97A3;margin-bottom:10px">Estimated 13th month pay</div>
+              <div style="font-family:'DM Mono',monospace;font-size:34px;color:#E4E7EA">$4,866.67</div>
+            </div>
+            <div style="border-radius:16px;background:#1B2027;overflow:hidden">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:56px;box-sizing:border-box;border-bottom:1px solid #262C35">
+                <div style="flex:1;font-size:14px;color:#E4E7EA">Base salary ÷ 12</div>
+                <div style="font-family:'DM Mono',monospace;font-size:14px;color:#E4E7EA">$5,200.00</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:56px;box-sizing:border-box;border-bottom:1px solid #262C35">
+                <div style="flex:1;font-size:14px;color:#E4E7EA">Prorated · 340 of 365 days</div>
+                <div style="font-family:'DM Mono',monospace;font-size:14px;color:#E4E7EA">×0.93</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;min-height:56px;box-sizing:border-box">
+                <div style="flex:1;font-size:14px;color:#E4E7EA">Tax withheld</div>
+                <div style="font-family:'DM Mono',monospace;font-size:14px;color:#FFB4AB">−$1,133.33</div>
+              </div>
+            </div>
+            <div style="height:48px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;font-size:14px;color:#E4E7EA">Export as PDF</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <div style="display:flex;align-items:baseline;gap:12px;margin:0 0 28px">
+    <h2 style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#8D97A3;font-weight:500;margin:0">Modals &amp; sheets</h2>
+    <div style="flex:1;height:1px;background:#262C35"></div>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:44px 36px;margin-bottom:56px">
+
+    <!-- ACCOUNT MENU SHEET -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Account menu — from the top-bar avatar</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="position:relative;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;display:flex;align-items:center;gap:12px;padding:0 16px;opacity:0.4">
+            <div style="width:36px;height:36px;border-radius:999px;background:#2E4A63"></div>
+            <div style="font-size:16px;color:#E4E7EA">Good evening, Jordan</div>
+          </div>
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,.55)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;border-radius:28px 28px 0 0;background:#171B21;padding:12px 20px 24px;box-sizing:border-box">
+            <div style="display:flex;justify-content:center;margin-bottom:16px"><div style="width:32px;height:4px;border-radius:2px;background:#414B58"></div></div>
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+              <div style="width:52px;height:52px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:500">JD</div>
+              <div>
+                <div style="font-size:15px;color:#E4E7EA;font-weight:500">Jordan Diaz</div>
+                <div style="font-size:12px;color:#8D97A3">jordan@example.com · Synced just now</div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+              <div style="border-radius:16px;background:#1B2027;padding:16px 8px;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="font-size:18px;color:#C9A8E8">⚑</div><div style="font-size:11px;color:#E4E7EA">Categories</div></div>
+              <div style="border-radius:16px;background:#1B2027;padding:16px 8px;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="font-size:18px;color:#9FD9A0">◔</div><div style="font-size:11px;color:#E4E7EA">13th Month</div></div>
+              <div style="border-radius:16px;background:#1B2027;padding:16px 8px;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="font-size:18px;color:#9FC3E8">⚙</div><div style="font-size:11px;color:#E4E7EA">Settings</div></div>
+            </div>
+            <div style="height:56px;border-radius:16px;background:#1B2027;display:flex;align-items:center;padding:0 16px;gap:12px;margin-bottom:8px">
+              <div style="font-size:16px;color:#B7C0CA">◐</div>
+              <div style="flex:1;font-size:14px;color:#E4E7EA">Dark theme</div>
+              <div style="width:40px;height:24px;border-radius:999px;background:#9FC3E8;position:relative"><div style="position:absolute;right:2px;top:2px;width:20px;height:20px;border-radius:999px;background:#16314A"></div></div>
+            </div>
+            <div style="height:56px;border-radius:16px;display:flex;align-items:center;padding:0 16px;gap:12px">
+              <div style="font-size:16px;color:#FFB4AB">⎋</div>
+              <div style="flex:1;font-size:14px;color:#FFB4AB">Sign out</div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- TRANSACTION DETAIL SHEET -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Transaction detail — tap any row</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="position:relative;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;display:flex;align-items:center;padding:0 20px;opacity:0.4"><div style="font-size:22px;color:#E4E7EA">Transactions</div></div>
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,.55)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;border-radius:28px 28px 0 0;background:#171B21;padding:12px 20px 24px;box-sizing:border-box">
+            <div style="display:flex;justify-content:center;margin-bottom:16px"><div style="width:32px;height:4px;border-radius:2px;background:#414B58"></div></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+              <div style="font-size:16px;font-weight:500;color:#E4E7EA">Entry detail</div>
+              <div style="width:48px;height:48px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:18px;margin:-12px">×</div>
+            </div>
+            <div style="text-align:center;margin-bottom:18px">
+              <div style="font-family:'DM Mono',monospace;font-size:34px;color:#FFB4AB">−$86.40</div>
+              <div style="font-size:12px;color:#8D97A3;margin-top:4px">Sep 9, 2026</div>
+            </div>
+            <div style="border-radius:16px;background:#1B2027;margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;min-height:52px;border-bottom:1px solid #262C35"><span style="font-size:12px;color:#8D97A3">Category</span><span style="font-size:14px;color:#E4E7EA">Groceries</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;min-height:52px;border-bottom:1px solid #262C35"><span style="font-size:12px;color:#8D97A3">Account</span><span style="font-size:14px;color:#E4E7EA">Chase Checking</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0 16px;min-height:52px"><span style="font-size:12px;color:#8D97A3">Note</span><span style="font-size:14px;color:#E4E7EA">Weekly groceries</span></div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <div style="flex:1;height:40px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;font-size:14px;color:#E4E7EA">Edit</div>
+              <div style="flex:1;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#FFB4AB">Delete</div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ADD CATEGORY SHEET -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Add category — from Categories</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="position:relative;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;display:flex;align-items:center;padding:0 20px;opacity:0.4"><div style="font-size:22px;color:#E4E7EA">Categories</div></div>
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,.55)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;border-radius:28px 28px 0 0;background:#171B21;padding:12px 20px 24px;box-sizing:border-box">
+            <div style="display:flex;justify-content:center;margin-bottom:16px"><div style="width:32px;height:4px;border-radius:2px;background:#414B58"></div></div>
+            <div style="font-size:16px;font-weight:500;color:#E4E7EA;margin-bottom:16px">New category</div>
+            <div style="display:flex;border-radius:999px;border:1px solid #414B58;overflow:hidden;height:40px;margin-bottom:16px">
+              <div style="flex:1;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">Expense</div>
+              <div style="flex:1;color:#B7C0CA;display:flex;align-items:center;justify-content:center;font-size:13px">Income</div>
+            </div>
+            <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#E4E7EA;margin-bottom:16px">Home maintenance</div>
+            <div style="font-size:12px;color:#8D97A3;margin-bottom:8px">Color</div>
+            <div style="display:flex;gap:10px;margin-bottom:16px">
+              <div style="width:28px;height:28px;border-radius:999px;background:#FFB4AB;box-shadow:0 0 0 2px #171B21,0 0 0 4px #FFB4AB"></div>
+              <div style="width:28px;height:28px;border-radius:999px;background:#9EC6EA"></div>
+              <div style="width:28px;height:28px;border-radius:999px;background:#9FD9A0"></div>
+              <div style="width:28px;height:28px;border-radius:999px;background:#C9A8E8"></div>
+              <div style="width:28px;height:28px;border-radius:999px;background:#9FC3E8"></div>
+            </div>
+            <div style="height:48px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500">Save category</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- ADD/EDIT BUDGET SHEET -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Edit budget — from Budgets</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="position:relative;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;display:flex;align-items:center;padding:0 20px;opacity:0.4"><div style="font-size:22px;color:#E4E7EA">Budgets</div></div>
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,.55)"></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;border-radius:28px 28px 0 0;background:#171B21;padding:12px 20px 24px;box-sizing:border-box">
+            <div style="display:flex;justify-content:center;margin-bottom:16px"><div style="width:32px;height:4px;border-radius:2px;background:#414B58"></div></div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">
+              <div style="width:36px;height:36px;border-radius:10px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:14px">▣</div>
+              <div style="font-size:16px;font-weight:500;color:#E4E7EA">Edit budget — Groceries</div>
+            </div>
+            <div style="font-size:12px;color:#8D97A3;margin-bottom:6px">Monthly limit</div>
+            <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#E4E7EA;margin-bottom:16px">$500.00</div>
+            <div style="height:56px;border-radius:16px;background:#1B2027;display:flex;align-items:center;padding:0 16px;gap:12px;margin-bottom:20px">
+              <div style="flex:1;font-size:14px;color:#E4E7EA">Roll over unused amount</div>
+              <div style="width:40px;height:24px;border-radius:999px;border:1px solid #414B58;position:relative"><div style="position:absolute;left:2px;top:2px;width:20px;height:20px;border-radius:999px;background:#8D97A3"></div></div>
+            </div>
+            <div style="height:48px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500">Save budget</div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- DELETE CONFIRMATION DIALOG -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Delete confirmation — basic dialog, not a sheet</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="position:relative;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;display:flex;align-items:center;padding:0 20px;opacity:0.4"><div style="font-size:22px;color:#E4E7EA">Transactions</div></div>
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center">
+            <div style="width:300px;border-radius:28px;background:#1B2027;padding:24px;box-sizing:border-box">
+              <div style="width:48px;height:48px;border-radius:999px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:16px">!</div>
+              <div style="font-size:16px;font-weight:500;color:#E4E7EA;margin-bottom:8px">Delete this transaction?</div>
+              <div style="font-size:14px;color:#8D97A3;line-height:20px;margin-bottom:22px">Whole Foods Market · −$86.40. This can't be undone.</div>
+              <div style="display:flex;justify-content:flex-end;gap:8px">
+                <div style="height:40px;padding:0 16px;border-radius:999px;display:flex;align-items:center;font-size:14px;color:#E4E7EA">Cancel</div>
+                <div style="height:40px;padding:0 16px;border-radius:999px;background:#FFB4AB;color:#3B1512;display:flex;align-items:center;font-size:14px;font-weight:500">Delete</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- TOAST -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Toast — non-blocking, save confirmation</div>
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="412,892">
+        <div style="position:relative;display:flex;flex-direction:column;height:100%;background:#12151A;overflow:hidden">
+          <div style="height:64px;flex-shrink:0;display:flex;align-items:center;padding:0 20px"><div style="font-size:22px;color:#E4E7EA">Transactions</div></div>
+          <div style="flex:1;overflow:hidden;padding:0 16px">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #262C35">
+              <div style="width:40px;height:40px;border-radius:12px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">↓</div>
+              <div style="flex:1;font-size:14px;color:#E4E7EA">Paycheck</div>
+              <div style="font-family:'DM Mono',monospace;font-size:14px;color:#9FD9A0">+$2,600.00</div>
+            </div>
+          </div>
+          <div style="position:absolute;left:16px;bottom:90px;height:48px;border-radius:16px;background:#232933;display:flex;align-items:center;gap:16px;padding:0 16px;box-shadow:0 4px 14px rgba(0,0,0,.4)">
+            <div style="font-size:14px;color:#E4E7EA">Expense added</div>
+            <div style="font-size:14px;color:#9FC3E8;font-weight:500">View</div>
+          </div>
+          <div style="height:78px;flex-shrink:0;background:#171B21;border-top:1px solid #262C35"></div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <div style="display:flex;align-items:baseline;gap:12px;margin:0 0 28px">
+    <h2 style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#8D97A3;font-weight:500;margin:0">Desktop — additional</h2>
+    <div style="flex:1;height:1px;background:#262C35"></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:48px;overflow-x:auto;padding-bottom:8px;margin-bottom:56px">
+
+    <!-- DESKTOP ACCOUNT DETAIL -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Account detail — breadcrumb + prev/next account paging</div>
+      <x-import component-from-global-scope="ChromeWindow" from="./browser-window.jsx" width="{{ 1320 }}" height="{{ 780 }}" url="ledger.app/accounts/chase-sapphire" hint-size="1320,780">
+        <div style="display:flex;height:100%;background:#12151A;font-family:'Roboto',system-ui,sans-serif">
+          <div style="width:236px;flex-shrink:0;background:#171B21;display:flex;flex-direction:column;padding:18px 12px;box-sizing:border-box;border-right:1px solid #262C35">
+            <div style="display:flex;align-items:center;gap:10px;padding:2px 8px 18px"><div style="width:26px;height:26px;border-radius:8px;background:#9FC3E8"></div><div style="font-size:15px;font-weight:500;color:#fff">Ledger</div></div>
+            <div style="height:44px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:500;margin-bottom:22px">+ New transaction</div>
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#414B58;padding:0 12px;margin-bottom:6px">Main</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⌂ Home</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">⇄ Transactions</div>
+            <div style="height:44px;border-radius:999px;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;font-weight:500;margin-bottom:4px">▣ Accounts</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px;margin-bottom:4px">◑ Budgets</div>
+            <div style="height:44px;border-radius:999px;color:#B7C0CA;display:flex;align-items:center;gap:12px;padding:0 16px;font-size:13px">▥ Reports</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 28px;border-bottom:1px solid #262C35">
+              <div style="flex:1;font-size:14px;color:#8D97A3">Accounts <span style="color:#E4E7EA;font-weight:500">/ Chase Sapphire</span></div>
+              <div style="width:36px;height:36px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:15px">‹</div>
+              <div style="width:36px;height:36px;border-radius:999px;border:1px solid #414B58;display:flex;align-items:center;justify-content:center;color:#B7C0CA;font-size:15px">›</div>
+            </div>
+            <div style="flex:1;overflow:auto;padding:28px">
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:20px">
+                <div style="border-radius:20px;background:#1B2027;padding:18px"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8D97A3;margin-bottom:10px">Balance owed</div><div style="font-family:'DM Mono',monospace;font-size:26px;color:#FFB4AB">−$1,246.30</div></div>
+                <div style="border-radius:20px;background:#1B2027;padding:18px"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8D97A3;margin-bottom:10px">Utilization</div><div style="font-family:'DM Mono',monospace;font-size:26px;color:#E4E7EA">31%</div></div>
+              </div>
+              <div style="border-radius:20px;background:#1B2027;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #262C35"><div style="width:34px;height:34px;border-radius:10px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">↑</div><div style="flex:1;font-size:14px;color:#E4E7EA">Netflix</div><div style="font-family:'DM Mono',monospace;font-size:14px;color:#FFB4AB">−$17.99</div></div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 16px"><div style="width:34px;height:34px;border-radius:10px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">↑</div><div style="flex:1;font-size:14px;color:#E4E7EA">Delta Air Lines</div><div style="font-family:'DM Mono',monospace;font-size:14px;color:#FFB4AB">−$412.00</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+    <!-- DESKTOP EDIT TRANSACTION DIALOG -->
+    <div>
+      <div style="font-size:13px;color:#8D97A3;margin-bottom:10px">Edit transaction — desktop keeps a dialog (no on-screen keyboard to fight)</div>
+      <x-import component-from-global-scope="ChromeWindow" from="./browser-window.jsx" width="{{ 1320 }}" height="{{ 780 }}" url="ledger.app/transactions" hint-size="1320,780">
+        <div style="position:relative;height:100%;background:#12151A;font-family:'Roboto',system-ui,sans-serif;display:flex;align-items:center;justify-content:center">
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,.55)"></div>
+          <div style="position:relative;width:480px;border-radius:28px;background:#1B2027;padding:24px;box-sizing:border-box">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+              <div style="font-size:18px;font-weight:500;color:#E4E7EA">Edit transaction</div>
+              <div style="color:#B7C0CA;font-size:18px">×</div>
+            </div>
+            <div style="display:flex;border-radius:999px;border:1px solid #414B58;overflow:hidden;height:40px;margin-bottom:16px">
+              <div style="flex:1;background:#2E4A63;color:#CFE1F5;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500">Expense</div>
+              <div style="flex:1;color:#B7C0CA;display:flex;align-items:center;justify-content:center;font-size:13px">Income</div>
+              <div style="flex:1;color:#B7C0CA;display:flex;align-items:center;justify-content:center;font-size:13px">Transfer</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+              <div>
+                <div style="font-size:12px;color:#8D97A3;margin-bottom:6px">Amount</div>
+                <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 16px;font-family:'DM Mono',monospace;font-size:14px;color:#FFB4AB">$86.40</div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#8D97A3;margin-bottom:6px">Category</div>
+                <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#E4E7EA">Groceries ⌄</div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#8D97A3;margin-bottom:6px">Account</div>
+                <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#E4E7EA">Chase Checking ⌄</div>
+              </div>
+              <div>
+                <div style="font-size:12px;color:#8D97A3;margin-bottom:6px">Date</div>
+                <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#E4E7EA">Sep 9, 2026</div>
+              </div>
+            </div>
+            <div style="font-size:12px;color:#8D97A3;margin-bottom:6px">Note</div>
+            <div style="height:52px;border-radius:4px;border:1px solid #414B58;display:flex;align-items:center;padding:0 16px;font-size:14px;color:#E4E7EA;margin-bottom:20px">Weekly groceries</div>
+            <div style="display:flex;justify-content:flex-end;gap:8px">
+              <div style="height:40px;padding:0 18px;border-radius:999px;display:flex;align-items:center;font-size:14px;color:#E4E7EA">Cancel</div>
+              <div style="height:40px;padding:0 18px;border-radius:999px;background:#9FC3E8;color:#16314A;display:flex;align-items:center;font-size:14px;font-weight:500">Save</div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+    </div>
+
+  </div>
+
+  <div style="max-width:760px;margin-top:12px;padding-top:24px;border-top:1px solid #262C35;font-size:13px;line-height:1.7;color:#8D97A3">
+    Full written spec for engineering handoff — navigation model, the add-transaction route replacing the dialog, and the exact shape/elevation/state-layer fixes — is in <a href="#" style="color:#9FC3E8">Ledger Redesign — Implementation Handoff.dc.html</a> alongside this file.
+  </div>
+
+</div>
+
+</x-dc>
+</body>
+</html>

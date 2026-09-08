@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./doc-page.js"></script>
+<style>doc-page:not(:defined){visibility:hidden}
+body{margin:0}
+h1,h2,h3{font-family:Georgia,'Times New Roman',serif}
+code{background:#f0ece3;padding:2px 5px;border-radius:4px;font-size:0.9em}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:0.92em}
+th,td{border:1px solid #d8d2c2;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#f4f0e6}
+.callout{background:#f4f0e6;border:1px solid #d8d2c2;border-radius:8px;padding:12px 16px;break-inside:avoid;margin:14px 0}
+</style>
+</helmet>
+<doc-page margin="0.85in">
+
+<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#7a6f4e;margin-bottom:6px">Ledger — Design / Frontend</div>
+<h1 style="font-size:30px;margin:0 0 4px">Navigation &amp; UX Redesign — Implementation Handoff</h1>
+<p style="color:#6b6455;margin:0 0 24px">Status: Ready for build · Date: 2026-09-09 · Companion visual reference: <code>Ledger Redesign — Screens.dc.html</code></p>
+
+<h2>1 — What's wrong today, precisely</h2>
+<p>The app already carries M3 tokens and an M3-shaped nav (<code>src/index.css</code>, <code>src/constants/colors.ts</code>, <code>BottomNav.tsx</code>) from the earlier <code>docs/M3_REDESIGN.md</code> pass. It reads as a reskin, not as Material, for structural reasons color can't fix:</p>
+<ul>
+  <li><b>Bottom nav is a floating rounded card</b> (<code>rounded-t-[28px]</code> in <code>BottomNav.tsx</code>) sitting off the screen edge. Real M3 navigation bars are flat, full-width, flush with the bottom edge — elevation comes from a tonal surface + hairline border, never a floating card with side gaps.</li>
+  <li><b>The add-transaction sheet is a dialog wearing a sheet's clothes.</b> <code>AppLayout.tsx</code> renders one Base UI <code>&lt;Dialog&gt;</code> for three unrelated jobs (add / account menu / entry detail) and reshapes it into a bottom sheet on mobile via a CSS override (<code>.m3-bottom-sheet</code> fighting the dialog's own centered-transform classes). <code>QuickEntry.tsx</code> then mixes a custom numeric keypad with native <code>&lt;input type="date"&gt;</code> / note fields inside that fixed, <code>max-h-[calc(100dvh-2rem)]</code> positioned popup. When a native input focuses, the OS keyboard changes the visual viewport; the sheet is positioned off <code>dvh</code> and doesn't re-measure, so the focused field ends up hidden or the sheet jumps/resizes under the keyboard. This is the "buggy modal" — it's a positioning-model conflict, not a one-line fix.</li>
+  <li><b>Inputs, buttons and chips use generic rounded-rectangle styling</b> (<code>rounded-xl</code> everywhere) instead of M3's shape scale, so nothing signals hierarchy — a text field looks like a button looks like a card.</li>
+  <li><b>No visible state layers.</b> Interactive surfaces hard-swap background color on press instead of layering a translucent state overlay, which is most of why the UI feels flat/generic rather than Material.</li>
+  <li><b>Categories, Budgets, Reports and Settings are jammed into one hand-rolled "More" popover</b> (fixed div + backdrop, not the <code>Sheet</code> primitive) — no focus trap, inconsistent active-state logic, and Budgets/Reports are two taps behind an unlabeled avatar tap.</li>
+</ul>
+
+<h2>2 — Principles for this pass</h2>
+<ol>
+  <li>Move off the gold seed — gold reads as premium/luxury, wrong tone for a self-hostable ledger. Rebuild the tonal palette from a new slate-blue seed (§2.5); keep Roboto/DM Mono and the rest of the shape/elevation system as-is.</li>
+  <li>The add-transaction flow gets its own route, not a dialog. M3 explicitly specs a "full-screen dialog" for complex, keyboard-heavy forms for this reason.</li>
+  <li>Every primary destination is one tap/click away, on both platforms, with the same five names.</li>
+  <li>Settings and Categories are real pushed screens with a back affordance, not a menu bolted onto the avatar.</li>
+</ol>
+
+<h2>2.5 — Palette: new seed color</h2>
+<p>Seed: <code>#5B7FA6</code> (slate blue), chosen to move off gold's premium/luxury connotation. Regenerate both schemes in <code>src/index.css</code> from this seed the same way the current gold scheme was generated (see <code>docs/M3_REDESIGN.md</code>) — the values below are the resulting roles. <b>Transfer moves from blue to violet</b> so it stays visually distinct from the new blue primary; income and expense are unchanged (they were never blue).</p>
+<table>
+<tr><th>Token</th><th>Dark: was → now</th><th>Light: was → now</th></tr>
+<tr><td>background / surface</td><td>#15130B → #12151A</td><td>#EFE7DA → #E7EAEE</td></tr>
+<tr><td>card / surface-container</td><td>#211F17 → #1B2027</td><td>#FFF8EE → #FFFFFF</td></tr>
+<tr><td>elevated / surface-container-high</td><td>#2A2718 → #232933</td><td>#EDE4D6 → #EEF1F4</td></tr>
+<tr><td>sidebar</td><td>#1D1B13 → #171B21</td><td>#F8F1E4 → #EDF0F3</td></tr>
+<tr><td>foreground</td><td>#E9E2D4 → #E4E7EA</td><td>#1E1B13 → #1A1D22</td></tr>
+<tr><td>muted-foreground</td><td>#999080 → #8D97A3</td><td>#5A5346 → #5B6570</td></tr>
+<tr><td>border / outline-variant</td><td>#2C2921 → #262C35</td><td>#DDD5C4 → #D7DCE2</td></tr>
+<tr><td>input / outline</td><td>#4D4739 → #414B58</td><td>#CFC7B5 → #B7C0CA</td></tr>
+<tr><td>primary</td><td>#EDC55F → #9FC3E8</td><td>#7A5900 → #35597A</td></tr>
+<tr><td>on-primary</td><td>#3E2E00 → #16314A</td><td>#FFFFFF → #FFFFFF</td></tr>
+<tr><td>accent / primary-container</td><td>#594400 → #2E4A63</td><td>#FFE18E → #D9E6F2</td></tr>
+<tr><td>on-primary-container</td><td>#FFE18E → #CFE1F5</td><td>#261A00 → #1B3A54</td></tr>
+<tr><td>secondary-container</td><td>#4F462B → #3E4B57</td><td>#E4D8B6 → #DCE6EE</td></tr>
+<tr><td>on-secondary-container</td><td>#F2E2BB → #DCE6EE</td><td>#3E3620 → #2B3A47</td></tr>
+<tr><td><b>transfer</b> (hue moved)</td><td>#9EC6EA → #C9A8E8</td><td>#1F5A87 → #6B4FA0</td></tr>
+<tr><td><b>transfer-container</b></td><td>#16293A → #2C1F3D</td><td>#CDE4F7 → #EDE0F7</td></tr>
+<tr><td>income / income-container</td><td>unchanged</td><td>unchanged</td></tr>
+<tr><td>expense / expense-container</td><td>unchanged</td><td>unchanged</td></tr>
+</table>
+<div class="callout">Applies to <code>src/index.css</code> (<code>:root</code> and <code>.dark</code> blocks) and any chart/badge color reseeding in <code>src/constants/colors.ts</code> that references these roles by name — variable names don't change, only values.</div>
+
+<h2>3 — Navigation model</h2>
+<h3>3.1 Mobile bottom nav — 5 destinations, flat bar, FAB floats above it</h3>
+<table>
+<tr><th>Slot</th><th>Today</th><th>Redesign</th></tr>
+<tr><td>Destinations</td><td>Home, Accounts, Activity, Budgets (4)</td><td>Home, Transactions, Accounts, Budgets, <b>Reports</b> (5) — Reports is promoted; it's a core review activity, not configuration.</td></tr>
+<tr><td>Categories / Settings</td><td>Behind avatar → hand-rolled "More" popover</td><td>Behind the top-bar avatar → a real modal bottom sheet (identity row, Categories, Settings, theme, sign out) — simple menu content, no keyboard, so a sheet is the right pattern here.</td></tr>
+<tr><td>Bar shape</td><td><code>rounded-t-[28px]</code>, floating off the edge, drop shadow</td><td>Flat rectangle, flush to the screen edge, <code>bg-sidebar</code> + 1px top hairline (<code>--sidebar-border</code>). No radius, no shadow — tonal color is the only elevation cue, per M3.</td></tr>
+<tr><td>Active indicator</td><td>64×32 pill, already close to spec</td><td>Keep the 64×32 pill (<code>bg-sidebar-accent</code>), but size all 5 items <code>flex:1</code> evenly — at 5 items + a floating FAB, per-item width is ~70–75px on a 390px screen, which fits (the FAB overlaps the bar, it doesn't occupy a slot).</td></tr>
+<tr><td>FAB</td><td>64px square, 20px radius, centered overlap</td><td>56px, 16px corner radius (M3 default FAB size/shape — 64px/20px is off-spec), centered, overlapping the bar top edge by 28px, elevation shadow <code>0 4px 12px rgba(0,0,0,.4)</code>.</td></tr>
+</table>
+
+<h3>3.2 Desktop sidebar — grouped, with a pinned compose action</h3>
+<ul>
+  <li>Two groups with an 11px uppercase label each: <b>Main</b> (Home, Transactions, Accounts, Budgets, Reports) and <b>Manage</b> (Categories, Settings).</li>
+  <li>A pinned, full-pill "+ New transaction" filled button at the top of the rail, under the logo — the desktop equivalent of the mobile FAB, always one click away regardless of which page is open.</li>
+  <li>Active item = full-width 44px pill, <code>background: var(--accent)</code> / <code>color: var(--accent-foreground)</code>, replacing the current 2px-left-bar treatment.</li>
+  <li>Persist collapse state to <code>localStorage</code> (<code>ledger-sidebar-collapsed</code>) — currently local <code>useState</code>, resets every reload.</li>
+  <li>Avatar + name/email + sign-out stays pinned at the bottom, unchanged in function.</li>
+</ul>
+
+<h3>3.3 Top bar — both platforms</h3>
+<p>A slim sticky bar replaces the bannerless header: leading area (page title, or a breadcrumb like <code>Settings / Appearance</code> on nested routes), a search field/button that opens cross-month transaction search, and a sync-status affordance. On mobile only, the leading area is the avatar + greeting (opens the account sheet); on desktop the avatar lives in the sidebar instead.</p>
+
+<h2>4 — Add-transaction: a route, not a dialog</h2>
+<p>Replace the <code>sheet === 'add'</code> branch of <code>AppLayout.tsx</code>'s dialog with two new full-screen routes, entered from the FAB / "+ New transaction" button:</p>
+<table>
+<tr><th>Route</th><th>Purpose</th><th>Content</th></tr>
+<tr><td><code>/transactions/new</code></td><td>Step 1 — type &amp; amount</td><td>Top bar: × close (left), title, "Next" filled pill (right, disabled until amount &gt; 0). Body: segmented Expense/Income/Transfer control, DM Mono amount display colored by type, a <b>custom</b> 3×4 keypad (never the OS keyboard), and the 4 most-used category chips for that type so a typical entry never needs step 2.</td></tr>
+<tr><td><code>/transactions/new/details</code></td><td>Step 2 — everything else</td><td>Top bar: ‹ back, "Details", "Save" filled pill. Body: a small recap card (type · category · amount), then ordinary outlined fields — Account (select), Date, Note — plus "Attach receipt". This is a normal document-flow page: when Note focuses, the OS keyboard resizes the layout exactly like any other form, because there is no fixed-position sheet fighting it.</td></tr>
+</table>
+<div class="callout">On mobile this is a full route push (slide-in from the right, matches the existing page-transition system); on desktop ≥1024px it can render as a two-step dialog instead, since desktop has no on-screen keyboard to conflict with. On success: pop back to whatever screen the flow was opened from and show a toast ("Expense added · View") — never force-navigate to <code>/transactions</code> (fixes defect #13 in <code>docs/design-document.md</code> §14).</div>
+<p>Delete: the <code>m3-bottom-sheet</code> CSS override, the touch-drag-dismiss handler in <code>AppLayout.tsx</code>, and <code>QuickEntry.tsx</code>'s role as a dialog child (its keypad/segmented/chip markup moves into the new step-1 route almost unchanged — it was already the right content, just trapped in the wrong container).</p>
+
+<h2>5 — Shape, elevation, state-layer corrections</h2>
+<table>
+<tr><th>Element</th><th>Today</th><th>Fix</th></tr>
+<tr><td>Buttons (filled/outlined)</td><td><code>rounded-xl</code> / <code>rounded-md</code> mix in <code>ui/button.tsx</code></td><td>Full pill (<code>border-radius: 999px</code>) at every size — M3 buttons are always fully rounded.</td></tr>
+<tr><td>Text fields</td><td>Plain <code>rounded-xl</code> bordered box, no distinct field identity</td><td>Outlined text field: 4px corner radius, 1px <code>--input</code> border, label above (or M3 floating label if adopting the full spec), 52px height.</td></tr>
+<tr><td>Cards</td><td><code>rounded-2xl</code>/<code>rounded-3xl</code> ad hoc per component</td><td>Standardize: list/row containers 16px, hero/summary cards 20–28px. Depth via tonal steps (<code>--card</code> → <code>--elevated</code>), not shadows.</td></tr>
+<tr><td>Chips</td><td><code>rounded-lg</code></td><td>8px corner radius (M3 "small" shape, the spec value for chips).</td></tr>
+<tr><td>FAB</td><td>64px / 20px radius</td><td>56px / 16px radius (default FAB, see §3.1).</td></tr>
+<tr><td>Bottom nav bar</td><td><code>rounded-t-[28px]</code>, shadow</td><td>Flat, 0 radius, 1px top hairline only (see §3.1).</td></tr>
+<tr><td>Hover/press feedback</td><td>Hard background swap</td><td>Add an 8% (hover) / 12% (pressed) overlay of the ink color on every interactive surface — buttons, list rows, chips, icon buttons, nav items.</td></tr>
+</table>
+
+<h2>6 — Screen-by-screen file changes</h2>
+<table>
+<tr><th>Screen</th><th>Files</th><th>Change</th></tr>
+<tr><td>Bottom nav</td><td><code>src/components/layout/BottomNav.tsx</code></td><td>Add Reports item + <code>PieChart</code>/report icon import; flat bar per §3.1; <code>aria-current</code>.</td></tr>
+<tr><td>App shell</td><td><code>src/components/layout/AppLayout.tsx</code></td><td>Remove the add-branch from the shared Dialog; keep it only for the account-menu sheet and entry-detail; add the two new routes' outlet handling; toast on transaction save instead of force-navigate.</td></tr>
+<tr><td>Add transaction</td><td><code>src/components/transactions/QuickEntry.tsx</code>, new <code>src/pages/AddTransactionPage.tsx</code> (+ <code>AddTransactionDetailsPage.tsx</code>)</td><td>Move keypad/type/chip UI into the new step-1 page; account/date/note/receipt become step-2's page body; wire both into <code>App.tsx</code> as routes.</td></tr>
+<tr><td>Sidebar</td><td><code>src/components/layout/Sidebar.tsx</code></td><td>Group into Main/Manage; persist collapse to <code>localStorage</code>; pinned "+ New transaction" button; full-pill active state.</td></tr>
+<tr><td>Top bar (new)</td><td>new <code>src/components/layout/TopBar.tsx</code></td><td>Breadcrumb/title, search entry point, sync status; mounted from <code>AppLayout.tsx</code> on both form factors.</td></tr>
+<tr><td>Account menu sheet</td><td><code>AppLayout.tsx</code> sheet branch</td><td>Keep as a bottom sheet (no keyboard content) — just remove Budgets (now in the nav bar), add nothing else.</td></tr>
+<tr><td>Categories / Settings</td><td><code>src/pages/CategoriesPage.tsx</code>, <code>src/pages/SettingsPage.tsx</code></td><td>Both become pushed routes with a top-bar back arrow, reached from the account sheet — not tab destinations.</td></tr>
+<tr><td>Tokens</td><td><code>src/index.css</code>, <code>src/components/ui/button.tsx</code>, <code>ui/input.tsx</code>, <code>ui/dialog.tsx</code>, <code>ui/badge.tsx</code></td><td>Shape-scale corrections from §5; remove <code>.m3-bottom-sheet</code>.</td></tr>
+</table>
+
+<h2>7 — Order of implementation</h2>
+<ol>
+  <li>Shape/elevation/state-layer token pass (§5) — no behavior change, immediately reduces the "reskin" feel.</li>
+  <li><code>BottomNav.tsx</code> flat bar + 5th item; <code>Sidebar.tsx</code> grouping + persisted collapse.</li>
+  <li><code>TopBar.tsx</code> (new) on both platforms.</li>
+  <li>Add-transaction routes (§4) — the concrete bug fix. Delete the old dialog branch and <code>.m3-bottom-sheet</code> only once the new routes are wired and the FAB/pinned button point at them.</li>
+  <li>Push Categories/Settings out of the "More" popover into routed screens with back affordances.</li>
+  <li>Toast system for save/undo/sync feedback, replacing the forced navigate on transaction save.</li>
+</ol>
+
+<h2>8 — Strict sizing reference</h2>
+<p>Some elements drift when this spec gets implemented from prose alone. The values below are authoritative — hold to them exactly rather than eyeballing off the companion mockup. Every number is CSS px at 1x (this is a web app, not native dp); use only the spacing scale below, nothing in between.</p>
+<p><b>Spacing scale:</b> 4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64px. Screen horizontal padding is always 16px on mobile, 28px on desktop content.</p>
+
+<h3>8.1 Chrome</h3>
+<table>
+<tr><th>Element</th><th>Size</th><th>Detail</th></tr>
+<tr><td>Top app bar</td><td>64px fixed height</td><td>Leading/trailing icon buttons: 48×48px hit area (24px icon inside), 8px gap between multiple trailing icons.</td></tr>
+<tr><td>Bottom nav bar</td><td>64px content row + <code>env(safe-area-inset-bottom)</code></td><td>Flat, 0 corner radius, 1px top border. Never rounded, never floating off the edge.</td></tr>
+<tr><td>Nav active indicator</td><td>64×32px pill</td><td>16px corner radius (= height ÷ 2). Icon 24px. Label 12px/16px, 4px below the pill.</td></tr>
+<tr><td>FAB</td><td>56×56px</td><td>16px corner radius, 24px "+" glyph. Fixed at <code>right: 16px</code>, <code>bottom: [nav bar height] + 12px</code> — must clear the bar with a 12px gap, never overlap it.</td></tr>
+<tr><td>Sidebar (desktop)</td><td>236px expanded / 72px collapsed</td><td>Nav row height 44px, full-pill (999px) radius, 4px vertical gap between rows.</td></tr>
+<tr><td>Cycle stepper</td><td>36px</td><td>Chevron circles 36×36px; center pill 36px tall, full width available.</td></tr>
+</table>
+
+<h3>8.2 Surfaces</h3>
+<table>
+<tr><th>Element</th><th>Size</th><th>Detail</th></tr>
+<tr><td>Hero/summary card</td><td>28px corner radius</td><td>20px padding all sides.</td></tr>
+<tr><td>List-container card</td><td>16px corner radius</td><td>Rows 56px min-height, 14–16px horizontal padding, 1px divider between rows (no divider after the last row).</td></tr>
+<tr><td>Filter / type / segmented chip</td><td>32–44px height</td><td>Fully rounded (999px).</td></tr>
+<tr><td>Assist / quick-pick chip</td><td>36px height</td><td>8px corner radius (not fully rounded — distinct from filter chips).</td></tr>
+<tr><td>Bottom sheet</td><td>Full width</td><td>28px top corners only. Drag handle 32×4px, 12px top margin. Bottom padding 20px + safe-area inset.</td></tr>
+<tr><td>Basic dialog (desktop)</td><td>400–560px wide</td><td>28px corner radius, 24px padding.</td></tr>
+</table>
+
+<h3>8.3 Controls</h3>
+<table>
+<tr><th>Element</th><th>Size</th><th>Detail</th></tr>
+<tr><td>Button — default</td><td>40px height</td><td>Top-bar "Next"/"Save" pills, secondary actions. Full pill.</td></tr>
+<tr><td>Button — primary CTA</td><td>48px height</td><td>Full-width terminal actions only (form Save, Sign in). Full pill.</td></tr>
+<tr><td>Text field</td><td>52px height</td><td>4px corner radius (outlined). Label 12px above field, 6px gap. 16px internal horizontal padding.</td></tr>
+<tr><td>Keypad key</td><td>52×52px</td><td>6px grid gap, fully rounded.</td></tr>
+<tr><td>Icon button</td><td>48×48px hit area minimum</td><td>Even when the visible glyph is 16–24px — never shrink the tap target.</td></tr>
+<tr><td>Avatar</td><td>36px topbar · 52px settings profile row · 32px sidebar footer</td><td>Three fixed sizes, nothing in between.</td></tr>
+</table>
+
+<h3>8.4 Type scale — exactly these, nothing in between</h3>
+<table>
+<tr><th>Role</th><th>Size/line</th><th>Weight</th><th>Where</th></tr>
+<tr><td>Amount — hero</td><td>34/40</td><td>400, DM Mono</td><td>Home/Budgets balance card. Step-1 keypad amount is the one exception, at 56/62.</td></tr>
+<tr><td>Amount — card</td><td>24/30</td><td>400, DM Mono</td><td>Desktop stat cards, budget overview total.</td></tr>
+<tr><td>Amount — row</td><td>14/20</td><td>400, DM Mono</td><td>Every transaction row and list amount, mobile and desktop alike — do not vary this per screen.</td></tr>
+<tr><td>Screen title</td><td>22/28</td><td>400</td><td>Top app bar title on tab and pushed screens.</td></tr>
+<tr><td>Section/card title</td><td>16/24</td><td>500</td><td>"Recent activity", card headers, sheet titles.</td></tr>
+<tr><td>Body</td><td>14/20</td><td>400</td><td>Row primary text, form values, body copy.</td></tr>
+<tr><td>Label</td><td>12/16</td><td>500 active / 400 inactive</td><td>Chips, nav labels, field labels.</td></tr>
+<tr><td>Overline</td><td>11/16, +.08em tracking</td><td>500, uppercase</td><td>Section eyebrows, category-list group headers.</td></tr>
+</table>
+
+<h3>8.5 Icons</h3>
+<p>Nav and top-bar icons: 24px. List-row leading tiles: 40×40px @ 12px radius (mobile), 34×34px @ 10px radius (desktop dense rows). Inline small icons: 16–18px. Never introduce a fourth icon size.</p>
+
+<div class="callout">Not covered here (out of scope for this pass, see <code>docs/design-document.md</code> for the fuller PWA/perf audit if it's picked up later): route-level code splitting, IndexedDB migration for the offline queue, command palette, real push notifications.</div>
+
+</doc-page>
+
+</x-dc>
+</body>
+</html>

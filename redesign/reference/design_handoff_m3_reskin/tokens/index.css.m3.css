@@ -1,0 +1,172 @@
+/* ═══════════════════════════════════════════════════════
+   LEDGER — Material 3 token layer
+   Drop-in replacement for the :root / .dark blocks in
+   src/index.css. Variable NAMES are unchanged, so every
+   shadcn component inherits without edits.
+
+   Fonts: Roboto (sans + headings) · DM Mono (money)
+   Seed:  Ledger gold  →  oklch(0.565 0.115 72) light
+                          oklch(0.830 0.115 85) dark
+   ═══════════════════════════════════════════════════════ */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Light theme (M3 light scheme) ── */
+:root {
+  --background: oklch(0.930 0.014 85);          /* #EFE7DA surface-dim   */
+  --foreground: oklch(0.220 0.012 85);          /* #1E1B13 on-surface    */
+
+  --card: oklch(0.980 0.012 88);                /* #FFF8EE surface       */
+  --card-foreground: oklch(0.220 0.012 85);
+
+  --popover: oklch(0.980 0.012 88);
+  --popover-foreground: oklch(0.220 0.012 85);
+
+  --primary: oklch(0.480 0.100 82);             /* #7A5900 — 4.5:1 w/ white */
+  --primary-foreground: oklch(1 0 0);
+
+  --secondary: oklch(0.870 0.040 90);           /* #E4D8B6 secondary-container */
+  --secondary-foreground: oklch(0.310 0.030 88);
+
+  --muted: oklch(0.940 0.014 86);               /* #F4ECDF surface-container */
+  --muted-foreground: oklch(0.420 0.014 86);    /* #5A5346 — 4.5:1 on muted  */
+
+  --accent: oklch(0.910 0.085 88);              /* #FFE18E primary-container */
+  --accent-foreground: oklch(0.230 0.045 80);   /* #261A00 */
+
+  --destructive: oklch(0.490 0.140 25);         /* #A4342B = --expense */
+
+  --border: oklch(0.870 0.016 86);              /* #DDD5C4 outline-variant */
+  --input: oklch(0.870 0.016 86);
+  --ring: oklch(0.480 0.100 82);
+
+  --radius: 0.75rem;                            /* M3 shape scale, was 0.5 */
+
+  /* Semantic money tokens — replace EMERALD / CORAL / GOLD */
+  --income: oklch(0.460 0.120 150);             /* #1E6B2E */
+  --income-container: oklch(0.900 0.060 150);   /* #C6EBC7 */
+  --expense: oklch(0.490 0.140 25);             /* #A4342B */
+  --expense-container: oklch(0.900 0.045 25);   /* #FFDAD6 */
+  --transfer: oklch(0.440 0.095 245);           /* #1F5A87 */
+  --transfer-container: oklch(0.900 0.040 245); /* #CDE4F7 */
+
+  /* Charts alias the semantics so Recharts needs no per-series colors */
+  --chart-1: var(--primary);
+  --chart-2: var(--income);
+  --chart-3: var(--expense);
+  --chart-4: var(--transfer);
+  --chart-5: oklch(0.520 0.110 300);
+
+  /* Sidebar — M3 navigation drawer */
+  --sidebar: oklch(0.960 0.014 88);             /* #F8F1E4 */
+  --sidebar-foreground: oklch(0.220 0.012 85);
+  --sidebar-primary: oklch(0.480 0.100 82);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.910 0.085 88);      /* active pill = primary-container */
+  --sidebar-accent-foreground: oklch(0.230 0.045 80);
+  --sidebar-border: oklch(0.870 0.016 86);
+  --sidebar-ring: oklch(0.480 0.100 82);
+
+  --surface: oklch(0.940 0.014 86);
+  --elevated: oklch(0.910 0.016 86);            /* #EDE4D6 surface-container-high */
+
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Dark theme (M3 dark scheme) ── */
+.dark {
+  --background: oklch(0.150 0.012 85);          /* #15130B surface       */
+  --foreground: oklch(0.910 0.015 88);          /* #E9E2D4 on-surface    */
+
+  --card: oklch(0.210 0.012 85);                /* #211F17 surface-container */
+  --card-foreground: oklch(0.910 0.015 88);
+
+  --popover: oklch(0.250 0.016 88);
+  --popover-foreground: oklch(0.910 0.015 88);
+
+  --primary: oklch(0.830 0.115 85);             /* #EDC55F */
+  --primary-foreground: oklch(0.280 0.055 78);  /* #3E2E00 */
+
+  --secondary: oklch(0.360 0.035 90);           /* #4F462B */
+  --secondary-foreground: oklch(0.900 0.030 88);
+
+  --muted: oklch(0.190 0.010 85);               /* #1D1B13 */
+  --muted-foreground: oklch(0.640 0.015 88);    /* #999080 */
+
+  --accent: oklch(0.330 0.075 80);              /* #594400 primary-container */
+  --accent-foreground: oklch(0.910 0.070 88);   /* #FFE18E */
+
+  --destructive: oklch(0.820 0.090 22);         /* #FFB4AB = --expense */
+
+  --border: oklch(0.250 0.010 85);              /* #2C2921 */
+  --input: oklch(0.360 0.012 88);               /* #4D4739 outline */
+  --ring: oklch(0.830 0.115 85);
+
+  --radius: 0.75rem;
+
+  --income: oklch(0.830 0.095 145);             /* #9FD9A0 */
+  --income-container: oklch(0.240 0.045 150);   /* #1E3320 */
+  --expense: oklch(0.820 0.090 22);             /* #FFB4AB */
+  --expense-container: oklch(0.250 0.060 25);   /* #3B1512 */
+  --transfer: oklch(0.790 0.070 245);           /* #9EC6EA */
+  --transfer-container: oklch(0.250 0.045 250); /* #16293A */
+
+  --chart-1: var(--primary);
+  --chart-2: var(--income);
+  --chart-3: var(--expense);
+  --chart-4: var(--transfer);
+  --chart-5: oklch(0.760 0.100 300);
+
+  --sidebar: oklch(0.190 0.010 85);             /* #1D1B13 */
+  --sidebar-foreground: oklch(0.910 0.015 88);
+  --sidebar-primary: oklch(0.830 0.115 85);
+  --sidebar-primary-foreground: oklch(0.280 0.055 78);
+  --sidebar-accent: oklch(0.330 0.075 80);
+  --sidebar-accent-foreground: oklch(0.910 0.070 88);
+  --sidebar-border: oklch(0.250 0.010 85);
+  --sidebar-ring: oklch(0.830 0.115 85);
+
+  --surface: oklch(0.150 0.012 85);
+  --elevated: oklch(0.250 0.016 88);            /* #2A2718 */
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Roboto', system-ui, sans-serif;
+  --font-heading: 'Roboto', system-ui, sans-serif;   /* Playfair Display removed */
+  --font-mono: 'DM Mono', 'Fira Mono', monospace;    /* kept */
+  --font-display: 'Roboto', system-ui, sans-serif;
+
+  /* new semantic utilities: text-income, bg-expense-container, … */
+  --color-income: var(--income);
+  --color-income-container: var(--income-container);
+  --color-expense: var(--expense);
+  --color-expense-container: var(--expense-container);
+  --color-transfer: var(--transfer);
+  --color-transfer-container: var(--transfer-container);
+
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+
+  /* keep every existing shadcn mapping block from the current index.css
+     verbatim below this line — none of those names changed. */
+}
+
+/* ── M3 shape scale ──
+   --radius: 0.75rem yields, via the existing calc() chain:
+   radius-sm  7.2px   chips, progress tracks
+   radius-md  9.6px   inputs, small buttons
+   radius-lg  12px    list items, sheets' inner cards
+   radius-xl  16.8px  → round UP to 20px for cards (M3 large)
+   radius-2xl 21.6px  bottom sheets (28px at the top corners)
+   Nav items and filled buttons use full pills: rounded-full at h-10/h-11.
+*/

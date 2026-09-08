@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=DM+Mono:wght@400;500&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #100E08; }
+  a { color: #EDC55F; text-decoration: none; }
+  a:hover { color: #FFE18E; }
+  .ms { font-family: 'Material Symbols Rounded'; font-weight: 400; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
+  .msf { font-variation-settings: 'FILL' 1; }
+</style>
+</helmet>
+
+<section style="padding:48px;display:flex;flex-direction:column;gap:40px;font-family:Roboto,system-ui,sans-serif;background:#100E08">
+
+  <div style="display:flex;flex-direction:column;gap:8px;max-width:900px">
+    <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Turn 7 · 7a</div>
+    <div style="font:400 32px/40px Roboto,sans-serif;color:#E9E2D4">Light theme — the four ambiguous screens</div>
+    <div style="font:400 15px/23px Roboto,sans-serif;color:#999080;text-wrap:pretty">The other frames map 1:1 through the README colour-role table. These four don't, because each leans on a tinted container in dark where light needs a different decision. Everything else in <a href="#6a">6a</a> derives directly.</div>
+  </div>
+
+  <div style="display:flex;gap:28px;flex-wrap:wrap">
+
+    <div data-screen-label="M2-light" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M2-light — <span style="font-family:'DM Mono',monospace;font-size:12px">/categories</span></div>
+      <div style="width:428px;height:908px;border-radius:32px;border:1px solid #DDD5C4;background:#EFE7DA;overflow:hidden;display:flex;flex-direction:column;position:relative">
+        <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#5A5346"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+        <div style="height:60px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px">
+          <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#1E1B13">arrow_back</span>
+          <span style="flex:1;font:500 20px/26px Roboto,sans-serif;color:#1E1B13">Categories</span>
+          <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#5A5346">search</span>
+        </div>
+        <div style="padding:0 16px 12px;flex-shrink:0">
+          <div style="display:flex;width:100%;height:44px;border-radius:22px;border:1px solid #CFC7B5;overflow:hidden">
+            <span style="flex:1;text-align:center;font:500 14px/44px Roboto,sans-serif;background:#FFE18E;color:#261A00">Expense · 9</span>
+            <span style="flex:1;text-align:center;font:500 14px/42px Roboto,sans-serif;color:#5A5346;border-left:1px solid #CFC7B5">Income · 4</span>
+          </div>
+        </div>
+        <div style="flex:1;min-height:0;overflow:hidden;padding:0 16px 16px">
+          <div style="border-radius:20px;background:#FFF8EE;padding:4px;display:flex;flex-direction:column">
+            <sc-for list="{{ categoriesLight }}" as="c" hint-placeholder-count="9">
+              <div style="display:flex;align-items:center;gap:14px;padding:11px 12px">
+                <span class="ms" style="width:40px;height:40px;border-radius:12px;background:{{ c.container }};color:{{ c.ink }};font-size:20px;line-height:40px;text-align:center;flex-shrink:0">{{ c.icon }}</span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <span style="font:500 14px/18px Roboto,sans-serif;color:#1E1B13">{{ c.name }}</span>
+                  <span style="font:400 12px/16px Roboto,sans-serif;color:#5A5346">{{ c.meta }}</span>
+                </span>
+                <span style="font:500 14px/18px 'DM Mono',monospace;color:#5A5346;flex-shrink:0">{{ c.share }}</span>
+                <span class="ms" style="font-size:20px;color:#CFC7B5;flex-shrink:0">chevron_right</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="position:absolute;right:16px;bottom:24px;width:64px;height:64px;border-radius:20px;background:#7A5900;color:#FFFFFF;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(60,45,10,.24)"><span class="ms" style="font-size:30px">add</span></div>
+      </div>
+      <div style="width:428px;font:400 13px/19px Roboto,sans-serif;color:#999080;text-wrap:pretty">Category tiles keep the container fill — <span style="font-family:'DM Mono',monospace;font-size:12px">#FFDAD6</span> on <span style="font-family:'DM Mono',monospace;font-size:12px">#FFF8EE</span> reads as a tint, not a warning, because the row ink stays neutral.</div>
+    </div>
+
+    <div data-screen-label="M4-light" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M4-light — <span style="font-family:'DM Mono',monospace;font-size:12px">/thirteenth-month</span></div>
+      <div style="width:428px;height:908px;border-radius:32px;border:1px solid #DDD5C4;background:#EFE7DA;overflow:hidden;display:flex;flex-direction:column">
+        <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#5A5346"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+        <div style="height:60px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px">
+          <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#1E1B13">arrow_back</span>
+          <span style="font:500 20px/26px Roboto,sans-serif;color:#1E1B13">13th month pay</span>
+        </div>
+        <div style="flex:1;min-height:0;overflow:hidden;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px">
+          <div style="border-radius:28px;background:#FFE18E;padding:24px;display:flex;flex-direction:column;gap:6px">
+            <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#4A3400">Estimated pay-out</div>
+            <div style="font:500 40px/46px 'DM Mono',monospace;color:#261A00">₱44,183</div>
+            <div style="font:400 13px/18px Roboto,sans-serif;color:#4A3400">Payable on or before Dec 24, 2026</div>
+          </div>
+          <div style="border-radius:20px;background:#FFF8EE;padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#7A5900">Your inputs</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font:400 12px/16px Roboto,sans-serif;color:#5A5346">Monthly basic pay</div>
+              <div style="height:52px;border-radius:12px;border:1px solid #CFC7B5;display:flex;align-items:center;padding:0 16px;gap:8px">
+                <span style="font:400 15px/20px 'DM Mono',monospace;color:#5A5346">₱</span>
+                <span style="flex:1;font:500 17px/22px 'DM Mono',monospace;color:#1E1B13">48,200</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                <div style="font:400 12px/16px Roboto,sans-serif;color:#5A5346">Months worked</div>
+                <div style="height:52px;border-radius:12px;border:1px solid #CFC7B5;display:flex;align-items:center;padding:0 16px"><span style="font:500 17px/22px 'DM Mono',monospace;color:#1E1B13">11</span></div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                <div style="font:400 12px/16px Roboto,sans-serif;color:#5A5346">Unpaid days</div>
+                <div style="height:52px;border-radius:12px;border:1px solid #CFC7B5;display:flex;align-items:center;padding:0 16px"><span style="font:500 17px/22px 'DM Mono',monospace;color:#1E1B13">3</span></div>
+              </div>
+            </div>
+          </div>
+          <div style="border-radius:20px;background:#FFF8EE;padding:4px;display:flex;flex-direction:column">
+            <div style="padding:12px 16px 4px;font:500 11px/15px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#7A5900">Breakdown</div>
+            <sc-for list="{{ thirteenthLight }}" as="r" hint-placeholder-count="4">
+              <div style="display:flex;justify-content:space-between;padding:13px 16px;border-top:1px solid #DDD5C4">
+                <span style="font:400 14px/18px Roboto,sans-serif;color:#5A5346">{{ r.label }}</span>
+                <span style="font:500 14px/18px 'DM Mono',monospace;color:{{ r.ink }}">{{ r.value }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="border-radius:20px;background:#CDE4F7;padding:14px 16px;display:flex;gap:12px">
+            <span class="ms" style="font-size:20px;color:#1F5A87;flex-shrink:0">info</span>
+            <div style="font:400 13px/19px Roboto,sans-serif;color:#123D5E;text-wrap:pretty">An estimate under PD 851: basic pay only, allowances and overtime excluded. Amounts up to ₱90,000 are tax-exempt.</div>
+          </div>
+          <div style="height:52px;border-radius:26px;background:#7A5900;color:#FFFFFF;font:500 15px/52px Roboto,sans-serif;text-align:center">Save as expected income</div>
+        </div>
+      </div>
+      <div style="width:428px;font:400 13px/19px Roboto,sans-serif;color:#999080;text-wrap:pretty">The hero stays <span style="font-family:'DM Mono',monospace;font-size:12px">primary-container</span> rather than flipping to filled primary — a solid <span style="font-family:'DM Mono',monospace;font-size:12px">#7A5900</span> block would out-shout the whole page in light. Ink drops to <span style="font-family:'DM Mono',monospace;font-size:12px">#261A00</span>, label to <span style="font-family:'DM Mono',monospace;font-size:12px">#4A3400</span>.</div>
+    </div>
+
+    <div data-screen-label="M6-light" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M6-light — <span style="font-family:'DM Mono',monospace;font-size:12px">/login</span></div>
+      <div style="width:428px;height:908px;border-radius:32px;border:1px solid #DDD5C4;background:#FFF8EE;overflow:hidden;display:flex;flex-direction:column">
+        <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#5A5346"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+        <div style="flex:1;min-height:0;padding:0 24px;display:flex;flex-direction:column;justify-content:center;gap:28px">
+          <div style="display:flex;flex-direction:column;gap:18px">
+            <div style="width:64px;height:64px;border-radius:20px;background:#7A5900;color:#FFFFFF;font:700 34px/64px Roboto,sans-serif;text-align:center">L</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font:400 30px/38px Roboto,sans-serif;color:#1E1B13">Welcome back</div>
+              <div style="font:400 15px/22px Roboto,sans-serif;color:#5A5346">Your cycle is waiting.</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="height:56px;border-radius:12px;border:1px solid #CFC7B5;display:flex;align-items:center;gap:12px;padding:0 16px">
+              <span class="ms" style="font-size:20px;color:#5A5346">mail</span>
+              <span style="flex:1;font:400 15px/20px Roboto,sans-serif;color:#1E1B13">miguel@ledger.app</span>
+            </div>
+            <div style="height:56px;border-radius:12px;border:2px solid #7A5900;display:flex;align-items:center;gap:12px;padding:0 15px">
+              <span class="ms" style="font-size:20px;color:#7A5900">lock</span>
+              <span style="flex:1;font:500 15px/20px 'DM Mono',monospace;color:#1E1B13;letter-spacing:.2em">••••••••</span>
+              <span class="ms" style="font-size:20px;color:#5A5346">visibility_off</span>
+            </div>
+            <div style="align-self:flex-end;font:500 13px/18px Roboto,sans-serif;color:#7A5900">Forgot password?</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:16px">
+            <div style="height:56px;border-radius:28px;background:#7A5900;color:#FFFFFF;font:500 16px/56px Roboto,sans-serif;text-align:center">Sign in</div>
+            <div style="display:flex;align-items:center;gap:14px"><span style="flex:1;height:1px;background:#DDD5C4"></span><span style="font:400 12px/16px Roboto,sans-serif;color:#5A5346">or</span><span style="flex:1;height:1px;background:#DDD5C4"></span></div>
+            <div style="height:56px;border-radius:28px;border:1px solid #CFC7B5;display:flex;align-items:center;justify-content:center;gap:10px"><span class="ms" style="font-size:20px;color:#1E1B13">g_translate</span><span style="font:500 15px/20px Roboto,sans-serif;color:#1E1B13">Continue with Google</span></div>
+          </div>
+          <div style="font:400 13px/20px Roboto,sans-serif;color:#5A5346;text-align:center;text-wrap:pretty">No account yet? <span style="color:#7A5900;font-weight:500">Create one</span><br>By continuing you accept the <span style="color:#7A5900">Terms</span> and <span style="color:#7A5900">Privacy Policy</span>.</div>
+        </div>
+      </div>
+      <div style="width:428px;font:400 13px/19px Roboto,sans-serif;color:#999080;text-wrap:pretty">Login is the one screen on <span style="font-family:'DM Mono',monospace;font-size:12px">surface</span> (<span style="font-family:'DM Mono',monospace;font-size:12px">#FFF8EE</span>) rather than <span style="font-family:'DM Mono',monospace;font-size:12px">surface-dim</span> — there are no cards to lift off a dimmer ground, so the page becomes the card. Focus ring on the password field is a 2px primary border, not a glow.</div>
+    </div>
+  </div>
+
+  <div data-screen-label="D4-light" style="display:flex;flex-direction:column;gap:10px">
+    <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">D4-light — <span style="font-family:'DM Mono',monospace;font-size:12px">/reports</span> desktop</div>
+    <div style="width:1280px;height:800px;border-radius:20px;border:1px solid #DDD5C4;background:#EFE7DA;overflow:hidden;display:flex">
+      <div style="width:220px;flex-shrink:0;background:#F8F1E4;border-right:1px solid #DDD5C4;padding:20px 12px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:10px;padding:0 8px 18px">
+          <span style="width:32px;height:32px;border-radius:10px;background:#7A5900;color:#FFFFFF;font:700 17px/32px Roboto,sans-serif;text-align:center">L</span>
+          <span style="font:500 17px/22px Roboto,sans-serif;color:#1E1B13">Ledger</span>
+        </div>
+        <sc-for list="{{ drawerReportsLight }}" as="d" hint-placeholder-count="7">
+          <div style="height:44px;border-radius:22px;background:{{ d.pill }};display:flex;align-items:center;gap:12px;padding:0 14px">
+            <span class="ms {{ d.fill }}" style="font-size:20px;color:{{ d.ink }}">{{ d.icon }}</span>
+            <span style="font:500 14px/18px Roboto,sans-serif;color:{{ d.ink }}">{{ d.label }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+        <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid #DDD5C4">
+          <div style="flex:1;font:400 22px/28px Roboto,sans-serif;color:#1E1B13">Reports</div>
+          <div style="display:flex;height:40px;border-radius:20px;border:1px solid #CFC7B5;overflow:hidden">
+            <span style="padding:0 16px;font:500 13px/40px Roboto,sans-serif;background:#FFE18E;color:#261A00">6M</span>
+            <span style="padding:0 16px;font:500 13px/38px Roboto,sans-serif;color:#5A5346;border-left:1px solid #CFC7B5">1Y</span>
+            <span style="padding:0 16px;font:500 13px/38px Roboto,sans-serif;color:#5A5346;border-left:1px solid #CFC7B5">All</span>
+          </div>
+          <div style="height:40px;padding:0 16px;border-radius:20px;border:1px solid #CFC7B5;color:#1E1B13;font:500 14px/38px Roboto,sans-serif;display:flex;align-items:center;gap:8px"><span class="ms" style="font-size:18px">download</span>Export CSV</div>
+        </div>
+        <div style="flex:1;min-height:0;overflow:hidden;padding:20px 24px;display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;gap:16px">
+            <sc-for list="{{ reportStatsLight }}" as="s" hint-placeholder-count="4">
+              <div style="flex:1;border-radius:20px;background:#FFF8EE;padding:18px;display:flex;flex-direction:column;gap:6px">
+                <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#5A5346">{{ s.label }}</div>
+                <div style="font:500 26px/32px 'DM Mono',monospace;color:{{ s.ink }}">{{ s.value }}</div>
+                <div style="font:400 12px/16px Roboto,sans-serif;color:#5A5346">{{ s.meta }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex:1;min-height:0;display:flex;gap:16px">
+            <div style="flex:1.6;min-width:0;border-radius:20px;background:#FFF8EE;padding:20px;display:flex;flex-direction:column;gap:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div style="font:500 16px/22px Roboto,sans-serif;color:#1E1B13">Income vs spend</div>
+                <div style="display:flex;gap:14px;font:400 12px/16px Roboto,sans-serif;color:#5A5346">
+                  <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:#1E6B2E"></span>Income</span>
+                  <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:#A4342B"></span>Spend</span>
+                  <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:2px;background:#7A5900"></span>Saved</span>
+                </div>
+              </div>
+              <div style="flex:1;display:flex;align-items:flex-end;gap:20px">
+                <sc-for list="{{ months }}" as="m" hint-placeholder-count="6">
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px">
+                    <div style="width:100%;display:flex;gap:6px;align-items:flex-end;height:280px">
+                      <div style="flex:1;height:{{ m.inD }};border-radius:6px 6px 0 0;background:#1E6B2E"></div>
+                      <div style="flex:1;height:{{ m.outD }};border-radius:6px 6px 0 0;background:#A4342B"></div>
+                    </div>
+                    <div style="font:400 12px/16px Roboto,sans-serif;color:#5A5346">{{ m.label }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:16px">
+              <div style="flex:1;border-radius:20px;background:#FFF8EE;padding:20px;display:flex;flex-direction:column;gap:14px">
+                <div style="font:500 16px/22px Roboto,sans-serif;color:#1E1B13">Where it went</div>
+                <sc-for list="{{ topSpendLight }}" as="t" hint-placeholder-count="5">
+                  <div style="display:flex;flex-direction:column;gap:7px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <span style="flex:1;font:400 13px/18px Roboto,sans-serif;color:#1E1B13">{{ t.name }}</span>
+                      <span style="font:500 13px/18px 'DM Mono',monospace;color:#1E1B13">{{ t.amount }}</span>
+                      <span style="width:38px;text-align:right;font:400 12px/16px 'DM Mono',monospace;color:#5A5346">{{ t.pct }}</span>
+                    </div>
+                    <div style="height:6px;border-radius:3px;background:#DDD5C4;overflow:hidden"><div style="width:{{ t.pct }};height:100%;border-radius:3px;background:{{ t.ink }}"></div></div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="border-radius:20px;background:#CDE4F7;padding:16px;display:flex;gap:12px">
+                <span class="ms" style="font-size:20px;color:#1F5A87;flex-shrink:0">insights</span>
+                <div style="font:400 13px/19px Roboto,sans-serif;color:#123D5E;text-wrap:pretty">Spend rose 14% in June and has fallen every month since. Dining is the only category still growing.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="max-width:900px;font:400 13px/19px Roboto,sans-serif;color:#999080;text-wrap:pretty">Chart bars go to the <em>full-strength</em> light tones (<span style="font-family:'DM Mono',monospace;font-size:12px">#1E6B2E</span> / <span style="font-family:'DM Mono',monospace;font-size:12px">#A4342B</span>), not the containers — a 280px bar in <span style="font-family:'DM Mono',monospace;font-size:12px">#C6EBC7</span> disappears against <span style="font-family:'DM Mono',monospace;font-size:12px">#FFF8EE</span>. Bar tracks use <span style="font-family:'DM Mono',monospace;font-size:12px">outline-variant</span>, one step darker than the card, since <span style="font-family:'DM Mono',monospace;font-size:12px">--input</span> is too heavy at 6px.</div>
+  </div>
+
+  <div style="height:1px;background:#2C2921"></div>
+
+  <div id="6a" style="display:flex;flex-direction:column;gap:8px;max-width:900px">
+    <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Turn 6 · 6a</div>
+    <div style="font:400 32px/40px Roboto,sans-serif;color:#E9E2D4">The remaining routes — full coverage</div>
+    <div style="font:400 15px/23px Roboto,sans-serif;color:#999080;text-wrap:pretty">Every route that <a href="#cov">COVERAGE.md</a> listed as unspecified, now specified. Seven mobile surfaces and four desktop ones, on the same token layer — no new colours, no new type. Dark only; each value has a light pair in the README colour-role table.</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#999080">Mobile · 428 × 908</div>
+    <div style="display:flex;gap:28px;flex-wrap:wrap">
+
+      <div data-screen-label="M1" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M1 — <span style="font-family:'DM Mono',monospace;font-size:12px">/settings</span> mobile</div>
+        <div style="width:428px;height:908px;border-radius:32px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#999080"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+          <div style="height:60px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px">
+            <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#E9E2D4">arrow_back</span>
+            <span style="font:500 20px/26px Roboto,sans-serif;color:#E9E2D4">Settings</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:hidden;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px">
+            <div style="border-radius:20px;background:#211F17;padding:16px;display:flex;align-items:center;gap:14px">
+              <span style="width:52px;height:52px;border-radius:26px;background:#594400;color:#FFE18E;font:500 19px/52px Roboto,sans-serif;text-align:center">MR</span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                <div style="font:500 16px/21px Roboto,sans-serif;color:#E9E2D4">Miguel Reyes</div>
+                <div style="font:400 13px/17px Roboto,sans-serif;color:#999080">miguel@ledger.app</div>
+              </div>
+              <span class="ms" style="font-size:20px;color:#999080">edit</span>
+            </div>
+
+            <div style="border-radius:20px;background:#211F17;padding:16px;display:flex;flex-direction:column;gap:14px">
+              <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Appearance</div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1;height:44px;border-radius:22px;background:#594400;color:#FFE18E;display:flex;align-items:center;justify-content:center;gap:8px"><span class="ms msf" style="font-size:18px">dark_mode</span><span style="font:500 14px/18px Roboto,sans-serif">Dark</span></div>
+                <div style="flex:1;height:44px;border-radius:22px;border:1px solid #4D4739;color:#999080;display:flex;align-items:center;justify-content:center;gap:8px"><span class="ms" style="font-size:18px">light_mode</span><span style="font:500 14px/18px Roboto,sans-serif">Light</span></div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="font:400 13px/17px Roboto,sans-serif;color:#999080">Text size</div>
+                <div style="display:flex;height:40px;border-radius:20px;border:1px solid #4D4739;overflow:hidden">
+                  <span style="flex:1;text-align:center;font:500 12px/38px Roboto,sans-serif;color:#999080">12</span>
+                  <span style="flex:1;text-align:center;font:500 14px/38px Roboto,sans-serif;background:#594400;color:#FFE18E;border-left:1px solid #4D4739;border-right:1px solid #4D4739">14</span>
+                  <span style="flex:1;text-align:center;font:500 16px/38px Roboto,sans-serif;color:#999080">16</span>
+                  <span style="flex:1;text-align:center;font:500 18px/38px Roboto,sans-serif;color:#999080;border-left:1px solid #4D4739">18</span>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="font:400 13px/17px Roboto,sans-serif;color:#999080">Accent</div>
+                <div style="display:flex;gap:12px">
+                  <span style="width:32px;height:32px;border-radius:16px;background:#EDC55F;box-shadow:0 0 0 2px #211F17,0 0 0 4px #EDC55F;display:flex;align-items:center;justify-content:center"><span class="ms" style="font-size:18px;color:#3E2E00">check</span></span>
+                  <span style="width:32px;height:32px;border-radius:16px;background:#9FD9A0"></span>
+                  <span style="width:32px;height:32px;border-radius:16px;background:#9EC6EA"></span>
+                  <span style="width:32px;height:32px;border-radius:16px;background:#D9A0C8"></span>
+                  <span style="width:32px;height:32px;border-radius:16px;background:#C2B8F0"></span>
+                </div>
+              </div>
+            </div>
+
+            <div style="border-radius:20px;background:#211F17;padding:4px;display:flex;flex-direction:column">
+              <div style="padding:12px 16px 4px;font:500 11px/15px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Notifications</div>
+              <sc-for list="{{ switches }}" as="s" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:14px;padding:13px 16px">
+                  <span style="flex:1;font:400 15px/20px Roboto,sans-serif;color:#E9E2D4">{{ s.label }}</span>
+                  <span style="width:52px;height:32px;border-radius:16px;background:{{ s.track }};display:flex;align-items:center;justify-content:{{ s.align }};padding:0 4px;flex-shrink:0"><span style="width:24px;height:24px;border-radius:12px;background:{{ s.thumb }}"></span></span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="border-radius:20px;background:#211F17;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Month cycle</div>
+              <div style="height:48px;border-radius:12px;border:1px solid #4D4739;display:flex;align-items:center;justify-content:space-between;padding:0 16px">
+                <span style="font:400 15px/20px Roboto,sans-serif;color:#E9E2D4">Starts on day 1</span>
+                <span class="ms" style="font-size:20px;color:#999080">expand_more</span>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px">
+              <div style="flex:1;height:48px;border-radius:24px;border:1px solid #4D4739;color:#E9E2D4;font:500 15px/46px Roboto,sans-serif;text-align:center">Sign out</div>
+              <div style="flex:1;height:48px;border-radius:24px;background:#3B1512;color:#FFB4AB;font:500 15px/48px Roboto,sans-serif;text-align:center">Delete data</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="M2" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M2 — <span style="font-family:'DM Mono',monospace;font-size:12px">/categories</span></div>
+        <div style="width:428px;height:908px;border-radius:32px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex;flex-direction:column;position:relative">
+          <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#999080"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+          <div style="height:60px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px">
+            <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#E9E2D4">arrow_back</span>
+            <span style="flex:1;font:500 20px/26px Roboto,sans-serif;color:#E9E2D4">Categories</span>
+            <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#999080">search</span>
+          </div>
+          <div style="padding:0 16px 12px;flex-shrink:0;display:flex;height:44px;border-radius:22px;overflow:hidden">
+            <div style="display:flex;width:100%;height:44px;border-radius:22px;border:1px solid #4D4739;overflow:hidden">
+              <span style="flex:1;text-align:center;font:500 14px/44px Roboto,sans-serif;background:#594400;color:#FFE18E">Expense · 9</span>
+              <span style="flex:1;text-align:center;font:500 14px/42px Roboto,sans-serif;color:#999080;border-left:1px solid #4D4739">Income · 4</span>
+            </div>
+          </div>
+          <div style="flex:1;min-height:0;overflow:hidden;padding:0 16px 16px;display:flex;flex-direction:column;gap:6px">
+            <div style="border-radius:20px;background:#211F17;padding:4px;display:flex;flex-direction:column">
+              <sc-for list="{{ categories }}" as="c" hint-placeholder-count="9">
+                <div style="display:flex;align-items:center;gap:14px;padding:11px 12px">
+                  <span class="ms" style="width:40px;height:40px;border-radius:12px;background:{{ c.container }};color:{{ c.ink }};font-size:20px;line-height:40px;text-align:center;flex-shrink:0">{{ c.icon }}</span>
+                  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                    <span style="font:500 14px/18px Roboto,sans-serif;color:#E9E2D4">{{ c.name }}</span>
+                    <span style="font:400 12px/16px Roboto,sans-serif;color:#999080">{{ c.meta }}</span>
+                  </span>
+                  <span style="font:500 14px/18px 'DM Mono',monospace;color:#999080;flex-shrink:0">{{ c.share }}</span>
+                  <span class="ms" style="font-size:20px;color:#4D4739;flex-shrink:0">chevron_right</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="position:absolute;right:16px;bottom:24px;width:64px;height:64px;border-radius:20px;background:#EDC55F;color:#3E2E00;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.45)"><span class="ms" style="font-size:30px">add</span></div>
+        </div>
+      </div>
+
+      <div data-screen-label="M3" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M3 — <span style="font-family:'DM Mono',monospace;font-size:12px">/reports</span></div>
+        <div style="width:428px;height:908px;border-radius:32px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#999080"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+          <div style="height:60px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px">
+            <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#E9E2D4">arrow_back</span>
+            <span style="flex:1;font:500 20px/26px Roboto,sans-serif;color:#E9E2D4">Reports</span>
+            <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#999080">ios_share</span>
+          </div>
+          <div style="flex-shrink:0;display:flex;gap:8px;padding:0 16px 12px;overflow:hidden">
+            <span style="height:34px;padding:0 14px;border-radius:17px;background:#594400;color:#FFE18E;font:500 13px/34px Roboto,sans-serif;white-space:nowrap">6 months</span>
+            <span style="height:34px;padding:0 14px;border-radius:17px;border:1px solid #4D4739;color:#999080;font:500 13px/32px Roboto,sans-serif;white-space:nowrap">Year</span>
+            <span style="height:34px;padding:0 14px;border-radius:17px;border:1px solid #4D4739;color:#999080;font:500 13px/32px Roboto,sans-serif;white-space:nowrap">Custom</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:hidden;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;gap:10px">
+              <div style="flex:1;border-radius:20px;background:#211F17;padding:16px;display:flex;flex-direction:column;gap:6px">
+                <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999080">Avg. saved</div>
+                <div style="font:500 22px/28px 'DM Mono',monospace;color:#9FD9A0">₱34,180</div>
+                <div style="font:400 12px/16px Roboto,sans-serif;color:#999080">per month</div>
+              </div>
+              <div style="flex:1;border-radius:20px;background:#211F17;padding:16px;display:flex;flex-direction:column;gap:6px">
+                <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999080">Savings rate</div>
+                <div style="font:500 22px/28px 'DM Mono',monospace;color:#E9E2D4">35.4%</div>
+                <div style="font:400 12px/16px Roboto,sans-serif;color:#9FD9A0">+2.1 pts</div>
+              </div>
+            </div>
+
+            <div style="border-radius:20px;background:#211F17;padding:18px 16px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div style="font:500 16px/22px Roboto,sans-serif;color:#E9E2D4">Income vs spend</div>
+                <div style="display:flex;gap:12px;font:400 11px/15px Roboto,sans-serif;color:#999080">
+                  <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:#9FD9A0"></span>In</span>
+                  <span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:#FFB4AB"></span>Out</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-end;gap:10px;height:120px">
+                <sc-for list="{{ months }}" as="m" hint-placeholder-count="6">
+                  <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+                    <div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:96px">
+                      <div style="flex:1;height:{{ m.inH }};border-radius:5px 5px 0 0;background:#9FD9A0"></div>
+                      <div style="flex:1;height:{{ m.outH }};border-radius:5px 5px 0 0;background:#FFB4AB"></div>
+                    </div>
+                    <div style="font:400 10px/12px Roboto,sans-serif;color:#999080">{{ m.label }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="border-radius:20px;background:#211F17;padding:18px 16px;display:flex;flex-direction:column;gap:14px">
+              <div style="font:500 16px/22px Roboto,sans-serif;color:#E9E2D4">Where it went</div>
+              <sc-for list="{{ topSpend }}" as="t" hint-placeholder-count="5">
+                <div style="display:flex;flex-direction:column;gap:7px">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span class="ms" style="width:28px;height:28px;border-radius:9px;background:{{ t.container }};color:{{ t.ink }};font-size:15px;line-height:28px;text-align:center;flex-shrink:0">{{ t.icon }}</span>
+                    <span style="flex:1;font:400 14px/18px Roboto,sans-serif;color:#E9E2D4">{{ t.name }}</span>
+                    <span style="font:500 13px/18px 'DM Mono',monospace;color:#E9E2D4">{{ t.amount }}</span>
+                  </div>
+                  <div style="height:6px;border-radius:3px;background:#2C2921;overflow:hidden"><div style="width:{{ t.pct }};height:100%;border-radius:3px;background:{{ t.ink }}"></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="M4" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M4 — <span style="font-family:'DM Mono',monospace;font-size:12px">/thirteenth-month</span></div>
+        <div style="width:428px;height:908px;border-radius:32px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#999080"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+          <div style="height:60px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px">
+            <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#E9E2D4">arrow_back</span>
+            <span style="font:500 20px/26px Roboto,sans-serif;color:#E9E2D4">13th month pay</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:hidden;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px">
+            <div style="border-radius:28px;background:#594400;padding:24px;display:flex;flex-direction:column;gap:6px">
+              <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#FFE18E">Estimated pay-out</div>
+              <div style="font:500 40px/46px 'DM Mono',monospace;color:#FFE18E">₱44,183</div>
+              <div style="font:400 13px/18px Roboto,sans-serif;color:#E8D5A8">Payable on or before Dec 24, 2026</div>
+            </div>
+            <div style="border-radius:20px;background:#211F17;padding:16px;display:flex;flex-direction:column;gap:12px">
+              <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Your inputs</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="font:400 12px/16px Roboto,sans-serif;color:#999080">Monthly basic pay</div>
+                <div style="height:52px;border-radius:12px;border:1px solid #4D4739;display:flex;align-items:center;padding:0 16px;gap:8px">
+                  <span style="font:400 15px/20px 'DM Mono',monospace;color:#999080">₱</span>
+                  <span style="flex:1;font:500 17px/22px 'DM Mono',monospace;color:#E9E2D4">48,200</span>
+                </div>
+              </div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                  <div style="font:400 12px/16px Roboto,sans-serif;color:#999080">Months worked</div>
+                  <div style="height:52px;border-radius:12px;border:1px solid #4D4739;display:flex;align-items:center;padding:0 16px"><span style="font:500 17px/22px 'DM Mono',monospace;color:#E9E2D4">11</span></div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+                  <div style="font:400 12px/16px Roboto,sans-serif;color:#999080">Unpaid days</div>
+                  <div style="height:52px;border-radius:12px;border:1px solid #4D4739;display:flex;align-items:center;padding:0 16px"><span style="font:500 17px/22px 'DM Mono',monospace;color:#E9E2D4">3</span></div>
+                </div>
+              </div>
+            </div>
+            <div style="border-radius:20px;background:#211F17;padding:4px;display:flex;flex-direction:column">
+              <div style="padding:12px 16px 4px;font:500 11px/15px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Breakdown</div>
+              <sc-for list="{{ thirteenth }}" as="r" hint-placeholder-count="4">
+                <div style="display:flex;justify-content:space-between;padding:13px 16px;border-top:1px solid #2C2921">
+                  <span style="font:400 14px/18px Roboto,sans-serif;color:#999080">{{ r.label }}</span>
+                  <span style="font:500 14px/18px 'DM Mono',monospace;color:{{ r.ink }}">{{ r.value }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="border-radius:20px;background:#16293A;padding:14px 16px;display:flex;gap:12px">
+              <span class="ms" style="font-size:20px;color:#9EC6EA;flex-shrink:0">info</span>
+              <div style="font:400 13px/19px Roboto,sans-serif;color:#C3DAEE;text-wrap:pretty">An estimate under PD 851: basic pay only, allowances and overtime excluded. Amounts up to ₱90,000 are tax-exempt.</div>
+            </div>
+            <div style="height:52px;border-radius:26px;background:#EDC55F;color:#3E2E00;font:500 15px/52px Roboto,sans-serif;text-align:center">Save as expected income</div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="M5" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M5 — <span style="font-family:'DM Mono',monospace;font-size:12px">/accounts/:id/transactions</span></div>
+        <div style="width:428px;height:908px;border-radius:32px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#999080"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+          <div style="height:60px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px">
+            <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#E9E2D4">arrow_back</span>
+            <span style="flex:1;font:500 20px/26px Roboto,sans-serif;color:#E9E2D4">BPI Debit</span>
+            <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#999080">tune</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:hidden;padding:0 16px 16px;display:flex;flex-direction:column;gap:12px">
+            <div style="border-radius:24px;background:#211F17;padding:20px;display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:center;gap:14px">
+                <span class="ms" style="width:44px;height:44px;border-radius:14px;background:#3B1512;color:#FFB4AB;font-size:22px;line-height:44px;text-align:center">credit_card</span>
+                <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                  <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#999080">Available</div>
+                  <div style="font:500 26px/32px 'DM Mono',monospace;color:#E9E2D4">₱62,770</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px">
+                <div style="flex:1;border-radius:14px;background:#1E3320;padding:10px 12px;display:flex;flex-direction:column;gap:2px"><span style="font:500 10px/14px Roboto,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#9FD9A0">In</span><span style="font:500 15px/20px 'DM Mono',monospace;color:#9FD9A0">₱48,200</span></div>
+                <div style="flex:1;border-radius:14px;background:#3B1512;padding:10px 12px;display:flex;flex-direction:column;gap:2px"><span style="font:500 10px/14px Roboto,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#FFB4AB">Out</span><span style="font:500 15px/20px 'DM Mono',monospace;color:#FFB4AB">₱18,640</span></div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;overflow:hidden">
+              <span style="height:34px;padding:0 14px;border-radius:17px;background:#594400;color:#FFE18E;font:500 13px/34px Roboto,sans-serif;white-space:nowrap">This cycle</span>
+              <span style="height:34px;padding:0 14px;border-radius:17px;border:1px solid #4D4739;color:#999080;font:500 13px/32px Roboto,sans-serif;white-space:nowrap">All time</span>
+              <span style="height:34px;padding:0 14px;border-radius:17px;border:1px solid #4D4739;color:#999080;font:500 13px/32px Roboto,sans-serif;white-space:nowrap">Expense</span>
+            </div>
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;padding:6px 6px 2px">
+                  <span style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">{{ g.day }}</span>
+                  <span style="font:400 12px/16px 'DM Mono',monospace;color:#999080">{{ g.total }}</span>
+                </div>
+                <div style="border-radius:20px;background:#211F17;padding:4px">
+                  <sc-for list="{{ g.items }}" as="tx" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:14px;padding:10px 12px">
+                      <span class="ms" style="width:40px;height:40px;border-radius:12px;background:{{ tx.container }};color:{{ tx.ink }};font-size:20px;line-height:40px;text-align:center;flex-shrink:0">{{ tx.icon }}</span>
+                      <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                        <span style="font:500 14px/18px Roboto,sans-serif;color:#E9E2D4">{{ tx.name }}</span>
+                        <span style="font:400 12px/16px Roboto,sans-serif;color:#999080">{{ tx.meta }}</span>
+                      </span>
+                      <span style="font:500 15px/20px 'DM Mono',monospace;color:{{ tx.ink }};flex-shrink:0">{{ tx.amount }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="M6" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M6 — <span style="font-family:'DM Mono',monospace;font-size:12px">/login</span></div>
+        <div style="width:428px;height:908px;border-radius:32px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#999080"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+          <div style="flex:1;min-height:0;padding:0 24px;display:flex;flex-direction:column;justify-content:center;gap:28px">
+            <div style="display:flex;flex-direction:column;gap:18px">
+              <div style="width:64px;height:64px;border-radius:20px;background:#EDC55F;color:#3E2E00;font:700 34px/64px Roboto,sans-serif;text-align:center">L</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="font:400 30px/38px Roboto,sans-serif;color:#E9E2D4">Welcome back</div>
+                <div style="font:400 15px/22px Roboto,sans-serif;color:#999080">Your cycle is waiting.</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="height:56px;border-radius:12px;border:1px solid #4D4739;display:flex;align-items:center;gap:12px;padding:0 16px">
+                <span class="ms" style="font-size:20px;color:#999080">mail</span>
+                <span style="flex:1;font:400 15px/20px Roboto,sans-serif;color:#E9E2D4">miguel@ledger.app</span>
+              </div>
+              <div style="height:56px;border-radius:12px;border:1px solid #EDC55F;display:flex;align-items:center;gap:12px;padding:0 16px">
+                <span class="ms" style="font-size:20px;color:#EDC55F">lock</span>
+                <span style="flex:1;font:500 15px/20px 'DM Mono',monospace;color:#E9E2D4;letter-spacing:.2em">••••••••</span>
+                <span class="ms" style="font-size:20px;color:#999080">visibility_off</span>
+              </div>
+              <div style="align-self:flex-end;font:500 13px/18px Roboto,sans-serif;color:#EDC55F">Forgot password?</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="height:56px;border-radius:28px;background:#EDC55F;color:#3E2E00;font:500 16px/56px Roboto,sans-serif;text-align:center">Sign in</div>
+              <div style="display:flex;align-items:center;gap:14px"><span style="flex:1;height:1px;background:#2C2921"></span><span style="font:400 12px/16px Roboto,sans-serif;color:#999080">or</span><span style="flex:1;height:1px;background:#2C2921"></span></div>
+              <div style="height:56px;border-radius:28px;border:1px solid #4D4739;display:flex;align-items:center;justify-content:center;gap:10px"><span class="ms" style="font-size:20px;color:#E9E2D4">g_translate</span><span style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">Continue with Google</span></div>
+            </div>
+            <div style="font:400 13px/20px Roboto,sans-serif;color:#999080;text-align:center;text-wrap:pretty">No account yet? <span style="color:#EDC55F;font-weight:500">Create one</span><br>By continuing you accept the <span style="color:#EDC55F">Terms</span> and <span style="color:#EDC55F">Privacy Policy</span>.</div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="M7" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">M7 — prose pages · <span style="font-family:'DM Mono',monospace;font-size:12px">/privacy</span> <span style="font-family:'DM Mono',monospace;font-size:12px">/terms</span> <span style="font-family:'DM Mono',monospace;font-size:12px">/data-deletion</span></div>
+        <div style="width:428px;height:908px;border-radius:32px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex;flex-direction:column">
+          <div style="height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font:500 12px/36px Roboto,sans-serif;color:#999080"><span>9:41</span><span class="ms" style="font-size:14px">signal_cellular_alt</span></div>
+          <div style="height:60px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 8px;border-bottom:1px solid #2C2921">
+            <span class="ms" style="width:48px;height:48px;font-size:24px;line-height:48px;text-align:center;color:#E9E2D4">arrow_back</span>
+            <span style="font:500 20px/26px Roboto,sans-serif;color:#E9E2D4">Privacy policy</span>
+          </div>
+          <div style="flex:1;min-height:0;overflow:hidden;padding:24px 24px 16px;display:flex;flex-direction:column;gap:20px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font:400 26px/34px Roboto,sans-serif;color:#E9E2D4">How Ledger handles your data</div>
+              <div style="font:400 12px/16px 'DM Mono',monospace;color:#999080">Updated Sep 1, 2026</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px;max-width:60ch">
+              <div style="font:400 15px/24px Roboto,sans-serif;color:#D0C6B0;text-wrap:pretty">Ledger stores your transactions, accounts and budgets so that they are available across your devices. Entries created offline stay on your device until the app can reach the server.</div>
+              <div style="font:500 17px/24px Roboto,sans-serif;color:#E9E2D4">What we store</div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;gap:12px"><span style="width:5px;height:5px;border-radius:3px;background:#EDC55F;margin-top:9px;flex-shrink:0"></span><span style="font:400 15px/24px Roboto,sans-serif;color:#D0C6B0">Account identity — your email address and display name.</span></div>
+                <div style="display:flex;gap:12px"><span style="width:5px;height:5px;border-radius:3px;background:#EDC55F;margin-top:9px;flex-shrink:0"></span><span style="font:400 15px/24px Roboto,sans-serif;color:#D0C6B0">Financial records you enter yourself — we never connect to a bank.</span></div>
+                <div style="display:flex;gap:12px"><span style="width:5px;height:5px;border-radius:3px;background:#EDC55F;margin-top:9px;flex-shrink:0"></span><span style="font:400 15px/24px Roboto,sans-serif;color:#D0C6B0">Preferences — theme, text size, cycle start day.</span></div>
+              </div>
+              <div style="font:500 17px/24px Roboto,sans-serif;color:#E9E2D4">Deleting your data</div>
+              <div style="font:400 15px/24px Roboto,sans-serif;color:#D0C6B0;text-wrap:pretty">You can remove everything from Settings. Deletion is immediate and cannot be undone.</div>
+            </div>
+            <div style="height:48px;border-radius:24px;border:1px solid #4D4739;color:#E9E2D4;font:500 15px/46px Roboto,sans-serif;text-align:center">Contact support</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="max-width:900px;font:400 13px/20px Roboto,sans-serif;color:#999080;text-wrap:pretty">One layout serves all three prose routes — only the app-bar title, page title and body change. Measure text at 60ch; 15/24 body on <span style="font-family:'DM Mono',monospace;font-size:12px">#D0C6B0</span> rather than full-strength ink, since these are read once, not scanned.</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#999080">Desktop · 1280 × 800 · same 220px drawer</div>
+    <div style="display:flex;gap:28px;flex-wrap:wrap">
+
+      <div data-screen-label="D1" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">D1 — <span style="font-family:'DM Mono',monospace;font-size:12px">/accounts</span> desktop</div>
+        <div style="width:1280px;height:800px;border-radius:20px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex">
+          <div style="width:220px;flex-shrink:0;background:#1D1B13;border-right:1px solid #2C2921;padding:20px 12px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:10px;padding:0 8px 18px">
+              <span style="width:32px;height:32px;border-radius:10px;background:#EDC55F;color:#3E2E00;font:700 17px/32px Roboto,sans-serif;text-align:center">L</span>
+              <span style="font:500 17px/22px Roboto,sans-serif;color:#E9E2D4">Ledger</span>
+            </div>
+            <sc-for list="{{ drawerAccounts }}" as="d" hint-placeholder-count="7">
+              <div style="height:44px;border-radius:22px;background:{{ d.pill }};display:flex;align-items:center;gap:12px;padding:0 14px">
+                <span class="ms {{ d.fill }}" style="font-size:20px;color:{{ d.ink }}">{{ d.icon }}</span>
+                <span style="font:500 14px/18px Roboto,sans-serif;color:{{ d.ink }}">{{ d.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:16px;padding:0 24px;border-bottom:1px solid #2C2921">
+              <div style="flex:1;font:400 22px/28px Roboto,sans-serif;color:#E9E2D4">Accounts</div>
+              <div style="height:40px;padding:0 20px;border-radius:20px;background:#EDC55F;color:#3E2E00;font:500 14px/40px Roboto,sans-serif;display:flex;align-items:center;gap:8px"><span class="ms" style="font-size:18px">add</span>New account</div>
+            </div>
+            <div style="flex:1;min-height:0;overflow:hidden;padding:20px 24px;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;gap:16px">
+                <div style="flex:1;border-radius:20px;background:#594400;padding:20px;display:flex;flex-direction:column;gap:4px"><div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#FFE18E">Net worth</div><div style="font:500 30px/38px 'DM Mono',monospace;color:#FFE18E">₱482,150</div></div>
+                <div style="flex:1;border-radius:20px;background:#211F17;padding:20px;display:flex;flex-direction:column;gap:4px"><div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999080">Cash</div><div style="font:500 30px/38px 'DM Mono',monospace;color:#9FD9A0">₱407,380</div></div>
+                <div style="flex:1;border-radius:20px;background:#211F17;padding:20px;display:flex;flex-direction:column;gap:4px"><div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999080">Credit used</div><div style="font:500 30px/38px 'DM Mono',monospace;color:#FFB4AB">₱11,204</div></div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+                <sc-for list="{{ accounts }}" as="ac" hint-placeholder-count="5">
+                  <div style="border-radius:20px;background:#211F17;padding:18px;display:flex;flex-direction:column;gap:14px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <span class="ms" style="width:40px;height:40px;border-radius:12px;background:{{ ac.container }};color:{{ ac.ink }};font-size:20px;line-height:40px;text-align:center;flex-shrink:0">{{ ac.icon }}</span>
+                      <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                        <span style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">{{ ac.name }}</span>
+                        <span style="font:400 12px/16px Roboto,sans-serif;color:#999080">{{ ac.meta }}</span>
+                      </span>
+                      <span class="ms" style="font-size:20px;color:#4D4739">more_vert</span>
+                    </div>
+                    <div style="display:flex;align-items:baseline;justify-content:space-between">
+                      <span style="font:500 22px/28px 'DM Mono',monospace;color:#E9E2D4">{{ ac.balance }}</span>
+                      <span style="font:400 12px/16px 'DM Mono',monospace;color:{{ ac.ink }}">{{ ac.delta }}</span>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="D2" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">D2 — <span style="font-family:'DM Mono',monospace;font-size:12px">/transactions</span> desktop · list + detail pane</div>
+        <div style="width:1280px;height:800px;border-radius:20px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex">
+          <div style="width:220px;flex-shrink:0;background:#1D1B13;border-right:1px solid #2C2921;padding:20px 12px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:10px;padding:0 8px 18px">
+              <span style="width:32px;height:32px;border-radius:10px;background:#EDC55F;color:#3E2E00;font:700 17px/32px Roboto,sans-serif;text-align:center">L</span>
+              <span style="font:500 17px/22px Roboto,sans-serif;color:#E9E2D4">Ledger</span>
+            </div>
+            <sc-for list="{{ drawerTx }}" as="d" hint-placeholder-count="7">
+              <div style="height:44px;border-radius:22px;background:{{ d.pill }};display:flex;align-items:center;gap:12px;padding:0 14px">
+                <span class="ms {{ d.fill }}" style="font-size:20px;color:{{ d.ink }}">{{ d.icon }}</span>
+                <span style="font:500 14px/18px Roboto,sans-serif;color:{{ d.ink }}">{{ d.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid #2C2921">
+              <div style="font:400 22px/28px Roboto,sans-serif;color:#E9E2D4">Transactions</div>
+              <div style="flex:1;max-width:320px;height:40px;border-radius:20px;background:#211F17;display:flex;align-items:center;gap:10px;padding:0 16px;margin-left:12px">
+                <span class="ms" style="font-size:18px;color:#999080">search</span>
+                <span style="font:400 14px/18px Roboto,sans-serif;color:#999080">Search 412 entries</span>
+              </div>
+              <div style="height:40px;padding:0 16px;border-radius:20px;border:1px solid #4D4739;color:#E9E2D4;font:500 14px/38px Roboto,sans-serif;display:flex;align-items:center;gap:8px"><span class="ms" style="font-size:18px">tune</span>Filters</div>
+              <div style="height:40px;padding:0 20px;border-radius:20px;background:#EDC55F;color:#3E2E00;font:500 14px/40px Roboto,sans-serif">Add</div>
+            </div>
+            <div style="flex:1;min-height:0;display:flex">
+              <div style="flex:1;min-width:0;overflow:hidden;padding:16px 20px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;gap:8px;padding:0 4px 10px">
+                  <span style="height:32px;padding:0 14px;border-radius:16px;background:#594400;color:#FFE18E;font:500 13px/32px Roboto,sans-serif">Sep 2026</span>
+                  <span style="height:32px;padding:0 14px;border-radius:16px;border:1px solid #4D4739;color:#999080;font:500 13px/30px Roboto,sans-serif">All accounts</span>
+                  <span style="height:32px;padding:0 14px;border-radius:16px;border:1px solid #4D4739;color:#999080;font:500 13px/30px Roboto,sans-serif">All categories</span>
+                </div>
+                <sc-for list="{{ txTable }}" as="tx" hint-placeholder-count="9">
+                  <div style="display:flex;align-items:center;gap:16px;padding:11px 12px;border-radius:14px;background:{{ tx.row }}">
+                    <span style="width:52px;flex-shrink:0;font:400 12px/16px 'DM Mono',monospace;color:#999080">{{ tx.date }}</span>
+                    <span class="ms" style="width:36px;height:36px;border-radius:11px;background:{{ tx.container }};color:{{ tx.ink }};font-size:18px;line-height:36px;text-align:center;flex-shrink:0">{{ tx.icon }}</span>
+                    <span style="flex:1;min-width:0;font:500 14px/18px Roboto,sans-serif;color:#E9E2D4">{{ tx.name }}</span>
+                    <span style="width:130px;flex-shrink:0;font:400 13px/17px Roboto,sans-serif;color:#999080">{{ tx.cat }}</span>
+                    <span style="width:130px;flex-shrink:0;font:400 13px/17px Roboto,sans-serif;color:#999080">{{ tx.account }}</span>
+                    <span style="width:110px;flex-shrink:0;text-align:right;font:500 15px/20px 'DM Mono',monospace;color:{{ tx.ink }}">{{ tx.amount }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="width:340px;flex-shrink:0;border-left:1px solid #2C2921;background:#1D1B13;padding:20px;display:flex;flex-direction:column;gap:16px">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <span style="font:500 16px/22px Roboto,sans-serif;color:#E9E2D4">Entry detail</span>
+                  <span class="ms" style="font-size:20px;color:#999080">close</span>
+                </div>
+                <div style="border-radius:20px;background:#3B1512;padding:18px;display:flex;flex-direction:column;gap:10px">
+                  <span class="ms" style="width:44px;height:44px;border-radius:14px;background:#15130B;color:#FFB4AB;font-size:22px;line-height:44px;text-align:center">restaurant</span>
+                  <div style="font:500 17px/22px Roboto,sans-serif;color:#E9E2D4">Kanto Freestyle</div>
+                  <div style="font:500 28px/34px 'DM Mono',monospace;color:#FFB4AB">−₱620</div>
+                </div>
+                <div style="border-radius:16px;background:#211F17;padding:4px;display:flex;flex-direction:column">
+                  <sc-for list="{{ detailRows }}" as="r" hint-placeholder-count="5">
+                    <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid #2C2921">
+                      <span style="font:400 13px/18px Roboto,sans-serif;color:#999080">{{ r.label }}</span>
+                      <span style="font:400 13px/18px Roboto,sans-serif;color:{{ r.ink }};text-align:right">{{ r.value }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:auto">
+                  <div style="flex:1;height:44px;border-radius:22px;border:1px solid #4D4739;color:#E9E2D4;font:500 14px/42px Roboto,sans-serif;text-align:center">Duplicate</div>
+                  <div style="flex:1;height:44px;border-radius:22px;background:#EDC55F;color:#3E2E00;font:500 14px/44px Roboto,sans-serif;text-align:center">Edit</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="D3" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">D3 — <span style="font-family:'DM Mono',monospace;font-size:12px">/budgets</span> desktop</div>
+        <div style="width:1280px;height:800px;border-radius:20px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex">
+          <div style="width:220px;flex-shrink:0;background:#1D1B13;border-right:1px solid #2C2921;padding:20px 12px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:10px;padding:0 8px 18px">
+              <span style="width:32px;height:32px;border-radius:10px;background:#EDC55F;color:#3E2E00;font:700 17px/32px Roboto,sans-serif;text-align:center">L</span>
+              <span style="font:500 17px/22px Roboto,sans-serif;color:#E9E2D4">Ledger</span>
+            </div>
+            <sc-for list="{{ drawerBudgets }}" as="d" hint-placeholder-count="7">
+              <div style="height:44px;border-radius:22px;background:{{ d.pill }};display:flex;align-items:center;gap:12px;padding:0 14px">
+                <span class="ms {{ d.fill }}" style="font-size:20px;color:{{ d.ink }}">{{ d.icon }}</span>
+                <span style="font:500 14px/18px Roboto,sans-serif;color:{{ d.ink }}">{{ d.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:16px;padding:0 24px;border-bottom:1px solid #2C2921">
+              <div style="flex:1;font:400 22px/28px Roboto,sans-serif;color:#E9E2D4">Budgets</div>
+              <div style="height:40px;display:flex;align-items:center;gap:10px">
+                <span class="ms" style="width:36px;height:36px;border-radius:18px;border:1px solid #2C2921;font-size:18px;line-height:34px;text-align:center;color:#999080">chevron_left</span>
+                <span style="height:36px;padding:0 16px;border-radius:18px;background:#594400;color:#FFE18E;font:500 13px/36px Roboto,sans-serif">Sep 1 – 30</span>
+                <span class="ms" style="width:36px;height:36px;border-radius:18px;border:1px solid #2C2921;font-size:18px;line-height:34px;text-align:center;color:#4D4739">chevron_right</span>
+              </div>
+              <div style="height:40px;padding:0 20px;border-radius:20px;background:#EDC55F;color:#3E2E00;font:500 14px/40px Roboto,sans-serif">New envelope</div>
+            </div>
+            <div style="flex:1;min-height:0;overflow:hidden;padding:20px 24px;display:flex;gap:20px">
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:16px">
+                <div style="border-radius:20px;background:#211F17;padding:22px;display:flex;flex-direction:column;gap:14px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between">
+                    <div style="font:500 17px/23px Roboto,sans-serif;color:#E9E2D4">September envelope</div>
+                    <div style="font:500 14px/19px 'DM Mono',monospace;color:#999080">68% used · 22 days left</div>
+                  </div>
+                  <div style="height:14px;border-radius:7px;background:#2C2921;overflow:hidden"><div style="width:68%;height:100%;border-radius:7px;background:#EDC55F"></div></div>
+                  <div style="display:flex;justify-content:space-between;font:400 13px/18px 'DM Mono',monospace;color:#999080"><span>₱61,238 spent</span><span>₱28,762 left of ₱90,000</span></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                  <sc-for list="{{ budgets }}" as="b" hint-placeholder-count="6">
+                    <div style="border-radius:20px;background:#211F17;padding:18px;display:flex;flex-direction:column;gap:12px">
+                      <div style="display:flex;align-items:center;gap:12px">
+                        <span class="ms" style="width:36px;height:36px;border-radius:11px;background:{{ b.container }};color:{{ b.ink }};font-size:18px;line-height:36px;text-align:center;flex-shrink:0">{{ b.icon }}</span>
+                        <span style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">{{ b.name }}</span>
+                        <span style="font:500 14px/19px 'DM Mono',monospace;color:{{ b.ink }}">{{ b.state }}</span>
+                      </div>
+                      <div style="height:8px;border-radius:4px;background:#2C2921;overflow:hidden"><div style="width:{{ b.pct }};height:100%;border-radius:4px;background:{{ b.ink }}"></div></div>
+                      <div style="font:400 12px/16px 'DM Mono',monospace;color:#999080">{{ b.detail }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:16px">
+                <div style="border-radius:20px;background:#3B1512;padding:18px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:center;gap:10px"><span class="ms" style="font-size:20px;color:#FFB4AB">error</span><span style="font:500 14px/19px Roboto,sans-serif;color:#FFB4AB">1 envelope over</span></div>
+                  <div style="font:400 13px/19px Roboto,sans-serif;color:#E0BDB8;text-wrap:pretty">Dining is ₱1,440 past its limit. Moving ₱1,500 from Fun would clear it.</div>
+                  <div style="height:36px;border-radius:18px;background:#15130B;color:#FFB4AB;font:500 13px/36px Roboto,sans-serif;text-align:center;margin-top:4px">Rebalance</div>
+                </div>
+                <div style="border-radius:20px;background:#211F17;padding:18px;display:flex;flex-direction:column;gap:14px">
+                  <div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">Pace</div>
+                  <sc-for list="{{ pace }}" as="p" hint-placeholder-count="3">
+                    <div style="display:flex;justify-content:space-between"><span style="font:400 13px/18px Roboto,sans-serif;color:#999080">{{ p.label }}</span><span style="font:500 13px/18px 'DM Mono',monospace;color:{{ p.ink }}">{{ p.value }}</span></div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-screen-label="D4" style="display:flex;flex-direction:column;gap:10px">
+        <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">D4 — <span style="font-family:'DM Mono',monospace;font-size:12px">/reports</span> desktop</div>
+        <div style="width:1280px;height:800px;border-radius:20px;border:1px solid #2C2921;background:#15130B;overflow:hidden;display:flex">
+          <div style="width:220px;flex-shrink:0;background:#1D1B13;border-right:1px solid #2C2921;padding:20px 12px;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:10px;padding:0 8px 18px">
+              <span style="width:32px;height:32px;border-radius:10px;background:#EDC55F;color:#3E2E00;font:700 17px/32px Roboto,sans-serif;text-align:center">L</span>
+              <span style="font:500 17px/22px Roboto,sans-serif;color:#E9E2D4">Ledger</span>
+            </div>
+            <sc-for list="{{ drawerReports }}" as="d" hint-placeholder-count="7">
+              <div style="height:44px;border-radius:22px;background:{{ d.pill }};display:flex;align-items:center;gap:12px;padding:0 14px">
+                <span class="ms {{ d.fill }}" style="font-size:20px;color:{{ d.ink }}">{{ d.icon }}</span>
+                <span style="font:500 14px/18px Roboto,sans-serif;color:{{ d.ink }}">{{ d.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid #2C2921">
+              <div style="flex:1;font:400 22px/28px Roboto,sans-serif;color:#E9E2D4">Reports</div>
+              <div style="display:flex;height:40px;border-radius:20px;border:1px solid #4D4739;overflow:hidden">
+                <span style="padding:0 16px;font:500 13px/40px Roboto,sans-serif;background:#594400;color:#FFE18E">6M</span>
+                <span style="padding:0 16px;font:500 13px/38px Roboto,sans-serif;color:#999080;border-left:1px solid #4D4739">1Y</span>
+                <span style="padding:0 16px;font:500 13px/38px Roboto,sans-serif;color:#999080;border-left:1px solid #4D4739">All</span>
+              </div>
+              <div style="height:40px;padding:0 16px;border-radius:20px;border:1px solid #4D4739;color:#E9E2D4;font:500 14px/38px Roboto,sans-serif;display:flex;align-items:center;gap:8px"><span class="ms" style="font-size:18px">download</span>Export CSV</div>
+            </div>
+            <div style="flex:1;min-height:0;overflow:hidden;padding:20px 24px;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;gap:16px">
+                <sc-for list="{{ reportStats }}" as="s" hint-placeholder-count="4">
+                  <div style="flex:1;border-radius:20px;background:#211F17;padding:18px;display:flex;flex-direction:column;gap:6px">
+                    <div style="font:500 11px/15px Roboto,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#999080">{{ s.label }}</div>
+                    <div style="font:500 26px/32px 'DM Mono',monospace;color:{{ s.ink }}">{{ s.value }}</div>
+                    <div style="font:400 12px/16px Roboto,sans-serif;color:#999080">{{ s.meta }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="flex:1;min-height:0;display:flex;gap:16px">
+                <div style="flex:1.6;min-width:0;border-radius:20px;background:#211F17;padding:20px;display:flex;flex-direction:column;gap:18px">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div style="font:500 16px/22px Roboto,sans-serif;color:#E9E2D4">Income vs spend</div>
+                    <div style="display:flex;gap:14px;font:400 12px/16px Roboto,sans-serif;color:#999080">
+                      <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:#9FD9A0"></span>Income</span>
+                      <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:2px;background:#FFB4AB"></span>Spend</span>
+                      <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:2px;background:#EDC55F"></span>Saved</span>
+                    </div>
+                  </div>
+                  <div style="flex:1;display:flex;align-items:flex-end;gap:20px">
+                    <sc-for list="{{ months }}" as="m" hint-placeholder-count="6">
+                      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px">
+                        <div style="width:100%;display:flex;gap:6px;align-items:flex-end;height:280px">
+                          <div style="flex:1;height:{{ m.inD }};border-radius:6px 6px 0 0;background:#9FD9A0"></div>
+                          <div style="flex:1;height:{{ m.outD }};border-radius:6px 6px 0 0;background:#FFB4AB"></div>
+                        </div>
+                        <div style="font:400 12px/16px Roboto,sans-serif;color:#999080">{{ m.label }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:16px">
+                  <div style="flex:1;border-radius:20px;background:#211F17;padding:20px;display:flex;flex-direction:column;gap:14px">
+                    <div style="font:500 16px/22px Roboto,sans-serif;color:#E9E2D4">Where it went</div>
+                    <sc-for list="{{ topSpend }}" as="t" hint-placeholder-count="5">
+                      <div style="display:flex;flex-direction:column;gap:7px">
+                        <div style="display:flex;align-items:center;gap:10px">
+                          <span style="flex:1;font:400 13px/18px Roboto,sans-serif;color:#E9E2D4">{{ t.name }}</span>
+                          <span style="font:500 13px/18px 'DM Mono',monospace;color:#E9E2D4">{{ t.amount }}</span>
+                          <span style="width:38px;text-align:right;font:400 12px/16px 'DM Mono',monospace;color:#999080">{{ t.pct }}</span>
+                        </div>
+                        <div style="height:6px;border-radius:3px;background:#2C2921;overflow:hidden"><div style="width:{{ t.pct }};height:100%;border-radius:3px;background:{{ t.ink }}"></div></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="border-radius:20px;background:#16293A;padding:16px;display:flex;gap:12px">
+                    <span class="ms" style="font-size:20px;color:#9EC6EA;flex-shrink:0">insights</span>
+                    <div style="font:400 13px/19px Roboto,sans-serif;color:#C3DAEE;text-wrap:pretty">Spend rose 14% in June and has fallen every month since. Dining is the only category still growing.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="cov" style="display:flex;flex-direction:column;gap:16px;max-width:900px;border-top:1px solid #2C2921;padding-top:28px">
+    <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#999080">Notes for implementation</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="font:400 15px/23px Roboto,sans-serif;color:#D0C6B0;text-wrap:pretty"><span style="color:#E9E2D4;font-weight:500">Nothing new was invented.</span> Every screen here is assembled from patterns already specified: the 40px container-tile list row, the card header, the segmented button, the chip row, the 340px detail pane, the M3 drawer pill. No new tokens, no new type sizes.</div>
+      <div style="font:400 15px/23px Roboto,sans-serif;color:#D0C6B0;text-wrap:pretty"><span style="color:#E9E2D4;font-weight:500">Reports is the one screen with new structure</span> — a 1.6 / 1 split with the bar chart left and category ranking plus an insight card right, four stat cards above. Recharts series map to <span style="font-family:'DM Mono',monospace;font-size:14px">--chart-2</span> / <span style="font-family:'DM Mono',monospace;font-size:14px">--chart-3</span>; the saved line is <span style="font-family:'DM Mono',monospace;font-size:14px">--chart-1</span>. The category ranking is horizontal bars, not a pie — it ranks and shows share in one read, and it survives a 300px column.</div>
+      <div style="font:400 15px/23px Roboto,sans-serif;color:#D0C6B0;text-wrap:pretty"><span style="color:#E9E2D4;font-weight:500">Desktop keeps every destination in the drawer.</span> The four-item bottom nav is a mobile constraint; the drawer has room for all seven, so <span style="font-family:'DM Mono',monospace;font-size:14px">Sidebar.tsx</span> is unchanged by the nav rework.</div>
+      <div style="font:400 15px/23px Roboto,sans-serif;color:#D0C6B0;text-wrap:pretty"><span style="color:#E9E2D4;font-weight:500">13th month is a calculator, not a report</span> — the result leads in a filled primary-container hero, inputs sit below it, and the PD 851 caveat is a transfer-container note rather than fine print.</div>
+    </div>
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:1000}}">
+const T = {
+  expense: { ink: '#FFB4AB', container: '#3B1512' },
+  income: { ink: '#9FD9A0', container: '#1E3320' },
+  transfer: { ink: '#9EC6EA', container: '#16293A' },
+  gold: { ink: '#EDC55F', container: '#594400' },
+};
+
+const L = {
+  expense: { ink: '#A4342B', container: '#FFDAD6' },
+  income: { ink: '#1E6B2E', container: '#C6EBC7' },
+  transfer: { ink: '#1F5A87', container: '#CDE4F7' },
+  gold: { ink: '#7A5900', container: '#FFE18E' },
+};
+
+const DRAWER = [
+  { label: 'Dashboard', icon: 'space_dashboard', key: 'dashboard' },
+  { label: 'Accounts', icon: 'account_balance_wallet', key: 'accounts' },
+  { label: 'Transactions', icon: 'swap_horiz', key: 'transactions' },
+  { label: 'Budgets', icon: 'pie_chart', key: 'budgets' },
+  { label: 'Categories', icon: 'sell', key: 'categories' },
+  { label: 'Reports', icon: 'bar_chart', key: 'reports' },
+  { label: '13th Month', icon: 'redeem', key: 'thirteenth' },
+];
+
+class Component extends DCLogic {
+  drawer(active) {
+    return DRAWER.map((d) => ({
+      label: d.label,
+      icon: d.icon,
+      pill: d.key === active ? '#594400' : 'transparent',
+      ink: d.key === active ? '#FFE18E' : '#999080',
+      fill: d.key === active ? 'msf' : '',
+    }));
+  }
+
+  drawerLight(active) {
+    return DRAWER.map((d) => ({
+      label: d.label,
+      icon: d.icon,
+      pill: d.key === active ? '#FFE18E' : 'transparent',
+      ink: d.key === active ? '#261A00' : '#5A5346',
+      fill: d.key === active ? 'msf' : '',
+    }));
+  }
+
+  renderVals() {
+    const tx = (name, meta, amount, k, icon) => ({ name, meta, amount, icon, ink: T[k].ink, container: T[k].container });
+    const catL = (name, meta, share, k, icon) => ({ name, meta, share, icon, ink: L[k].ink, container: L[k].container });
+    const cat = (name, meta, share, k, icon) => ({ name, meta, share, icon, ink: T[k].ink, container: T[k].container });
+
+    return {
+      drawerReportsLight: this.drawerLight('reports'),
+
+      categoriesLight: [
+        catL('Dining', '38 entries · ₱9,440', '15%', 'expense', 'restaurant'),
+        catL('Groceries', '22 entries · ₱11,100', '18%', 'expense', 'shopping_cart'),
+        catL('Transport', '41 entries · ₱4,160', '7%', 'expense', 'directions_bus'),
+        catL('Bills', '9 entries · ₱10,920', '18%', 'expense', 'receipt_long'),
+        catL('Rent', '1 entry · ₱18,000', '29%', 'expense', 'home_work'),
+        catL('Health', '4 entries · ₱2,380', '4%', 'expense', 'medical_services'),
+        catL('Fun', '12 entries · ₱1,550', '3%', 'expense', 'sports_esports'),
+        catL('Pets', '6 entries · ₱1,890', '3%', 'expense', 'pets'),
+        catL('Gifts', '3 entries · ₱1,798', '3%', 'expense', 'card_giftcard'),
+      ],
+
+      thirteenthLight: [
+        { label: 'Basic pay × months worked', value: '₱530,200', ink: '#1E1B13' },
+        { label: '÷ 12', value: '₱44,183', ink: '#1E1B13' },
+        { label: 'Unpaid-day deduction', value: '−₱0', ink: '#5A5346' },
+        { label: 'Tax withheld (under ₱90,000)', value: '₱0', ink: '#1E6B2E' },
+      ],
+
+      reportStatsLight: [
+        { label: 'Total income', value: '₱578,400', meta: 'last 6 months', ink: '#1E6B2E' },
+        { label: 'Total spend', value: '₱373,320', meta: 'last 6 months', ink: '#A4342B' },
+        { label: 'Avg. saved', value: '₱34,180', meta: 'per month', ink: '#1E1B13' },
+        { label: 'Savings rate', value: '35.4%', meta: '+2.1 pts vs prior 6M', ink: '#7A5900' },
+      ],
+
+      topSpendLight: [
+        { name: 'Rent', amount: '₱18,000', pct: '29%', icon: 'home_work', ink: L.expense.ink, container: L.expense.container },
+        { name: 'Groceries', amount: '₱11,100', pct: '18%', icon: 'shopping_cart', ink: L.expense.ink, container: L.expense.container },
+        { name: 'Bills', amount: '₱10,920', pct: '18%', icon: 'receipt_long', ink: L.gold.ink, container: L.gold.container },
+        { name: 'Dining', amount: '₱9,440', pct: '15%', icon: 'restaurant', ink: L.expense.ink, container: L.expense.container },
+        { name: 'Transport', amount: '₱4,160', pct: '7%', icon: 'directions_bus', ink: L.transfer.ink, container: L.transfer.container },
+      ],
+
+      drawerAccounts: this.drawer('accounts'),
+      drawerTx: this.drawer('transactions'),
+      drawerBudgets: this.drawer('budgets'),
+      drawerReports: this.drawer('reports'),
+
+      switches: [
+        { label: 'Budget alerts', track: '#EDC55F', thumb: '#3E2E00', align: 'flex-end' },
+        { label: 'Bill reminders', track: '#EDC55F', thumb: '#3E2E00', align: 'flex-end' },
+        { label: 'Weekly summary', track: '#4D4739', thumb: '#999080', align: 'flex-start' },
+      ],
+
+      categories: [
+        cat('Dining', '38 entries · ₱9,440', '15%', 'expense', 'restaurant'),
+        cat('Groceries', '22 entries · ₱11,100', '18%', 'expense', 'shopping_cart'),
+        cat('Transport', '41 entries · ₱4,160', '7%', 'expense', 'directions_bus'),
+        cat('Bills', '9 entries · ₱10,920', '18%', 'expense', 'receipt_long'),
+        cat('Rent', '1 entry · ₱18,000', '29%', 'expense', 'home_work'),
+        cat('Health', '4 entries · ₱2,380', '4%', 'expense', 'medical_services'),
+        cat('Fun', '12 entries · ₱1,550', '3%', 'expense', 'sports_esports'),
+        cat('Pets', '6 entries · ₱1,890', '3%', 'expense', 'pets'),
+        cat('Gifts', '3 entries · ₱1,798', '3%', 'expense', 'card_giftcard'),
+      ],
+
+      months: [
+        { label: 'Apr', inH: '58%', outH: '42%', inD: '62%', outD: '45%' },
+        { label: 'May', inH: '66%', outH: '48%', inD: '70%', outD: '52%' },
+        { label: 'Jun', inH: '52%', outH: '62%', inD: '55%', outD: '66%' },
+        { label: 'Jul', inH: '78%', outH: '44%', inD: '82%', outD: '47%' },
+        { label: 'Aug', inH: '72%', outH: '54%', inD: '76%', outD: '58%' },
+        { label: 'Sep', inH: '90%', outH: '62%', inD: '95%', outD: '66%' },
+      ],
+
+      topSpend: [
+        { name: 'Rent', amount: '₱18,000', pct: '29%', icon: 'home_work', ink: T.expense.ink, container: T.expense.container },
+        { name: 'Groceries', amount: '₱11,100', pct: '18%', icon: 'shopping_cart', ink: T.expense.ink, container: T.expense.container },
+        { name: 'Bills', amount: '₱10,920', pct: '18%', icon: 'receipt_long', ink: T.gold.ink, container: T.gold.container },
+        { name: 'Dining', amount: '₱9,440', pct: '15%', icon: 'restaurant', ink: T.expense.ink, container: T.expense.container },
+        { name: 'Transport', amount: '₱4,160', pct: '7%', icon: 'directions_bus', ink: T.transfer.ink, container: T.transfer.container },
+      ],
+
+      thirteenth: [
+        { label: 'Basic pay × months worked', value: '₱530,200', ink: '#E9E2D4' },
+        { label: '÷ 12', value: '₱44,183', ink: '#E9E2D4' },
+        { label: 'Unpaid-day deduction', value: '−₱0', ink: '#999080' },
+        { label: 'Tax withheld (under ₱90,000)', value: '₱0', ink: '#9FD9A0' },
+      ],
+
+      accounts: [
+        { name: 'BPI Savings', meta: '••• 4821 · primary', balance: '₱214,900', delta: '+₱48,200', icon: 'savings', ink: T.income.ink, container: T.income.container },
+        { name: 'CIMB Emergency', meta: '••• 9034 · 4.0% p.a.', balance: '₱180,000', delta: '+₱10,000', icon: 'shield', ink: T.income.ink, container: T.income.container },
+        { name: 'GCash', meta: 'e-wallet', balance: '₱12,480', delta: '−₱6,120', icon: 'account_balance_wallet', ink: T.expense.ink, container: T.expense.container },
+        { name: 'BPI Debit', meta: '••• 7712', balance: '₱62,770', delta: '−₱18,640', icon: 'credit_card', ink: T.expense.ink, container: T.expense.container },
+        { name: 'Metrobank Credit', meta: 'Due Sep 24', balance: '−₱11,204', delta: '38% used', icon: 'credit_score', ink: T.transfer.ink, container: T.transfer.container },
+      ],
+
+      groups: [
+        { day: 'Today · Sep 8', total: '−₱4,030', items: [tx('Kanto Freestyle', 'Dining · 7:42 PM', '−₱620', 'expense', 'restaurant'), tx('Meralco', 'Utilities · 9:10 AM', '−₱3,410', 'expense', 'bolt')] },
+        { day: 'Sep 7', total: '−₱2,620', items: [tx('SM Supermarket', 'Groceries · 6:05 PM', '−₱2,620', 'expense', 'shopping_cart')] },
+        { day: 'Sep 1', total: '+₱48,200', items: [tx('Payroll — Sep 1', 'Salary · 12:01 AM', '+₱48,200', 'income', 'payments'), tx('To Emergency Fund', 'Transfer · CIMB', '₱10,000', 'transfer', 'swap_horiz')] },
+      ],
+
+      txTable: [
+        { date: 'Sep 8', name: 'Kanto Freestyle', cat: 'Dining', account: 'BPI Debit', amount: '−₱620', icon: 'restaurant', ink: T.expense.ink, container: T.expense.container, row: '#211F17' },
+        { date: 'Sep 8', name: 'Meralco', cat: 'Utilities', account: 'GCash', amount: '−₱3,410', icon: 'bolt', ink: T.expense.ink, container: T.expense.container, row: 'transparent' },
+        { date: 'Sep 7', name: 'SM Supermarket', cat: 'Groceries', account: 'BPI Debit', amount: '−₱2,620', icon: 'shopping_cart', ink: T.expense.ink, container: T.expense.container, row: 'transparent' },
+        { date: 'Sep 6', name: 'Grab', cat: 'Transport', account: 'GCash', amount: '−₱310', icon: 'directions_bus', ink: T.expense.ink, container: T.expense.container, row: 'transparent' },
+        { date: 'Sep 5', name: 'Landlord', cat: 'Rent', account: 'BPI Savings', amount: '−₱18,000', icon: 'home_work', ink: T.expense.ink, container: T.expense.container, row: 'transparent' },
+        { date: 'Sep 3', name: 'To Emergency Fund', cat: 'Transfer', account: 'CIMB', amount: '₱10,000', icon: 'swap_horiz', ink: T.transfer.ink, container: T.transfer.container, row: 'transparent' },
+        { date: 'Sep 2', name: 'Watsons', cat: 'Health', account: 'BPI Debit', amount: '−₱890', icon: 'medical_services', ink: T.expense.ink, container: T.expense.container, row: 'transparent' },
+        { date: 'Sep 1', name: 'Payroll — Sep 1', cat: 'Salary', account: 'BPI Savings', amount: '+₱48,200', icon: 'payments', ink: T.income.ink, container: T.income.container, row: 'transparent' },
+        { date: 'Sep 1', name: 'Spotify', cat: 'Fun', account: 'Metrobank', amount: '−₱194', icon: 'sports_esports', ink: T.expense.ink, container: T.expense.container, row: 'transparent' },
+      ],
+
+      detailRows: [
+        { label: 'Date', value: 'Sep 8, 2026 · 7:42 PM', ink: '#E9E2D4' },
+        { label: 'Category', value: 'Dining', ink: '#E9E2D4' },
+        { label: 'Account', value: 'BPI Debit ••• 7712', ink: '#E9E2D4' },
+        { label: 'Budget impact', value: 'Dining now 118%', ink: '#FFB4AB' },
+        { label: 'Note', value: 'Dinner with Ana', ink: '#E9E2D4' },
+      ],
+
+      budgets: [
+        { name: 'Dining', state: '118%', pct: '100%', detail: '₱9,440 of ₱8,000 · ₱1,440 over', icon: 'restaurant', ink: T.expense.ink, container: T.expense.container },
+        { name: 'Groceries', state: '74%', pct: '74%', detail: '₱11,100 of ₱15,000', icon: 'shopping_cart', ink: T.income.ink, container: T.income.container },
+        { name: 'Transport', state: '52%', pct: '52%', detail: '₱4,160 of ₱8,000', icon: 'directions_bus', ink: T.income.ink, container: T.income.container },
+        { name: 'Bills', state: '91%', pct: '91%', detail: '₱10,920 of ₱12,000', icon: 'receipt_long', ink: T.gold.ink, container: T.gold.container },
+        { name: 'Fun', state: '31%', pct: '31%', detail: '₱1,550 of ₱5,000', icon: 'sports_esports', ink: T.transfer.ink, container: T.transfer.container },
+        { name: 'Health', state: '48%', pct: '48%', detail: '₱2,380 of ₱5,000', icon: 'medical_services', ink: T.income.ink, container: T.income.container },
+      ],
+
+      pace: [
+        { label: 'Daily allowance left', value: '₱1,307', ink: '#E9E2D4' },
+        { label: 'Projected month end', value: '₱84,100', ink: '#9FD9A0' },
+        { label: 'Last month, same day', value: '₱66,420', ink: '#999080' },
+      ],
+
+      reportStats: [
+        { label: 'Total income', value: '₱578,400', meta: 'last 6 months', ink: '#9FD9A0' },
+        { label: 'Total spend', value: '₱373,320', meta: 'last 6 months', ink: '#FFB4AB' },
+        { label: 'Avg. saved', value: '₱34,180', meta: 'per month', ink: '#E9E2D4' },
+        { label: 'Savings rate', value: '35.4%', meta: '+2.1 pts vs prior 6M', ink: '#EDC55F' },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

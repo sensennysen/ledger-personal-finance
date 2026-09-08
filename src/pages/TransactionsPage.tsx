@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
 import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
-import { useMonthCycle } from '@/hooks/useMonthCycle'
+import { useCycle } from '@/contexts/cycleState'
 import { useCategories } from '@/hooks/useCategories'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
@@ -45,8 +45,7 @@ function addMonths(key: string, delta: number) {
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
-  const { startDay } = useMonthCycle()
-  const [selectedMonth, setSelectedMonth] = useState(() => getCurrentCycleMonthKey(startDay))
+  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
   const [createOpen, setCreateOpen] = useState(false)
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
@@ -455,7 +454,7 @@ export default function TransactionsPage() {
       )}
 
       {/* Month navigation */}
-      <div className="hidden items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2 sm:flex">
+      <div className="hidden items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2 md:flex">
         <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
           <ChevronLeft className="w-4 h-4" />
         </Button>

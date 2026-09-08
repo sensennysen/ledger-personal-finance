@@ -350,7 +350,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         {importResult ? (
           <div className="flex flex-col items-center gap-4 py-6 text-center">
             <div className="w-14 h-14 rounded-full bg-[oklch(0.660_0.150_155/0.15)] flex items-center justify-center">
-              <FileText className="w-7 h-7 text-[oklch(0.660_0.150_155)]" />
+              <FileText className="w-7 h-7 text-income" />
             </div>
             <div>
               <p className="font-semibold text-lg">
@@ -462,8 +462,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                             <td
                               className={`px-3 py-2 text-right font-medium tabular-nums ${
                                 row.type === 'expense'
-                                  ? 'text-[oklch(0.620_0.160_18)]'
-                                  : 'text-[oklch(0.660_0.150_155)]'
+                                  ? 'text-expense'
+                                  : 'text-income'
                               }`}
                             >
                               {row.type === 'expense' ? '-' : '+'}

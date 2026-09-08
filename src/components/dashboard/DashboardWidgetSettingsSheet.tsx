@@ -1,4 +1,5 @@
 import { ArrowDown, ArrowUp, GripVertical, Settings2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { DASHBOARD_WIDGET_LABELS, DEFAULT_WIDGET_ORDER, type DashboardWidgetKey } from '@/hooks/useDashboardPrefs'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -33,12 +34,12 @@ export function DashboardWidgetSettingsSheet({
   setWidgetControlRef,
 }: DashboardWidgetSettingsSheetProps) {
   const orderedWidgetControls = widgetOrder.filter((key) => DEFAULT_WIDGET_ORDER.includes(key))
+  const trigger = <SheetTrigger render={<Button variant="ghost" size="icon" className="shrink-0" aria-label="Customize dashboard" title="Customize dashboard" />}><Settings2 className="size-5" /></SheetTrigger>
+  const mobileTools = document.getElementById('mobile-dashboard-tools')
 
   return (
     <Sheet>
-      <SheetTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0" aria-label="Customize dashboard" title="Customize dashboard" />}>
-        <Settings2 className="w-3.5 h-3.5" />
-      </SheetTrigger>
+      {!isDesktopDrag && mobileTools ? createPortal(trigger, mobileTools) : trigger}
       <SheetContent className="w-[280px] sm:max-w-[280px]">
         <SheetHeader>
           <SheetTitle>Dashboard Widgets</SheetTitle>
@@ -48,7 +49,6 @@ export function DashboardWidgetSettingsSheet({
             <div
               key={key}
               ref={setWidgetControlRef(key)}
-              draggable={isDesktopDrag}
               onDragStart={() => {
                 setDraggedWidget(key)
                 setDropTargetWidget(null)
@@ -75,7 +75,7 @@ export function DashboardWidgetSettingsSheet({
                 dropTargetWidget === key && 'is-drop-target'
               )}
             >
-              <GripVertical className="reorder-handle hidden md:block w-3.5 h-3.5 text-muted-foreground cursor-grab" />
+              <span draggable={isDesktopDrag} className="hidden md:block" aria-label={`Drag ${DASHBOARD_WIDGET_LABELS[key]}`}><GripVertical className="reorder-handle size-5 text-input cursor-grab" /></span>
               <span className="text-sm flex-1">{DASHBOARD_WIDGET_LABELS[key]}</span>
               <div className="flex items-center gap-1 md:hidden">
                 <Button variant="ghost" size="icon-xs" onClick={() => moveWidget(key, -1)} disabled={index === 0}>

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=DM+Mono:wght@400;500&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #100E08; }
+  a { color: #EDC55F; text-decoration: none; }
+  a:hover { color: #FFE18E; }
+  .ms { font-family: 'Material Symbols Rounded'; font-weight: 400; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
+  .msf { font-variation-settings: 'FILL' 1; }
+  @keyframes sheetUp { from { transform: translateY(101%); } to { transform: translateY(0); } }
+  @keyframes scrim { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+</style>
+</helmet>
+
+<section style="padding:48px;display:flex;gap:56px;align-items:flex-start;font-family:Roboto,system-ui,sans-serif;background:#100E08;min-height:100vh">
+
+  <div style="display:flex;flex-direction:column;gap:16px;flex-shrink:0">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Turn 5 · 5a</div>
+      <div style="font:400 30px/38px Roboto,sans-serif;color:#E9E2D4">Ledger PWA — navigation rework</div>
+      <div style="font:400 15px/22px Roboto,sans-serif;color:#999080;max-width:420px;text-wrap:pretty">Interactive. Tap the nav bar, the FAB, the avatar, and any transaction row.</div>
+    </div>
+
+    <div data-screen-label="PWA" style="width:428px">
+      <x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" dark="{{ true }}" hint-size="428px,908px">
+        <div style="height:100%;display:flex;flex-direction:column;background:#15130B;font-family:Roboto,system-ui,sans-serif;position:relative;overflow:hidden">
+
+          <sc-if value="{{ offlineOn }}" hint-placeholder-val="{{ false }}">
+            <div style="flex-shrink:0;display:flex;align-items:center;gap:10px;padding:10px 16px;background:#3B1512;color:#FFB4AB">
+              <span class="ms" style="font-size:18px">cloud_off</span>
+              <span style="font:500 13px/18px Roboto,sans-serif">Offline — 3 entries will sync when you reconnect</span>
+            </div>
+          </sc-if>
+
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:8px 8px 8px 16px;background:#15130B">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+              <div style="font:500 20px/26px Roboto,sans-serif;color:#E9E2D4">{{ screenTitle }}</div>
+              <div style="font:400 12px/16px Roboto,sans-serif;color:#999080">{{ screenSub }}</div>
+            </div>
+            <button type="button" style="width:48px;height:48px;border:0;background:transparent;border-radius:24px;color:#999080;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#211F17;color:#E9E2D4">
+              <span class="ms" style="font-size:24px">search</span>
+            </button>
+            <button type="button" onClick="{{ openMore }}" style="width:48px;height:48px;border:0;background:transparent;border-radius:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0" style-hover="background:#211F17">
+              <span style="width:34px;height:34px;border-radius:17px;background:#594400;color:#FFE18E;font:500 14px/34px Roboto,sans-serif;text-align:center">MR</span>
+            </button>
+          </div>
+
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 12px 10px">
+            <button type="button" style="width:36px;height:36px;border-radius:18px;border:1px solid #2C2921;background:transparent;color:#999080;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#211F17">
+              <span class="ms" style="font-size:18px">chevron_left</span>
+            </button>
+            <div style="flex:1;height:36px;border-radius:18px;background:#594400;color:#FFE18E;display:flex;align-items:center;justify-content:center;gap:8px">
+              <span class="ms" style="font-size:16px">calendar_month</span>
+              <span style="font:500 13px/16px Roboto,sans-serif">Sep 1 – 30 · cycle open</span>
+            </div>
+            <button type="button" style="width:36px;height:36px;border-radius:18px;border:1px solid #2C2921;background:transparent;color:#999080;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#211F17">
+              <span class="ms" style="font-size:18px">chevron_right</span>
+            </button>
+          </div>
+
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:0 12px 120px;display:flex;flex-direction:column;gap:12px">
+
+            <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="border-radius:28px;background:#211F17;padding:20px;display:flex;flex-direction:column;gap:16px">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                    <div style="display:flex;flex-direction:column;gap:4px">
+                      <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#999080">Net worth</div>
+                      <div style="font:500 34px/40px 'DM Mono',monospace;color:#E9E2D4">₱482,150</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:4px;height:28px;padding:0 10px;border-radius:14px;background:#1E3320;color:#9FD9A0">
+                      <span class="ms" style="font-size:16px">arrow_upward</span>
+                      <span style="font:500 12px/16px 'DM Mono',monospace">4.2%</span>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <div style="flex:1;border-radius:16px;background:#1E3320;padding:12px 14px;display:flex;flex-direction:column;gap:2px">
+                      <div style="display:flex;align-items:center;gap:6px;color:#9FD9A0"><span class="ms" style="font-size:16px">south_west</span><span style="font:500 11px/14px Roboto,sans-serif;letter-spacing:.06em;text-transform:uppercase">In</span></div>
+                      <div style="font:500 18px/24px 'DM Mono',monospace;color:#9FD9A0">₱96,400</div>
+                    </div>
+                    <div style="flex:1;border-radius:16px;background:#3B1512;padding:12px 14px;display:flex;flex-direction:column;gap:2px">
+                      <div style="display:flex;align-items:center;gap:6px;color:#FFB4AB"><span class="ms" style="font-size:16px">north_east</span><span style="font:500 11px/14px Roboto,sans-serif;letter-spacing:.06em;text-transform:uppercase">Out</span></div>
+                      <div style="font:500 18px/24px 'DM Mono',monospace;color:#FFB4AB">₱61,238</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:10px;border-radius:20px;background:#3B1512;padding:14px 16px">
+                  <span class="ms" style="font-size:22px;color:#FFB4AB">error</span>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+                    <div style="font:500 14px/18px Roboto,sans-serif;color:#FFB4AB">Dining is 118% of budget</div>
+                    <div style="font:400 12px/16px Roboto,sans-serif;color:#E0BDB8">₱1,440 over with 22 days left</div>
+                  </div>
+                  <span class="ms" style="font-size:20px;color:#FFB4AB">chevron_right</span>
+                </div>
+
+                <div style="border-radius:20px;background:#211F17;padding:18px 16px;display:flex;flex-direction:column;gap:14px">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div style="font:500 16px/22px Roboto,sans-serif;color:#E9E2D4">Cash flow</div>
+                    <div style="display:flex;height:32px;border-radius:16px;border:1px solid #4D4739;overflow:hidden">
+                      <span style="padding:0 14px;font:500 12px/32px Roboto,sans-serif;background:#594400;color:#FFE18E">6M</span>
+                      <span style="padding:0 14px;font:500 12px/32px Roboto,sans-serif;color:#999080">1Y</span>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:flex-end;gap:10px;height:112px">
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:88px"><div style="flex:1;height:52px;border-radius:5px 5px 0 0;background:#9FD9A0"></div><div style="flex:1;height:38px;border-radius:5px 5px 0 0;background:#FFB4AB"></div></div><div style="font:400 10px/12px Roboto,sans-serif;color:#999080">Apr</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:88px"><div style="flex:1;height:60px;border-radius:5px 5px 0 0;background:#9FD9A0"></div><div style="flex:1;height:44px;border-radius:5px 5px 0 0;background:#FFB4AB"></div></div><div style="font:400 10px/12px Roboto,sans-serif;color:#999080">May</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:88px"><div style="flex:1;height:46px;border-radius:5px 5px 0 0;background:#9FD9A0"></div><div style="flex:1;height:56px;border-radius:5px 5px 0 0;background:#FFB4AB"></div></div><div style="font:400 10px/12px Roboto,sans-serif;color:#999080">Jun</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:88px"><div style="flex:1;height:70px;border-radius:5px 5px 0 0;background:#9FD9A0"></div><div style="flex:1;height:40px;border-radius:5px 5px 0 0;background:#FFB4AB"></div></div><div style="font:400 10px/12px Roboto,sans-serif;color:#999080">Jul</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:88px"><div style="flex:1;height:64px;border-radius:5px 5px 0 0;background:#9FD9A0"></div><div style="flex:1;height:50px;border-radius:5px 5px 0 0;background:#FFB4AB"></div></div><div style="font:400 10px/12px Roboto,sans-serif;color:#999080">Aug</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:88px"><div style="flex:1;height:80px;border-radius:5px 5px 0 0;background:#9FD9A0"></div><div style="flex:1;height:58px;border-radius:5px 5px 0 0;background:#FFB4AB"></div></div><div style="font:500 10px/12px Roboto,sans-serif;color:#E9E2D4">Sep</div></div>
+                  </div>
+                </div>
+
+                <div style="border-radius:20px;background:#211F17;padding:18px 4px 8px;display:flex;flex-direction:column;gap:6px">
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:0 12px 4px">
+                    <div style="font:500 16px/22px Roboto,sans-serif;color:#E9E2D4">Recent</div>
+                    <button type="button" onClick="{{ goActivity }}" style="border:0;background:transparent;font:500 13px/18px Roboto,sans-serif;color:#EDC55F;cursor:pointer;padding:6px 8px;border-radius:12px" style-hover="background:#2A2718">See all</button>
+                  </div>
+                  <sc-for list="{{ recent }}" as="tx" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ openDetail }}" style="display:flex;align-items:center;gap:14px;padding:10px 12px;border:0;background:transparent;border-radius:16px;cursor:pointer;text-align:left;width:100%" style-hover="background:#2A2718">
+                      <span class="ms" style="width:40px;height:40px;border-radius:12px;background:{{ tx.container }};color:{{ tx.ink }};font-size:20px;line-height:40px;text-align:center;flex-shrink:0">{{ tx.icon }}</span>
+                      <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                        <span style="font:500 14px/18px Roboto,sans-serif;color:#E9E2D4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tx.name }}</span>
+                        <span style="font:400 12px/16px Roboto,sans-serif;color:#999080">{{ tx.meta }}</span>
+                      </span>
+                      <span style="font:500 15px/20px 'DM Mono',monospace;color:{{ tx.ink }};flex-shrink:0">{{ tx.amount }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isAccounts }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="border-radius:24px;background:#594400;padding:18px 20px;display:flex;flex-direction:column;gap:2px">
+                  <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#FFE18E">Across 5 accounts</div>
+                  <div style="font:500 30px/38px 'DM Mono',monospace;color:#FFE18E">₱482,150</div>
+                </div>
+                <sc-for list="{{ accounts }}" as="ac" hint-placeholder-count="5">
+                  <button type="button" style="display:flex;align-items:center;gap:14px;padding:16px;border:0;border-radius:20px;background:#211F17;cursor:pointer;text-align:left;width:100%" style-hover="background:#2A2718">
+                    <span class="ms" style="width:44px;height:44px;border-radius:14px;background:{{ ac.container }};color:{{ ac.ink }};font-size:22px;line-height:44px;text-align:center;flex-shrink:0">{{ ac.icon }}</span>
+                    <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                      <span style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">{{ ac.name }}</span>
+                      <span style="font:400 12px/16px Roboto,sans-serif;color:#999080">{{ ac.meta }}</span>
+                    </span>
+                    <span style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+                      <span style="font:500 15px/20px 'DM Mono',monospace;color:#E9E2D4">{{ ac.balance }}</span>
+                      <span style="font:400 11px/14px 'DM Mono',monospace;color:{{ ac.ink }}">{{ ac.delta }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isActivity }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px">
+                  <span style="height:34px;padding:0 14px;border-radius:17px;background:#594400;color:#FFE18E;font:500 13px/34px Roboto,sans-serif;white-space:nowrap">All</span>
+                  <span style="height:34px;padding:0 14px;border-radius:17px;border:1px solid #4D4739;color:#999080;font:500 13px/32px Roboto,sans-serif;white-space:nowrap">Expense</span>
+                  <span style="height:34px;padding:0 14px;border-radius:17px;border:1px solid #4D4739;color:#999080;font:500 13px/32px Roboto,sans-serif;white-space:nowrap">Income</span>
+                  <span style="height:34px;padding:0 14px;border-radius:17px;border:1px solid #4D4739;color:#999080;font:500 13px/32px Roboto,sans-serif;white-space:nowrap">Transfer</span>
+                  <span style="height:34px;padding:0 14px;border-radius:17px;border:1px solid #4D4739;color:#999080;font:500 13px/32px Roboto,sans-serif;white-space:nowrap">Unsynced</span>
+                </div>
+                <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;padding:10px 6px 4px">
+                      <span style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">{{ g.day }}</span>
+                      <span style="font:400 12px/16px 'DM Mono',monospace;color:#999080">{{ g.total }}</span>
+                    </div>
+                    <div style="border-radius:20px;background:#211F17;padding:4px">
+                      <sc-for list="{{ g.items }}" as="tx" hint-placeholder-count="3">
+                        <button type="button" onClick="{{ openDetail }}" style="display:flex;align-items:center;gap:14px;padding:10px 12px;border:0;background:transparent;border-radius:16px;cursor:pointer;text-align:left;width:100%" style-hover="background:#2A2718">
+                          <span class="ms" style="width:40px;height:40px;border-radius:12px;background:{{ tx.container }};color:{{ tx.ink }};font-size:20px;line-height:40px;text-align:center;flex-shrink:0">{{ tx.icon }}</span>
+                          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                            <span style="font:500 14px/18px Roboto,sans-serif;color:#E9E2D4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tx.name }}</span>
+                            <span style="font:400 12px/16px Roboto,sans-serif;color:#999080">{{ tx.meta }}</span>
+                          </span>
+                          <span style="font:500 15px/20px 'DM Mono',monospace;color:{{ tx.ink }};flex-shrink:0">{{ tx.amount }}</span>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isBudgets }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="border-radius:24px;background:#211F17;padding:20px;display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;align-items:baseline;justify-content:space-between">
+                    <div style="font:500 16px/22px Roboto,sans-serif;color:#E9E2D4">September envelope</div>
+                    <div style="font:500 13px/18px 'DM Mono',monospace;color:#999080">68% used</div>
+                  </div>
+                  <div style="height:12px;border-radius:6px;background:#2C2921;overflow:hidden"><div style="width:68%;height:100%;border-radius:6px;background:#EDC55F"></div></div>
+                  <div style="display:flex;justify-content:space-between;font:400 12px/16px 'DM Mono',monospace;color:#999080"><span>₱61,238 spent</span><span>₱28,762 left</span></div>
+                </div>
+                <sc-for list="{{ budgets }}" as="b" hint-placeholder-count="5">
+                  <div style="border-radius:20px;background:#211F17;padding:16px;display:flex;flex-direction:column;gap:10px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <span class="ms" style="width:36px;height:36px;border-radius:12px;background:{{ b.container }};color:{{ b.ink }};font-size:18px;line-height:36px;text-align:center;flex-shrink:0">{{ b.icon }}</span>
+                      <span style="flex:1;font:500 14px/18px Roboto,sans-serif;color:#E9E2D4">{{ b.name }}</span>
+                      <span style="font:500 13px/18px 'DM Mono',monospace;color:{{ b.ink }}">{{ b.state }}</span>
+                    </div>
+                    <div style="height:8px;border-radius:4px;background:#2C2921;overflow:hidden"><div style="width:{{ b.pct }};height:100%;border-radius:4px;background:{{ b.ink }}"></div></div>
+                    <div style="font:400 12px/16px 'DM Mono',monospace;color:#999080">{{ b.detail }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+
+          <sc-if value="{{ installOn }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:12px;right:12px;bottom:104px;z-index:20;border-radius:20px;background:#2A2718;border:1px solid #4D4739;padding:14px 14px 14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:fadeUp .24s ease both">
+              <span class="ms" style="font-size:22px;color:#EDC55F">install_mobile</span>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+                <div style="font:500 13px/18px Roboto,sans-serif;color:#E9E2D4">Install Ledger</div>
+                <div style="font:400 12px/16px Roboto,sans-serif;color:#999080">Works offline, opens full-screen</div>
+              </div>
+              <button type="button" onClick="{{ dismissInstall }}" style="height:36px;padding:0 16px;border:0;border-radius:18px;background:#EDC55F;color:#3E2E00;font:500 13px/36px Roboto,sans-serif;cursor:pointer">Install</button>
+            </div>
+          </sc-if>
+
+          <button type="button" onClick="{{ openAdd }}" style="position:absolute;right:16px;bottom:104px;z-index:15;width:64px;height:64px;border:0;border-radius:20px;background:#EDC55F;color:#3E2E00;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.45)" style-active="transform:scale(.96)">
+            <span class="ms" style="font-size:30px">add</span>
+          </button>
+
+          <div style="flex-shrink:0;position:relative;z-index:16;height:88px;border-radius:28px 28px 0 0;background:#1D1B13;border-top:1px solid #2C2921;display:flex;align-items:flex-start;padding:12px 8px 0">
+            <button type="button" onClick="{{ goHome }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:transparent;cursor:pointer;padding:0">
+              <span style="width:60px;height:32px;border-radius:16px;background:{{ nav.home.pill }};display:flex;align-items:center;justify-content:center"><span class="ms {{ nav.home.fill }}" style="font-size:24px;color:{{ nav.home.ink }}">home</span></span>
+              <span style="font:500 12px/16px Roboto,sans-serif;color:{{ nav.home.label }}">Home</span>
+            </button>
+            <button type="button" onClick="{{ goAccounts }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:transparent;cursor:pointer;padding:0">
+              <span style="width:60px;height:32px;border-radius:16px;background:{{ nav.accounts.pill }};display:flex;align-items:center;justify-content:center"><span class="ms {{ nav.accounts.fill }}" style="font-size:24px;color:{{ nav.accounts.ink }}">account_balance_wallet</span></span>
+              <span style="font:500 12px/16px Roboto,sans-serif;color:{{ nav.accounts.label }}">Accounts</span>
+            </button>
+            <button type="button" onClick="{{ goActivity }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:transparent;cursor:pointer;padding:0">
+              <span style="width:60px;height:32px;border-radius:16px;background:{{ nav.activity.pill }};display:flex;align-items:center;justify-content:center"><span class="ms {{ nav.activity.fill }}" style="font-size:24px;color:{{ nav.activity.ink }}">swap_horiz</span></span>
+              <span style="font:500 12px/16px Roboto,sans-serif;color:{{ nav.activity.label }}">Activity</span>
+            </button>
+            <button type="button" onClick="{{ goBudgets }}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:transparent;cursor:pointer;padding:0">
+              <span style="width:60px;height:32px;border-radius:16px;background:{{ nav.budgets.pill }};display:flex;align-items:center;justify-content:center"><span class="ms {{ nav.budgets.fill }}" style="font-size:24px;color:{{ nav.budgets.ink }}">pie_chart</span></span>
+              <span style="font:500 12px/16px Roboto,sans-serif;color:{{ nav.budgets.label }}">Budgets</span>
+            </button>
+          </div>
+
+          <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:30;background:rgba(0,0,0,.5);animation:scrim .18s ease both"></div>
+          </sc-if>
+
+          <sc-if value="{{ addOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:0;right:0;bottom:0;z-index:31;border-radius:28px 28px 0 0;background:#2A2718;padding:12px 20px 24px;display:flex;flex-direction:column;gap:18px;animation:sheetUp .26s cubic-bezier(.05,.7,.1,1) both">
+              <div style="width:32px;height:4px;border-radius:2px;background:#4D4739;align-self:center"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div style="font:500 20px/26px Roboto,sans-serif;color:#E9E2D4">New entry</div>
+                <button type="button" onClick="{{ closeSheet }}" style="width:40px;height:40px;border:0;border-radius:20px;background:transparent;color:#999080;cursor:pointer" style-hover="background:#211F17"><span class="ms" style="font-size:22px">close</span></button>
+              </div>
+              <div style="display:flex;height:44px;border-radius:22px;border:1px solid #4D4739;overflow:hidden">
+                <button type="button" onClick="{{ pickExpense }}" style="flex:1;border:0;cursor:pointer;font:500 14px/44px Roboto,sans-serif;background:{{ kind.expense.bg }};color:{{ kind.expense.ink }}">Expense</button>
+                <button type="button" onClick="{{ pickIncome }}" style="flex:1;border:0;border-left:1px solid #4D4739;cursor:pointer;font:500 14px/44px Roboto,sans-serif;background:{{ kind.income.bg }};color:{{ kind.income.ink }}">Income</button>
+                <button type="button" onClick="{{ pickTransfer }}" style="flex:1;border:0;border-left:1px solid #4D4739;cursor:pointer;font:500 14px/44px Roboto,sans-serif;background:{{ kind.transfer.bg }};color:{{ kind.transfer.ink }}">Transfer</button>
+              </div>
+              <div style="display:flex;align-items:baseline;justify-content:center;gap:6px;padding:6px 0 2px">
+                <span style="font:400 24px/30px 'DM Mono',monospace;color:#999080">₱</span>
+                <span style="font:500 52px/58px 'DM Mono',monospace;color:{{ kindInk }}">{{ amount }}</span>
+              </div>
+              <div style="display:flex;gap:8px;overflow-x:auto">
+                <sc-for list="{{ quickCats }}" as="c" hint-placeholder-count="5">
+                  <span style="height:36px;padding:0 14px;border-radius:18px;background:#211F17;border:1px solid #4D4739;color:#E9E2D4;font:500 13px/34px Roboto,sans-serif;white-space:nowrap;display:flex;align-items:center;gap:6px"><span class="ms" style="font-size:16px;color:#EDC55F">{{ c.icon }}</span>{{ c.name }}</span>
+                </sc-for>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+                <sc-for list="{{ keys }}" as="k" hint-placeholder-count="12">
+                  <button type="button" onClick="{{ k.press }}" style="height:56px;border:0;border-radius:16px;background:#211F17;color:#E9E2D4;font:500 22px/56px 'DM Mono',monospace;cursor:pointer;padding:0" style-hover="background:#332F1E">{{ k.label }}</button>
+                </sc-for>
+              </div>
+              <button type="button" onClick="{{ closeSheet }}" style="height:56px;border:0;border-radius:28px;background:#EDC55F;color:#3E2E00;font:500 16px/56px Roboto,sans-serif;cursor:pointer">Save entry</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ moreOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:0;right:0;bottom:0;z-index:31;border-radius:28px 28px 0 0;background:#2A2718;padding:12px 20px 24px;display:flex;flex-direction:column;gap:18px;animation:sheetUp .26s cubic-bezier(.05,.7,.1,1) both">
+              <div style="width:32px;height:4px;border-radius:2px;background:#4D4739;align-self:center"></div>
+              <div style="display:flex;align-items:center;gap:14px">
+                <span style="width:52px;height:52px;border-radius:26px;background:#594400;color:#FFE18E;font:500 19px/52px Roboto,sans-serif;text-align:center">MR</span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <div style="font:500 17px/22px Roboto,sans-serif;color:#E9E2D4">Miguel Reyes</div>
+                  <div style="font:400 13px/18px Roboto,sans-serif;color:#999080">miguel@ledger.app · synced 2m ago</div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+                <div style="border-radius:20px;background:#211F17;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px"><span class="ms" style="font-size:24px;color:#9EC6EA">bar_chart</span><span style="font:500 12px/15px Roboto,sans-serif;color:#E9E2D4;text-align:center">Reports</span></div>
+                <div style="border-radius:20px;background:#211F17;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px"><span class="ms" style="font-size:24px;color:#EDC55F">sell</span><span style="font:500 12px/15px Roboto,sans-serif;color:#E9E2D4;text-align:center">Categories</span></div>
+                <div style="border-radius:20px;background:#211F17;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px"><span class="ms" style="font-size:24px;color:#9FD9A0">redeem</span><span style="font:500 12px/15px Roboto,sans-serif;color:#E9E2D4;text-align:center">13th Mo</span></div>
+                <div style="border-radius:20px;background:#211F17;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:8px"><span class="ms" style="font-size:24px;color:#999080">settings</span><span style="font:500 12px/15px Roboto,sans-serif;color:#E9E2D4;text-align:center">Settings</span></div>
+              </div>
+              <div style="border-radius:20px;background:#211F17;padding:4px;display:flex;flex-direction:column">
+                <div style="display:flex;align-items:center;gap:14px;padding:14px 16px">
+                  <span class="ms" style="font-size:22px;color:#999080">dark_mode</span>
+                  <span style="flex:1;font:400 15px/20px Roboto,sans-serif;color:#E9E2D4">Dark theme</span>
+                  <span style="width:52px;height:32px;border-radius:16px;background:#EDC55F;display:flex;align-items:center;justify-content:flex-end;padding:0 4px"><span style="width:24px;height:24px;border-radius:12px;background:#3E2E00"></span></span>
+                </div>
+                <button type="button" onClick="{{ toggleOffline }}" style="display:flex;align-items:center;gap:14px;padding:14px 16px;border:0;background:transparent;cursor:pointer;text-align:left;border-radius:16px" style-hover="background:#2A2718">
+                  <span class="ms" style="font-size:22px;color:#999080">cloud_sync</span>
+                  <span style="flex:1;font:400 15px/20px Roboto,sans-serif;color:#E9E2D4">Simulate offline</span>
+                  <span class="ms" style="font-size:20px;color:#999080">chevron_right</span>
+                </button>
+              </div>
+              <button type="button" onClick="{{ closeSheet }}" style="height:48px;border:1px solid #4D4739;border-radius:24px;background:transparent;color:#FFB4AB;font:500 15px/46px Roboto,sans-serif;cursor:pointer">Sign out</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ detailOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:0;right:0;bottom:0;z-index:31;border-radius:28px 28px 0 0;background:#2A2718;padding:12px 20px 24px;display:flex;flex-direction:column;gap:18px;animation:sheetUp .26s cubic-bezier(.05,.7,.1,1) both">
+              <div style="width:32px;height:4px;border-radius:2px;background:#4D4739;align-self:center"></div>
+              <div style="display:flex;align-items:center;gap:14px">
+                <span class="ms" style="width:52px;height:52px;border-radius:16px;background:#3B1512;color:#FFB4AB;font-size:26px;line-height:52px;text-align:center">restaurant</span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                  <div style="font:500 17px/22px Roboto,sans-serif;color:#E9E2D4">Kanto Freestyle</div>
+                  <div style="font:400 13px/18px Roboto,sans-serif;color:#999080">Dining · BPI Debit</div>
+                </div>
+                <div style="font:500 22px/28px 'DM Mono',monospace;color:#FFB4AB">−₱620</div>
+              </div>
+              <div style="border-radius:20px;background:#211F17;padding:4px;display:flex;flex-direction:column">
+                <div style="display:flex;justify-content:space-between;padding:13px 16px"><span style="font:400 14px/18px Roboto,sans-serif;color:#999080">Date</span><span style="font:400 14px/18px Roboto,sans-serif;color:#E9E2D4">Sep 8, 2026 · 7:42 PM</span></div>
+                <div style="display:flex;justify-content:space-between;padding:13px 16px;border-top:1px solid #2C2921"><span style="font:400 14px/18px Roboto,sans-serif;color:#999080">Budget impact</span><span style="font:400 14px/18px Roboto,sans-serif;color:#FFB4AB">Dining now 118%</span></div>
+                <div style="display:flex;justify-content:space-between;padding:13px 16px;border-top:1px solid #2C2921"><span style="font:400 14px/18px Roboto,sans-serif;color:#999080">Note</span><span style="font:400 14px/18px Roboto,sans-serif;color:#E9E2D4">Dinner with Ana</span></div>
+              </div>
+              <div style="display:flex;gap:10px">
+                <button type="button" onClick="{{ closeSheet }}" style="flex:1;height:48px;border:1px solid #4D4739;border-radius:24px;background:transparent;color:#E9E2D4;font:500 15px/46px Roboto,sans-serif;cursor:pointer">Duplicate</button>
+                <button type="button" onClick="{{ closeSheet }}" style="flex:1;height:48px;border:0;border-radius:24px;background:#EDC55F;color:#3E2E00;font:500 15px/48px Roboto,sans-serif;cursor:pointer">Edit</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </x-import>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:20px;max-width:460px;padding-top:96px">
+    <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#999080">What changed vs. the re-skin</div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;gap:14px">
+        <span class="ms" style="font-size:22px;color:#EDC55F;flex-shrink:0">bottom_navigation</span>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">Four real destinations, no “More” tab</div>
+          <div style="font:400 14px/20px Roboto,sans-serif;color:#999080;text-wrap:pretty">Home · Accounts · Activity · Budgets. <span style="font-family:'DM Mono',monospace;font-size:13px">/settings</span> was a nav destination pretending to be a menu; it now lives behind the avatar with Reports, Categories and 13th Month, so every bar item is a place you can be.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px">
+        <span class="ms" style="font-size:22px;color:#EDC55F;flex-shrink:0">add_circle</span>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">FAB out of the bar, amount-first sheet</div>
+          <div style="font:400 14px/20px Roboto,sans-serif;color:#999080;text-wrap:pretty">The centre notch ate a nav slot and put the primary action where thumbs stretch. It moves to the M3 bottom-end FAB and opens a keypad sheet: type, amount, category — three taps to logged.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px">
+        <span class="ms" style="font-size:22px;color:#EDC55F;flex-shrink:0">event_available</span>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">Month cycle is global, not per-page</div>
+          <div style="font:400 14px/20px Roboto,sans-serif;color:#999080;text-wrap:pretty">The stepper sits under the app bar on every destination, so “which month am I looking at” is never a question — and Activity, Budgets and Home stay in sync.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px">
+        <span class="ms" style="font-size:22px;color:#EDC55F;flex-shrink:0">install_mobile</span>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">PWA state is first-class</div>
+          <div style="font:400 14px/20px Roboto,sans-serif;color:#999080;text-wrap:pretty">The install prompt and offline banner stop being stray banners: offline pins to the top with a pending-sync count, install floats above the FAB and dismisses for good. Toggle both from the avatar sheet or the Tweaks panel.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:14px">
+        <span class="ms" style="font-size:22px;color:#EDC55F;flex-shrink:0">swipe_up</span>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">Sheets, never dialogs</div>
+          <div style="font:400 14px/20px Roboto,sans-serif;color:#999080;text-wrap:pretty">Add, account menu and transaction detail are all thumb-reachable bottom sheets with drag handles — one interaction model instead of a popover, a dialog and a page.</div>
+        </div>
+      </div>
+    </div>
+    <div style="height:1px;background:#2C2921"></div>
+    <div style="font:400 13px/20px Roboto,sans-serif;color:#5A5346;text-wrap:pretty">Repo impact: <span style="font-family:'DM Mono',monospace;font-size:12px">BottomNav.tsx</span> loses its <span style="font-family:'DM Mono',monospace;font-size:12px">More</span> item and centre FAB, <span style="font-family:'DM Mono',monospace;font-size:12px">AppLayout.tsx</span> gains the cycle bar + a single sheet host, and <span style="font-family:'DM Mono',monospace;font-size:12px">/budgets</span> is promoted from the More menu to a route in the bar. The token layer is unchanged from the re-skin.</div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1040,&quot;height&quot;:1080},&quot;offline&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;PWA state&quot;},&quot;showInstallPrompt&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;PWA state&quot;}}">
+const tone = {
+  expense: { ink: '#FFB4AB', container: '#3B1512' },
+  income: { ink: '#9FD9A0', container: '#1E3320' },
+  transfer: { ink: '#9EC6EA', container: '#16293A' },
+};
+
+class Component extends DCLogic {
+  state = { tab: 'home', sheet: null, kind: 'expense', amount: '620', offline: false, install: true };
+
+  go = (tab) => () => this.setState({ tab: tab, sheet: null });
+  open = (sheet) => () => this.setState({ sheet: sheet });
+  pick = (kind) => () => this.setState({ kind: kind });
+
+  press = (label) => () => this.setState((s) => {
+    if (label === '⌫') return { amount: s.amount.length > 1 ? s.amount.slice(0, -1) : '0' };
+    if (label === '.') return { amount: s.amount.indexOf('.') === -1 ? s.amount + '.' : s.amount };
+    return { amount: s.amount === '0' ? label : (s.amount.length < 8 ? s.amount + label : s.amount) };
+  });
+
+  navItem(tab) {
+    const on = this.state.tab === tab;
+    return {
+      pill: on ? '#594400' : 'transparent',
+      ink: on ? '#FFE18E' : '#999080',
+      label: on ? '#E9E2D4' : '#999080',
+      fill: on ? 'msf' : '',
+    };
+  }
+
+  kindChip(kind) {
+    const on = this.state.kind === kind;
+    return { bg: on ? '#594400' : 'transparent', ink: on ? '#FFE18E' : '#999080' };
+  }
+
+  renderVals() {
+    const { tab, sheet, kind } = this.state;
+    const titles = {
+      home: ['Good evening, Miguel', 'Everything synced'],
+      accounts: ['Accounts', '5 accounts · 2 cards'],
+      activity: ['Activity', '38 entries this cycle'],
+      budgets: ['Budgets', '6 envelopes · 1 over'],
+    };
+    const t = titles[tab] || titles.home;
+    const tx = (name, meta, amount, k, icon) => ({ name, meta, amount, icon, ink: tone[k].ink, container: tone[k].container });
+
+    return {
+      screenTitle: t[0],
+      screenSub: t[1],
+      isHome: tab === 'home',
+      isAccounts: tab === 'accounts',
+      isActivity: tab === 'activity',
+      isBudgets: tab === 'budgets',
+      goHome: this.go('home'),
+      goAccounts: this.go('accounts'),
+      goActivity: this.go('activity'),
+      goBudgets: this.go('budgets'),
+      openAdd: this.open('add'),
+      openMore: this.open('more'),
+      openDetail: this.open('detail'),
+      closeSheet: this.open(null),
+      sheetOpen: sheet !== null,
+      addOpen: sheet === 'add',
+      moreOpen: sheet === 'more',
+      detailOpen: sheet === 'detail',
+      offlineOn: this.props.offline ?? this.state.offline,
+      installOn: (this.props.showInstallPrompt ?? true) && this.state.install && sheet === null,
+      dismissInstall: () => this.setState({ install: false }),
+      toggleOffline: () => this.setState((s) => ({ offline: !s.offline, sheet: null })),
+      nav: {
+        home: this.navItem('home'),
+        accounts: this.navItem('accounts'),
+        activity: this.navItem('activity'),
+        budgets: this.navItem('budgets'),
+      },
+      kind: { expense: this.kindChip('expense'), income: this.kindChip('income'), transfer: this.kindChip('transfer') },
+      kindInk: tone[kind].ink,
+      amount: this.state.amount,
+      pickExpense: this.pick('expense'),
+      pickIncome: this.pick('income'),
+      pickTransfer: this.pick('transfer'),
+      keys: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'].map((label) => ({ label, press: this.press(label) })),
+      quickCats: [
+        { name: 'Dining', icon: 'restaurant' },
+        { name: 'Groceries', icon: 'shopping_cart' },
+        { name: 'Transport', icon: 'directions_bus' },
+        { name: 'Bills', icon: 'receipt_long' },
+        { name: 'Rent', icon: 'home_work' },
+      ],
+      recent: [
+        tx('Kanto Freestyle', 'Dining · BPI Debit', '−₱620', 'expense', 'restaurant'),
+        tx('Payroll — Sep 1', 'Salary · BPI Savings', '+₱48,200', 'income', 'payments'),
+        tx('To Emergency Fund', 'Transfer · CIMB', '₱10,000', 'transfer', 'swap_horiz'),
+        tx('Meralco', 'Utilities · GCash', '−₱3,410', 'expense', 'bolt'),
+      ],
+      accounts: [
+        { name: 'BPI Savings', meta: '••• 4821 · primary', balance: '₱214,900', delta: '+₱48,200', icon: 'savings', ink: tone.income.ink, container: tone.income.container },
+        { name: 'CIMB Emergency', meta: '••• 9034 · 4.0% p.a.', balance: '₱180,000', delta: '+₱10,000', icon: 'shield', ink: tone.income.ink, container: tone.income.container },
+        { name: 'GCash', meta: 'e-wallet', balance: '₱12,480', delta: '−₱6,120', icon: 'account_balance_wallet', ink: tone.expense.ink, container: tone.expense.container },
+        { name: 'BPI Debit', meta: '••• 7712', balance: '₱62,770', delta: '−₱18,640', icon: 'credit_card', ink: tone.expense.ink, container: tone.expense.container },
+        { name: 'Metrobank Credit', meta: 'Due Sep 24 · ₱11,204', balance: '−₱11,204', delta: '38% used', icon: 'credit_score', ink: tone.transfer.ink, container: tone.transfer.container },
+      ],
+      groups: [
+        {
+          day: 'Today · Sep 8', total: '−₱4,030',
+          items: [
+            tx('Kanto Freestyle', 'Dining · BPI Debit', '−₱620', 'expense', 'restaurant'),
+            tx('Meralco', 'Utilities · GCash', '−₱3,410', 'expense', 'bolt'),
+          ],
+        },
+        {
+          day: 'Yesterday · Sep 7', total: '+₱37,580',
+          items: [
+            tx('Payroll — Sep 1', 'Salary · BPI Savings', '+₱48,200', 'income', 'payments'),
+            tx('To Emergency Fund', 'Transfer · CIMB', '₱10,000', 'transfer', 'swap_horiz'),
+            tx('SM Supermarket', 'Groceries · BPI Debit', '−₱2,620', 'expense', 'shopping_cart'),
+          ],
+        },
+      ],
+      budgets: [
+        { name: 'Dining', state: '118%', pct: '100%', detail: '₱9,440 of ₱8,000 · ₱1,440 over', icon: 'restaurant', ink: tone.expense.ink, container: tone.expense.container },
+        { name: 'Groceries', state: '74%', pct: '74%', detail: '₱11,100 of ₱15,000', icon: 'shopping_cart', ink: tone.income.ink, container: tone.income.container },
+        { name: 'Transport', state: '52%', pct: '52%', detail: '₱4,160 of ₱8,000', icon: 'directions_bus', ink: tone.income.ink, container: tone.income.container },
+        { name: 'Bills', state: '91%', pct: '91%', detail: '₱10,920 of ₱12,000', icon: 'receipt_long', ink: '#EDC55F', container: '#594400' },
+        { name: 'Fun', state: '31%', pct: '31%', detail: '₱1,550 of ₱5,000', icon: 'sports_esports', ink: tone.transfer.ink, container: tone.transfer.container },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>

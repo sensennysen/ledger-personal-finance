@@ -1,10 +1,11 @@
-import { CORAL, EMERALD } from '@/constants/colors'
+import { EXPENSE, INCOME } from '@/constants/colors'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { getAccountNetWorthContribution } from '@/lib/creditCards'
 import { formatCurrency } from '@/lib/utils'
 import type { DashboardExpenseCategoryDetail, DashboardStatsSummary } from '@/hooks/useDashboardData'
 import type { Account, Transaction } from '@/types'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DialogHeader } from '@/components/ui/dialog'
+import { DetailSurface as Dialog, DetailContent as DialogContent, DetailTitle as DialogTitle } from './DashboardDetailSurface'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { DashboardSummaryValueRow } from '@/components/dashboard/DashboardSummaryValueRow'
 import { DashboardTransactionRow } from '@/components/dashboard/DashboardTransactionRow'
@@ -59,7 +60,7 @@ function TransactionListDialog({
               <DashboardTransactionRow
                 key={tx.id}
                 icon={tx.category?.icon ?? (prefix === '+' ? 'In' : 'Out')}
-                iconBackgroundColor={`${tx.category?.color ?? '#6b7280'}22`}
+                iconBackgroundColor={`var(--${tx.type}-container)`}
                 title={tx.description}
                 subtitle={`${tx.category?.name ?? 'Uncategorized'} - ${tx.date}`}
                 amount={
@@ -128,7 +129,7 @@ export function DashboardDetailDialogs({
                       <p className="text-[0.8125rem] font-medium truncate">{account.name}</p>
                       <p className="text-[0.6875rem] text-muted-foreground capitalize">{account.type.replace('_', ' ')}</p>
                     </div>
-                    <p className="money text-sm font-semibold shrink-0" style={{ color: contribution >= 0 ? EMERALD : CORAL }}>
+                    <p className="money text-sm font-semibold shrink-0" style={{ color: contribution >= 0 ? INCOME : EXPENSE }}>
                       {formatCurrency(contribution, account.currency)}
                     </p>
                   </div>
@@ -147,7 +148,7 @@ export function DashboardDetailDialogs({
                 <DashboardSummaryValueRow
                   label="Credit card debt"
                   value={
-                    <span className="money text-sm font-semibold" style={{ color: CORAL }}>
+                    <span className="money text-sm font-semibold" style={{ color: EXPENSE }}>
                       -{formatCurrency(stats.totalCreditCardDebt, currency)}
                     </span>
                   }
@@ -169,7 +170,7 @@ export function DashboardDetailDialogs({
         emptyMessage="No income this month"
         totalLabel="Total Income"
         totalValue={stats.income}
-        totalColor={EMERALD}
+        totalColor={INCOME}
         transactions={monthIncomeTx}
         prefix="+"
       />
@@ -181,7 +182,7 @@ export function DashboardDetailDialogs({
         emptyMessage="No expenses this month"
         totalLabel="Total Expenses"
         totalValue={stats.expenses}
-        totalColor={CORAL}
+        totalColor={EXPENSE}
         transactions={monthExpenseTx}
         prefix="-"
       />
@@ -218,7 +219,7 @@ export function DashboardDetailDialogs({
                         {categoryBreakdown.transactions.map((tx) => (
                           <div key={tx.id} className="flex items-center justify-between gap-2 py-1">
                             <p className="text-xs text-muted-foreground truncate flex-1">{tx.description}</p>
-                            <p className="text-xs money font-medium shrink-0" style={{ color: CORAL }}>
+                            <p className="text-xs money font-medium shrink-0" style={{ color: EXPENSE }}>
                               -{formatCurrency(tx.amount, tx.currency)}
                             </p>
                           </div>

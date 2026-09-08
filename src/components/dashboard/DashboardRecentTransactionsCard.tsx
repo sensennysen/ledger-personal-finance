@@ -1,5 +1,6 @@
+import { useEntryDetail } from '@/contexts/EntryContext'
 import { useNavigate } from 'react-router-dom'
-import { CORAL, EMERALD, GOLD } from '@/constants/colors'
+import { EXPENSE, INCOME, TRANSFER } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { Transaction } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -16,9 +17,9 @@ interface DashboardRecentTransactionsCardProps {
 }
 
 function getTransactionAmountColor(type: Transaction['type']) {
-  if (type === 'income') return EMERALD
-  if (type === 'expense') return CORAL
-  return GOLD
+  if (type === 'income') return INCOME
+  if (type === 'expense') return EXPENSE
+  return TRANSFER
 }
 
 function getTransactionPrefix(type: Transaction['type']) {
@@ -35,9 +36,10 @@ export function DashboardRecentTransactionsCard({
   style,
 }: DashboardRecentTransactionsCardProps) {
   const navigate = useNavigate()
+  const openDetail = useEntryDetail()
 
   return (
-    <div className="min-w-0 max-w-full rounded-xl border border-border/60 p-5 bg-card" style={style}>
+    <div className="min-w-0 max-w-full rounded-[20px] border border-border p-4 md:p-5 bg-card" style={style}>
       <DashboardCardHeader
         title="Recent Transactions"
         subtitle={isCurrentMonth ? 'Latest activity' : monthLabel}
@@ -61,8 +63,9 @@ export function DashboardRecentTransactionsCard({
           {recentTransactions.map((transaction) => (
             <DashboardTransactionRow
               key={transaction.id}
+              onClick={()=>openDetail?.(transaction)}
               icon={transaction.category?.icon ?? 'Tx'}
-              iconBackgroundColor={`${transaction.category?.color ?? '#6b7280'}22`}
+              iconBackgroundColor={'var(--'+transaction.type+'-container)'}
               title={transaction.description}
               subtitle={transaction.date}
               amount={

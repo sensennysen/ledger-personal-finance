@@ -1,5 +1,5 @@
 import { ArrowRight, BarChart3, TrendingDown, TrendingUp } from 'lucide-react'
-import { CORAL, EMERALD } from '@/constants/colors'
+import { EXPENSE, INCOME } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { DashboardCashFlowForecast } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
@@ -27,7 +27,7 @@ export function DashboardCashFlowForecastCard({
   const netChange = forecast.projectedIncome - forecast.projectedExpenses
 
   return (
-    <div className="rounded-xl border border-border/60 p-5 bg-card" style={style}>
+    <div className="rounded-[20px] border border-border p-4 md:p-5 bg-card" style={style}>
       <DashboardCardHeader
         title="Cash Flow Forecast"
         subtitle={isCurrentMonth ? 'Projected end-of-cycle balance' : `Full cycle · ${monthLabel}`}
@@ -47,7 +47,7 @@ export function DashboardCashFlowForecastCard({
               <p className="text-[0.625rem] text-muted-foreground uppercase tracking-wider mb-1">Projected</p>
               <p
                 className="money text-[0.9375rem] font-bold"
-                style={{ color: forecast.projectedBalance >= currentBalance ? EMERALD : CORAL }}
+                style={{ color: forecast.projectedBalance >= currentBalance ? INCOME : EXPENSE }}
               >
                 {formatCurrency(forecast.projectedBalance, currency)}
               </p>
@@ -57,26 +57,26 @@ export function DashboardCashFlowForecastCard({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: EMERALD }} />
+                <TrendingUp className="w-3.5 h-3.5 shrink-0" style={{ color: INCOME }} />
                 Expected income
               </span>
-              <span className="money font-medium" style={{ color: EMERALD }}>
+              <span className="money font-medium" style={{ color: INCOME }}>
                 +{formatCurrency(forecast.projectedIncome, currency)}
               </span>
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                <TrendingDown className="w-3.5 h-3.5 shrink-0" style={{ color: CORAL }} />
+                <TrendingDown className="w-3.5 h-3.5 shrink-0" style={{ color: EXPENSE }} />
                 Expected expenses
               </span>
-              <span className="money font-medium" style={{ color: CORAL }}>
+              <span className="money font-medium" style={{ color: EXPENSE }}>
                 -{formatCurrency(forecast.projectedExpenses, currency)}
               </span>
             </div>
             <div className="h-px bg-border/40" />
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Net change</span>
-              <span className="money font-semibold" style={{ color: netChange >= 0 ? EMERALD : CORAL }}>
+              <span className="money font-semibold" style={{ color: netChange >= 0 ? INCOME : EXPENSE }}>
                 {netChange >= 0 ? '+' : ''}
                 {formatCurrency(netChange, currency)}
               </span>
@@ -95,7 +95,7 @@ export function DashboardCashFlowForecastCard({
                   )}
                   <span
                     className="money font-medium shrink-0"
-                    style={{ color: item.tx.type === 'income' ? EMERALD : CORAL }}
+                    style={{ color: item.tx.type === 'income' ? INCOME : EXPENSE }}
                   >
                     {item.tx.type === 'income' ? '+' : '-'}
                     {formatCurrency(item.total, currency)}

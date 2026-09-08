@@ -1,7 +1,7 @@
+import { WidgetDragContext } from '@/contexts/widgetDragState'
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
-  ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
   Plus,
@@ -22,9 +22,9 @@ import { DEFAULT_WIDGET_ORDER, useDashboardPrefs, type DashboardWidgetKey } from
 import { useSpendingAlerts } from '@/hooks/useSpendingAlerts'
 import { usePreferences } from '@/hooks/usePreferences'
 import { useFlipReorder } from '@/hooks/useFlipReorder'
-import { formatCurrency, getCurrencySymbol, getCurrentCycleMonthKey, getLocalDateString, cn } from '@/lib/utils'
-import { useMonthCycle } from '@/hooks/useMonthCycle'
-import { EMERALD, CORAL, GOLD } from '@/constants/colors'
+import { formatCurrency, getCurrencySymbol, getLocalDateString, cn } from '@/lib/utils'
+import { useCycle } from '@/contexts/cycleState'
+import { INCOME, EXPENSE, GOLD } from '@/constants/colors'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { DashboardDetailDialogs, type DashboardDetailView } from '@/components/dashboard/DashboardDetailDialogs'
@@ -62,8 +62,8 @@ function StatCard({
   className?: string
 }) {
   const accentColor =
-    variant === 'income' ? EMERALD
-    : variant === 'expense' ? CORAL
+    variant === 'income' ? INCOME
+    : variant === 'expense' ? EXPENSE
     : GOLD
 
   return (
@@ -72,7 +72,7 @@ function StatCard({
       tabIndex={onClick ? 0 : undefined}
       aria-label={onClick ? `View ${title.toLowerCase()} details` : undefined}
       className={cn(
-        'relative overflow-hidden rounded-xl border border-border/60 p-5 transition-all duration-300 group bg-card hover-lift press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative overflow-hidden rounded-[20px] border border-border p-5 transition-colors duration-200 group bg-card press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         onClick && 'cursor-pointer select-none',
         className
       )}
@@ -83,23 +83,15 @@ function StatCard({
           onClick()
         }
       }}
-      onMouseEnter={(event) => {
-        event.currentTarget.style.boxShadow = '0 4px 24px oklch(0 0 0 / 25%)'
-      }}
-      onMouseLeave={(event) => {
-        event.currentTarget.style.boxShadow = 'none'
-      }}
+
     >
-      <div
-        className="absolute top-0 right-0 w-20 h-20 rounded-full -translate-y-1/2 translate-x-1/2 opacity-[0.07] pointer-events-none"
-        style={{ background: accentColor }}
-      />
+
 
       <div className="flex items-start justify-between mb-4">
         <p className="text-[0.6875rem] font-medium text-muted-foreground uppercase tracking-widest">{title}</p>
         <div className="flex items-center gap-1.5">
-          <div className="w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border">
-            <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{background: variant==='income'?'var(--income-container)':variant==='expense'?'var(--expense-container)':'var(--accent)'}}>
+            <Icon className="w-3.5 h-3.5" style={{color:accentColor}} />
           </div>
           {onClick && (
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
@@ -124,7 +116,7 @@ function StatCard({
             <p
               className="text-[0.6875rem] font-medium"
               style={{
-                color: trend === 'up' ? EMERALD : trend === 'down' ? CORAL : 'oklch(0.570 0.015 290)',
+                color: trend === 'up' ? INCOME : trend === 'down' ? EXPENSE : 'var(--muted-foreground)',
               }}
             >
               {sub}
@@ -160,11 +152,10 @@ export default function DashboardPage() {
   const { transactions, loading: txLoading } = useTransactions()
   const { categories } = useCategories()
   const { purchases: loanPurchases, allocations: loanAllocations, loading: loansLoading } = useLoanPurchases()
-  const { budgets } = useBudgets()
-  const { startDay } = useMonthCycle()
+  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
+  const { budgets } = useBudgets({ selectedMonth, startDay })
   const [chartPeriod, setChartPeriod] = useState<DashboardChartPeriod>('month')
   const [detailView, setDetailView] = useState<DashboardDetailView>(null)
-  const [selectedMonth, setSelectedMonth] = useState(() => getCurrentCycleMonthKey(startDay))
 
   const {
     isCurrentMonth,
@@ -253,8 +244,9 @@ export default function DashboardPage() {
   }, [creditCards, updateAccount])
 
   return (
-    <div className="mx-auto grid w-full min-w-0 max-w-7xl gap-6 overflow-x-hidden p-4 md:p-6 lg:grid-cols-2">
-      <div className="flex items-start justify-between gap-3 flex-wrap lg:col-span-2">
+    <WidgetDragContext.Provider value={{start:setDraggedWidget,drop:key=>{if(draggedWidget)reorderWidget(draggedWidget,key);setDraggedWidget(null)},end:()=>setDraggedWidget(null)}}>
+    <div className="mx-auto grid w-full min-w-0 max-w-7xl gap-4 overflow-x-hidden p-4 md:p-6 lg:grid-cols-[1.5fr_1fr]">
+      <div className="hidden md:flex items-start justify-between gap-3 flex-wrap lg:col-span-2">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold leading-tight truncate">
             {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Dashboard'}
@@ -284,11 +276,11 @@ export default function DashboardPage() {
       </div>
 
       <div
-        className="h-px lg:col-span-2"
+        className="hidden md:block h-px lg:col-span-2"
         style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }}
       />
 
-      <div className="flex items-center gap-2 lg:col-span-2">
+      <div className="hidden md:flex items-center gap-2 lg:col-span-2">
         <div className="flex items-center gap-1 bg-muted/40 rounded-xl px-2 py-1.5 flex-1">
           <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => setSelectedMonth((month) => addMonths(month, -1))}>
             <ChevronLeft className="w-4 h-4" />
@@ -331,7 +323,7 @@ export default function DashboardPage() {
                 'flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm',
                 alert.type === 'budget_exceeded'
                   ? 'border-destructive/30 bg-destructive/5 text-destructive'
-                  : 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400'
+                  : 'border-input bg-expense-container text-expense'
               )}
             >
               <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -358,8 +350,12 @@ export default function DashboardPage() {
         />
       )}
 
+      {widgets.stats && <section className="md:hidden rounded-3xl bg-card p-5" style={{order:0}}>
+        <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] mt-2">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
+        <div className="grid grid-cols-2 gap-3 mt-4">{([{view:'income',label:'↙ In',value:stats.income,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl p-3 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p></button>)}</div>
+      </section>}
       {widgets.stats && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:col-span-2" style={widgetGridStyle('stats')}>
+        <div className="hidden md:grid gap-4 grid-cols-3 lg:col-span-2" style={widgetGridStyle('stats')}>
           <StatCard
             title="Net Worth"
             value={formatCurrency(stats.totalBalance, currency)}
@@ -392,15 +388,7 @@ export default function DashboardPage() {
             onClick={() => setDetailView('expenses')}
             className="animate-fade-up anim-delay-2"
           />
-          <StatCard
-            title="Net Cash Flow"
-            value={formatCurrency(stats.net, currency)}
-            sub={stats.net >= 0 ? 'Positive flow' : 'Negative flow'}
-            icon={ArrowLeftRight}
-            trend={stats.net >= 0 ? 'up' : 'down'}
-            loading={loading}
-            className="animate-fade-up anim-delay-3"
-          />
+
         </div>
       )}
 
@@ -483,5 +471,6 @@ export default function DashboardPage() {
         currency={currency}
       />
     </div>
+    </WidgetDragContext.Provider>
   )
 }

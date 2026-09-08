@@ -124,7 +124,7 @@ export default function PrivacyPolicyPage() {
             <div>
               <h1
                 className="text-3xl md:text-4xl font-bold tracking-tight"
-                style={{ fontFamily: "'Playfair Display', serif" }}
+                style={{ fontFamily: "Roboto, system-ui, sans-serif" }}
               >
                 Privacy Policy
               </h1>
@@ -177,13 +177,13 @@ export default function PrivacyPolicyPage() {
         <div
           className="rounded-xl border p-5 mb-10 flex gap-4"
           style={{
-            borderColor: 'oklch(0.570 0.170 18 / 0.25)',
-            background: 'oklch(0.570 0.170 18 / 0.04)',
+            borderColor: 'var(--expense)',
+            background: 'var(--expense-container)',
           }}
         >
           <Trash2
             className="mt-0.5 shrink-0 w-5 h-5"
-            style={{ color: 'oklch(0.570 0.170 18)' }}
+            style={{ color: 'var(--expense)' }}
           />
           <div>
             <p className="text-sm font-semibold text-foreground mb-1">Want to delete your data?</p>

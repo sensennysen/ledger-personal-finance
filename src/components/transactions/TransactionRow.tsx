@@ -1,3 +1,4 @@
+import { useEntryDetail } from '@/contexts/EntryContext'
 import { useEffect, useState } from 'react'
 import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
@@ -52,6 +53,7 @@ export function TransactionRow({
   onSelect,
   contextAccountId,
 }: TransactionRowProps) {
+  const openDetail = useEntryDetail()
   const [receiptOpen, setReceiptOpen] = useState(false)
   const [resolvedReceiptUrl, setResolvedReceiptUrl] = useState<string | null>(null)
   const [receiptLoading, setReceiptLoading] = useState(false)
@@ -114,8 +116,8 @@ export function TransactionRow({
       )}
       {/* Icon */}
       <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-base"
-        style={tx.category ? { backgroundColor: tx.category.color + '20' } : { backgroundColor: '#f1f5f9' }}
+        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-base"
+        style={{ backgroundColor: 'var(--'+tx.type+'-container)' }}
       >
         {tx.category ? tx.category.icon : <Icon className={`w-4 h-4 ${TRANSACTION_TYPE_COLOR[tx.type]}`} />}
       </div>
@@ -124,8 +126,8 @@ export function TransactionRow({
       <div className="flex-1 min-w-0 space-y-0.5">
         {/* Row 1: description | amount */}
         <div className="flex items-baseline justify-between gap-2">
-          <p className="text-sm font-medium truncate">{tx.description}</p>
-          <p className={`text-sm font-semibold shrink-0 ${amountColorClass}`}>
+          <button type="button" className="text-sm font-medium truncate text-left py-1" onClick={()=>openDetail ? openDetail(tx,()=>onEdit(tx)) : onEdit(tx)}>{tx.description}</button>
+          <p className={`money text-sm font-semibold shrink-0 ${amountColorClass}`}>
             {amountPrefix}{formatCurrency(displayAmount, tx.currency)}
           </p>
         </div>

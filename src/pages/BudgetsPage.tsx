@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -9,12 +9,15 @@ import {
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useBudgets } from '@/hooks/useBudgets'
+import { getBudgetCycleRange } from '@/lib/budgetCycle'
+import { useCycle } from '@/contexts/cycleState'
+import { CycleStepper } from '@/components/layout/CycleStepper'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useSavingsGoals, type GoalWithContributions } from '@/hooks/useSavingsGoals'
 import { useCategories } from '@/hooks/useCategories'
 import { CURRENCIES, ACCOUNT_COLORS } from '@/types'
 import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
-import { EMERALD, CORAL } from '@/constants/colors'
+import { INCOME, EXPENSE } from '@/constants/colors'
 import { BUDGET_WARNING_THRESHOLD, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -64,39 +67,6 @@ const BUDGET_PERIOD_LABELS: Record<BudgetFormValues['period'], string> = {
 const getCurrencyLabel = (value: string | null | undefined) => value ?? 'Select currency'
 const DEFAULT_GOAL_ICON = '\u{1F3AF}'
 const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
-
-function localDateStr(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-function getBudgetPeriodRange(period: Budget['period']): { start: string; end: string } {
-  const now = new Date()
-
-  if (period === 'weekly') {
-    const dayOfWeek = now.getDay()
-    const monday = new Date(now)
-    monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7))
-    monday.setHours(0, 0, 0, 0)
-    const sunday = new Date(monday)
-    sunday.setDate(monday.getDate() + 6)
-    return { start: localDateStr(monday), end: localDateStr(sunday) }
-  }
-
-  if (period === 'quarterly') {
-    const quarter = Math.floor(now.getMonth() / 3)
-    const start = new Date(now.getFullYear(), quarter * 3, 1)
-    const end = new Date(now.getFullYear(), quarter * 3 + 3, 0)
-    return { start: localDateStr(start), end: localDateStr(end) }
-  }
-
-  if (period === 'yearly') {
-    return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` }
-  }
-
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  return { start: localDateStr(start), end: localDateStr(end) }
-}
 
 function BudgetForm({
   defaultValues,
@@ -638,7 +608,7 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
               <tr key={entry.period_start} className="border-b last:border-0">
                 <td className="py-2 pr-3 font-medium">{month}</td>
                 {budget.rollover_enabled && (
-                  <td className={`text-right py-2 px-3 text-xs ${entry.rollover_in >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                  <td className={`text-right py-2 px-3 text-xs ${entry.rollover_in >= 0 ? 'text-income dark:text-income' : 'text-destructive'}`}>
                     {entry.rollover_in >= 0 ? '+' : ''}{formatCurrency(entry.rollover_in, entry.currency)}
                   </td>
                 )}
@@ -665,7 +635,7 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
                       ? <span className="text-xs text-destructive font-medium whitespace-nowrap">
                           +{formatCurrency(entry.spent_amount - effective, entry.currency)}
                         </span>
-                      : <span className="text-xs text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                      : <span className="text-xs text-income dark:text-income whitespace-nowrap">
                           -{formatCurrency(effective - entry.spent_amount, entry.currency)}
                         </span>
                     }
@@ -727,7 +697,7 @@ function BudgetTransactionsDialog({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">{remaining < 0 ? 'Over' : 'Left'}</p>
-            <p className={remaining < 0 ? 'font-semibold text-destructive' : 'font-semibold text-emerald-600 dark:text-emerald-400'}>
+            <p className={remaining < 0 ? 'font-semibold text-destructive' : 'font-semibold text-income dark:text-income'}>
               {formatCurrency(Math.abs(remaining), budget.currency)}
             </p>
           </div>
@@ -841,7 +811,7 @@ function SavingsGoalCard({
             <div>
               <CardTitle className="text-base flex items-center gap-1.5">
                 {goal.name}
-                {goal.is_completed && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                {goal.is_completed && <CheckCircle2 className="w-4 h-4 text-income" />}
               </CardTitle>
               <div className="flex gap-1.5 mt-0.5 flex-wrap">
                 {goal.deadline && (
@@ -893,7 +863,7 @@ function SavingsGoalCard({
             className="h-full rounded-full transition-all duration-500"
             style={{
               width: `${pct}%`,
-              backgroundColor: goal.is_completed ? '#10b981' : goal.color,
+              backgroundColor: goal.is_completed ? 'var(--income)' : goal.color,
             }}
           />
         </div>
@@ -903,7 +873,7 @@ function SavingsGoalCard({
           </span>
           <span className="font-medium">
             {pct >= 100
-              ? <span style={{ color: EMERALD }}>Goal reached!</span>
+              ? <span style={{ color: INCOME }}>Goal reached!</span>
               : <span>{formatCurrency(remaining, goal.currency)} to go</span>
             }
           </span>
@@ -934,7 +904,7 @@ function SavingsGoalCard({
               {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronR className="w-3 h-3" />}
               {goal.linkedTransactions!.length} linked transaction{goal.linkedTransactions!.length !== 1 ? 's' : ''}
               {goal.totalContributed !== undefined && (
-                <span className="ml-1 font-medium" style={{ color: goal.totalContributed >= 0 ? EMERALD : CORAL }}>
+                <span className="ml-1 font-medium" style={{ color: goal.totalContributed >= 0 ? INCOME : EXPENSE }}>
                   ({goal.totalContributed >= 0 ? '+' : ''}{formatCurrency(goal.totalContributed, goal.currency)})
                 </span>
               )}
@@ -945,7 +915,7 @@ function SavingsGoalCard({
                   <div key={tx.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/40">
                     <span className="text-muted-foreground">{tx.date}</span>
                     <span className="truncate flex-1 mx-2">{tx.description}</span>
-                    <span style={{ color: tx.type === 'income' ? EMERALD : CORAL }}>
+                    <span style={{ color: tx.type === 'income' ? INCOME : EXPENSE }}>
                       {tx.type === 'income' ? '+' : '−'}{formatCurrency(tx.amount, tx.currency)}
                     </span>
                   </div>
@@ -963,7 +933,8 @@ function SavingsGoalCard({
 
 export default function BudgetsPage() {
   const { profile } = useAuth()
-  const { budgets, loading, createBudget, updateBudget, deleteBudget } = useBudgets()
+  const { selectedMonth, startDay } = useCycle()
+  const { budgets, loading, error: budgetError, createBudget, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
   const { goals, loading: goalsLoading, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
 
   const [activeTab, setActiveTab] = useState('budgets')
@@ -978,8 +949,8 @@ export default function BudgetsPage() {
 
   const defaultCurrency = profile?.default_currency ?? 'USD'
   const selectedBudgetRange = React.useMemo(
-    () => selectedBudget ? getBudgetPeriodRange(selectedBudget.period) : null,
-    [selectedBudget]
+    () => selectedBudget ? getBudgetCycleRange(selectedBudget.period, selectedMonth, startDay) : null,
+    [selectedBudget, selectedMonth, startDay]
   )
   const {
     transactions: selectedBudgetTransactions,
@@ -1030,7 +1001,7 @@ export default function BudgetsPage() {
   const monthlyBudgets = budgets.filter((b) => b.period === 'monthly')
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Budgets & Goals</h1>
@@ -1048,6 +1019,8 @@ export default function BudgetsPage() {
         )}
       </div>
 
+      <CycleStepper className="hidden md:flex" />
+      {budgetError && <p role="alert" className="rounded-xl bg-expense-container text-expense p-4 text-sm">{budgetError}</p>}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="budgets" className="gap-1.5">
@@ -1177,7 +1150,7 @@ export default function BudgetsPage() {
                             <RefreshCw className="w-2.5 h-2.5" />
                             {rollover >= 0 ? 'Rollover surplus' : 'Rollover debt'}
                           </span>
-                          <span className={rollover >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}>
+                          <span className={rollover >= 0 ? 'text-income dark:text-income' : 'text-destructive'}>
                             {rollover >= 0 ? '+' : ''}{formatCurrency(rollover, budget.currency)}
                           </span>
                         </div>
@@ -1199,7 +1172,7 @@ export default function BudgetsPage() {
                       <span className="font-medium">
                         {over
                           ? <span className="text-destructive">{formatCurrency(Math.abs(remaining), budget.currency)} over</span>
-                          : <span style={{ color: EMERALD }}>{formatCurrency(remaining, budget.currency)} left</span>
+                          : <span style={{ color: INCOME }}>{formatCurrency(remaining, budget.currency)} left</span>
                         }
                       </span>
                     </div>

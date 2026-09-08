@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { EMERALD, CORAL, GOLD } from '@/constants/colors'
+import { INCOME, EXPENSE, GOLD } from '@/constants/colors'
 import type { Transaction } from '@/types'
 
 // --- constants ---
@@ -198,12 +198,13 @@ export default function ThirteenthMonthPage() {
         </Select>
       </div>
 
+      <section className="rounded-3xl bg-accent text-accent-foreground p-6"><p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p><p className="money text-[40px] leading-tight mt-3">{loading ? '…' : formatCurrency(thirteenthMonthPay,currency)}</p><p className="text-sm mt-3">{formatCurrency(totalIncluded,currency)} basic salary ÷ 12</p></section>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <SummaryCard
           label="Total Basic Salary"
           value={formatCurrency(totalIncluded, currency)}
           sub={`${monthsWithIncome} of ${monthsElapsed} month${monthsElapsed !== 1 ? 's' : ''} covered`}
-          color={EMERALD}
+          color={INCOME}
           loading={loading}
         />
         <SummaryCard
@@ -217,12 +218,12 @@ export default function ThirteenthMonthPage() {
           label="Records Included"
           value={loading ? '-' : `${effectiveIncluded.size} / ${transactions.length}`}
           sub="Tap rows below to toggle"
-          color={CORAL}
+          color={EXPENSE}
           loading={loading}
         />
       </div>
 
-      <div className="flex items-start gap-2.5 rounded-xl border border-border/60 bg-muted/40 p-4 text-sm text-muted-foreground">
+      <div className="flex items-start gap-2.5 rounded-xl bg-transfer-container p-4 text-sm text-transfer">
         <Info className="w-4 h-4 mt-0.5 shrink-0" />
         <p>
           All income transactions for the year are shown below. Check only the records that qualify
@@ -237,7 +238,7 @@ export default function ThirteenthMonthPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <CardTitle className="text-base flex items-center gap-2">
-                <CalendarCheck className="w-4 h-4" style={{ color: EMERALD }} />
+                <CalendarCheck className="w-4 h-4" style={{ color: INCOME }} />
                 Income Records � {year}
               </CardTitle>
               <CardDescription>Select the records that count as basic salary</CardDescription>
@@ -301,9 +302,9 @@ export default function ThirteenthMonthPage() {
                         title={allOn ? 'Deselect all in month' : 'Select all in month'}
                       >
                         {allOn
-                          ? <CheckSquare className="w-4 h-4" style={{ color: EMERALD }} />
+                          ? <CheckSquare className="w-4 h-4" style={{ color: INCOME }} />
                           : someOn
-                            ? <CheckSquare className="w-4 h-4 opacity-50" style={{ color: EMERALD }} />
+                            ? <CheckSquare className="w-4 h-4 opacity-50" style={{ color: INCOME }} />
                             : <Square className="w-4 h-4" />
                         }
                       </button>
@@ -314,7 +315,7 @@ export default function ThirteenthMonthPage() {
                         </Badge>
                         <span
                           className="text-sm font-semibold tabular-nums"
-                          style={{ color: inclTotal > 0 ? EMERALD : undefined }}
+                          style={{ color: inclTotal > 0 ? INCOME : undefined }}
                         >
                           {inclTotal > 0
                             ? formatCurrency(inclTotal, currency)

@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_COLORS, CURRENCIES, type AccountType } from '@/types'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { cn, formatCurrency } from '@/lib/utils'
-import { GOLD } from '@/constants/colors'
+
 import { DEFAULT_CURRENCY } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -714,7 +714,7 @@ export default function AccountsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <p className="money text-[1.375rem] font-bold" style={{ color: account.balance < 0 ? 'var(--destructive)' : GOLD }}>
+          <p className="money text-[1.375rem] font-bold" style={{ color: account.balance < 0 ? 'var(--destructive)' : 'var(--foreground)' }}>
             {formatCurrency(
               account.type === 'credit_card'
                 ? getCreditCardSpending(account)

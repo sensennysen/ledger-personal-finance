@@ -4,8 +4,8 @@
   "description": "Track spending, manage accounts, and plan budgets.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f0ece5",
-  "theme_color": "#f0ece5",
+  "background_color": "#15130B",
+  "theme_color": "#15130B",
   "orientation": "portrait",
   "scope": "/",
   "icons": [

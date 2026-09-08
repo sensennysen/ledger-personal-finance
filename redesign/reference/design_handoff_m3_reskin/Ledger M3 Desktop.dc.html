@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=DM+Mono:wght@400;500&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #0C0A05; }
+  a { color: #EDC55F; text-decoration: none; }
+  a:hover { color: #FFE18E; }
+</style>
+</helmet>
+
+<div style="min-height:100vh;padding:56px 56px 96px;background:#0C0A05;font-family:Roboto,system-ui,sans-serif;color:#E9E2D4;display:flex;flex-direction:column;gap:56px">
+
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:820px">
+    <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#999080">Ledger · Material Design 3 · Desktop</div>
+    <div style="font:400 36px/44px Roboto,sans-serif;color:#E9E2D4">Desktop — persistent navigation, split view, keyboard-first</div>
+    <div style="font:400 16px/24px Roboto,sans-serif;color:#D0C6B0;text-wrap:pretty">The mobile IA holds, but desktop stops hiding it: the five destinations live in a permanent navigation drawer, the breadcrumb is always addressable, and detail opens beside the list instead of replacing it. Both themes below share one token set.</div>
+  </div>
+
+  <sc-if value="{{ showSemanticPanel }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;flex-direction:column;gap:24px;padding:32px;border-radius:28px;background:#15130B;border:1px solid #2C2921;max-width:1400px">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font:500 14px/20px Roboto,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#EDC55F">Semantic transaction colors</div>
+      <div style="font:400 15px/22px Roboto,sans-serif;color:#D0C6B0;max-width:880px;text-wrap:pretty">Gold stays the brand and interaction color; it never encodes money. Direction is carried by three dedicated hues, applied to the type chip, the amount, and any delta indicator — so a row's kind is legible before the label is read. Color is always paired with a sign or arrow, never the only cue.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      <div style="padding:20px;border-radius:16px;background:#1E3320;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:10px;background:#2C4A2E;color:#9FD9A0;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">south_west</span></div><div style="font:500 16px/24px Roboto,sans-serif;color:#9FD9A0">Income · incoming</div></div>
+        <div style="font:500 24px/32px 'DM Mono',monospace;color:#9FD9A0">+2,450.00</div>
+        <div style="display:flex;flex-direction:column;gap:2px;font:400 12px/18px 'DM Mono',monospace;color:#C7E8C8"><span>dark  #9FD9A0 on #1E3320</span><span>light #1E6B2E on #C6EBC7</span></div>
+      </div>
+      <div style="padding:20px;border-radius:16px;background:#3B1512;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:10px;background:#5A211C;color:#FFB4AB;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">north_east</span></div><div style="font:500 16px/24px Roboto,sans-serif;color:#FFB4AB">Expense · outgoing</div></div>
+        <div style="font:500 24px/32px 'DM Mono',monospace;color:#FFB4AB">−84.12</div>
+        <div style="display:flex;flex-direction:column;gap:2px;font:400 12px/18px 'DM Mono',monospace;color:#FFDAD6"><span>dark  #FFB4AB on #3B1512</span><span>light #A4342B on #FFDAD6</span></div>
+      </div>
+      <div style="padding:20px;border-radius:16px;background:#16293A;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:32px;height:32px;border-radius:10px;background:#21405A;color:#9EC6EA;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">swap_horiz</span></div><div style="font:500 16px/24px Roboto,sans-serif;color:#9EC6EA">Transfer · internal</div></div>
+        <div style="font:500 24px/32px 'DM Mono',monospace;color:#9EC6EA">⇄ 500.00</div>
+        <div style="display:flex;flex-direction:column;gap:2px;font:400 12px/18px 'DM Mono',monospace;color:#CBE2F5"><span>dark  #9EC6EA on #16293A</span><span>light #1F5A87 on #CDE4F7</span></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding-top:4px">
+      <div style="font:500 13px/18px Roboto,sans-serif;color:#999080">Contrast pairs</div>
+      <div style="height:32px;padding:0 14px;border-radius:8px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:18px">arrow_upward</span>Net worth up 2.4%</div>
+      <div style="height:32px;padding:0 14px;border-radius:8px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:18px">arrow_upward</span>Spend up 21% — worse</div>
+      <div style="height:32px;padding:0 14px;border-radius:8px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:18px">arrow_downward</span>Spend down 8% — better</div>
+      <div style="font:400 13px/18px Roboto,sans-serif;color:#999080;text-wrap:pretty">Direction is judged by outcome, not arithmetic — rising spend is red even though the number grew.</div>
+    </div>
+  </div>
+  </sc-if>
+
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:760px">
+    <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Dark theme · default</div>
+    <div style="font:400 14px/20px Roboto,sans-serif;color:#999080;text-wrap:pretty">1400 × 880 at the default window size. Drawer 264, content min 640, detail pane 380.</div>
+  </div>
+
+  <div data-theme-block="dark" style="display:flex;flex-direction:column;gap:44px">
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div data-screen-label="D01" style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#999080">D01 — Dashboard · permanent drawer</div>
+      <x-import component-from-global-scope="MacWindow" from="./macos-window.jsx" bare="{{ true }}" dark="{{ true }}" width="{{ 1400 }}" height="{{ 880 }}" title="Ledger" hint-size="1400px,880px">
+        <div style="height:100%;display:flex;background:#15130B;font-family:Roboto,system-ui,sans-serif;overflow:hidden">
+
+          <div style="width:264px;flex-shrink:0;background:#1D1B13;display:flex;flex-direction:column;padding:16px 12px;gap:16px;border-right:1px solid #2C2921">
+            <div style="display:flex;align-items:center;gap:10px;padding:4px 8px">
+              <div style="width:32px;height:32px;border-radius:10px;background:#EDC55F;color:#3E2E00;display:flex;align-items:center;justify-content:center;font:700 18px/24px Roboto,sans-serif">L</div>
+              <div style="font:500 20px/28px Roboto,sans-serif;color:#E9E2D4">Ledger</div>
+            </div>
+            <div style="height:40px;border-radius:12px;background:#2A2718;display:flex;align-items:center;gap:10px;padding:0 12px">
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#999080">search</span>
+              <div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#999080">Search</div>
+              <div style="padding:2px 6px;border-radius:6px;border:1px solid #4D4739;font:500 11px/16px 'DM Mono',monospace;color:#999080">⌘K</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="height:52px;border-radius:26px;background:#594400;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#FFE18E;font-variation-settings:'FILL' 1">home</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#FFE18E">Home</div></div>
+              <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#D0C6B0">receipt_long</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#D0C6B0">Transactions</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#999080">248</div></div>
+              <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#D0C6B0">account_balance</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#D0C6B0">Accounts</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#999080">5</div></div>
+              <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#D0C6B0">donut_small</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#D0C6B0">Budgets</div><div style="width:8px;height:8px;border-radius:4px;background:#FFB4AB"></div></div>
+              <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#D0C6B0">bar_chart</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#D0C6B0">Reports</div></div>
+            </div>
+            <div style="height:1px;background:#2C2921;margin:4px 12px"></div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <div style="padding:4px 16px 6px;font:500 12px/16px Roboto,sans-serif;letter-spacing:.5px;color:#999080">ACCOUNTS</div>
+              <div style="height:40px;border-radius:20px;display:flex;align-items:center;gap:12px;padding:0 16px"><div style="width:8px;height:8px;border-radius:4px;background:#9FD9A0"></div><div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#D0C6B0">Chase Checking</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#999080">8,142</div></div>
+              <div style="height:40px;border-radius:20px;display:flex;align-items:center;gap:12px;padding:0 16px"><div style="width:8px;height:8px;border-radius:4px;background:#FFB4AB"></div><div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#D0C6B0">Amex Gold</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#999080">−1,204</div></div>
+              <div style="height:40px;border-radius:20px;display:flex;align-items:center;gap:12px;padding:0 16px"><div style="width:8px;height:8px;border-radius:4px;background:#9EC6EA"></div><div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#D0C6B0">Ally Savings</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#999080">21,900</div></div>
+            </div>
+            <div style="flex:1"></div>
+            <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#D0C6B0">settings</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#D0C6B0">Settings</div></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:16px;background:#211F17">
+              <div style="width:32px;height:32px;border-radius:16px;background:#4F462B;color:#F2E2BB;display:flex;align-items:center;justify-content:center;font:500 13px/18px Roboto,sans-serif">AM</div>
+              <div style="flex:1;min-width:0"><div style="font:400 14px/20px Roboto,sans-serif;color:#E9E2D4">Anna Meyer</div><div style="display:flex;align-items:center;gap:4px;font:400 12px/16px Roboto,sans-serif;color:#9FD9A0"><span style="font-family:'Material Symbols Rounded';font-size:14px">cloud_done</span>Synced</div></div>
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#999080">unfold_more</span>
+            </div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:16px;padding:0 28px;border-bottom:1px solid #2C2921">
+              <div style="font:500 20px/28px Roboto,sans-serif;color:#E9E2D4">Home</div>
+              <div style="flex:1"></div>
+              <div style="display:flex;align-items:center;gap:2px">
+                <div style="width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:20px">chevron_left</span></div>
+                <div style="height:36px;padding:0 14px;border-radius:10px;border:1px solid #4D4739;display:flex;align-items:center;gap:8px;font:500 14px/20px Roboto,sans-serif;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:18px">calendar_month</span>Sep 2026 cycle</div>
+                <div style="width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:20px">chevron_right</span></div>
+              </div>
+              <div style="height:40px;padding:0 20px;border-radius:20px;background:#EDC55F;color:#3E2E00;display:flex;align-items:center;gap:8px;font:500 14px/20px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:20px">add</span>New transaction</div>
+            </div>
+
+            <div style="flex:1;overflow:hidden;padding:24px 28px;display:flex;flex-direction:column;gap:20px">
+              <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:20px">
+                <div style="padding:24px;border-radius:20px;background:#211F17;display:flex;flex-direction:column;gap:16px">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                    <div style="display:flex;flex-direction:column;gap:4px">
+                      <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.5px;color:#D0C6B0">NET WORTH</div>
+                      <div style="font:500 40px/48px 'DM Mono',monospace;color:#E9E2D4">$42,318.64</div>
+                    </div>
+                    <div style="height:32px;padding:0 12px;border-radius:8px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;gap:6px;font:500 14px/20px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:18px">arrow_upward</span>2.4%</div>
+                  </div>
+                  <div style="display:flex;gap:12px">
+                    <div style="flex:1;padding:14px 16px;border-radius:12px;background:#1E3320;display:flex;flex-direction:column;gap:4px">
+                      <div style="display:flex;align-items:center;gap:6px;font:500 12px/16px Roboto,sans-serif;color:#9FD9A0"><span style="font-family:'Material Symbols Rounded';font-size:16px">south_west</span>IN</div>
+                      <div style="font:500 22px/28px 'DM Mono',monospace;color:#9FD9A0">+4,900.00</div>
+                    </div>
+                    <div style="flex:1;padding:14px 16px;border-radius:12px;background:#3B1512;display:flex;flex-direction:column;gap:4px">
+                      <div style="display:flex;align-items:center;gap:6px;font:500 12px/16px Roboto,sans-serif;color:#FFB4AB"><span style="font-family:'Material Symbols Rounded';font-size:16px">north_east</span>OUT</div>
+                      <div style="font:500 22px/28px 'DM Mono',monospace;color:#FFB4AB">−3,142.18</div>
+                    </div>
+                    <div style="flex:1;padding:14px 16px;border-radius:12px;background:#2A2718;display:flex;flex-direction:column;gap:4px">
+                      <div style="font:500 12px/16px Roboto,sans-serif;color:#D0C6B0">NET</div>
+                      <div style="font:500 22px/28px 'DM Mono',monospace;color:#E9E2D4">+1,757.82</div>
+                    </div>
+                  </div>
+                </div>
+                <div style="padding:20px;border-radius:20px;background:#211F17;display:flex;flex-direction:column;gap:12px">
+                  <div style="font:500 16px/24px Roboto,sans-serif;color:#E9E2D4">Needs attention</div>
+                  <div style="padding:12px 14px;border-radius:12px;background:#3B1512;display:flex;align-items:flex-start;gap:10px">
+                    <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#FFB4AB">credit_card_clock</span>
+                    <div style="flex:1"><div style="font:500 14px/20px Roboto,sans-serif;color:#FFB4AB">Sapphire due in 3 days</div><div style="font:400 12px/16px Roboto,sans-serif;color:#FFDAD6">$1,204.55 · pay by Sep 10</div></div>
+                  </div>
+                  <div style="padding:12px 14px;border-radius:12px;background:#2A2718;display:flex;align-items:flex-start;gap:10px">
+                    <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#EDC55F">rule</span>
+                    <div style="flex:1"><div style="font:500 14px/20px Roboto,sans-serif;color:#E9E2D4">6 uncategorised</div><div style="font:400 12px/16px Roboto,sans-serif;color:#999080">Imported Sep 5 · review</div></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1.55fr;gap:20px">
+                <div style="padding:20px;border-radius:20px;background:#211F17;display:flex;flex-direction:column;gap:14px">
+                  <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:500 16px/24px Roboto,sans-serif;color:#E9E2D4">Budgets</div><div style="font:500 14px/20px Roboto,sans-serif;color:#EDC55F">See all</div></div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;justify-content:space-between;font:400 14px/20px Roboto,sans-serif;color:#D0C6B0"><span>Groceries</span><span style="font-family:'DM Mono',monospace">412 / 600</span></div>
+                    <div style="height:6px;border-radius:3px;background:#4D4739"><div style="width:68%;height:6px;border-radius:3px;background:#EDC55F"></div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;justify-content:space-between;font:400 14px/20px Roboto,sans-serif;color:#FFB4AB"><span>Dining out</span><span style="font-family:'DM Mono',monospace">288 / 250</span></div>
+                    <div style="height:6px;border-radius:3px;background:#4D4739"><div style="width:100%;height:6px;border-radius:3px;background:#FFB4AB"></div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;justify-content:space-between;font:400 14px/20px Roboto,sans-serif;color:#D0C6B0"><span>Transport</span><span style="font-family:'DM Mono',monospace">96 / 180</span></div>
+                    <div style="height:6px;border-radius:3px;background:#4D4739"><div style="width:53%;height:6px;border-radius:3px;background:#EDC55F"></div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;justify-content:space-between;font:400 14px/20px Roboto,sans-serif;color:#D0C6B0"><span>Subscriptions</span><span style="font-family:'DM Mono',monospace">61 / 90</span></div>
+                    <div style="height:6px;border-radius:3px;background:#4D4739"><div style="width:68%;height:6px;border-radius:3px;background:#EDC55F"></div></div>
+                  </div>
+                </div>
+                <div style="padding:20px;border-radius:20px;background:#211F17;display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div style="font:500 16px/24px Roboto,sans-serif;color:#E9E2D4">Cash flow · 6 cycles</div>
+                    <div style="display:flex;gap:14px">
+                      <div style="display:flex;align-items:center;gap:6px;font:400 12px/16px Roboto,sans-serif;color:#D0C6B0"><div style="width:10px;height:10px;border-radius:2px;background:#9FD9A0"></div>In</div>
+                      <div style="display:flex;align-items:center;gap:6px;font:400 12px/16px Roboto,sans-serif;color:#D0C6B0"><div style="width:10px;height:10px;border-radius:2px;background:#FFB4AB"></div>Out</div>
+                    </div>
+                  </div>
+                  <div style="flex:1;display:flex;align-items:flex-end;gap:22px;padding-top:8px">
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:74px;border-radius:4px 4px 0 0;background:#9FD9A0"></div><div style="width:16px;height:58px;border-radius:4px 4px 0 0;background:#FFB4AB"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#999080">Apr</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:80px;border-radius:4px 4px 0 0;background:#9FD9A0"></div><div style="width:16px;height:70px;border-radius:4px 4px 0 0;background:#FFB4AB"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#999080">May</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:66px;border-radius:4px 4px 0 0;background:#9FD9A0"></div><div style="width:16px;height:84px;border-radius:4px 4px 0 0;background:#FFB4AB"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#999080">Jun</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:92px;border-radius:4px 4px 0 0;background:#9FD9A0"></div><div style="width:16px;height:61px;border-radius:4px 4px 0 0;background:#FFB4AB"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#999080">Jul</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:88px;border-radius:4px 4px 0 0;background:#9FD9A0"></div><div style="width:16px;height:66px;border-radius:4px 4px 0 0;background:#FFB4AB"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#999080">Aug</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:98px;border-radius:4px 4px 0 0;background:#9FD9A0"></div><div style="width:16px;height:63px;border-radius:4px 4px 0 0;background:#FFB4AB"></div></div><div style="font:500 12px/16px Roboto,sans-serif;color:#E9E2D4">Sep</div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="max-width:900px;font:400 13px/18px Roboto,sans-serif;color:#999080;text-wrap:pretty">The drawer carries a second, account-level list below the destinations — the thing desktop users actually navigate by. Cycle stepper sits in the header, not in a filter drawer, because the whole dashboard is scoped to it.</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div data-screen-label="D02" style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#999080">D02 — Transactions · rail + list + detail</div>
+      <x-import component-from-global-scope="MacWindow" from="./macos-window.jsx" bare="{{ true }}" dark="{{ true }}" width="{{ 1400 }}" height="{{ 880 }}" title="Ledger — Transactions" hint-size="1400px,880px">
+        <div style="height:100%;display:flex;background:#15130B;font-family:Roboto,system-ui,sans-serif;overflow:hidden">
+
+          <div style="width:88px;flex-shrink:0;background:#1D1B13;display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:12px;border-right:1px solid #2C2921">
+            <div style="width:32px;height:32px;border-radius:10px;background:#EDC55F;color:#3E2E00;display:flex;align-items:center;justify-content:center;font:700 18px/24px Roboto,sans-serif">L</div>
+            <div style="width:56px;height:56px;border-radius:16px;background:#EDC55F;color:#3E2E00;display:flex;align-items:center;justify-content:center;margin-top:4px"><span style="font-family:'Material Symbols Rounded';font-size:24px">add</span></div>
+            <div style="display:flex;flex-direction:column;gap:4px;align-items:center;margin-top:8px">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:22px">home</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#D0C6B0">Home</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;background:#594400;display:flex;align-items:center;justify-content:center;color:#FFE18E"><span style="font-family:'Material Symbols Rounded';font-size:22px;font-variation-settings:'FILL' 1">receipt_long</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#FFE18E">Ledger</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:22px">account_balance</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#D0C6B0">Accounts</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:22px">donut_small</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#D0C6B0">Budgets</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:22px">bar_chart</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#D0C6B0">Reports</div></div>
+            </div>
+            <div style="flex:1"></div>
+            <div style="width:32px;height:32px;border-radius:16px;background:#4F462B;color:#F2E2BB;display:flex;align-items:center;justify-content:center;font:500 13px/18px Roboto,sans-serif">AM</div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid #2C2921">
+            <div style="flex-shrink:0;padding:16px 24px 12px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid #2C2921">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="display:flex;align-items:baseline;gap:8px;font:400 13px/18px Roboto,sans-serif;color:#999080"><span>Home</span><span>/</span><span style="font:500 20px/28px Roboto,sans-serif;color:#E9E2D4">Transactions</span></div>
+                <div style="flex:1"></div>
+                <div style="height:36px;flex:0 1 280px;border-radius:12px;background:#2A2718;display:flex;align-items:center;gap:8px;padding:0 12px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:18px;color:#999080">search</span>
+                  <div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#E9E2D4">whole foods</div>
+                  <span style="font-family:'Material Symbols Rounded';font-size:18px;color:#999080">close</span>
+                </div>
+                <div style="height:36px;padding:0 14px;border-radius:10px;border:1px solid #4D4739;display:flex;align-items:center;gap:8px;font:500 14px/20px Roboto,sans-serif;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:18px">download</span>Export</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <div style="height:32px;padding:0 12px;border-radius:8px;background:#594400;color:#FFE18E;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:18px">check</span>Sep 2026</div>
+                <div style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #4D4739;color:#D0C6B0;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif">All accounts<span style="font-family:'Material Symbols Rounded';font-size:18px">expand_more</span></div>
+                <div style="height:32px;padding:0 12px;border-radius:8px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">south_west</span>Income</div>
+                <div style="height:32px;padding:0 12px;border-radius:8px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">north_east</span>Expense</div>
+                <div style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #4D4739;color:#9EC6EA;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">swap_horiz</span>Transfer</div>
+                <div style="flex:1"></div>
+                <div style="font:400 13px/18px 'DM Mono',monospace;color:#999080">31 of 248</div>
+              </div>
+            </div>
+
+            <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+              <div style="padding:10px 24px 6px;font:500 12px/16px Roboto,sans-serif;letter-spacing:.5px;color:#999080;background:#1D1B13">TODAY · SEP 8</div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px;background:#2A2718;border-left:3px solid #EDC55F">
+                <div style="width:40px;height:40px;border-radius:12px;background:#5A211C;color:#FFB4AB;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">local_grocery_store</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">Whole Foods Market</div><div style="font:400 13px/18px Roboto,sans-serif;color:#999080">Groceries · Chase Checking</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">north_east</span>EXPENSE</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#FFB4AB;width:120px;text-align:right">−84.12</div>
+              </div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#2C4A2E;color:#9FD9A0;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">payments</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">Northwind Payroll</div><div style="font:400 13px/18px Roboto,sans-serif;color:#999080">Salary · Chase Checking</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#1E3320;color:#9FD9A0;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">south_west</span>INCOME</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#9FD9A0;width:120px;text-align:right">+2,450.00</div>
+              </div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#21405A;color:#9EC6EA;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">swap_horiz</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">To Ally Savings</div><div style="font:400 13px/18px Roboto,sans-serif;color:#999080">Internal · Chase → Ally</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#16293A;color:#9EC6EA;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">swap_horiz</span>TRANSFER</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#9EC6EA;width:120px;text-align:right">500.00</div>
+              </div>
+              <div style="padding:10px 24px 6px;font:500 12px/16px Roboto,sans-serif;letter-spacing:.5px;color:#999080;background:#1D1B13">SAT · SEP 6</div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#5A211C;color:#FFB4AB;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">restaurant</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">Kissaten</div><div style="font:400 13px/18px Roboto,sans-serif;color:#999080">Dining out · Amex Gold</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">north_east</span>EXPENSE</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#FFB4AB;width:120px;text-align:right">−38.40</div>
+              </div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#5A211C;color:#FFB4AB;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">directions_subway</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">MTA OMNY</div><div style="font:400 13px/18px Roboto,sans-serif;color:#999080">Transport · Amex Gold</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">north_east</span>EXPENSE</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#FFB4AB;width:120px;text-align:right">−2.90</div>
+              </div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#2A2718;color:#EDC55F;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">help</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#E9E2D4">SQ *VENDOR 4471</div><div style="display:flex;align-items:center;gap:6px;font:400 13px/18px Roboto,sans-serif;color:#EDC55F"><span style="font-family:'Material Symbols Rounded';font-size:14px">rule</span>Uncategorised · assign</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">north_east</span>EXPENSE</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#FFB4AB;width:120px;text-align:right">−21.75</div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="flex-shrink:0;height:52px;display:flex;align-items:center;gap:16px;padding:0 24px;border-top:1px solid #2C2921;background:#1D1B13">
+                <div style="font:400 13px/18px Roboto,sans-serif;color:#999080">Selected total</div>
+                <div style="font:500 14px/20px 'DM Mono',monospace;color:#E9E2D4">−84.12</div>
+                <div style="flex:1"></div>
+                <div style="font:400 13px/18px Roboto,sans-serif;color:#999080">In −2,450.00 · Out −147.17 · Net +2,302.83</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="width:380px;flex-shrink:0;background:#211F17;display:flex;flex-direction:column">
+            <div style="height:56px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 12px 0 20px;border-bottom:1px solid #2C2921">
+              <div style="flex:1;font:500 16px/24px Roboto,sans-serif;color:#E9E2D4">Transaction</div>
+              <div style="width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:20px">open_in_new</span></div>
+              <div style="width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#D0C6B0"><span style="font-family:'Material Symbols Rounded';font-size:20px">close</span></div>
+            </div>
+            <div style="flex:1;padding:20px;display:flex;flex-direction:column;gap:18px">
+              <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+                <div style="height:26px;padding:0 10px;border-radius:6px;background:#3B1512;color:#FFB4AB;display:flex;align-items:center;gap:6px;font:500 12px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">north_east</span>EXPENSE</div>
+                <div style="font:500 36px/44px 'DM Mono',monospace;color:#FFB4AB">−84.12</div>
+                <div style="font:400 14px/20px Roboto,sans-serif;color:#D0C6B0">Whole Foods Market · Sep 8, 2026 · 6:41 PM</div>
+              </div>
+              <div style="height:1px;background:#2C2921"></div>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#999080">Account</div><div style="flex:1;display:flex;align-items:center;gap:8px;font:400 14px/20px Roboto,sans-serif;color:#E9E2D4"><div style="width:8px;height:8px;border-radius:4px;background:#9FD9A0"></div>Chase Checking</div></div>
+                <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#999080">Category</div><div style="flex:1"><div style="display:inline-flex;height:32px;padding:0 12px;border-radius:8px;background:#2A2718;color:#E9E2D4;align-items:center;gap:8px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">local_grocery_store</span>Groceries<span style="font-family:'Material Symbols Rounded';font-size:16px;color:#999080">expand_more</span></div></div></div>
+                <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#999080">Budget</div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;font:400 13px/18px Roboto,sans-serif;color:#D0C6B0"><span>Groceries</span><span style="font-family:'DM Mono',monospace">412 / 600</span></div><div style="height:6px;border-radius:3px;background:#4D4739"><div style="width:68%;height:6px;border-radius:3px;background:#EDC55F"></div></div></div></div>
+                <div style="display:flex;align-items:flex-start;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#999080">Note</div><div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#D0C6B0;text-wrap:pretty">Weekly shop + party supplies. Split with Dan pending.</div></div>
+                <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#999080">Tags</div><div style="flex:1;display:flex;gap:6px"><div style="height:26px;padding:0 10px;border-radius:6px;border:1px solid #4D4739;color:#D0C6B0;display:flex;align-items:center;font:500 12px/16px Roboto,sans-serif">shared</div><div style="height:26px;padding:0 10px;border-radius:6px;border:1px solid #4D4739;color:#D0C6B0;display:flex;align-items:center;font:500 12px/16px Roboto,sans-serif">reimbursable</div></div></div>
+              </div>
+              <div style="height:1px;background:#2C2921"></div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="font:500 13px/18px Roboto,sans-serif;color:#999080">Receipt</div>
+                <div style="height:128px;border-radius:12px;border:1px dashed #4D4739;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#999080"><span style="font-family:'Material Symbols Rounded';font-size:24px">attach_file</span><div style="font:400 13px/18px Roboto,sans-serif">Drop an image or ⌘V</div></div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1;height:40px;border-radius:20px;background:#EDC55F;color:#3E2E00;display:flex;align-items:center;justify-content:center;font:500 14px/20px Roboto,sans-serif">Save changes</div>
+                <div style="width:40px;height:40px;border-radius:20px;border:1px solid #4D4739;display:flex;align-items:center;justify-content:center;color:#FFB4AB"><span style="font-family:'Material Symbols Rounded';font-size:20px">delete</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="max-width:900px;font:400 13px/18px Roboto,sans-serif;color:#999080;text-wrap:pretty">Selection is a 3px gold edge plus a raised surface — never a colored fill, which would collide with the type coding. Type chips repeat the hue at row scale so a scan reads direction without parsing signs.</div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:6px;max-width:760px">
+    <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#EDC55F">Light theme</div>
+    <div style="font:400 14px/20px Roboto,sans-serif;color:#999080;text-wrap:pretty">Same geometry, same roles, re-mapped tones: gold darkens to #7A5900 so it still carries 4.5:1 on the warm neutrals, and the three transaction hues swap to their light containers.</div>
+  </div>
+
+  <div data-theme-block="light" style="display:flex;flex-direction:column;gap:44px;padding:40px;border-radius:32px;background:#E7DFD1">
+
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div data-screen-label="L01" style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6E6758">L01 — Dashboard · light</div>
+      <x-import component-from-global-scope="MacWindow" from="./macos-window.jsx" bare="{{ true }}" width="{{ 1400 }}" height="{{ 880 }}" title="Ledger" hint-size="1400px,880px">
+        <div style="height:100%;display:flex;background:#FFF8EE;font-family:Roboto,system-ui,sans-serif;overflow:hidden">
+
+          <div style="width:264px;flex-shrink:0;background:#F8F1E4;display:flex;flex-direction:column;padding:16px 12px;gap:16px;border-right:1px solid #DDD5C4">
+            <div style="display:flex;align-items:center;gap:10px;padding:4px 8px">
+              <div style="width:32px;height:32px;border-radius:10px;background:#7A5900;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font:700 18px/24px Roboto,sans-serif">L</div>
+              <div style="font:500 20px/28px Roboto,sans-serif;color:#1E1B13">Ledger</div>
+            </div>
+            <div style="height:40px;border-radius:12px;background:#EDE4D6;display:flex;align-items:center;gap:10px;padding:0 12px">
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#6E6758">search</span>
+              <div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#6E6758">Search</div>
+              <div style="padding:2px 6px;border-radius:6px;border:1px solid #CFC7B5;font:500 11px/16px 'DM Mono',monospace;color:#6E6758">⌘K</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <div style="height:52px;border-radius:26px;background:#FFE18E;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#261A00;font-variation-settings:'FILL' 1">home</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#261A00">Home</div></div>
+              <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#4D4739">receipt_long</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#4D4739">Transactions</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#6E6758">248</div></div>
+              <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#4D4739">account_balance</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#4D4739">Accounts</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#6E6758">5</div></div>
+              <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#4D4739">donut_small</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#4D4739">Budgets</div><div style="width:8px;height:8px;border-radius:4px;background:#A4342B"></div></div>
+              <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#4D4739">bar_chart</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#4D4739">Reports</div></div>
+            </div>
+            <div style="height:1px;background:#DDD5C4;margin:4px 12px"></div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <div style="padding:4px 16px 6px;font:500 12px/16px Roboto,sans-serif;letter-spacing:.5px;color:#6E6758">ACCOUNTS</div>
+              <div style="height:40px;border-radius:20px;display:flex;align-items:center;gap:12px;padding:0 16px"><div style="width:8px;height:8px;border-radius:4px;background:#1E6B2E"></div><div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#4D4739">Chase Checking</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#6E6758">8,142</div></div>
+              <div style="height:40px;border-radius:20px;display:flex;align-items:center;gap:12px;padding:0 16px"><div style="width:8px;height:8px;border-radius:4px;background:#A4342B"></div><div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#4D4739">Amex Gold</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#6E6758">−1,204</div></div>
+              <div style="height:40px;border-radius:20px;display:flex;align-items:center;gap:12px;padding:0 16px"><div style="width:8px;height:8px;border-radius:4px;background:#1F5A87"></div><div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#4D4739">Ally Savings</div><div style="font:400 13px/18px 'DM Mono',monospace;color:#6E6758">21,900</div></div>
+            </div>
+            <div style="flex:1"></div>
+            <div style="height:52px;border-radius:26px;display:flex;align-items:center;gap:12px;padding:0 16px"><span style="font-family:'Material Symbols Rounded';font-size:22px;color:#4D4739">settings</span><div style="flex:1;font:500 15px/20px Roboto,sans-serif;color:#4D4739">Settings</div></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:16px;background:#F4ECDF">
+              <div style="width:32px;height:32px;border-radius:16px;background:#E4D8B6;color:#3E3620;display:flex;align-items:center;justify-content:center;font:500 13px/18px Roboto,sans-serif">AM</div>
+              <div style="flex:1;min-width:0"><div style="font:400 14px/20px Roboto,sans-serif;color:#1E1B13">Anna Meyer</div><div style="display:flex;align-items:center;gap:4px;font:400 12px/16px Roboto,sans-serif;color:#1E6B2E"><span style="font-family:'Material Symbols Rounded';font-size:14px">cloud_done</span>Synced</div></div>
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#6E6758">unfold_more</span>
+            </div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+            <div style="height:64px;flex-shrink:0;display:flex;align-items:center;gap:16px;padding:0 28px;border-bottom:1px solid #DDD5C4">
+              <div style="font:500 20px/28px Roboto,sans-serif;color:#1E1B13">Home</div>
+              <div style="flex:1"></div>
+              <div style="display:flex;align-items:center;gap:2px">
+                <div style="width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:20px">chevron_left</span></div>
+                <div style="height:36px;padding:0 14px;border-radius:10px;border:1px solid #CFC7B5;display:flex;align-items:center;gap:8px;font:500 14px/20px Roboto,sans-serif;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:18px">calendar_month</span>Sep 2026 cycle</div>
+                <div style="width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:20px">chevron_right</span></div>
+              </div>
+              <div style="height:40px;padding:0 20px;border-radius:20px;background:#7A5900;color:#FFFFFF;display:flex;align-items:center;gap:8px;font:500 14px/20px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:20px">add</span>New transaction</div>
+            </div>
+
+            <div style="flex:1;overflow:hidden;padding:24px 28px;display:flex;flex-direction:column;gap:20px">
+              <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:20px">
+                <div style="padding:24px;border-radius:20px;background:#F4ECDF;display:flex;flex-direction:column;gap:16px">
+                  <div style="display:flex;align-items:flex-start;justify-content:space-between">
+                    <div style="display:flex;flex-direction:column;gap:4px">
+                      <div style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.5px;color:#4D4739">NET WORTH</div>
+                      <div style="font:500 40px/48px 'DM Mono',monospace;color:#1E1B13">$42,318.64</div>
+                    </div>
+                    <div style="height:32px;padding:0 12px;border-radius:8px;background:#C6EBC7;color:#1E6B2E;display:flex;align-items:center;gap:6px;font:500 14px/20px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:18px">arrow_upward</span>2.4%</div>
+                  </div>
+                  <div style="display:flex;gap:12px">
+                    <div style="flex:1;padding:14px 16px;border-radius:12px;background:#C6EBC7;display:flex;flex-direction:column;gap:4px">
+                      <div style="display:flex;align-items:center;gap:6px;font:500 12px/16px Roboto,sans-serif;color:#1E6B2E"><span style="font-family:'Material Symbols Rounded';font-size:16px">south_west</span>IN</div>
+                      <div style="font:500 22px/28px 'DM Mono',monospace;color:#1E6B2E">+4,900.00</div>
+                    </div>
+                    <div style="flex:1;padding:14px 16px;border-radius:12px;background:#FFDAD6;display:flex;flex-direction:column;gap:4px">
+                      <div style="display:flex;align-items:center;gap:6px;font:500 12px/16px Roboto,sans-serif;color:#A4342B"><span style="font-family:'Material Symbols Rounded';font-size:16px">north_east</span>OUT</div>
+                      <div style="font:500 22px/28px 'DM Mono',monospace;color:#A4342B">−3,142.18</div>
+                    </div>
+                    <div style="flex:1;padding:14px 16px;border-radius:12px;background:#EDE4D6;display:flex;flex-direction:column;gap:4px">
+                      <div style="font:500 12px/16px Roboto,sans-serif;color:#4D4739">NET</div>
+                      <div style="font:500 22px/28px 'DM Mono',monospace;color:#1E1B13">+1,757.82</div>
+                    </div>
+                  </div>
+                </div>
+                <div style="padding:20px;border-radius:20px;background:#F4ECDF;display:flex;flex-direction:column;gap:12px">
+                  <div style="font:500 16px/24px Roboto,sans-serif;color:#1E1B13">Needs attention</div>
+                  <div style="padding:12px 14px;border-radius:12px;background:#FFDAD6;display:flex;align-items:flex-start;gap:10px">
+                    <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#A4342B">credit_card_clock</span>
+                    <div style="flex:1"><div style="font:500 14px/20px Roboto,sans-serif;color:#A4342B">Sapphire due in 3 days</div><div style="font:400 12px/16px Roboto,sans-serif;color:#7A2E26">$1,204.55 · pay by Sep 10</div></div>
+                  </div>
+                  <div style="padding:12px 14px;border-radius:12px;background:#EDE4D6;display:flex;align-items:flex-start;gap:10px">
+                    <span style="font-family:'Material Symbols Rounded';font-size:20px;color:#7A5900">rule</span>
+                    <div style="flex:1"><div style="font:500 14px/20px Roboto,sans-serif;color:#1E1B13">6 uncategorised</div><div style="font:400 12px/16px Roboto,sans-serif;color:#6E6758">Imported Sep 5 · review</div></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1.55fr;gap:20px">
+                <div style="padding:20px;border-radius:20px;background:#F4ECDF;display:flex;flex-direction:column;gap:14px">
+                  <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:500 16px/24px Roboto,sans-serif;color:#1E1B13">Budgets</div><div style="font:500 14px/20px Roboto,sans-serif;color:#7A5900">See all</div></div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;justify-content:space-between;font:400 14px/20px Roboto,sans-serif;color:#4D4739"><span>Groceries</span><span style="font-family:'DM Mono',monospace">412 / 600</span></div>
+                    <div style="height:6px;border-radius:3px;background:#CFC7B5"><div style="width:68%;height:6px;border-radius:3px;background:#7A5900"></div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;justify-content:space-between;font:400 14px/20px Roboto,sans-serif;color:#A4342B"><span>Dining out</span><span style="font-family:'DM Mono',monospace">288 / 250</span></div>
+                    <div style="height:6px;border-radius:3px;background:#CFC7B5"><div style="width:100%;height:6px;border-radius:3px;background:#A4342B"></div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;justify-content:space-between;font:400 14px/20px Roboto,sans-serif;color:#4D4739"><span>Transport</span><span style="font-family:'DM Mono',monospace">96 / 180</span></div>
+                    <div style="height:6px;border-radius:3px;background:#CFC7B5"><div style="width:53%;height:6px;border-radius:3px;background:#7A5900"></div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <div style="display:flex;justify-content:space-between;font:400 14px/20px Roboto,sans-serif;color:#4D4739"><span>Subscriptions</span><span style="font-family:'DM Mono',monospace">61 / 90</span></div>
+                    <div style="height:6px;border-radius:3px;background:#CFC7B5"><div style="width:68%;height:6px;border-radius:3px;background:#7A5900"></div></div>
+                  </div>
+                </div>
+                <div style="padding:20px;border-radius:20px;background:#F4ECDF;display:flex;flex-direction:column;gap:12px">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div style="font:500 16px/24px Roboto,sans-serif;color:#1E1B13">Cash flow · 6 cycles</div>
+                    <div style="display:flex;gap:14px">
+                      <div style="display:flex;align-items:center;gap:6px;font:400 12px/16px Roboto,sans-serif;color:#4D4739"><div style="width:10px;height:10px;border-radius:2px;background:#1E6B2E"></div>In</div>
+                      <div style="display:flex;align-items:center;gap:6px;font:400 12px/16px Roboto,sans-serif;color:#4D4739"><div style="width:10px;height:10px;border-radius:2px;background:#A4342B"></div>Out</div>
+                    </div>
+                  </div>
+                  <div style="flex:1;display:flex;align-items:flex-end;gap:22px;padding-top:8px">
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:74px;border-radius:4px 4px 0 0;background:#1E6B2E"></div><div style="width:16px;height:58px;border-radius:4px 4px 0 0;background:#A4342B"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#6E6758">Apr</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:80px;border-radius:4px 4px 0 0;background:#1E6B2E"></div><div style="width:16px;height:70px;border-radius:4px 4px 0 0;background:#A4342B"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#6E6758">May</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:66px;border-radius:4px 4px 0 0;background:#1E6B2E"></div><div style="width:16px;height:84px;border-radius:4px 4px 0 0;background:#A4342B"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#6E6758">Jun</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:92px;border-radius:4px 4px 0 0;background:#1E6B2E"></div><div style="width:16px;height:61px;border-radius:4px 4px 0 0;background:#A4342B"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#6E6758">Jul</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:88px;border-radius:4px 4px 0 0;background:#1E6B2E"></div><div style="width:16px;height:66px;border-radius:4px 4px 0 0;background:#A4342B"></div></div><div style="font:400 12px/16px Roboto,sans-serif;color:#6E6758">Aug</div></div>
+                    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:100%;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:130px"><div style="width:16px;height:98px;border-radius:4px 4px 0 0;background:#1E6B2E"></div><div style="width:16px;height:63px;border-radius:4px 4px 0 0;background:#A4342B"></div></div><div style="font:500 12px/16px Roboto,sans-serif;color:#1E1B13">Sep</div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="max-width:900px;font:400 13px/18px Roboto,sans-serif;color:#6E6758;text-wrap:pretty">The drawer carries a second, account-level list below the destinations — the thing desktop users actually navigate by. Cycle stepper sits in the header, not in a filter drawer, because the whole dashboard is scoped to it.</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div data-screen-label="L02" style="font:500 12px/16px Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6E6758">L02 — Transactions · light</div>
+      <x-import component-from-global-scope="MacWindow" from="./macos-window.jsx" bare="{{ true }}" width="{{ 1400 }}" height="{{ 880 }}" title="Ledger — Transactions" hint-size="1400px,880px">
+        <div style="height:100%;display:flex;background:#FFF8EE;font-family:Roboto,system-ui,sans-serif;overflow:hidden">
+
+          <div style="width:88px;flex-shrink:0;background:#F8F1E4;display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:12px;border-right:1px solid #DDD5C4">
+            <div style="width:32px;height:32px;border-radius:10px;background:#7A5900;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font:700 18px/24px Roboto,sans-serif">L</div>
+            <div style="width:56px;height:56px;border-radius:16px;background:#7A5900;color:#FFFFFF;display:flex;align-items:center;justify-content:center;margin-top:4px"><span style="font-family:'Material Symbols Rounded';font-size:24px">add</span></div>
+            <div style="display:flex;flex-direction:column;gap:4px;align-items:center;margin-top:8px">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:22px">home</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#4D4739">Home</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;background:#FFE18E;display:flex;align-items:center;justify-content:center;color:#261A00"><span style="font-family:'Material Symbols Rounded';font-size:22px;font-variation-settings:'FILL' 1">receipt_long</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#261A00">Ledger</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:22px">account_balance</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#4D4739">Accounts</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:22px">donut_small</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#4D4739">Budgets</div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 0"><div style="width:56px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:22px">bar_chart</span></div><div style="font:500 12px/16px Roboto,sans-serif;color:#4D4739">Reports</div></div>
+            </div>
+            <div style="flex:1"></div>
+            <div style="width:32px;height:32px;border-radius:16px;background:#E4D8B6;color:#3E3620;display:flex;align-items:center;justify-content:center;font:500 13px/18px Roboto,sans-serif">AM</div>
+          </div>
+
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid #DDD5C4">
+            <div style="flex-shrink:0;padding:16px 24px 12px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid #DDD5C4">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="display:flex;align-items:baseline;gap:8px;font:400 13px/18px Roboto,sans-serif;color:#6E6758"><span>Home</span><span>/</span><span style="font:500 20px/28px Roboto,sans-serif;color:#1E1B13">Transactions</span></div>
+                <div style="flex:1"></div>
+                <div style="height:36px;flex:0 1 280px;border-radius:12px;background:#EDE4D6;display:flex;align-items:center;gap:8px;padding:0 12px">
+                  <span style="font-family:'Material Symbols Rounded';font-size:18px;color:#6E6758">search</span>
+                  <div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#1E1B13">whole foods</div>
+                  <span style="font-family:'Material Symbols Rounded';font-size:18px;color:#6E6758">close</span>
+                </div>
+                <div style="height:36px;padding:0 14px;border-radius:10px;border:1px solid #CFC7B5;display:flex;align-items:center;gap:8px;font:500 14px/20px Roboto,sans-serif;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:18px">download</span>Export</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <div style="height:32px;padding:0 12px;border-radius:8px;background:#FFE18E;color:#261A00;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:18px">check</span>Sep 2026</div>
+                <div style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #CFC7B5;color:#4D4739;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif">All accounts<span style="font-family:'Material Symbols Rounded';font-size:18px">expand_more</span></div>
+                <div style="height:32px;padding:0 12px;border-radius:8px;background:#C6EBC7;color:#1E6B2E;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">south_west</span>Income</div>
+                <div style="height:32px;padding:0 12px;border-radius:8px;background:#FFDAD6;color:#A4342B;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">north_east</span>Expense</div>
+                <div style="height:32px;padding:0 12px;border-radius:8px;border:1px solid #CFC7B5;color:#1F5A87;display:flex;align-items:center;gap:6px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">swap_horiz</span>Transfer</div>
+                <div style="flex:1"></div>
+                <div style="font:400 13px/18px 'DM Mono',monospace;color:#6E6758">31 of 248</div>
+              </div>
+            </div>
+
+            <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+              <div style="padding:10px 24px 6px;font:500 12px/16px Roboto,sans-serif;letter-spacing:.5px;color:#6E6758;background:#F8F1E4">TODAY · SEP 8</div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px;background:#EDE4D6;border-left:3px solid #7A5900;box-shadow:inset 0 0 0 1px #E1D6BC">
+                <div style="width:40px;height:40px;border-radius:12px;background:#FFB4AB;color:#A4342B;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">local_grocery_store</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#1E1B13">Whole Foods Market</div><div style="font:400 13px/18px Roboto,sans-serif;color:#6E6758">Groceries · Chase Checking</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#FFDAD6;color:#A4342B;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">north_east</span>EXPENSE</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#A4342B;width:120px;text-align:right">−84.12</div>
+              </div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#A8DCA9;color:#1E6B2E;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">payments</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#1E1B13">Northwind Payroll</div><div style="font:400 13px/18px Roboto,sans-serif;color:#6E6758">Salary · Chase Checking</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#C6EBC7;color:#1E6B2E;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">south_west</span>INCOME</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#1E6B2E;width:120px;text-align:right">+2,450.00</div>
+              </div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#A9CFEE;color:#1F5A87;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">swap_horiz</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#1E1B13">To Ally Savings</div><div style="font:400 13px/18px Roboto,sans-serif;color:#6E6758">Internal · Chase → Ally</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#CDE4F7;color:#1F5A87;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">swap_horiz</span>TRANSFER</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#1F5A87;width:120px;text-align:right">500.00</div>
+              </div>
+              <div style="padding:10px 24px 6px;font:500 12px/16px Roboto,sans-serif;letter-spacing:.5px;color:#6E6758;background:#F8F1E4">SAT · SEP 6</div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#FFB4AB;color:#A4342B;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">restaurant</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#1E1B13">Kissaten</div><div style="font:400 13px/18px Roboto,sans-serif;color:#6E6758">Dining out · Amex Gold</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#FFDAD6;color:#A4342B;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">north_east</span>EXPENSE</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#A4342B;width:120px;text-align:right">−38.40</div>
+              </div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#FFB4AB;color:#A4342B;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">directions_subway</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#1E1B13">MTA OMNY</div><div style="font:400 13px/18px Roboto,sans-serif;color:#6E6758">Transport · Amex Gold</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#FFDAD6;color:#A4342B;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">north_east</span>EXPENSE</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#A4342B;width:120px;text-align:right">−2.90</div>
+              </div>
+              <div style="padding:12px 24px;display:flex;align-items:center;gap:14px">
+                <div style="width:40px;height:40px;border-radius:12px;background:#EDE4D6;color:#7A5900;display:flex;align-items:center;justify-content:center"><span style="font-family:'Material Symbols Rounded';font-size:20px">help</span></div>
+                <div style="flex:1;min-width:0"><div style="font:500 15px/20px Roboto,sans-serif;color:#1E1B13">SQ *VENDOR 4471</div><div style="display:flex;align-items:center;gap:6px;font:400 13px/18px Roboto,sans-serif;color:#7A5900"><span style="font-family:'Material Symbols Rounded';font-size:14px">rule</span>Uncategorised · assign</div></div>
+                <div style="height:24px;padding:0 8px;border-radius:6px;background:#FFDAD6;color:#A4342B;display:flex;align-items:center;gap:4px;font:500 11px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:14px">north_east</span>EXPENSE</div>
+                <div style="font:500 16px/24px 'DM Mono',monospace;color:#A4342B;width:120px;text-align:right">−21.75</div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="flex-shrink:0;height:52px;display:flex;align-items:center;gap:16px;padding:0 24px;border-top:1px solid #DDD5C4;background:#F8F1E4">
+                <div style="font:400 13px/18px Roboto,sans-serif;color:#6E6758">Selected total</div>
+                <div style="font:500 14px/20px 'DM Mono',monospace;color:#1E1B13">−84.12</div>
+                <div style="flex:1"></div>
+                <div style="font:400 13px/18px Roboto,sans-serif;color:#6E6758">In −2,450.00 · Out −147.17 · Net +2,302.83</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="width:380px;flex-shrink:0;background:#F4ECDF;display:flex;flex-direction:column">
+            <div style="height:56px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 12px 0 20px;border-bottom:1px solid #DDD5C4">
+              <div style="flex:1;font:500 16px/24px Roboto,sans-serif;color:#1E1B13">Transaction</div>
+              <div style="width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:20px">open_in_new</span></div>
+              <div style="width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#4D4739"><span style="font-family:'Material Symbols Rounded';font-size:20px">close</span></div>
+            </div>
+            <div style="flex:1;padding:20px;display:flex;flex-direction:column;gap:18px">
+              <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+                <div style="height:26px;padding:0 10px;border-radius:6px;background:#FFDAD6;color:#A4342B;display:flex;align-items:center;gap:6px;font:500 12px/16px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">north_east</span>EXPENSE</div>
+                <div style="font:500 36px/44px 'DM Mono',monospace;color:#A4342B">−84.12</div>
+                <div style="font:400 14px/20px Roboto,sans-serif;color:#4D4739">Whole Foods Market · Sep 8, 2026 · 6:41 PM</div>
+              </div>
+              <div style="height:1px;background:#DDD5C4"></div>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#6E6758">Account</div><div style="flex:1;display:flex;align-items:center;gap:8px;font:400 14px/20px Roboto,sans-serif;color:#1E1B13"><div style="width:8px;height:8px;border-radius:4px;background:#1E6B2E"></div>Chase Checking</div></div>
+                <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#6E6758">Category</div><div style="flex:1"><div style="display:inline-flex;height:32px;padding:0 12px;border-radius:8px;background:#EDE4D6;color:#1E1B13;align-items:center;gap:8px;font:500 13px/18px Roboto,sans-serif"><span style="font-family:'Material Symbols Rounded';font-size:16px">local_grocery_store</span>Groceries<span style="font-family:'Material Symbols Rounded';font-size:16px;color:#6E6758">expand_more</span></div></div></div>
+                <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#6E6758">Budget</div><div style="flex:1;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;font:400 13px/18px Roboto,sans-serif;color:#4D4739"><span>Groceries</span><span style="font-family:'DM Mono',monospace">412 / 600</span></div><div style="height:6px;border-radius:3px;background:#CFC7B5"><div style="width:68%;height:6px;border-radius:3px;background:#7A5900"></div></div></div></div>
+                <div style="display:flex;align-items:flex-start;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#6E6758">Note</div><div style="flex:1;font:400 14px/20px Roboto,sans-serif;color:#4D4739;text-wrap:pretty">Weekly shop + party supplies. Split with Dan pending.</div></div>
+                <div style="display:flex;align-items:center;gap:12px"><div style="width:96px;font:400 13px/18px Roboto,sans-serif;color:#6E6758">Tags</div><div style="flex:1;display:flex;gap:6px"><div style="height:26px;padding:0 10px;border-radius:6px;border:1px solid #CFC7B5;color:#4D4739;display:flex;align-items:center;font:500 12px/16px Roboto,sans-serif">shared</div><div style="height:26px;padding:0 10px;border-radius:6px;border:1px solid #CFC7B5;color:#4D4739;display:flex;align-items:center;font:500 12px/16px Roboto,sans-serif">reimbursable</div></div></div>
+              </div>
+              <div style="height:1px;background:#DDD5C4"></div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="font:500 13px/18px Roboto,sans-serif;color:#6E6758">Receipt</div>
+                <div style="height:128px;border-radius:12px;border:1px dashed #CFC7B5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#6E6758"><span style="font-family:'Material Symbols Rounded';font-size:24px">attach_file</span><div style="font:400 13px/18px Roboto,sans-serif">Drop an image or ⌘V</div></div>
+              </div>
+              <div style="flex:1"></div>
+              <div style="display:flex;gap:10px">
+                <div style="flex:1;height:40px;border-radius:20px;background:#7A5900;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font:500 14px/20px Roboto,sans-serif">Save changes</div>
+                <div style="width:40px;height:40px;border-radius:20px;border:1px solid #CFC7B5;display:flex;align-items:center;justify-content:center;color:#A4342B"><span style="font-family:'Material Symbols Rounded';font-size:20px">delete</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </x-import>
+      <div style="max-width:900px;font:400 13px/18px Roboto,sans-serif;color:#6E6758;text-wrap:pretty">Selection is a 3px gold edge plus a raised surface — never a colored fill, which would collide with the type coding. Type chips repeat the hue at row scale so a scan reads direction without parsing signs.</div>
+    </div>
+
+    </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showSemanticPanel&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Spec&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { showSemanticPanel: this.props.showSemanticPanel ?? true };
+  }
+}
+</script>
+</body>
+</html>

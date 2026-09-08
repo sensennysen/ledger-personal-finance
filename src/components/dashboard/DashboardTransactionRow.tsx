@@ -1,4 +1,5 @@
 interface DashboardTransactionRowProps {
+  onClick?: () => void
   icon: React.ReactNode
   iconBackgroundColor: string
   title: string
@@ -9,6 +10,7 @@ interface DashboardTransactionRowProps {
 }
 
 export function DashboardTransactionRow({
+  onClick,
   icon,
   iconBackgroundColor,
   title,
@@ -18,9 +20,9 @@ export function DashboardTransactionRow({
   className = 'hover:bg-white/3',
 }: DashboardTransactionRowProps) {
   return (
-    <div className={`grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 transition-colors ${className}`}>
+    <div role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onClick={onClick} onKeyDown={event=>{if(onClick && (event.key==='Enter'||event.key===' ')){event.preventDefault();onClick()}}} className={`grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 transition-colors ${className}`}>
       <div
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
+        className="w-10 h-10 rounded-xl flex items-center justify-center text-sm shrink-0"
         style={{ backgroundColor: iconBackgroundColor }}
       >
         {icon}

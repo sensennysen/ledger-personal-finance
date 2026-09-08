@@ -1,5 +1,5 @@
 import { Bell, CircleDollarSign } from 'lucide-react'
-import { CORAL } from '@/constants/colors'
+import { EXPENSE } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { UpcomingBill } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
@@ -15,9 +15,9 @@ interface DashboardUpcomingBillsCardProps {
 }
 
 function getUpcomingBillDayColor(daysUntil: number) {
-  if (daysUntil === 0) return CORAL
-  if (daysUntil <= 3) return 'oklch(0.750 0.140 75)'
-  return 'oklch(0.570 0.015 290)'
+  if (daysUntil === 0) return EXPENSE
+  if (daysUntil <= 3) return 'var(--primary)'
+  return 'var(--muted-foreground)'
 }
 
 export function DashboardUpcomingBillsCard({
@@ -28,7 +28,7 @@ export function DashboardUpcomingBillsCard({
   style,
 }: DashboardUpcomingBillsCardProps) {
   return (
-    <div className="min-w-0 max-w-full rounded-xl border border-border/60 p-5 bg-card" style={style}>
+    <div className="min-w-0 max-w-full rounded-[20px] border border-border p-4 md:p-5 bg-card" style={style}>
       <DashboardCardHeader
         title="Upcoming Bills"
         subtitle={isCurrentMonth ? 'Bills due this cycle' : `Bills due · ${monthLabel}`}
@@ -55,7 +55,7 @@ export function DashboardUpcomingBillsCard({
                 </>
               }
               amount={
-                <span style={{ color: CORAL }}>
+                <span style={{ color: EXPENSE }}>
                   -{formatCurrency(amount, currency)}
                 </span>
               }

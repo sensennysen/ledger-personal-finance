@@ -15,6 +15,7 @@ import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage'
 import TermsOfServicePage from '@/pages/TermsOfServicePage'
 import DataDeletionPage from '@/pages/DataDeletionPage'
 import ReportsPage from '@/pages/ReportsPage'
+import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
 
 type RouteMetaEntry = {
   test: (pathname: string) => boolean
@@ -67,6 +68,11 @@ const routeMeta: RouteMetaEntry[] = [
     test: (pathname) => pathname === '/login',
     title: 'Login',
     description: 'Sign in to access your personal wallet dashboard securely.',
+  },
+  {
+    test: (pathname) => pathname === '/thirteenth-month',
+    title: '13th Month Pay',
+    description: 'Estimate your 13th month pay from selected basic salary records.',
   },
   {
     test: (pathname) => pathname === '/privacy',
@@ -187,6 +193,7 @@ function ProtectedRoutes() {
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="budgets" element={<BudgetsPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="thirteenth-month" element={<ThirteenthMonthPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>

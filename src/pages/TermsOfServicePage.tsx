@@ -128,7 +128,7 @@ export default function TermsOfServicePage() {
             <div>
               <h1
                 className="text-3xl md:text-4xl font-bold tracking-tight"
-                style={{ fontFamily: "'Playfair Display', serif" }}
+                style={{ fontFamily: "Roboto, system-ui, sans-serif" }}
               >
                 Terms of Service
               </h1>

@@ -30,9 +30,9 @@ export const TRANSACTION_TYPE_ICON: Record<TransactionType, React.ElementType> =
 }
 
 export const TRANSACTION_TYPE_COLOR: Record<TransactionType, string> = {
-  income: 'text-[oklch(0.660_0.150_155)]',
-  expense: 'text-[oklch(0.620_0.160_18)]',
-  transfer: 'text-[oklch(0.700_0.115_72)]',
+  income: 'text-income',
+  expense: 'text-expense',
+  transfer: 'text-transfer',
 }
 
 export const BALANCE_ADJUSTMENT_DESCRIPTION = 'Balance Adjustment'

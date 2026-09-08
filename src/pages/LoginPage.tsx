@@ -24,43 +24,7 @@ export default function LoginPage() {
       : null
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden">
-
-      {/* ── Atmospheric background ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {/* Central gold haze */}
-        <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-175 h-125 rounded-full"
-          style={{ background: 'radial-gradient(ellipse, color-mix(in srgb, var(--primary) 5%, transparent) 0%, transparent 70%)' }}
-        />
-        {/* Subtle dot grid */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, var(--foreground) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
-        {/* Decorative rings top-left */}
-        <div
-          className="absolute -top-40 -left-40 w-120 h-120 rounded-full border border-primary/6"
-        />
-        <div
-          className="absolute -top-20 -left-20 w-70 h-70 rounded-full border border-primary/8"
-        />
-        {/* Decorative rings bottom-right */}
-        <div
-          className="absolute -bottom-48 -right-48 w-125 h-125 rounded-full border border-primary/5"
-        />
-        <div
-          className="absolute -bottom-24 -right-24 w-75 h-75 rounded-full border border-primary/7"
-        />
-        {/* Diagonal gold line accent */}
-        <div
-          className="absolute top-0 right-0 w-px h-full opacity-10"
-          style={{ background: 'linear-gradient(to bottom, transparent, var(--primary), transparent)' }}
-        />
-      </div>
+    <div className="min-h-dvh bg-card flex items-center justify-center relative overflow-hidden">
 
       <div className="relative z-10 w-full max-w-100 px-6">
 
@@ -75,8 +39,8 @@ export default function LoginPage() {
           </div>
 
           <h1
-            className="text-[3.25rem] font-semibold leading-none mb-3 tracking-tight"
-            style={{ fontFamily: '"Playfair Display", Georgia, serif' }}
+            className="text-[40px] font-semibold leading-none mb-3 tracking-tight"
+            style={{ fontFamily: 'Roboto, system-ui, sans-serif' }}
           >
             Ledger
             <span style={{ color: 'var(--primary)' }}>.</span>
@@ -91,9 +55,9 @@ export default function LoginPage() {
           <div
             className="mb-5 rounded-xl border px-4 py-3 text-sm"
             style={{
-              borderColor: 'oklch(0.620 0.160 18 / 0.35)',
-              background: 'oklch(0.620 0.160 18 / 0.08)',
-              color: 'oklch(0.700 0.130 18)',
+              borderColor: 'var(--expense)',
+              background: 'var(--expense-container)',
+              color: 'var(--expense)',
             }}
           >
             {authError}
@@ -102,11 +66,11 @@ export default function LoginPage() {
 
         {/* ── Sign-in card ── */}
         <div
-          className="rounded-2xl border border-border/60 p-6 bg-card"
+          className="rounded-[20px] p-2"
         >
           <p
             className="text-[1.0625rem] font-semibold mb-1 text-foreground"
-            style={{ fontFamily: '"Playfair Display", Georgia, serif' }}
+            style={{ fontFamily: 'Roboto, system-ui, sans-serif' }}
           >
             Sign in to continue
           </p>
@@ -118,22 +82,13 @@ export default function LoginPage() {
           <button
             onClick={signInWithGoogle}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-5 py-3 rounded-xl text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-3 px-5 h-12 rounded-full text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              background: 'oklch(0.158 0.007 265)',
-              border: '1px solid oklch(1 0 0 / 10%)',
-              color: 'oklch(0.940 0.008 290)',
+              background: 'var(--primary)',
+              border: '1px solid var(--primary)',
+              color: 'var(--primary-foreground)',
             }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget
-              el.style.borderColor = 'color-mix(in srgb, var(--primary) 25%, transparent)'
-              el.style.background = 'color-mix(in srgb, var(--primary) 7%, transparent)'
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget
-              el.style.borderColor = 'oklch(1 0 0 / 10%)'
-              el.style.background = 'oklch(0.158 0.007 265)'
-            }}
+
           >
             {/* Google logo */}
             <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
@@ -146,7 +101,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="text-center text-[0.6875rem] text-muted-foreground/50 mt-6 leading-relaxed">
+        <p className="text-center text-[0.6875rem] text-muted-foreground mt-6 leading-relaxed">
           By signing in, you agree to our{' '}
           <Link to="/terms" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
             Terms of Service

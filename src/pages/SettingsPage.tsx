@@ -11,7 +11,7 @@ import { usePreferences, type DateFormat, type NumberLocale, type Preferences } 
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
 import { cn } from '@/lib/utils'
-import { EMERALD } from '@/constants/colors'
+import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -162,7 +162,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-2xl mx-auto">
+    <div className="settings-grid p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start max-w-6xl mx-auto">
       <h1 className="text-2xl font-bold">Settings</h1>
 
       {/* Profile */}
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                 {form.formState.errors.root && (
                   <span className="text-sm text-destructive">{form.formState.errors.root.message}</span>
                 )}
-                {saved && <span className="text-sm" style={{ color: EMERALD }}>Saved!</span>}
+                {saved && <span className="text-sm" style={{ color: INCOME }}>Saved!</span>}
                 <Button type="submit" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
                 </Button>
@@ -246,9 +246,9 @@ export default function SettingsPage() {
             <button
               onClick={() => setTheme('light')}
               className={cn(
-                'flex flex-col items-center gap-2 rounded-xl border-2 px-5 py-4 transition-all cursor-pointer',
+                'flex items-center gap-2 rounded-full border px-5 h-11 transition-all cursor-pointer',
                 theme === 'light'
-                  ? 'border-primary bg-primary/8'
+                  ? 'border-primary bg-accent'
                   : 'border-border hover:border-primary/40 hover:bg-accent'
               )}
             >
@@ -258,9 +258,9 @@ export default function SettingsPage() {
             <button
               onClick={() => setTheme('dark')}
               className={cn(
-                'flex flex-col items-center gap-2 rounded-xl border-2 px-5 py-4 transition-all cursor-pointer',
+                'flex items-center gap-2 rounded-full border px-5 h-11 transition-all cursor-pointer',
                 theme === 'dark'
-                  ? 'border-primary bg-primary/8'
+                  ? 'border-primary bg-accent'
                   : 'border-border hover:border-primary/40 hover:bg-accent'
               )}
             >
@@ -272,15 +272,15 @@ export default function SettingsPage() {
 
           <div>
             <p className="text-sm font-medium mb-2 flex items-center gap-2"><ALargeSmall className="w-4 h-4" /> Font Size</p>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-4 gap-0 rounded-full overflow-hidden border border-input">
               {(['sm', 'md', 'lg', 'xl'] as FontSize[]).map((size) => (
                 <button
                   key={size}
                   onClick={() => setFontSize(size)}
                   className={cn(
-                    'rounded-lg border-2 px-2 py-2 transition-all cursor-pointer text-center',
+                    'border-r last:border-r-0 border-input px-2 h-11 transition-all cursor-pointer text-center',
                     fontSize === size
-                      ? 'border-primary bg-primary/8 text-primary font-medium'
+                      ? 'border-primary bg-accent text-primary font-medium'
                       : 'border-border hover:border-primary/40 hover:bg-accent text-muted-foreground'
                   )}
                   style={{ fontSize: size === 'sm' ? '12px' : size === 'md' ? '14px' : size === 'lg' ? '16px' : '18px' }}

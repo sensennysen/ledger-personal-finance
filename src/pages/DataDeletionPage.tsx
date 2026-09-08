@@ -78,14 +78,14 @@ export default function DataDeletionPage() {
           <div className="flex items-center gap-3 mb-4">
             <div
               className="flex items-center justify-center w-10 h-10 rounded-xl"
-              style={{ background: 'oklch(0.570 0.170 18 / 0.10)' }}
+              style={{ background: 'var(--expense-container)' }}
             >
-              <Trash2 className="w-5 h-5" style={{ color: 'oklch(0.570 0.170 18)' }} />
+              <Trash2 className="w-5 h-5" style={{ color: 'var(--expense)' }} />
             </div>
             <div>
               <h1
                 className="text-3xl md:text-4xl font-bold tracking-tight"
-                style={{ fontFamily: "'Playfair Display', serif" }}
+                style={{ fontFamily: "Roboto, system-ui, sans-serif" }}
               >
                 Data Deletion Instructions
               </h1>
@@ -107,7 +107,7 @@ export default function DataDeletionPage() {
         <section className="mb-10">
           <h2
             className="text-base font-semibold mb-4"
-            style={{ color: 'oklch(0.570 0.170 18)' }}
+            style={{ color: 'var(--expense)' }}
           >
             Data We Hold About You
           </h2>
@@ -128,7 +128,7 @@ export default function DataDeletionPage() {
         <section className="mb-10">
           <h2
             className="text-base font-semibold mb-6"
-            style={{ color: 'oklch(0.570 0.170 18)' }}
+            style={{ color: 'var(--expense)' }}
           >
             How to Request Deletion
           </h2>
@@ -138,8 +138,8 @@ export default function DataDeletionPage() {
                 <div
                   className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold tabular-nums"
                   style={{
-                    background: 'oklch(0.570 0.170 18 / 0.08)',
-                    color: 'oklch(0.570 0.170 18)',
+                    background: 'var(--expense-container)',
+                    color: 'var(--expense)',
                     fontFamily: "'DM Mono', monospace",
                   }}
                 >
@@ -158,13 +158,13 @@ export default function DataDeletionPage() {
         <div
           className="rounded-xl border p-5 mb-10 flex gap-4"
           style={{
-            borderColor: 'oklch(0.570 0.170 18 / 0.25)',
-            background: 'oklch(0.570 0.170 18 / 0.04)',
+            borderColor: 'var(--expense)',
+            background: 'var(--expense-container)',
           }}
         >
           <CheckCircle2
             className="mt-0.5 shrink-0 w-5 h-5"
-            style={{ color: 'oklch(0.570 0.170 18)' }}
+            style={{ color: 'var(--expense)' }}
           />
           <div className="space-y-1">
             <p className="text-sm font-semibold text-foreground">What happens after deletion</p>

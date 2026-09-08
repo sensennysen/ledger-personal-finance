@@ -40,7 +40,7 @@ import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { EMERALD, CORAL, GOLD } from '@/constants/colors'
+import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
 import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
@@ -620,7 +620,7 @@ export default function ReportsPage() {
                 style={{
                   background: 'linear-gradient(135deg, oklch(0.620 0.160 18 / 0.15), oklch(0.620 0.160 18 / 0.08))',
                   border: '1px solid oklch(0.620 0.160 18 / 0.30)',
-                  color: CORAL,
+                  color: EXPENSE,
                 }}
               >
                 <Download className="w-3.5 h-3.5" />
@@ -664,7 +664,7 @@ export default function ReportsPage() {
 
       {/* Date controls */}
       <div
-        className="hidden md:flex rounded-xl border border-border/60 bg-card p-4 flex-col gap-4"
+        className="hidden md:flex rounded-[20px] border border-border bg-card p-4 flex-col gap-4"
       >
         <div className="flex items-center gap-2">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
@@ -689,7 +689,7 @@ export default function ReportsPage() {
                   ? 'border-transparent'
                   : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
               )}
-              style={preset === p ? { background: GOLD, color: 'oklch(0.15 0 0)' } : {}}
+              style={preset === p ? { background: GOLD, color: 'var(--primary-foreground)' } : {}}
             >
               {label}
             </button>
@@ -726,7 +726,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Saved presets */}
-      <div className="hidden md:flex rounded-xl border border-border/60 bg-card p-4 flex-col gap-3">
+      <div className="hidden md:flex rounded-[20px] border border-border bg-card p-4 flex-col gap-3">
         <div className="flex items-center gap-2">
           <Bookmark className="w-4 h-4 text-muted-foreground" />
           <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Saved Presets</span>
@@ -781,14 +781,14 @@ export default function ReportsPage() {
           title="Total Income"
           value={formatCurrency(totalIncome, currency)}
           icon={TrendingUp}
-          color={EMERALD}
+          color={INCOME}
           loading={loading}
         />
         <StatCard
           title="Total Expenses"
           value={formatCurrency(totalExpenses, currency)}
           icon={TrendingDown}
-          color={CORAL}
+          color={EXPENSE}
           loading={loading}
         />
         <StatCard
@@ -796,7 +796,7 @@ export default function ReportsPage() {
           value={formatCurrency(netChange, currency)}
           sub={netChange >= 0 ? 'Surplus' : 'Deficit'}
           icon={netChange >= 0 ? TrendingUp : TrendingDown}
-          color={netChange >= 0 ? EMERALD : CORAL}
+          color={netChange >= 0 ? INCOME : EXPENSE}
           loading={loading}
         />
         <StatCard
@@ -806,14 +806,60 @@ export default function ReportsPage() {
             ? `Assets minus Liabilities`
             : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
           icon={Wallet}
-          color={GOLD}
+          color={'var(--foreground)'}
           loading={loading}
         />
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-[1.6fr_1fr] gap-4">
+          {/* Monthly Income vs Expenses */}
+          <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
+              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Monthly Income vs. Expenses — Last 12 Months</p>
+            </div>
+            {loading ? (
+              <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
+            ) : (
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v: number) => formatCurrency(v, currency)}
+                      width={72}
+                    />
+                    <Tooltip
+                      formatter={(v, name) => [formatCurrency(v as number, currency), name as string]}
+                      contentStyle={{
+                        fontSize: 11,
+                        background: 'var(--card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        color: 'var(--foreground)',
+                      }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+                    <Bar dataKey="income" name="Income" fill={INCOME} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+
         {/* Account balances */}
-        <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
+        <div className="order-3 lg:col-span-2 rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
           <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Account Balances</p>
           {loading ? (
             <div className="flex flex-col gap-2">
@@ -840,7 +886,7 @@ export default function ReportsPage() {
                   </div>
                   <span
                     className="text-[0.8125rem] font-semibold tabular-nums shrink-0"
-                    style={{ color: acc.balance < 0 ? CORAL : 'inherit' }}
+                    style={{ color: acc.balance < 0 ? EXPENSE : 'inherit' }}
                   >
                     {formatCurrency(acc.balance, acc.currency)}
                   </span>
@@ -858,7 +904,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Category breakdown */}
-        <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
+        <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
           <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
             Expenses by Category
           </p>
@@ -901,7 +947,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Transactions table */}
-      <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+      <div className="rounded-[20px] border border-border bg-card overflow-hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/60">
           <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
             Transactions
@@ -946,7 +992,7 @@ export default function ReportsPage() {
                 {sortedTransactions.map((t, i) => {
                   const isIncome = t.type === 'income'
                   const isTransfer = t.type === 'transfer'
-                  const amountColor = isIncome ? EMERALD : isTransfer ? GOLD : CORAL
+                  const amountColor = isIncome ? INCOME : isTransfer ? TRANSFER : EXPENSE
                   const sign = isIncome ? '+' : isTransfer ? '↔' : '−'
                   return (
                     <tr
@@ -1005,9 +1051,9 @@ export default function ReportsPage() {
         <TabsContent value="analytics" className="mt-6 flex flex-col gap-6">
 
           {/* Net Worth Over Time */}
-          <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
+          <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-3.5 h-3.5" style={{ color: EMERALD }} />
+              <TrendingUp className="w-3.5 h-3.5" style={{ color: INCOME }} />
               <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time</p>
             </div>
             {loading ? (
@@ -1043,10 +1089,10 @@ export default function ReportsPage() {
                     <Line
                       type="monotone"
                       dataKey="netWorth"
-                      stroke={EMERALD}
+                      stroke={INCOME}
                       strokeWidth={2}
                       dot={false}
-                      activeDot={{ r: 4, fill: EMERALD, strokeWidth: 0 }}
+                      activeDot={{ r: 4, fill: INCOME, strokeWidth: 0 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -1055,7 +1101,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Monthly Income vs Expenses */}
-          <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
+          <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
               <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Monthly Income vs. Expenses — Last 12 Months</p>
@@ -1091,8 +1137,8 @@ export default function ReportsPage() {
                       }}
                     />
                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-                    <Bar dataKey="income" name="Income" fill={EMERALD} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="expenses" name="Expenses" fill={CORAL} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="income" name="Income" fill={INCOME} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1100,10 +1146,10 @@ export default function ReportsPage() {
           </div>
 
           {/* Spending by Merchant */}
-          <div className="rounded-xl border border-border/60 bg-card p-4 flex flex-col gap-3">
+          <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Store className="w-3.5 h-3.5" style={{ color: CORAL }} />
+                <Store className="w-3.5 h-3.5" style={{ color: EXPENSE }} />
                 <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Spending by Merchant</p>
               </div>
               <span className="text-[0.6875rem] text-muted-foreground">{presetLabel}</span>
@@ -1124,7 +1170,7 @@ export default function ReportsPage() {
                         <span className="text-xs font-medium truncate">{merchant.displayName}</span>
                         <span className="text-[0.625rem] text-muted-foreground shrink-0 ml-0.5">{merchant.count}×</span>
                       </div>
-                      <span className="text-xs tabular-nums shrink-0" style={{ color: CORAL }}>
+                      <span className="text-xs tabular-nums shrink-0" style={{ color: EXPENSE }}>
                         {formatCurrency(merchant.amount, currency)}
                       </span>
                     </div>
@@ -1133,7 +1179,7 @@ export default function ReportsPage() {
                         className="h-full rounded-full transition-all duration-500"
                         style={{
                           width: `${(merchant.amount / merchantBreakdown[0].amount) * 100}%`,
-                          background: CORAL,
+                          background: EXPENSE,
                           opacity: 0.65,
                         }}
                       />
@@ -1176,7 +1222,7 @@ export default function ReportsPage() {
                     ? 'border-transparent'
                     : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
                 )}
-                style={preset === p ? { background: GOLD, color: 'oklch(0.15 0 0)' } : {}}
+                style={preset === p ? { background: GOLD, color: 'var(--primary-foreground)' } : {}}
               >
                 {label}
               </button>

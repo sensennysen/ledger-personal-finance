@@ -101,8 +101,7 @@ export function getCustomMonthRange(
  * If today >= startDay of this calendar month → current month key.
  * Else → previous month key.
  */
-export function getCurrentCycleMonthKey(startDay: number = 1): string {
-  const today = new Date()
+export function getCurrentCycleMonthKey(startDay: number = 1, today = new Date()): string {
   const year = today.getFullYear()
   const month = today.getMonth() // 0-indexed
   const day = today.getDate()

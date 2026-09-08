@@ -81,7 +81,7 @@ export default function Sidebar() {
           {!collapsed && (
             <span
               className="ml-2.5 text-[0.8125rem] font-semibold tracking-[0.08em] text-foreground/80 truncate uppercase"
-              style={{ fontFamily: '"Outfit", sans-serif' }}
+              style={{ fontFamily: '"Roboto", sans-serif' }}
             >
               Ledger
             </span>
@@ -99,17 +99,15 @@ export default function Sidebar() {
                     to={to}
                     end={exact}
                     className={cn(
-                      'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[0.8125rem] font-medium transition-all duration-200 press-scale',
+                      'relative flex items-center gap-3 px-4 h-11 rounded-full text-[0.8125rem] font-medium transition-all duration-200 press-scale',
                       active
-                        ? 'text-primary bg-primary/8'
+                        ? 'text-sidebar-accent-foreground bg-sidebar-accent'
                         : 'text-muted-foreground hover:text-foreground hover:bg-white/4',
                       collapsed && 'justify-center px-2'
                     )}
                   />
                 )}>
-                  {active && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4.5 rounded-r-full bg-primary" />
-                  )}
+
                   <Icon className="w-4 h-4 shrink-0" />
                   {!collapsed && <span>{label}</span>}
                 </TooltipTrigger>

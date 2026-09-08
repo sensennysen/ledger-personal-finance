@@ -1,3 +1,8 @@
+import {
+  argbFromHex,
+  hexFromArgb,
+  themeFromSourceColor,
+} from '@material/material-color-utilities'
 import { createContext, useContext, useEffect, useState } from 'react'
 
 type Theme = 'dark' | 'light'
@@ -42,7 +47,13 @@ function getInitialTheme(): Theme {
 function getInitialFontSize(): FontSize {
   try {
     const stored = localStorage.getItem(FONT_SIZE_KEY)
-    if (stored === 'sm' || stored === 'md' || stored === 'lg' || stored === 'xl') return stored
+    if (
+      stored === 'sm' ||
+      stored === 'md' ||
+      stored === 'lg' ||
+      stored === 'xl'
+    )
+      return stored
   } catch {
     // Ignore storage access failures and fall back to defaults.
   }
@@ -57,16 +68,6 @@ function getInitialAccent(): string {
   }
 }
 
-/** Return a contrasting foreground hex (#ffffff or dark) for a given hex color. */
-function contrastForeground(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16) / 255
-  const g = parseInt(hex.slice(3, 5), 16) / 255
-  const b = parseInt(hex.slice(5, 7), 16) / 255
-  // Relative luminance (WCAG formula)
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-  return luminance > 0.35 ? '#1a1205' : '#ffffff'
-}
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(getInitialTheme)
   const [fontSize, setFontSizeState] = useState<FontSize>(getInitialFontSize)
@@ -79,6 +80,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       root.classList.remove('dark')
     }
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#15130B' : '#EFE7DA')
     try {
       localStorage.setItem(STORAGE_KEY, theme)
     } catch {
@@ -97,28 +101,67 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (/^#[0-9a-fA-F]{6}$/.test(accentColor)) {
-      const fg = contrastForeground(accentColor)
-      document.documentElement.style.setProperty('--primary', accentColor)
-      document.documentElement.style.setProperty('--primary-foreground', fg)
-      document.documentElement.style.setProperty('--ring', accentColor)
-      document.documentElement.style.setProperty('--sidebar-primary', accentColor)
-      document.documentElement.style.setProperty('--sidebar-primary-foreground', fg)
-      document.documentElement.style.setProperty('--sidebar-ring', accentColor)
+      const root = document.documentElement
+      const names = [
+        '--primary',
+        '--primary-foreground',
+        '--accent',
+        '--accent-foreground',
+        '--ring',
+        '--sidebar-primary',
+        '--sidebar-primary-foreground',
+        '--sidebar-accent',
+        '--sidebar-accent-foreground',
+        '--sidebar-ring',
+      ]
+      if (accentColor.toLowerCase() === DEFAULT_ACCENT) {
+        names.forEach((name) => root.style.removeProperty(name))
+      } else {
+        const scheme = themeFromSourceColor(argbFromHex(accentColor)).schemes[
+          theme
+        ]
+        const values = [
+          scheme.primary,
+          scheme.onPrimary,
+          scheme.primaryContainer,
+          scheme.onPrimaryContainer,
+          scheme.primary,
+          scheme.primary,
+          scheme.onPrimary,
+          scheme.primaryContainer,
+          scheme.onPrimaryContainer,
+          scheme.primary,
+        ]
+        names.forEach((name, index) =>
+          root.style.setProperty(name, hexFromArgb(values[index])),
+        )
+      }
     }
     try {
       localStorage.setItem(ACCENT_KEY, accentColor)
     } catch {
       // Ignore storage access failures and keep the in-memory preference.
     }
-  }, [accentColor])
+  }, [accentColor, theme])
 
   const setTheme = (t: Theme) => setThemeState(t)
-  const toggleTheme = () => setThemeState((t) => (t === 'dark' ? 'light' : 'dark'))
+  const toggleTheme = () =>
+    setThemeState((t) => (t === 'dark' ? 'light' : 'dark'))
   const setFontSize = (size: FontSize) => setFontSizeState(size)
   const setAccentColor = (color: string) => setAccentState(color)
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme, fontSize, setFontSize, accentColor, setAccentColor }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        toggleTheme,
+        setTheme,
+        fontSize,
+        setFontSize,
+        accentColor,
+        setAccentColor,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   )

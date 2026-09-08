@@ -1,72 +1,78 @@
+/* ═══════════════════════════════════════════════════════
+   LEDGER — Material 3 token layer
+   Drop-in replacement for the :root / .dark blocks in
+   src/index.css. Variable NAMES are unchanged, so every
+   shadcn component inherits without edits.
+
+   Fonts: Roboto (sans + headings) · DM Mono (money)
+   Seed:  Ledger gold  →  oklch(0.565 0.115 72) light
+                          oklch(0.830 0.115 85) dark
+   ═══════════════════════════════════════════════════════ */
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* ═══════════════════════════════════════════════════════
-   OBSIDIAN LEDGER — Light/Dark Theme
-   Fonts: Playfair Display · Outfit · DM Mono
-   ═══════════════════════════════════════════════════════ */
-
 @custom-variant dark (&:is(.dark *));
 
-/* ── Light theme (default) ── */
+/* ── Light theme (M3 light scheme) ── */
 :root {
-  /* Warm parchment palette */
-  --background: oklch(0.972 0.010 72);
-  --foreground: oklch(0.130 0.010 265);
+  --background: #EFE7DA;          /* #EFE7DA surface-dim   */
+  --foreground: #1E1B13;          /* #1E1B13 on-surface    */
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.130 0.010 265);
+  --card: #FFF8EE;                /* #FFF8EE surface       */
+  --card-foreground: #1E1B13;
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.130 0.010 265);
+  --popover: #FFF8EE;
+  --popover-foreground: #1E1B13;
 
-  /* Gold */
-  --primary: oklch(0.565 0.115 72);
-  --primary-foreground: oklch(1 0 0);
+  --primary: #7A5900;             /* #7A5900 — 4.5:1 w/ white */
+  --primary-foreground: #FFFFFF;
 
-  --secondary: oklch(0.945 0.012 72);
-  --secondary-foreground: oklch(0.250 0.010 265);
+  --secondary: #E4D8B6;           /* #E4D8B6 secondary-container */
+  --secondary-foreground: #3E3620;
 
-  --muted: oklch(0.952 0.008 72);
-  --muted-foreground: oklch(0.490 0.015 265);
+  --muted: #F4ECDF;               /* #F4ECDF surface-container */
+  --muted-foreground: #5A5346;    /* #5A5346 — 4.5:1 on muted  */
 
-  --accent: oklch(0.945 0.012 72);
-  --accent-foreground: oklch(0.250 0.010 265);
+  --accent: #FFE18E;              /* #FFE18E primary-container */
+  --accent-foreground: #261A00;   /* #261A00 */
 
-  --destructive: oklch(0.570 0.170 18);
+  --destructive: var(--expense);         /* #A4342B = --expense */
 
-  --border: oklch(0.875 0.015 72);
-  --input: oklch(0.875 0.015 72);
-  --ring: oklch(0.565 0.115 72);
+  --border: #DDD5C4;              /* #DDD5C4 outline-variant */
+  --input: #CFC7B5;
+  --ring: var(--primary);
 
-  /* Charts */
+  --radius: 0.75rem;                            /* M3 shape scale, was 0.5 */
+
+  /* Semantic money tokens — replace INCOME / EXPENSE / GOLD */
+  --income: #1E6B2E;             /* #1E6B2E */
+  --income-container: #C6EBC7;   /* #C6EBC7 */
+  --expense: #A4342B;             /* #A4342B */
+  --expense-container: #FFDAD6;   /* #FFDAD6 */
+  --transfer: #1F5A87;           /* #1F5A87 */
+  --transfer-container: #CDE4F7; /* #CDE4F7 */
+
+  /* Charts alias the semantics so Recharts needs no per-series colors */
   --chart-1: var(--primary);
-  --chart-2: oklch(0.620 0.145 155);
-  --chart-3: oklch(0.580 0.155 18);
-  --chart-4: oklch(0.620 0.165 220);
-  --chart-5: oklch(0.660 0.130 290);
+  --chart-2: var(--income);
+  --chart-3: var(--expense);
+  --chart-4: var(--transfer);
+  --chart-5: oklch(0.520 0.110 300);
 
-  --radius: 0.5rem;
+  /* Sidebar — M3 navigation drawer */
+  --sidebar: #F8F1E4;             /* #F8F1E4 */
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);      /* active pill = primary-container */
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--primary);
 
-  /* Sidebar — warm cream in light mode */
-  --sidebar: oklch(0.960 0.015 72);
-  --sidebar-foreground: oklch(0.130 0.010 265);
-  --sidebar-primary: oklch(0.565 0.115 72);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.938 0.015 72);
-  --sidebar-accent-foreground: oklch(0.250 0.010 265);
-  --sidebar-border: oklch(0.860 0.018 72);
-  --sidebar-ring: oklch(0.565 0.115 72);
-
-  /* Custom design tokens */
-  --gold: var(--primary);
-  --gold-bright: color-mix(in oklch, var(--primary) 80%, white);
-  --gold-dim: color-mix(in oklch, var(--primary) 75%, black);
-  --emerald: oklch(0.580 0.145 155);
-  --coral: oklch(0.580 0.155 18);
-  --surface: oklch(0.958 0.010 72);
-  --elevated: oklch(0.980 0.008 72);
+  --surface: oklch(0.940 0.014 86);
+  --elevated: #EDE4D6;            /* #EDE4D6 surface-container-high */
 
   color-scheme: light;
   font-synthesis: none;
@@ -75,80 +81,79 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Dark theme ── */
+/* ── Dark theme (M3 dark scheme) ── */
 .dark {
-  /* Deep Obsidian palette */
-  --background: oklch(0.080 0.005 265);
-  --foreground: oklch(0.940 0.008 290);
+  --background: #15130B;          /* #15130B surface       */
+  --foreground: #E9E2D4;          /* #E9E2D4 on-surface    */
 
-  --card: oklch(0.112 0.006 265);
-  --card-foreground: oklch(0.940 0.008 290);
+  --card: #211F17;                /* #211F17 surface-container */
+  --card-foreground: #E9E2D4;
 
-  --popover: oklch(0.125 0.007 265);
-  --popover-foreground: oklch(0.940 0.008 290);
+  --popover: #2A2718;
+  --popover-foreground: #E9E2D4;
 
-  /* Gold */
-  --primary: oklch(0.700 0.115 72);
-  --primary-foreground: oklch(0.090 0.015 72);
+  --primary: #EDC55F;             /* #EDC55F */
+  --primary-foreground: #3E2E00;  /* #3E2E00 */
 
-  --secondary: oklch(0.155 0.006 265);
-  --secondary-foreground: oklch(0.920 0.010 290);
+  --secondary: #4F462B;           /* #4F462B */
+  --secondary-foreground: #F2E2BB;
 
-  --muted: oklch(0.140 0.005 265);
-  --muted-foreground: oklch(0.640 0.015 290);
+  --muted: #1D1B13;               /* #1D1B13 */
+  --muted-foreground: #999080;    /* #999080 */
 
-  --accent: oklch(0.160 0.008 265);
-  --accent-foreground: oklch(0.920 0.010 290);
+  --accent: #594400;              /* #594400 primary-container */
+  --accent-foreground: #FFE18E;   /* #FFE18E */
 
-  --destructive: oklch(0.620 0.160 18);
+  --destructive: var(--expense);         /* #FFB4AB = --expense */
 
-  --border: oklch(1 0 0 / 7%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.700 0.115 72);
+  --border: #2C2921;              /* #2C2921 */
+  --input: #4D4739;               /* #4D4739 outline */
+  --ring: var(--primary);
 
-  /* Charts */
+  --radius: 0.75rem;
+
+  --income: #9FD9A0;             /* #9FD9A0 */
+  --income-container: #1E3320;   /* #1E3320 */
+  --expense: #FFB4AB;             /* #FFB4AB */
+  --expense-container: #3B1512;   /* #3B1512 */
+  --transfer: #9EC6EA;           /* #9EC6EA */
+  --transfer-container: #16293A; /* #16293A */
+
   --chart-1: var(--primary);
-  --chart-2: oklch(0.660 0.150 155);
-  --chart-3: oklch(0.620 0.160 18);
-  --chart-4: oklch(0.680 0.170 220);
-  --chart-5: oklch(0.720 0.140 290);
+  --chart-2: var(--income);
+  --chart-3: var(--expense);
+  --chart-4: var(--transfer);
+  --chart-5: oklch(0.760 0.100 300);
 
-  --radius: 0.5rem;
+  --sidebar: #1D1B13;             /* #1D1B13 */
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--primary);
 
-  /* Sidebar — deeper obsidian */
-  --sidebar: oklch(0.063 0.004 265);
-  --sidebar-foreground: oklch(0.940 0.008 290);
-  --sidebar-primary: oklch(0.700 0.115 72);
-  --sidebar-primary-foreground: oklch(0.090 0.015 72);
-  --sidebar-accent: oklch(0.150 0.008 265);
-  --sidebar-accent-foreground: oklch(0.920 0.010 290);
-  --sidebar-border: oklch(1 0 0 / 6%);
-  --sidebar-ring: oklch(0.700 0.115 72);
-
-  /* Custom design tokens */
-  --gold: var(--primary);
-  --gold-bright: color-mix(in oklch, var(--primary) 80%, white);
-  --gold-dim: color-mix(in oklch, var(--primary) 75%, black);
-  --emerald: oklch(0.660 0.150 155);
-  --coral: oklch(0.620 0.160 18);
-  --surface: oklch(0.130 0.005 265);
-  --elevated: oklch(0.158 0.007 265);
+  --surface: oklch(0.150 0.012 85);
+  --elevated: #2A2718;            /* #2A2718 */
 
   color-scheme: dark;
 }
 
 @theme inline {
-  --font-sans: 'Outfit', 'Segoe UI', sans-serif;
-  --font-heading: 'Playfair Display', Georgia, serif;
-  --font-mono: 'DM Mono', 'Fira Mono', monospace;
-  --font-display: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Roboto', system-ui, sans-serif;
+  --font-heading: 'Roboto', system-ui, sans-serif;   /* Playfair Display removed */
+  --font-mono: 'DM Mono', 'Fira Mono', monospace;    /* kept */
+  --font-display: 'Roboto', system-ui, sans-serif;
 
-  /* Custom color tokens */
-  --color-gold: var(--gold);
-  --color-gold-bright: var(--gold-bright);
-  --color-gold-dim: var(--gold-dim);
-  --color-emerald: var(--emerald);
-  --color-coral: var(--coral);
+  /* new semantic utilities: text-income, bg-expense-container, … */
+  --color-income: var(--income);
+  --color-income-container: var(--income-container);
+  --color-expense: var(--expense);
+  --color-expense-container: var(--expense-container);
+  --color-transfer: var(--transfer);
+  --color-transfer-container: var(--transfer-container);
+
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);
 
@@ -200,19 +205,15 @@
   body {
     @apply text-foreground;
     background-color: var(--background);
-    background-image: radial-gradient(
-      ellipse 70% 45% at 50% -5%,
-      oklch(from var(--primary) l c h / 0.05),
-      transparent
-    );
-    font-family: 'Outfit', 'Segoe UI', sans-serif;
+
+    font-family: 'Roboto', system-ui, sans-serif;
     margin: 0;
   }
   html {
     @apply font-sans;
   }
   h1 {
-    font-family: 'Playfair Display', Georgia, serif;
+    font-family: 'Roboto', system-ui, sans-serif;
     font-weight: 600;
     letter-spacing: -0.02em;
   }
@@ -233,6 +234,25 @@
   }
 }
 
+/* Shared Material surfaces and safe-area aware mobile sheets. */
+.settings-grid > :first-child { grid-column: 1 / -1; }
+.settings-grid > [data-slot="card"] { height: 100%; }
+[data-slot="card"] { box-shadow: none; }
+.m3-bottom-sheet {
+  top: auto; bottom: 0; left: 0; width: 100%; max-width: none;
+  transform: none; translate: none; border-radius: 28px 28px 0 0;
+  background: var(--elevated); padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
+  animation: slide-in-bottom 260ms cubic-bezier(.05,.7,.1,1);
+  grid-template-columns: minmax(0, 1fr);
+}
+.m3-bottom-sheet > * { min-width: 0; }
+@media (max-width: 767px) {
+  button, a, input, select { touch-action: manipulation; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .m3-bottom-sheet { animation: none; }
+}
+
 /* ── Utility classes ── */
 
 /* DM Mono tabular numbers for all financial values */
@@ -242,27 +262,10 @@
   letter-spacing: -0.025em;
 }
 
-/* Warm gold gradient on primary balance figures */
-.balance-gradient {
-  background: linear-gradient(135deg, #B87A20 0%, #9A6118 55%, #7D4E12 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-family: 'DM Mono', monospace;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.03em;
-}
+.balance-gradient { color: var(--foreground); font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
 
-.dark .balance-gradient {
-  background: linear-gradient(135deg, #F0C870 0%, #C9964A 55%, #A87230 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Display / editorial font */
 .font-display {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'Roboto', system-ui, sans-serif;
 }
 
 /* ═══════════════════════════════════════════════════════

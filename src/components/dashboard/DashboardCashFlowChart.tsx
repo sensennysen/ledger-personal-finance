@@ -1,6 +1,6 @@
 import {
-  Area,
-  AreaChart,
+  Bar,
+  BarChart,
   CartesianGrid,
   Legend,
   ResponsiveContainer,
@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { CORAL, EMERALD } from '@/constants/colors'
+import { EXPENSE, INCOME } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { DashboardCashFlowPoint, DashboardChartPeriod } from '@/hooks/useDashboardData'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -38,7 +38,7 @@ export function DashboardCashFlowChart({
   style,
 }: DashboardCashFlowChartProps) {
   return (
-    <div className="rounded-xl border border-border/60 overflow-hidden bg-card lg:col-span-2" style={style}>
+    <div className="rounded-[20px] border border-border overflow-hidden bg-card min-w-0" style={style}>
       <div className="px-5 pt-5 pb-3">
         <DashboardCardHeader
           title="Cash Flow"
@@ -53,7 +53,7 @@ export function DashboardCashFlowChart({
               </TabsList>
             </Tabs>
           )}
-          className="flex-col sm:flex-row sm:items-center mb-0"
+          className="flex-col 2xl:flex-row 2xl:items-center mb-0"
         />
       </div>
       <div className="px-2 pb-4">
@@ -61,17 +61,7 @@ export function DashboardCashFlowChart({
           <Skeleton className="h-64 w-full" />
         ) : (
           <ResponsiveContainer width="100%" height={240}>
-            <AreaChart data={cashFlowData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
-              <defs>
-                <linearGradient id="income-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={EMERALD} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={EMERALD} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="expense-grad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={CORAL} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={CORAL} stopOpacity={0} />
-                </linearGradient>
-              </defs>
+            <BarChart data={cashFlowData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis
                 dataKey="label"
@@ -92,9 +82,9 @@ export function DashboardCashFlowChart({
                 cursor={{ stroke: 'var(--primary)', strokeWidth: 1, strokeOpacity: 0.3 }}
               />
               <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }} />
-              <Area type="monotone" dataKey="income" stroke={EMERALD} fill="url(#income-grad)" strokeWidth={2} name="Income" dot={false} />
-              <Area type="monotone" dataKey="expenses" stroke={CORAL} fill="url(#expense-grad)" strokeWidth={2} name="Expenses" dot={false} />
-            </AreaChart>
+              <Bar dataKey="income" fill={INCOME} radius={[4,4,0,0]} name="Income" />
+              <Bar dataKey="expenses" fill={EXPENSE} radius={[4,4,0,0]} name="Expenses" />
+            </BarChart>
           </ResponsiveContainer>
         )}
       </div>

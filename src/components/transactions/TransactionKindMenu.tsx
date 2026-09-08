@@ -26,21 +26,21 @@ const transactionKinds = [
     label: 'Expense',
     description: 'Money spent from an account',
     icon: ArrowUpRight,
-    color: 'text-[oklch(0.620_0.160_18)]',
+    color: 'text-expense',
   },
   {
     kind: 'income' as const,
     label: 'Income',
     description: 'Money received into an account',
     icon: ArrowDownLeft,
-    color: 'text-[oklch(0.660_0.150_155)]',
+    color: 'text-income',
   },
   {
     kind: 'transfer' as const,
     label: 'Transfer',
     description: 'Move money between accounts',
     icon: ArrowLeftRight,
-    color: 'text-[oklch(0.700_0.115_72)]',
+    color: 'text-transfer',
   },
 ]
 

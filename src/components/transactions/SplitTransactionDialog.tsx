@@ -182,7 +182,7 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
             </Button>
             <span
               className={`text-sm font-medium ${
-                balanced ? 'text-[oklch(0.660_0.150_155)]' : 'text-destructive'
+                balanced ? 'text-income' : 'text-destructive'
               }`}
             >
               {balanced

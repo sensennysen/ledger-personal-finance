@@ -1,5 +1,5 @@
 import { CalendarClock, CreditCard } from 'lucide-react'
-import { CORAL, EMERALD } from '@/constants/colors'
+import { EXPENSE, INCOME } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { CreditCardWithState } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
@@ -21,7 +21,7 @@ export function DashboardCreditCardMonitor({
   style,
 }: DashboardCreditCardMonitorProps) {
   return (
-    <div className="rounded-xl border border-border/60 p-5 bg-card space-y-4 lg:col-span-2" style={style}>
+    <div className="rounded-[20px] border border-border p-4 md:p-5 bg-card space-y-4 lg:col-span-2" style={style}>
       <DashboardCardHeader
         title="Credit Card Monitor"
         subtitle="Spending, statement, and payment tracking"
@@ -39,13 +39,13 @@ export function DashboardCreditCardMonitor({
                   {formatCurrency(card.acc.credit_limit ?? 0, card.acc.currency)}
                 </p>
               </div>
-              <p className="text-xs font-semibold" style={{ color: card.nearLimit ? CORAL : EMERALD }}>
+              <p className="text-xs font-semibold" style={{ color: card.nearLimit ? EXPENSE : INCOME }}>
                 {card.utilizationPct.toFixed(1)}% used
               </p>
             </div>
             <Progress
               value={Math.min(card.utilizationPct, 100)}
-              className={card.nearLimit ? '[&>div]:bg-[oklch(0.620_0.160_18)]' : '[&>div]:bg-[oklch(0.660_0.150_155)]'}
+              className={card.nearLimit ? '[&>div]:bg-expense' : '[&>div]:bg-income'}
             />
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-md border border-border/40 px-2 py-1.5">
@@ -63,7 +63,7 @@ export function DashboardCreditCardMonitor({
             </div>
             <div className="flex items-center justify-between rounded-md border border-border/40 px-2.5 py-2 text-xs">
               <span className="text-muted-foreground">Remaining</span>
-              <span className="money font-semibold" style={{ color: card.remainingToPay > 0 ? CORAL : EMERALD }}>
+              <span className="money font-semibold" style={{ color: card.remainingToPay > 0 ? EXPENSE : INCOME }}>
                 {formatCurrency(card.remainingToPay, card.acc.currency)}
               </span>
             </div>

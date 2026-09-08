@@ -1,5 +1,5 @@
 import { BUDGET_WARNING_THRESHOLD } from '@/constants/accounts'
-import { CORAL } from '@/constants/colors'
+import { EXPENSE } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { Budget } from '@/types'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
@@ -12,14 +12,14 @@ interface DashboardBudgetProgressCardProps {
 }
 
 function getBudgetAmountColor(over: boolean, percentage: number) {
-  if (over) return CORAL
-  if (percentage > BUDGET_WARNING_THRESHOLD) return 'oklch(0.750 0.140 75)'
-  return 'oklch(0.570 0.015 290)'
+  if (over) return EXPENSE
+  if (percentage > BUDGET_WARNING_THRESHOLD) return 'var(--primary)'
+  return 'var(--muted-foreground)'
 }
 
 function getBudgetProgressClass(over: boolean, percentage: number) {
-  if (over) return '[&>div]:bg-[oklch(0.620_0.160_18)]'
-  if (percentage > BUDGET_WARNING_THRESHOLD) return '[&>div]:bg-[oklch(0.750_0.140_75)]'
+  if (over) return '[&>div]:bg-expense'
+  if (percentage > BUDGET_WARNING_THRESHOLD) return '[&>div]:bg-primary'
   return '[&>div]:bg-primary'
 }
 
@@ -29,7 +29,7 @@ export function DashboardBudgetProgressCard({
   style,
 }: DashboardBudgetProgressCardProps) {
   return (
-    <div className="rounded-xl border border-border/60 p-5 bg-card" style={style}>
+    <div className="rounded-[20px] border border-border p-4 md:p-5 bg-card" style={style}>
       <DashboardCardHeader
         title="Budget Progress"
         subtitle={`Spending vs budget limits · ${monthLabel}`}

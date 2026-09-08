@@ -781,7 +781,7 @@ export default function AccountTransactionsPage() {
                 </div>
                 <Progress
                   value={Math.min(getCreditUtilizationPct(account), 100)}
-                  className={getCreditUtilizationPct(account) >= (account.utilization_target_pct ?? 30) ? '[&>div]:bg-[oklch(0.620_0.160_18)]' : '[&>div]:bg-[oklch(0.660_0.150_155)]'}
+                  className={getCreditUtilizationPct(account) >= (account.utilization_target_pct ?? 30) ? '[&>div]:bg-expense' : '[&>div]:bg-income'}
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_1fr_1fr_auto] gap-2">

@@ -317,13 +317,13 @@ function StatCard({
   loading?: boolean
 }) {
   return (
-    <div className="rounded-[18px] bg-card p-4">
-      <div className="flex items-start justify-between gap-3">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+    <div className="min-w-0 rounded-[18px] bg-card p-4">
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           {title}
         </span>
         <span
-          className="flex size-7 items-center justify-center rounded-lg"
+          className="flex size-7 shrink-0 items-center justify-center rounded-lg"
           style={{
             background: `color-mix(in srgb, ${color} 16%, transparent)`,
             color,
@@ -336,7 +336,7 @@ function StatCard({
         <Skeleton className="mt-2.5 h-6 w-28" />
       ) : (
         <p
-          className="money mt-2.5 text-[22px] font-bold wrap-break-word"
+          className="money mt-2.5 truncate text-[17px] font-bold sm:text-[19px] lg:text-[22px]"
           style={{ color }}
         >
           {value}
@@ -596,20 +596,16 @@ export default function ReportsPage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 p-4 pb-24 md:p-8 md:pb-6">
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-[26px] font-bold tracking-[-0.01em] text-foreground">
-              Reports
-            </h1>
-            <p className="mt-1 text-[13px] text-muted-foreground">{presetLabel}</p>
-          </div>
-
-          <div className="flex flex-col items-end gap-2.5">
-            <TabsList className="border-transparent bg-surface-container">
-              <TabsTrigger value="overview" className="px-4">Overview</TabsTrigger>
-              <TabsTrigger value="analytics" className="px-4">Analytics</TabsTrigger>
-              <TabsTrigger value="thirteenth" className="px-4">13th Month</TabsTrigger>
-            </TabsList>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-[26px] font-bold tracking-[-0.01em] text-foreground">
+                Reports
+              </h1>
+              <p className="mt-1 truncate text-[13px] text-muted-foreground">
+                {presetLabel}
+              </p>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -617,7 +613,7 @@ export default function ReportsPage() {
                     variant="outline"
                     size="sm"
                     disabled={loading || filtered.length === 0}
-                    className="h-8 gap-2"
+                    className="h-8 shrink-0 gap-2"
                   />
                 }
               >
@@ -637,6 +633,27 @@ export default function ReportsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          <TabsList className="w-full border-transparent bg-surface-container sm:w-fit">
+            <TabsTrigger
+              value="overview"
+              className="whitespace-nowrap px-2.5 sm:px-4"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger
+              value="analytics"
+              className="whitespace-nowrap px-2.5 sm:px-4"
+            >
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger
+              value="thirteenth"
+              className="whitespace-nowrap px-2.5 sm:px-4"
+            >
+              <span className="sm:hidden">13th Mo</span>
+              <span className="hidden sm:inline">13th Month</span>
+            </TabsTrigger>
+          </TabsList>
         </div>
 
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
@@ -785,7 +802,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           title="Total Income"
           value={formatCurrency(totalIncome, currency)}
@@ -1212,7 +1229,7 @@ export default function ReportsPage() {
           <DialogHeader>
             <DialogTitle>Date Range</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-wrap gap-2">
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             {([
               ['this_month', 'This Month'],
               ['last_month', 'Last Month'],
@@ -1226,10 +1243,10 @@ export default function ReportsPage() {
                 key={p}
                 onClick={() => { setPreset(p); if (p !== 'custom') setDateRangeOpen(false) }}
                 className={cn(
-                  'px-3 py-1.5 rounded-lg text-[0.6875rem] font-medium tracking-wide border transition-all duration-150',
+                  'shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-[0.6875rem] font-medium tracking-wide transition-all duration-150',
                   preset === p
                     ? 'border-transparent'
-                    : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
+                    : 'border-border/60 text-muted-foreground hover:border-border hover:text-foreground'
                 )}
                 style={preset === p ? { background: GOLD, color: 'var(--primary-foreground)' } : {}}
               >
@@ -1238,27 +1255,29 @@ export default function ReportsPage() {
             ))}
           </div>
           {preset === 'custom' && (
-            <div className="flex flex-wrap gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
-                <Input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="w-40 text-[0.8125rem] h-8"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
-                <Input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="w-40 text-[0.8125rem] h-8"
-                />
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
+                  <Input
+                    type="date"
+                    value={customStart}
+                    onChange={(e) => setCustomStart(e.target.value)}
+                    className="h-9 w-full min-w-0 text-[0.8125rem]"
+                  />
+                </div>
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
+                  <Input
+                    type="date"
+                    value={customEnd}
+                    onChange={(e) => setCustomEnd(e.target.value)}
+                    className="h-9 w-full min-w-0 text-[0.8125rem]"
+                  />
+                </div>
               </div>
               {customStart && customEnd && customStart > customEnd && (
-                <p className="self-end pb-1 text-xs text-destructive">
+                <p className="text-xs text-destructive">
                   Start date must be on or before end date.
                 </p>
               )}

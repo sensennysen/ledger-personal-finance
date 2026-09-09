@@ -1036,15 +1036,28 @@ export default function BudgetsPage() {
       <CycleStepper className="hidden md:flex" />
       {budgetError && <p role="alert" className="rounded-xl bg-expense-container text-expense p-4 text-sm">{budgetError}</p>}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-fit border-transparent bg-surface-container">
-          <TabsTrigger value="budgets" className="gap-1.5 px-4">
-            <Target className="size-3.5" />Budgets
+        <TabsList className="w-full border-transparent bg-surface-container sm:w-fit">
+          <TabsTrigger
+            value="budgets"
+            className="gap-1.5 whitespace-nowrap px-2.5 sm:px-4"
+          >
+            <Target className="size-3.5 shrink-0" />Budgets
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-1.5 px-4">
-            <History className="size-3.5" />Budget History
+          <TabsTrigger
+            value="history"
+            className="gap-1.5 whitespace-nowrap px-2.5 sm:px-4"
+          >
+            <History className="size-3.5 shrink-0" />
+            <span className="sm:hidden">History</span>
+            <span className="hidden sm:inline">Budget History</span>
           </TabsTrigger>
-          <TabsTrigger value="goals" className="gap-1.5 px-4">
-            <PiggyBank className="size-3.5" />Savings Goals
+          <TabsTrigger
+            value="goals"
+            className="gap-1.5 whitespace-nowrap px-2.5 sm:px-4"
+          >
+            <PiggyBank className="size-3.5 shrink-0" />
+            <span className="sm:hidden">Goals</span>
+            <span className="hidden sm:inline">Savings Goals</span>
           </TabsTrigger>
         </TabsList>
 

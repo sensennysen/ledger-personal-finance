@@ -245,28 +245,28 @@ export default function DashboardPage() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div
-            className="rounded-2xl p-3.5"
+            className="min-w-0 rounded-2xl p-3.5"
             style={{ background: 'var(--income-container)', color: 'var(--income)' }}
           >
-            <span className="text-[11px] font-semibold uppercase">
+            <span className="block truncate text-[11px] font-semibold uppercase">
               Income · {monthShort}
             </span>
-            <p className="money mt-1.5 text-[20px] font-bold">
-              +{formatCurrency(stats.income, currency)}
+            <p className="money mt-1.5 truncate text-[17px] font-bold sm:text-[19px] lg:text-[20px]">
+              {formatCurrency(stats.income, currency)}
             </p>
           </div>
           <div
-            className="rounded-2xl p-3.5"
+            className="min-w-0 rounded-2xl p-3.5"
             style={{
               background: 'var(--expense-container)',
               color: 'var(--expense)',
             }}
           >
-            <span className="text-[11px] font-semibold uppercase">
+            <span className="block truncate text-[11px] font-semibold uppercase">
               Expenses · {monthShort}
             </span>
-            <p className="money mt-1.5 text-[20px] font-bold">
-              &minus;{formatCurrency(stats.expenses, currency)}
+            <p className="money mt-1.5 truncate text-[17px] font-bold sm:text-[19px] lg:text-[20px]">
+              {formatCurrency(stats.expenses, currency)}
             </p>
           </div>
         </div>

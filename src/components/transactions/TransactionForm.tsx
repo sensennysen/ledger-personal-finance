@@ -237,6 +237,13 @@ export function TransactionForm({
     await onSubmit({ ...values, receipt_url })
   }
 
+  const amountTone =
+    isLoanRepayment || type === 'expense'
+      ? 'var(--expense)'
+      : type === 'income'
+        ? 'var(--income)'
+        : 'var(--transfer)'
+
   const hasExtraDetails =
     Boolean(notes?.trim()) ||
     tags.length > 0 ||
@@ -271,6 +278,72 @@ export function TransactionForm({
             )}
           />
         )}
+
+        {/* Amount-first block */}
+        <div className="flex items-center justify-between gap-3 rounded-[18px] border-[1.5px] border-input p-4">
+          <FormField
+            control={form.control}
+            name="amount"
+            render={({ field }) => (
+              <FormItem className="min-w-0 flex-1 space-y-0">
+                <FormLabel className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Amount
+                </FormLabel>
+                <FormControl>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="money text-[15px] text-muted-foreground">
+                      $
+                    </span>
+                    <input
+                      inputMode="decimal"
+                      name={field.name}
+                      ref={field.ref}
+                      onBlur={field.onBlur}
+                      placeholder="0.00"
+                      value={
+                        typeof field.value === 'number' ||
+                        typeof field.value === 'string'
+                          ? field.value
+                          : ''
+                      }
+                      onChange={(event) => field.onChange(event.target.value)}
+                      className="money w-full min-w-0 bg-transparent text-[36px] font-bold leading-none outline-none placeholder:text-muted-foreground/40"
+                      style={{ color: amountTone }}
+                    />
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="currency"
+            render={({ field }) => (
+              <FormItem className="shrink-0 space-y-0">
+                <Select
+                  modal={false}
+                  onValueChange={field.onChange}
+                  value={field.value}
+                  disabled={isLoanRepayment}
+                >
+                  <FormControl>
+                    <SelectTrigger className="h-9 w-auto gap-1.5 rounded-full border-transparent bg-surface-container px-3.5 text-[13px] font-semibold">
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent alignItemWithTrigger={false} align="end">
+                    {CURRENCIES.map((currency) => (
+                      <SelectItem key={currency.code} value={currency.code}>
+                        {currency.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           <FormField
@@ -422,54 +495,6 @@ export function TransactionForm({
           />
         )}
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <FormField
-            control={form.control}
-            name="amount"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Amount</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    name={field.name}
-                    ref={field.ref}
-                    onBlur={field.onBlur}
-                    value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
-                    onChange={(event) => field.onChange(event.target.value)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Currency</FormLabel>
-                <Select modal={false} onValueChange={field.onChange} value={field.value} disabled={isLoanRepayment}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent alignItemWithTrigger={false} align="start">
-                    {CURRENCIES.map((currency) => (
-                      <SelectItem key={currency.code} value={currency.code}>
-                        {currency.code}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormItem>
-            )}
-          />
-        </div>
-
         {type === 'transfer' && (
           <FormField
             control={form.control}
@@ -517,27 +542,29 @@ export function TransactionForm({
           />
         </div>
 
-        <div className="rounded-lg border border-border/70 bg-muted/20">
+        <div className="overflow-hidden rounded-[14px] border border-outline-variant bg-surface-container">
           <button
             type="button"
-            className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left"
+            className="flex w-full items-center justify-between gap-3 px-3.5 py-3 text-left"
             onClick={() => setShowMoreDetails((value) => !value)}
             aria-expanded={showMoreDetails}
           >
             <div>
-              <p className="text-sm font-medium leading-none">More details</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="text-[13px] font-semibold leading-none text-foreground">
+                More details
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
                 Notes, tags, goals, recurring settings, and receipt
                 {hasExtraDetails ? ' included' : ' optional'}
               </p>
             </div>
-            <span className="text-xs font-medium text-muted-foreground">
+            <span className="text-[12px] font-semibold text-primary">
               {showMoreDetails ? 'Hide' : hasExtraDetails ? 'Review' : 'Add'}
             </span>
           </button>
 
           {showMoreDetails && (
-            <div className="space-y-3 border-t border-border/70 px-3 py-3 sm:space-y-4">
+            <div className="space-y-3 border-t border-outline-variant bg-card px-3.5 py-3.5 sm:space-y-4">
               <FormField
                 control={form.control}
                 name="notes"

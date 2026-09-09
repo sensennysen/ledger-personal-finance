@@ -233,3 +233,26 @@ confirmation dialog are unchanged.
   `CardHeader` / `CardTitle` / `CardDescription` were removed (their text moved to
   the section heading). Icons moved from the card titles to the rail.
 - The unused `.settings-grid` rules remain in `index.css` (harmless).
+
+---
+
+## Phase 10 — Transaction modals
+
+Files: `src/components/transactions/TransactionForm.tsx`.
+
+**No feature loss.** `TransactionForm` already had a collapsible "More details"
+section (Notes / Tags / Goal / Recurring / Receipt) and `QuickEntry` (mobile) is
+already an amount-first keypad; `TransactionKindMenu` already renders
+icon + label + description rows.
+
+**Changed:**
+
+- Amount + currency moved to a prominent **bordered "AMOUNT" block at the top**
+  (was a plain 2-col grid after Account/Category). The amount is now a large
+  borderless number field (`$` prefix, 36px, tinted with the kind's semantic
+  colour) using `inputMode="decimal"` — the `type="number"` spinner is gone.
+  Currency is a pill `Select`.
+- "More details" toggle restyled to a surface-container card with a primary
+  "Add / Review / Hide" affordance (no behaviour change).
+- The kind menu remains a dropdown (not a bottom sheet on mobile), consistent
+  with the Phase 6 row menu.

@@ -626,7 +626,7 @@ export function TransactionForm({
           )}
         </div>
 
-        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end sm:pt-0">
+        <div className="sticky bottom-0 -mx-5 flex flex-col-reverse gap-2 bg-elevated px-5 pb-1 pt-2 sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>

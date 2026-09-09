@@ -95,10 +95,21 @@ export default function SettingsPage() {
     SETTINGS_SECTIONS[0].id,
   )
   const mainRef = useRef<HTMLElement | null>(null)
-  // While a rail click is animating we hold the highlight on the target and
-  // ignore scroll-driven updates so it can't flicker back.
+  // While a rail click is scrolling we pin the highlight to the target and
+  // ignore the scroll spy, so it can't flash through intermediate sections.
   const spyLockRef = useRef<string | null>(null)
   const spyLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const recomputeRef = useRef<() => void>(() => {})
+
+  const releaseLock = useCallback((id: string) => {
+    if (spyLockRef.current !== id) return
+    spyLockRef.current = null
+    if (spyLockTimerRef.current) {
+      clearTimeout(spyLockTimerRef.current)
+      spyLockTimerRef.current = null
+    }
+    recomputeRef.current()
+  }, [])
 
   useEffect(() => {
     const root = mainRef.current
@@ -110,10 +121,13 @@ export default function SettingsPage() {
     const scroller = getScrollParent(root)
 
     let frame = 0
+    let settle: ReturnType<typeof setTimeout> | null = null
+
     const compute = () => {
       frame = 0
       if (spyLockRef.current) {
-        setActiveSection(spyLockRef.current)
+        const locked = spyLockRef.current
+        setActiveSection((prev) => (prev === locked ? prev : locked))
         return
       }
 
@@ -134,8 +148,21 @@ export default function SettingsPage() {
 
       setActiveSection((prev) => (prev === current ? prev : current))
     }
+    recomputeRef.current = compute
+
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(compute)
+      // Release the click-lock only once scrolling has actually stopped, so a
+      // long smooth scroll (e.g. from the bottom back to the top) never runs
+      // the position spy mid-flight.
+      if (spyLockRef.current) {
+        if (settle) clearTimeout(settle)
+        const locked = spyLockRef.current
+        settle = setTimeout(() => {
+          settle = null
+          releaseLock(locked)
+        }, 150)
+      }
     }
 
     compute()
@@ -146,24 +173,26 @@ export default function SettingsPage() {
       target.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
       if (frame) cancelAnimationFrame(frame)
-      if (spyLockTimerRef.current) clearTimeout(spyLockTimerRef.current)
+      if (settle) clearTimeout(settle)
+      recomputeRef.current = () => {}
     }
-  }, [])
+  }, [releaseLock])
 
-  const jumpTo = useCallback((id: string) => {
-    // Commit the selection immediately and hold it through the smooth scroll,
-    // even when the section is already on screen (scrollIntoView is a no-op then)
-    // so the scroll spy can't flicker the highlight back.
-    setActiveSection(id)
-    spyLockRef.current = id
-    if (spyLockTimerRef.current) clearTimeout(spyLockTimerRef.current)
-    spyLockTimerRef.current = setTimeout(() => {
-      spyLockRef.current = null
-    }, 650)
-    document
-      .getElementById(id)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [])
+  const jumpTo = useCallback(
+    (id: string) => {
+      // Commit the selection immediately and pin the spy to it. The lock is
+      // lifted when scrolling settles (or after a fallback, for the case where
+      // the target is already positioned and no scroll events fire).
+      setActiveSection(id)
+      spyLockRef.current = id
+      if (spyLockTimerRef.current) clearTimeout(spyLockTimerRef.current)
+      spyLockTimerRef.current = setTimeout(() => releaseLock(id), 1200)
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    },
+    [releaseLock],
+  )
   const { theme, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
   const { prefs, set: setPref } = usePreferences()

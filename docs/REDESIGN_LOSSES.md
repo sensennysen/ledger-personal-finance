@@ -54,3 +54,38 @@ Files: `src/components/layout/{Sidebar,BottomNav,AppLayout}.tsx`.
 Budgets / **More**); More opens the existing sheet host (`sheet === 'account'`).
 FAB is 56px `rounded-[16px]` with `--el3`. Logo is a text "L" badge (was
 `l-black/white.png`).
+
+---
+
+## Phase 3 — Home / Dashboard
+
+File: `src/pages/DashboardPage.tsx` rewritten to the handoff's 6 sections
+(month stepper + Add, Net Worth hero + income/expense tiles, Cash Flow bars,
+Credit Card, Recent Transactions). `useDashboardData` is still the data source.
+
+**Removed from the Home screen** (components left on disk, now unreferenced —
+`src/components/dashboard/*`, `src/hooks/useDashboardPrefs.ts`,
+`useSpendingAlerts.ts`, `useFlipReorder.ts`, `src/contexts/widgetDragState.ts`):
+
+- **Configurable widget system**: show/hide widgets, drag-reorder, the
+  `DashboardWidgetSettingsSheet`. Home now has a fixed layout.
+- **"Needs attention" / spending-alert banners** (budget-exceeded, large
+  transaction) — `useSpendingAlerts` + dismiss state.
+- **Upcoming Bills card** (`DashboardUpcomingBillsCard`) — recurring + loan bills
+  due this cycle.
+- **Category pie / expenses-by-category card** (`DashboardCategoryPieCard`).
+- **Budget progress card** (`DashboardBudgetProgressCard`).
+- **Cash-flow forecast card** (`DashboardCashFlowForecastCard`) — projected
+  income/expenses/balance from recurring series.
+- **Dashboard detail dialogs / desktop entry-detail side surface**
+  (`DashboardDetailDialogs`, `DashboardDetailSurface`) — tapping a stat card
+  no longer opens an in-place breakdown. Transaction rows still open the shared
+  entry-detail sheet.
+- **Credit-card monitor for multiple cards** (`DashboardCreditCardMonitor`) — the
+  new Credit Card card shows only the first credit-card account.
+- **"Weekly" cash-flow granularity** — segmented is now Daily / 3 mo / 12 mo only.
+- Cash-flow chart is now a plain CSS bar chart (no Recharts axes / tooltip /
+  y-axis scale labels) and the income series is drawn in `--primary`, not
+  `--income`, per the mockup.
+- Automatic **credit-card statement-balance locking** effect is retained (kept as
+  a background `useEffect` in the rewritten `DashboardPage`).

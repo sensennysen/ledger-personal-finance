@@ -256,3 +256,25 @@ icon + label + description rows.
   "Add / Review / Hide" affordance (no behaviour change).
 - The kind menu remains a dropdown (not a bottom sheet on mobile), consistent
   with the Phase 6 row menu.
+
+---
+
+## Phase 11 — Verification
+
+No code changes beyond docs. `npm run build`, `npm run lint`, and
+`npm run test:redesign` all pass on the final tree. `docs/M3_REDESIGN.md` rewritten
+for the blue/indigo system.
+
+## Cross-cutting items to revisit
+
+- **Categories page** has no desktop navigation entry (only mobile More sheet /
+  URL). Consider re-adding it to the desktop rail or Settings.
+- **Saved transaction templates** can be created (row menu) and used (Activity
+  "Quick add" strip, kept beyond the mockup) but there's no dedicated
+  management surface.
+- **Dashboard widgets** (upcoming bills, category pie, budget progress, cash-flow
+  forecast, spending alerts) and their component files are unreferenced but still
+  on disk — delete or re-surface.
+- **Import CSV** dialog is on disk but unreachable.
+- Mobile row-action and add-transaction-kind menus are dropdowns, not the
+  bottom sheets the mockups show.

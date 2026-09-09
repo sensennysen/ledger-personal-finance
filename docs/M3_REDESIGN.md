@@ -1,32 +1,55 @@
-# Ledger Material 3 redesign
+# Ledger Material 3 redesign — blue/indigo handoff
 
-Implemented from `redesign/Ledger M3 Mobile Design.zip`, using the existing React, Tailwind, Base UI, and Supabase application. The extracted HTML prototypes remain under `redesign/reference/` for comparison.
+Implemented from `~/Downloads/Application redesign project.zip`
+("design_handoff_dark_theme", from Claude Design), on top of the existing
+React + Tailwind v4 + Base UI + Supabase app. This supersedes the earlier
+gold M3 pass. Reference `.dc.html` mockups + screenshots are in that bundle;
+they were recreated with the app's own primitives, not embedded.
 
-## Implemented
+Delivered in 11 committed phases on the `redesign-v1` branch. Every capability
+that was removed or trimmed to match a mockup is listed in
+[`REDESIGN_LOSSES.md`](./REDESIGN_LOSSES.md), grouped by phase.
 
-- Warm light/dark palettes using the handoff's exact hex values, Roboto headings/body text, DM Mono money values, tonal surfaces, rounded cards, pill controls, and semantic income/expense/transfer colors.
-- Material color utilities generate matching primary/on-primary/container colors for custom accents; money colors stay fixed.
-- Four mobile destinations: Home, Accounts, Activity, Budgets. Separate bottom-end FAB and an avatar menu with Reports, Categories, 13th Month, Settings, theme, and sign-out controls.
-- Shared add/account/entry-detail sheet host with keyboard dismissal, focus management through Base UI, safe-area padding, and drag-handle dismissal.
-- Amount-first quick entry with decimal keypad, frequently used categories, remembered account, expandable date/account/note fields, validation, and saving through the existing transaction hook. Receipts, recurring entries, loan repayment, and exchange-rate details remain available through the full form.
-- Shared cycle state across Home, Activity, and Budgets. Budget totals and drill-down ranges use the selected cycle, including custom starts, historical periods, and year boundaries. Stale requests cannot overwrite a more recently selected cycle.
-- Mobile balance overview with income/expense chips; desktop summary cards; bar-chart cash flow; widget drag handles; desktop dashboard and entry detail panes.
-- Settings columns and appearance controls, report overview chart/category split, semantic transaction rows, login/legal-page typography, and a standalone 13th Month route with a result hero.
-- Offline pending-entry count, a single sync subscription, persistent install-prompt dismissal, and updated PWA colors.
+## Design system
 
-## Integration choices
+- **Palette:** M3 blue/indigo — `--primary` `#55659A` light / `#B7C1EC` dark —
+  replacing the gold seed. Cool neutral surfaces; a full validated dark scheme;
+  tonal semantic roles `--income` / `--expense` / `--transfer` / `--gold`, each
+  with a `-container`. All values are the handoff's exact hex.
+- **Tokens** (`src/index.css`): existing shadcn variable names keep their roles
+  (so components inherit for free); added M3 role aliases
+  `--primary-container`, `--surface-container(-high)`, `--nav-container`,
+  `--outline(-variant)`, `--gold(-container)` and elevation `--el1` / `--el3`,
+  each with a matching Tailwind `--color-*` / `--shadow-*` utility.
+- **Type:** Roboto (sans + headings), DM Mono (`.money`, tabular-nums) — unchanged.
+- **Shape/elevation:** surface cards 16–24px radius with `--el1`; pill buttons,
+  chips, tabs, nav items; modals `rounded-[28px]` + `--el3`; 56px FAB.
+- **Custom accent:** the Settings colour picker still regenerates
+  primary / primary-container from a seed via `@material/material-color-utilities`;
+  money colours stay fixed.
 
-- Detail panes start at 1024px, following `COVERAGE.md`; tablet layouts retain dialogs to avoid squeezing content.
-- The install prompt sits above the mobile FAB so both remain usable.
-- Account/category colors chosen by the user remain available. Semantic money colors describe transaction direction separately.
-- Existing exports, report tabs, filters, bulk operations, receipts, recurring transactions, loans, savings goals, and account management are retained.
+## Screens
+
+| Screen | Notes |
+|---|---|
+| Navigation | 240px desktop rail / 80px tablet icon rail (no collapse); 5-item mobile bottom nav (Home / Accounts / Activity / Budgets / **More**); More sheet = Categories / Reports / Settings + dark mode + sign out; 56px FAB. |
+| Home | Net Worth hero + income/expense container tiles, Cash Flow card (Daily/3mo/12mo segmented), Credit Card card, Recent Transactions. Fixed layout — the configurable widget system is gone. |
+| Accounts | Assets − Liabilities = Net Worth breakdown; Assets list card; Liabilities cards (accent stripe, utilisation bar, "Due in Nd" chip, loan schedule). Add Account modal. |
+| Account Detail | Outlined back button + type tile; solid-fill hero (account colour / `--expense` / `--gold`); credit-card payment panel; loan Summary/Purchases/Activity tabs; hero ⋯ = Edit / Delete account. |
+| Activity | Pill search, All/Income/Expense/Transfer segmented, month stepper, Select; day-grouped rows in one surface card; single ⋯ row menu (Edit / Split / Save as template / Delete). |
+| Budgets & Goals | Budgets / Budget History / Savings Goals pill tabs; budget + goal cards with thin progress bars + status chips; all modals retained. |
+| Reports | Overview / Analytics / 13th Month pill tabs; single Export button → CSV / PDF menu; flat stat cards with tinted delta lines; charts + account balances + recent-in-period. |
+| Settings | Sticky section rail (labels desktop / icons tablet / none mobile) with scroll-spy + jump; single ≤640px column; 7 sections unchanged; type-DELETE confirm. |
+| Transaction entry | Amount-first bordered block (`$` + large tinted decimal field + currency pill), Account/Category + Description/Date grids, collapsible "More details" (notes / tags / goal / recurring / receipt). |
 
 ## Validation
 
-- `npm ci` restores the exact lockfile dependencies. Material color utilities are the only added production dependency.
-- `npm run build` performs TypeScript checking and builds the app/PWA.
-- `npm run lint` checks the application.
-- `npm run test:redesign` covers custom-cycle/leap-year/year-boundary ranges, budget periods, keypad editing and limits, and transaction validation without submitting transactions.
-- The authenticated mobile dashboard and quick-entry keypad were inspected at 428px. A horizontal sheet overflow found during that check was corrected.
-
-Browser automation became unavailable after the session changed. Final desktop/tablet/light-theme visual comparison and real-device install/offline testing remain unverified. No test transactions were submitted to the user's account.
+- `npm ci` restores the lockfile (`@material/material-color-utilities` is required
+  and was not present in the pre-existing `node_modules`).
+- `npm run build` (tsc -b + vite) — passes.
+- `npm run lint` — passes.
+- `npm run test:redesign` — passes (cycle boundaries, keypad editing, transaction
+  validation; `src/lib/{utils,budgetCycle,entryAmount}.ts` and
+  `transactionFormSchema.ts` semantics untouched).
+- No authenticated visual pass was possible (Google OAuth gate); each phase was
+  verified against build + lint + the dev-server transform only.

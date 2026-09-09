@@ -405,10 +405,10 @@ export default function TransactionsPage() {
 
         {/* Search + type filter */}
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
+          <div className="relative w-full sm:w-60 sm:shrink-0">
             <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search transactions…"
+              placeholder="Search…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-11 rounded-full border-transparent bg-surface-container pl-10"
@@ -417,9 +417,9 @@ export default function TransactionsPage() {
           <Tabs
             value={filterType}
             onValueChange={setFilterType}
-            className="w-full sm:w-auto"
+            className="w-full sm:min-w-0 sm:flex-1"
           >
-            <TabsList className="w-full sm:w-auto">
+            <TabsList className="w-full">
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="income">Income</TabsTrigger>
               <TabsTrigger value="expense">Expense</TabsTrigger>

@@ -193,3 +193,21 @@ the new primitive + token styling with no structural change.
 - Tabs restyled to a `w-fit` surface-container pill (was a full-width 3-col grid).
 - `CycleStepper` kept on desktop Budgets even though the mockup shows no month
   control (period selection has to come from somewhere).
+
+---
+
+## Phase 8 — Reports
+
+File: `src/pages/ReportsPage.tsx` — targeted restyle; date-range presets, saved
+presets, mobile controls, charts, account-balances list, recent-in-period list,
+and the Analytics tab keep their behaviour and inherit the new styling.
+
+**Changed:**
+
+- The two separate **CSV** / **PDF** export buttons → one **Export** button with a
+  CSV / PDF dropdown menu (per the mockup).
+- `StatCard`: dropped the decorative blurred colour blob; flatter card
+  (`rounded-[18px]`, no border, `--el1`); icon tile is a plain tinted square; the
+  delta/sub line is tinted with the card's semantic colour instead of muted grey.
+- Tabs restyled to a surface-container pill; the `h-7` / `text-xs` trigger sizing
+  dropped for the standard pill size.

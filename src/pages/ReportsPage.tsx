@@ -10,6 +10,7 @@ import {
   Bookmark,
   BookmarkPlus,
   Trash2,
+  ChevronDown,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -39,6 +40,12 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
@@ -310,32 +317,36 @@ function StatCard({
   loading?: boolean
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border/60 p-4 sm:p-5 bg-card">
-      <div
-        className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 pointer-events-none"
-        style={{ background: color, filter: 'blur(32px)', transform: 'translate(30%, -30%)' }}
-      />
-      <div className="flex items-start justify-between gap-3 sm:gap-4">
-        <div className="min-w-0">
-          <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground mb-1">{title}</p>
-          {loading ? (
-            <Skeleton className="h-7 w-28" />
-          ) : (
-            <p className="text-lg sm:text-2xl font-bold tracking-tight wrap-break-word" style={{ color }}>
-              {value}
-            </p>
-          )}
-          {sub && !loading && (
-            <p className="text-[0.6875rem] text-muted-foreground mt-1 wrap-break-word">{sub}</p>
-          )}
-        </div>
-        <div
-          className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0"
-          style={{ background: `${color.replace(')', ' / 0.12)')}`, boxShadow: `0 0 0 1px ${color.replace(')', ' / 0.20)')}` }}
+    <div className="rounded-[18px] bg-card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          {title}
+        </span>
+        <span
+          className="flex size-7 items-center justify-center rounded-lg"
+          style={{
+            background: `color-mix(in srgb, ${color} 16%, transparent)`,
+            color,
+          }}
         >
-          <Icon className="w-4 h-4" style={{ color }} />
-        </div>
+          <Icon className="size-3.5" />
+        </span>
       </div>
+      {loading ? (
+        <Skeleton className="mt-2.5 h-6 w-28" />
+      ) : (
+        <p
+          className="money mt-2.5 text-[22px] font-bold wrap-break-word"
+          style={{ color }}
+        >
+          {value}
+        </p>
+      )}
+      {sub && !loading && (
+        <p className="mt-1 text-[11px] wrap-break-word" style={{ color }}>
+          {sub}
+        </p>
+      )}
     </div>
   )
 }
@@ -583,50 +594,48 @@ export default function ReportsPage() {
   })()
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 md:pb-6">
+    <div className="mx-auto flex max-w-5xl flex-col gap-6 p-4 pb-24 md:p-8 md:pb-6">
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">Reports</h1>
-            <p className="text-xs text-muted-foreground">{presetLabel}</p>
+            <h1 className="text-[26px] font-bold tracking-[-0.01em] text-foreground">
+              Reports
+            </h1>
+            <p className="mt-1 text-[13px] text-muted-foreground">{presetLabel}</p>
           </div>
 
-          <div className="flex flex-col items-end gap-2">
-            <TabsList className="h-8">
-              <TabsTrigger value="overview" className="text-xs h-7 px-3">Overview</TabsTrigger>
-              <TabsTrigger value="analytics" className="text-xs h-7 px-3">Analytics</TabsTrigger>
-              <TabsTrigger value="thirteenth" className="text-xs h-7 px-3">13th Month</TabsTrigger>
+          <div className="flex flex-col items-end gap-2.5">
+            <TabsList className="border-transparent bg-surface-container">
+              <TabsTrigger value="overview" className="px-4">Overview</TabsTrigger>
+              <TabsTrigger value="analytics" className="px-4">Analytics</TabsTrigger>
+              <TabsTrigger value="thirteenth" className="px-4">13th Month</TabsTrigger>
             </TabsList>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={handleExport}
-                disabled={loading || filtered.length === 0}
-                size="sm"
-                className="gap-2 shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 15%, transparent), color-mix(in srgb, var(--primary) 8%, transparent))',
-                  border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
-                  color: 'var(--primary)',
-                }}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loading || filtered.length === 0}
+                    className="h-8 gap-2"
+                  />
+                }
               >
-                <Download className="w-3.5 h-3.5" />
-                CSV
-              </Button>
-              <Button
-                onClick={handleExportPdf}
-                disabled={loading || filtered.length === 0}
-                size="sm"
-                className="gap-2 shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, oklch(0.620 0.160 18 / 0.15), oklch(0.620 0.160 18 / 0.08))',
-                  border: '1px solid oklch(0.620 0.160 18 / 0.30)',
-                  color: EXPENSE,
-                }}
-              >
-                <Download className="w-3.5 h-3.5" />
-                PDF
-              </Button>
-            </div>
+                <Download className="size-3.5" />
+                Export
+                <ChevronDown className="size-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExport}>
+                  <Download className="size-4 text-primary" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPdf}>
+                  <Download className="size-4 text-expense" />
+                  Export as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

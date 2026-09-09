@@ -8,7 +8,6 @@ import {
   Sun,
   Moon,
   LogOut,
-  CalendarDays,
 } from 'lucide-react'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
@@ -123,7 +122,7 @@ function LayoutShell() {
   )
   const title =
     sheet === 'account'
-      ? 'Your account'
+      ? 'More'
       : sheet === 'detail'
         ? 'Entry detail'
         : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]
@@ -216,12 +215,12 @@ function LayoutShell() {
             />
           </aside>
         )}
-        <BottomNav />
+        <BottomNav onMore={() => setSheet('account')} />
         {mobile && !sheet && location.pathname !== '/settings' && (
           <button
             aria-label="Add transaction"
             onClick={() => openAddTransactionModal('expense')}
-            className="fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center"
+            className="fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] z-30 size-14 rounded-[16px] bg-primary text-primary-foreground shadow-[var(--el3)] flex items-center justify-center"
           >
             <Plus className="size-7" />
           </button>
@@ -284,28 +283,11 @@ function LayoutShell() {
                 />
               ))}
             {sheet === 'account' && (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                  {avatar}
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {user?.email}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {isOnline ? pendingCount + ' pending changes' : 'Offline'}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-2.5">
                   {[
-                    { label: 'Reports', to: '/reports', icon: FileBarChart2 },
                     { label: 'Categories', to: '/categories', icon: Tag },
-                    {
-                      label: '13th Month',
-                      to: '/thirteenth-month',
-                      icon: CalendarDays,
-                    },
+                    { label: 'Reports', to: '/reports', icon: FileBarChart2 },
                     { label: 'Settings', to: '/settings', icon: Settings },
                   ].map(({ label, to, icon: Icon }) => (
                     <button
@@ -314,29 +296,33 @@ function LayoutShell() {
                         setSheet(null)
                         navigate(to)
                       }}
-                      className="bg-card rounded-[18px] py-4 flex flex-col items-center gap-2 text-[11px]"
+                      className="flex flex-col items-center gap-2 rounded-2xl bg-surface-container py-4 text-[11px] font-semibold text-foreground"
                     >
                       <Icon className="size-5 text-transfer" />
                       {label}
                     </button>
                   ))}
                 </div>
-                <Button
-                  variant="ghost"
-                  onClick={toggleTheme}
-                  className="w-full justify-start h-14"
-                >
-                  {theme === 'dark' ? <Sun /> : <Moon />}
-                  {theme === 'dark' ? 'Light' : 'Dark'} theme
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void signOut()}
-                  className="w-full text-expense"
-                >
-                  <LogOut />
-                  Sign out
-                </Button>
+                <div className="border-t border-outline-variant">
+                  <button
+                    onClick={toggleTheme}
+                    className="flex w-full items-center gap-3 px-1 py-3.5 text-sm font-medium text-foreground"
+                  >
+                    {theme === 'dark' ? (
+                      <Sun className="size-[18px]" />
+                    ) : (
+                      <Moon className="size-[18px]" />
+                    )}
+                    {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                  </button>
+                  <button
+                    onClick={() => void signOut()}
+                    className="flex w-full items-center gap-3 px-1 py-3.5 text-sm font-medium text-expense"
+                  >
+                    <LogOut className="size-[18px]" />
+                    Sign out
+                  </button>
+                </div>
               </div>
             )}
             {sheet === 'detail' && entry && (

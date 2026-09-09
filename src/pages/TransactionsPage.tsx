@@ -363,59 +363,70 @@ export default function TransactionsPage() {
       </div>
 
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-2.5">
-        <div className="relative min-w-[180px] flex-1">
-          <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search transactions…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-11 rounded-full border-transparent bg-surface-container pl-10"
-          />
-        </div>
-        <Tabs value={filterType} onValueChange={setFilterType} className="w-auto">
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="income">Income</TabsTrigger>
-            <TabsTrigger value="expense">Expense</TabsTrigger>
-            <TabsTrigger value="transfer">Transfer</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className="flex items-center gap-1 rounded-full bg-surface-container px-2.5 py-1.5">
-          <span className="text-[13px] font-semibold text-foreground">
-            {monthLabel}
-          </span>
-          <button
+      <div className="space-y-3">
+        {/* Period + select mode */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1 rounded-full bg-surface-container p-1 pl-1.5">
+            <button
+              type="button"
+              aria-label="Previous month"
+              onClick={() => setSelectedMonth((m) => addMonths(m, -1))}
+              className="flex size-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <span className="min-w-[7.5rem] text-center text-[13px] font-semibold text-foreground">
+              {monthLabel}
+            </span>
+            <button
+              type="button"
+              aria-label="Next month"
+              onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
+              disabled={isCurrentMonth}
+              className="flex size-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground disabled:opacity-40"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+          <Button
             type="button"
-            aria-label="Previous month"
-            onClick={() => setSelectedMonth((m) => addMonths(m, -1))}
-            className="flex size-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground"
+            variant={selectMode ? 'secondary' : 'outline'}
+            className="h-9 shrink-0 gap-1.5 rounded-xl"
+            onClick={toggleSelectMode}
           >
-            <ChevronLeft className="size-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Next month"
-            onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
-            disabled={isCurrentMonth}
-            className="flex size-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground disabled:opacity-40"
-          >
-            <ChevronRight className="size-4" />
-          </button>
+            {selectMode ? (
+              <CheckSquare className="size-4" />
+            ) : (
+              <Square className="size-4" />
+            )}
+            Select items
+          </Button>
         </div>
-        <Button
-          type="button"
-          variant={selectMode ? 'secondary' : 'outline'}
-          className="h-11 shrink-0 gap-1.5"
-          onClick={toggleSelectMode}
-        >
-          {selectMode ? (
-            <CheckSquare className="size-4" />
-          ) : (
-            <Square className="size-4" />
-          )}
-          Select
-        </Button>
+
+        {/* Search + type filter */}
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search transactions…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 rounded-full border-transparent bg-surface-container pl-10"
+            />
+          </div>
+          <Tabs
+            value={filterType}
+            onValueChange={setFilterType}
+            className="w-full sm:w-auto"
+          >
+            <TabsList className="w-full sm:w-auto">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="income">Income</TabsTrigger>
+              <TabsTrigger value="expense">Expense</TabsTrigger>
+              <TabsTrigger value="transfer">Transfer</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       {/* Templates quick-add strip */}

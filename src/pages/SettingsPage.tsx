@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -74,32 +74,96 @@ const SETTINGS_SECTIONS = [
   { id: 'account', label: 'Account', icon: ShieldAlert, danger: true },
 ] as const
 
+function getScrollParent(el: HTMLElement | null): HTMLElement | null {
+  let node = el?.parentElement ?? null
+  while (node) {
+    const overflowY = getComputedStyle(node).overflowY
+    if (
+      (overflowY === 'auto' || overflowY === 'scroll') &&
+      node.scrollHeight > node.clientHeight
+    ) {
+      return node
+    }
+    node = node.parentElement
+  }
+  return null
+}
+
 export default function SettingsPage() {
   const { user, profile, signOut, deleteAccount, refreshProfile } = useAuth()
-  const [activeSection, setActiveSection] = useState<string>('profile')
+  const [activeSection, setActiveSection] = useState<string>(
+    SETTINGS_SECTIONS[0].id,
+  )
   const mainRef = useRef<HTMLElement | null>(null)
+  // While a rail click is animating we hold the highlight on the target and
+  // ignore scroll-driven updates so it can't flicker back.
+  const spyLockRef = useRef<string | null>(null)
+  const spyLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const root = mainRef.current
     if (!root) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
-        if (visible?.target.id) setActiveSection(visible.target.id)
-      },
-      { root: null, rootMargin: '-96px 0px -55% 0px', threshold: [0, 0.25, 0.5, 1] },
+    const sections = Array.from(
+      root.querySelectorAll<HTMLElement>('section[id]'),
     )
-    root.querySelectorAll('section[id]').forEach((el) => observer.observe(el))
-    return () => observer.disconnect()
+    if (sections.length === 0) return
+    const scroller = getScrollParent(root)
+
+    let frame = 0
+    const compute = () => {
+      frame = 0
+      if (spyLockRef.current) {
+        setActiveSection(spyLockRef.current)
+        return
+      }
+
+      const line = (scroller ? scroller.getBoundingClientRect().top : 0) + 112
+      let current = sections[0].id
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top - line <= 1) current = section.id
+        else break
+      }
+
+      // Snap to the last section once scrolled (near) the bottom, so short
+      // trailing sections can still be selected.
+      if (scroller) {
+        const atBottom =
+          scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 4
+        if (atBottom) current = sections[sections.length - 1].id
+      }
+
+      setActiveSection((prev) => (prev === current ? prev : current))
+    }
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(compute)
+    }
+
+    compute()
+    const target: HTMLElement | Window = scroller ?? window
+    target.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      target.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (frame) cancelAnimationFrame(frame)
+      if (spyLockTimerRef.current) clearTimeout(spyLockTimerRef.current)
+    }
   }, [])
 
-  const jumpTo = (id: string) => {
+  const jumpTo = useCallback((id: string) => {
+    // Commit the selection immediately and hold it through the smooth scroll,
+    // even when the section is already on screen (scrollIntoView is a no-op then)
+    // so the scroll spy can't flicker the highlight back.
+    setActiveSection(id)
+    spyLockRef.current = id
+    if (spyLockTimerRef.current) clearTimeout(spyLockTimerRef.current)
+    spyLockTimerRef.current = setTimeout(() => {
+      spyLockRef.current = null
+    }, 650)
     document
       .getElementById(id)
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  }, [])
   const { theme, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
   const { prefs, set: setPref } = usePreferences()

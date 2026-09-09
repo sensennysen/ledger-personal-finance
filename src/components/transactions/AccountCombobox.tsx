@@ -68,7 +68,7 @@ export function AccountCombobox({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={cn('w-full justify-between px-3 font-normal', !selectedAccount && 'text-muted-foreground', className)}
+            className={cn('h-12 w-full justify-between rounded-xl px-3 font-normal', !selectedAccount && 'text-muted-foreground', className)}
           />
         }
       >

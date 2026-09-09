@@ -89,3 +89,31 @@ Credit Card, Recent Transactions). `useDashboardData` is still the data source.
   `--income`, per the mockup.
 - Automatic **credit-card statement-balance locking** effect is retained (kept as
   a background `useEffect` in the rewritten `DashboardPage`).
+
+---
+
+## Phase 4 — Accounts
+
+File: `src/pages/AccountsPage.tsx` rewritten. `AccountForm` (the Add/Edit modal
+body, all credit-card + loan fields) is kept and **exported** for Phase 5.
+`createAccount` flow unchanged.
+
+**Removed:**
+
+- **Per-account ⋯ menu on the list** (Edit / Delete). Editing and deleting an
+  account is now only possible from that account's **detail** page (Phase 5).
+  `updateAccountWithAdjustment` / `deleteAccount` are no longer called here.
+- **Flat vs. grouped account view** toggle + persistence (`prefs.accView`,
+  `prefs.accGroupOrder`, `profile.account_group_order`). The list is now a fixed
+  **Assets** vs **Liabilities** split (liabilities = `credit_card` + `loan`).
+- **Grouping by every account type** (Cash / Checking / Savings / Investment / …
+  headers). Collapsed to the two-way Assets/Liabilities split.
+- **Drag-reorder** of accounts and of type-groups; up/down arrow reordering;
+  "Rearrange accounts" mode. `updateAccountOrder` and `useFlipReorder` are no
+  longer used on this page (account order still follows the hook's default order).
+- **Credit-card reminder badge on the list card** ("Due: N days" /
+  "Statement: N days"). Replaced by a single "Due in Nd" chip on liability cards.
+- **Sub-notes on asset rows** ("Owed. Subtracted from net worth.", limit line,
+  loan schedule) — asset rows now show name + type + balance only; credit/loan
+  detail lives on the Liabilities cards.
+- `EmptyState` retained; `Badge` component no longer used on this page.

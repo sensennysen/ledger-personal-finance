@@ -1,6 +1,6 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet, Pencil, Trash2, MoreHorizontal } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -19,6 +19,16 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
@@ -33,7 +43,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { DEFAULT_CURRENCY } from '@/constants/accounts'
-import type { Account, AccountType, CreditCardPayment, Transaction } from '@/types'
+import type { Account, AccountType, Transaction } from '@/types'
 
 const accountSchema = z.object({
   name: z.string().min(1, 'Name is required').max(50),
@@ -301,7 +311,7 @@ export default function AccountTransactionsPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
-  const { accounts, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment } = useAccounts()
+  const { accounts, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment, deleteAccount } = useAccounts()
   const { transactions, loading, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
   const [filterType, setFilterType] = useState<string>('all')
@@ -309,13 +319,12 @@ export default function AccountTransactionsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editAccountOpen, setEditAccountOpen] = useState(false)
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentDate, setPaymentDate] = useState(getLocalDateString)
   const [paymentFromAccountId, setPaymentFromAccountId] = useState<string | null>(null)
-  const [paymentHistory, setPaymentHistory] = useState<CreditCardPayment[]>([])
-  const [paymentsLoading, setPaymentsLoading] = useState(false)
   const [loanSection, setLoanSection] = useState<'summary' | 'purchases' | 'activity'>('summary')
 
   // Undo delete
@@ -464,33 +473,6 @@ export default function AccountTransactionsPage() {
     if (snapshot) showUndo([snapshot], `"${snapshot.description}" deleted`)
   }
 
-  useEffect(() => {
-    const fetchPaymentHistory = async () => {
-      if (!user || !accountId || account?.type !== 'credit_card') {
-        setPaymentHistory([])
-        return
-      }
-
-      setPaymentsLoading(true)
-      const { data, error } = await supabase
-        .from('credit_card_payments')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('account_id', accountId)
-        .order('payment_date', { ascending: false })
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        setFormError(error.message)
-      } else {
-        setPaymentHistory((data as CreditCardPayment[]) ?? [])
-      }
-      setPaymentsLoading(false)
-    }
-
-    fetchPaymentHistory()
-  }, [user, accountId, account?.type])
-
   const handleLogPayment = async () => {
     if (!account || account.type !== 'credit_card' || !user) return
     const amount = Number(paymentAmount)
@@ -525,7 +507,7 @@ export default function AccountTransactionsPage() {
     const currentPaid = account.statement_paid_amount ?? 0
     const nextPaid = Math.min(currentPaid + amount, amountToPay)
 
-    const { data: insertedPayment, error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from('credit_card_payments')
       .insert({
         user_id: user.id,
@@ -533,8 +515,6 @@ export default function AccountTransactionsPage() {
         amount,
         payment_date: paymentDate,
       })
-      .select('*')
-      .single()
     if (insertError) {
       setFormError(insertError.message)
       return
@@ -551,7 +531,6 @@ export default function AccountTransactionsPage() {
     }
     setFormError(null)
     setPaymentAmount('')
-    setPaymentHistory((prev) => [insertedPayment as CreditCardPayment, ...prev])
     refetchAccounts()
   }
 
@@ -568,37 +547,47 @@ export default function AccountTransactionsPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">
+    <div className="mx-auto max-w-3xl space-y-4 p-4 md:p-8">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" aria-label="Back to accounts" onClick={() => navigate('/accounts')} className="shrink-0">
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+      <div className="flex items-center gap-3.5">
+        <button
+          type="button"
+          aria-label="Back to accounts"
+          onClick={() => navigate('/accounts')}
+          className="flex size-[38px] shrink-0 items-center justify-center rounded-full border border-outline text-muted-foreground"
+        >
+          <ArrowLeft className="size-4" />
+        </button>
         {account ? (
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex min-w-0 flex-1 items-center gap-3.5">
             <div
-              className="p-2.5 rounded-xl shrink-0"
-              style={{ backgroundColor: account.color + '20', color: account.color }}
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl"
+              style={{ backgroundColor: account.color + '22', color: account.color }}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className="size-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-bold truncate">{account.name}</h1>
-              <p className="text-sm text-muted-foreground">{ACCOUNT_TYPE_LABELS[account.type]}</p>
+              <h1 className="truncate text-[22px] font-bold text-foreground">
+                {account.name}
+              </h1>
+              <p className="text-[13px] text-muted-foreground">
+                {ACCOUNT_TYPE_LABELS[account.type]}
+              </p>
             </div>
           </div>
         ) : (
-          <h1 className="text-xl font-bold">Account Transactions</h1>
+          <h1 className="flex-1 text-[22px] font-bold">Account</h1>
         )}
         {account?.type === 'loan' ? (
           <Button
-            className="gap-2 shrink-0"
+            className="shrink-0 gap-2 bg-gold text-white hover:bg-gold/90"
             onClick={() => {
               setTransactionKind('loan-repayment')
               setCreateOpen(true)
             }}
           >
-            <Plus className="w-4 h-4" />Make payment
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">Make Payment</span>
           </Button>
         ) : (
           <TransactionKindMenu
@@ -613,8 +602,9 @@ export default function AccountTransactionsPage() {
               setCreateOpen(true)
             }}
             trigger={
-              <Button className="gap-2 shrink-0">
-                <Plus className="w-4 h-4" />Add
+              <Button className="shrink-0 gap-2">
+                <Plus className="size-4" />
+                <span className="hidden sm:inline">Add Transaction</span>
               </Button>
             }
           />
@@ -665,13 +655,20 @@ export default function AccountTransactionsPage() {
       {/* Account balance card */}
       {account && (account.type !== 'loan' || loanSection === 'summary') && (
         <div
-          className="rounded-xl p-4 text-white"
-          style={{ background: `linear-gradient(135deg, ${account.color}dd, ${account.color}99)` }}
+          className="rounded-[20px] p-6 text-white"
+          style={{
+            background:
+              account.type === 'credit_card'
+                ? 'var(--expense)'
+                : account.type === 'loan'
+                  ? 'var(--gold)'
+                  : account.color,
+          }}
         >
           <div className="flex items-start justify-between gap-3">
-            <p className="text-sm font-medium opacity-80">{account.type === 'loan' ? 'Outstanding Loan' : account.type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</p>
+            <p className="text-xs font-semibold opacity-85">{account.type === 'loan' ? 'Outstanding Loan' : account.type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</p>
             <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Account actions" className="h-8 w-8 rounded-full text-white hover:bg-black/15 hover:text-white" />}>
+              <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Account actions" className="size-8 rounded-full bg-white/15 text-white hover:bg-white/25 hover:text-white" />}>
                 <MoreHorizontal className="w-4 h-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -679,10 +676,17 @@ export default function AccountTransactionsPage() {
                   <Pencil className="w-4 h-4 mr-2" />
                   Edit account
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setDeleteAccountOpen(true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete account
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <p className="money text-3xl font-bold mt-1">
+          <p className="money text-[36px] font-bold mt-1.5">
             {formatCurrency(account.type === 'credit_card' ? getCreditCardSpending(account) : account.type === 'loan' ? getLoanAmountOwed(account) : account.balance, account.currency)}
           </p>
           {account.type === 'loan' ? (
@@ -836,23 +840,6 @@ export default function AccountTransactionsPage() {
                   Last payment: {formatCurrency(account.last_payment_amount, currency)} on {account.last_payment_date}
                 </p>
               )}
-              <div className="pt-1 border-t border-white/20">
-                <p className="text-[0.6875rem] uppercase tracking-wide opacity-70 mb-1.5">Payment History</p>
-                {paymentsLoading ? (
-                  <p className="text-[0.6875rem] opacity-70">Loading payment history...</p>
-                ) : paymentHistory.length === 0 ? (
-                  <p className="text-[0.6875rem] opacity-70">No logged payments yet.</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                    {paymentHistory.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between text-[0.75rem]">
-                        <span className="opacity-80">{p.payment_date}</span>
-                        <span className="font-semibold">{formatCurrency(p.amount, currency)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           )}
           {account.type === 'loan' && formatLoanSchedule(account) && (
@@ -883,15 +870,48 @@ export default function AccountTransactionsPage() {
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="mb-1 flex size-11 items-center justify-center rounded-xl bg-expense-container text-expense">
+              <Trash2 className="size-5" />
+            </div>
+            <AlertDialogTitle>Delete &ldquo;{account?.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This account will be archived and removed from your account list.
+              Its transaction history is preserved and still counted in reports.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-expense text-white hover:bg-expense/90"
+              onClick={async () => {
+                if (!account) return
+                const { error } = await deleteAccount(account.id)
+                if (error) {
+                  setFormError(error)
+                  return
+                }
+                setDeleteAccountOpen(false)
+                navigate('/accounts')
+              }}
+            >
+              Delete Account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Filters */}
-      {(account?.type !== 'loan' || loanSection === 'activity') && <div className="flex flex-col sm:flex-row gap-2">
+      {(account?.type !== 'loan' || loanSection === 'activity') && <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search transactions..."
+            placeholder="Search transactions…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="h-11 rounded-full border-transparent bg-surface-container pl-10"
           />
         </div>
         <Tabs value={filterType} onValueChange={setFilterType} className="w-full sm:w-auto">

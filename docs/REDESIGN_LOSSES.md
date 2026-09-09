@@ -117,3 +117,28 @@ body, all credit-card + loan fields) is kept and **exported** for Phase 5.
   loan schedule) — asset rows now show name + type + balance only; credit/loan
   detail lives on the Liabilities cards.
 - `EmptyState` retained; `Badge` component no longer used on this page.
+
+---
+
+## Phase 5 — Account Detail
+
+File: `src/pages/AccountTransactionsPage.tsx` — mostly a **restyle**; the handoff
+keeps nearly all functionality (credit-card payment logging, loan
+Summary/Purchases/Activity tabs, edit-account, edit/delete transaction, undo
+toast).
+
+**Removed:**
+
+- **Credit-card payment-history list** in the hero panel (the scrollable list of
+  past logged payments). Payments are still written to `credit_card_payments` and
+  to the account (`last_payment_amount` / `last_payment_date`), and the
+  "Last payment: $X on <date>" line stays. The history-fetch `useEffect`,
+  `paymentHistory` / `paymentsLoading` state, and the `CreditCardPayment` import
+  were removed.
+- Header fallback title "Account Transactions" → "Account".
+- Hero card is a **solid fill** (was a diagonal gradient of the account colour);
+  credit cards use solid `--expense`, loans solid `--gold` regardless of the
+  account's chosen colour. Other account types still use their own colour.
+
+**Added (restores a Phase 4 loss):** "Delete account" in the hero ⋯ menu, with a
+confirm dialog ("Delete "X"?" → archive explanation → red **Delete Account**).

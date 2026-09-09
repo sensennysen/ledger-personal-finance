@@ -315,20 +315,23 @@ export default function TransactionsPage() {
             {monthLabel}
           </p>
         </div>
-        <TransactionKindMenu
-          onSelect={(kind) => {
-            setTemplateDefaults(undefined)
-            setFormError(null)
-            setTransactionKind(kind)
-            setCreateOpen(true)
-          }}
-          trigger={
-            <Button className="shrink-0 gap-2 max-md:size-10 max-md:p-0">
-              <Plus className="size-4" />
-              <span className="hidden md:inline">Add Transaction</span>
-            </Button>
-          }
-        />
+        {/* Hidden on mobile — the layout FAB already provides this action */}
+        <div className="hidden shrink-0 md:block">
+          <TransactionKindMenu
+            onSelect={(kind) => {
+              setTemplateDefaults(undefined)
+              setFormError(null)
+              setTransactionKind(kind)
+              setCreateOpen(true)
+            }}
+            trigger={
+              <Button className="gap-2">
+                <Plus className="size-4" />
+                Add Transaction
+              </Button>
+            }
+          />
+        </div>
         <Dialog
           open={createOpen}
           onOpenChange={(open) => {

@@ -15,11 +15,12 @@
 export const INCOME = 'var(--income)'
 export const EXPENSE = 'var(--expense)'
 export const TRANSFER = 'var(--transfer)'
-export const GOLD = 'var(--primary)'
+export const GOLD = 'var(--gold)'
 
 export const INCOME_CONTAINER = 'var(--income-container)'
 export const EXPENSE_CONTAINER = 'var(--expense-container)'
 export const TRANSFER_CONTAINER = 'var(--transfer-container)'
+export const GOLD_CONTAINER = 'var(--gold-container)'
 
 
 /**

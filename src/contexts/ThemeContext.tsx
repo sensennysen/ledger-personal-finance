@@ -15,7 +15,7 @@ const FONT_SIZE_MAP: Record<FontSize, string> = {
   xl: '20px',
 }
 
-const DEFAULT_ACCENT = '#c79144' // approximate hex for oklch(0.700 0.115 72) — app gold
+const DEFAULT_ACCENT = '#55659a' // M3 blue/indigo primary (light seed)
 
 interface ThemeContextValue {
   theme: Theme
@@ -82,7 +82,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#15130B' : '#EFE7DA')
+      ?.setAttribute('content', theme === 'dark' ? '#15161B' : '#EFEEF2')
     try {
       localStorage.setItem(STORAGE_KEY, theme)
     } catch {
@@ -107,6 +107,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         '--primary-foreground',
         '--accent',
         '--accent-foreground',
+        '--primary-container',
+        '--on-primary-container',
         '--ring',
         '--sidebar-primary',
         '--sidebar-primary-foreground',
@@ -123,6 +125,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         const values = [
           scheme.primary,
           scheme.onPrimary,
+          scheme.primaryContainer,
+          scheme.onPrimaryContainer,
           scheme.primaryContainer,
           scheme.onPrimaryContainer,
           scheme.primary,

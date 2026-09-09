@@ -15,64 +15,81 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── Light theme (M3 light scheme) ── */
+/* ── Light theme (M3 light scheme — blue/indigo handoff) ── */
 :root {
-  --background: #EFE7DA;          /* #EFE7DA surface-dim   */
-  --foreground: #1E1B13;          /* #1E1B13 on-surface    */
+  --background: #EFEEF2;          /* bg */
+  --foreground: #2B2A30;          /* on-surface */
 
-  --card: #FFF8EE;                /* #FFF8EE surface       */
-  --card-foreground: #1E1B13;
+  --card: #FAF9FB;               /* surface */
+  --card-foreground: #2B2A30;
 
-  --popover: #FFF8EE;
-  --popover-foreground: #1E1B13;
+  --popover: #FAF9FB;
+  --popover-foreground: #2B2A30;
 
-  --primary: #7A5900;             /* #7A5900 — 4.5:1 w/ white */
-  --primary-foreground: #FFFFFF;
+  --primary: #55659A;
+  --primary-foreground: #FFFFFF; /* on-primary */
 
-  --secondary: #E4D8B6;           /* #E4D8B6 secondary-container */
-  --secondary-foreground: #3E3620;
+  --secondary: #E7E4ED;          /* secondary-container */
+  --secondary-foreground: #3D3A47;
 
-  --muted: #F4ECDF;               /* #F4ECDF surface-container */
-  --muted-foreground: #5A5346;    /* #5A5346 — 4.5:1 on muted  */
+  --muted: #F1F0F4;             /* surface-container */
+  --muted-foreground: #6B6A72;  /* on-surface-variant */
 
-  --accent: #FFE18E;              /* #FFE18E primary-container */
-  --accent-foreground: #261A00;   /* #261A00 */
+  --accent: #E4E7F5;            /* primary-container */
+  --accent-foreground: #2E3A63; /* on-primary-container */
 
-  --destructive: var(--expense);         /* #A4342B = --expense */
+  --destructive: var(--expense);
 
-  --border: #DDD5C4;              /* #DDD5C4 outline-variant */
-  --input: #CFC7B5;
+  --border: #D9D7DE;            /* outline-variant */
+  --input: #B6B4BD;            /* outline */
   --ring: var(--primary);
 
-  --radius: 0.75rem;                            /* M3 shape scale, was 0.5 */
+  --radius: 0.75rem;
 
-  /* Semantic money tokens — replace INCOME / EXPENSE / GOLD */
-  --income: #1E6B2E;             /* #1E6B2E */
-  --income-container: #C6EBC7;   /* #C6EBC7 */
-  --expense: #A4342B;             /* #A4342B */
-  --expense-container: #FFDAD6;   /* #FFDAD6 */
-  --transfer: #1F5A87;           /* #1F5A87 */
-  --transfer-container: #CDE4F7; /* #CDE4F7 */
+  /* Semantic money tokens */
+  --income: #3D7A4A;
+  --income-container: #DCEEDF;
+  --expense: #B4574A;
+  --expense-container: #F5DEDA;
+  --transfer: #3F6E93;
+  --transfer-container: #DCEAF2;
+  --gold: #9A7F3D;              /* loan accent */
+  --gold-container: #F1E8D4;
+
+  /* M3 role aliases used directly by redesigned screens */
+  --primary-container: #E4E7F5;
+  --on-primary-container: #2E3A63;
+  --secondary-container: #E7E4ED;
+  --on-secondary-container: #3D3A47;
+  --surface-container: #F1F0F4;
+  --surface-container-high: #E7E5EA;
+  --nav-container: #F3F2F6;
+  --outline: #B6B4BD;
+  --outline-variant: #D9D7DE;
+
+  /* M3 elevation */
+  --el1: 0 1px 2px rgba(0, 0, 0, 0.10), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --el3: 0 4px 8px rgba(0, 0, 0, 0.20), 0 1px 3px rgba(0, 0, 0, 0.15);
 
   /* Charts alias the semantics so Recharts needs no per-series colors */
   --chart-1: var(--primary);
   --chart-2: var(--income);
   --chart-3: var(--expense);
   --chart-4: var(--transfer);
-  --chart-5: oklch(0.520 0.110 300);
+  --chart-5: var(--gold);
 
-  /* Sidebar — M3 navigation drawer */
-  --sidebar: #F8F1E4;             /* #F8F1E4 */
+  /* Sidebar — M3 navigation drawer (= nav-container) */
+  --sidebar: #F3F2F6;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--accent);      /* active pill = primary-container */
   --sidebar-accent-foreground: var(--accent-foreground);
-  --sidebar-border: var(--border);
+  --sidebar-border: var(--outline-variant);
   --sidebar-ring: var(--primary);
 
-  --surface: oklch(0.940 0.014 86);
-  --elevated: #EDE4D6;            /* #EDE4D6 surface-container-high */
+  --surface: #FAF9FB;
+  --elevated: #E7E5EA;          /* surface-container-high */
 
   color-scheme: light;
   font-synthesis: none;
@@ -81,61 +98,76 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Dark theme (M3 dark scheme) ── */
+/* ── Dark theme (M3 dark scheme — validated on Home) ── */
 .dark {
-  --background: #15130B;          /* #15130B surface       */
-  --foreground: #E9E2D4;          /* #E9E2D4 on-surface    */
+  --background: #15161B;          /* bg */
+  --foreground: #E4E2E7;          /* on-surface */
 
-  --card: #211F17;                /* #211F17 surface-container */
-  --card-foreground: #E9E2D4;
+  --card: #1E2027;              /* surface */
+  --card-foreground: #E4E2E7;
 
-  --popover: #2A2718;
-  --popover-foreground: #E9E2D4;
+  --popover: #1E2027;
+  --popover-foreground: #E4E2E7;
 
-  --primary: #EDC55F;             /* #EDC55F */
-  --primary-foreground: #3E2E00;  /* #3E2E00 */
+  --primary: #B7C1EC;
+  --primary-foreground: #1F2A5C; /* on-primary */
 
-  --secondary: #4F462B;           /* #4F462B */
-  --secondary-foreground: #F2E2BB;
+  --secondary: #403E47;         /* secondary-container */
+  --secondary-foreground: #E4E1E9;
 
-  --muted: #1D1B13;               /* #1D1B13 */
-  --muted-foreground: #999080;    /* #999080 */
+  --muted: #24262D;            /* surface-container */
+  --muted-foreground: #C4C1CC; /* on-surface-variant */
 
-  --accent: #594400;              /* #594400 primary-container */
-  --accent-foreground: #FFE18E;   /* #FFE18E */
+  --accent: #3A4470;           /* primary-container */
+  --accent-foreground: #DDE1FF;
 
-  --destructive: var(--expense);         /* #FFB4AB = --expense */
+  --destructive: var(--expense);
 
-  --border: #2C2921;              /* #2C2921 */
-  --input: #4D4739;               /* #4D4739 outline */
+  --border: #46464F;           /* outline-variant */
+  --input: #8E8C97;           /* outline */
   --ring: var(--primary);
 
   --radius: 0.75rem;
 
-  --income: #9FD9A0;             /* #9FD9A0 */
-  --income-container: #1E3320;   /* #1E3320 */
-  --expense: #FFB4AB;             /* #FFB4AB */
-  --expense-container: #3B1512;   /* #3B1512 */
-  --transfer: #9EC6EA;           /* #9EC6EA */
-  --transfer-container: #16293A; /* #16293A */
+  --income: #8FD99F;
+  --income-container: #1E3A24;
+  --expense: #F2A399;
+  --expense-container: #4A2320;
+  --transfer: #A8C8E8;
+  --transfer-container: #1E3547;
+  --gold: #D9C08A;
+  --gold-container: #4A3F1E;
+
+  --primary-container: #3A4470;
+  --on-primary-container: #DDE1FF;
+  --secondary-container: #403E47;
+  --on-secondary-container: #E4E1E9;
+  --surface-container: #24262D;
+  --surface-container-high: #2C2E36;
+  --nav-container: #1B1C22;
+  --outline: #8E8C97;
+  --outline-variant: #46464F;
+
+  --el1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --el3: 0 4px 10px rgba(0, 0, 0, 0.6), 0 1px 4px rgba(0, 0, 0, 0.5);
 
   --chart-1: var(--primary);
   --chart-2: var(--income);
   --chart-3: var(--expense);
   --chart-4: var(--transfer);
-  --chart-5: oklch(0.760 0.100 300);
+  --chart-5: var(--gold);
 
-  --sidebar: #1D1B13;             /* #1D1B13 */
+  --sidebar: #1B1C22;
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: var(--accent);
   --sidebar-accent-foreground: var(--accent-foreground);
-  --sidebar-border: var(--border);
+  --sidebar-border: var(--outline-variant);
   --sidebar-ring: var(--primary);
 
-  --surface: oklch(0.150 0.012 85);
-  --elevated: #2A2718;            /* #2A2718 */
+  --surface: #1E2027;
+  --elevated: #2C2E36;
 
   color-scheme: dark;
 }
@@ -153,6 +185,22 @@
   --color-expense-container: var(--expense-container);
   --color-transfer: var(--transfer);
   --color-transfer-container: var(--transfer-container);
+  --color-gold: var(--gold);
+  --color-gold-container: var(--gold-container);
+
+  /* M3 role utilities: bg-surface-container, text-on-primary-container, border-outline, … */
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-nav-container: var(--nav-container);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  --shadow-el1: var(--el1);
+  --shadow-el3: var(--el3);
 
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);
@@ -237,7 +285,7 @@
 /* Shared Material surfaces and safe-area aware mobile sheets. */
 .settings-grid > :first-child { grid-column: 1 / -1; }
 .settings-grid > [data-slot="card"] { height: 100%; }
-[data-slot="card"] { box-shadow: none; }
+[data-slot="card"] { box-shadow: var(--el1); }
 .m3-bottom-sheet {
   top: auto; bottom: 0; left: 0; width: 100%; max-width: none;
   transform: none; translate: none; border-radius: 28px 28px 0 0;

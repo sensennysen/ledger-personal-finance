@@ -257,6 +257,10 @@ icon + label + description rows.
 - The kind menu remains a dropdown (not a bottom sheet on mobile), consistent
   with the Phase 6 row menu.
 
+**Post-redesign change:** mobile Add Transaction now uses the same
+`TransactionForm` as desktop instead of `QuickEntry` (the amount-first decimal
+keypad). `QuickEntry.tsx` is no longer referenced (kept on disk).
+
 ---
 
 ## Phase 11 — Verification

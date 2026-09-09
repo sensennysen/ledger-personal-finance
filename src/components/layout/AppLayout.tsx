@@ -33,7 +33,6 @@ import {
   TransactionForm,
   type TransactionFormValues,
 } from '@/components/transactions/TransactionForm'
-import { QuickEntry } from '@/components/transactions/QuickEntry'
 import {
   TRANSACTION_KIND_DIALOG_TITLES,
   type TransactionKind,
@@ -268,20 +267,13 @@ function LayoutShell() {
                 {formError}
               </p>
             )}
-            {sheet === 'add' &&
-              (mobile ? (
-                <QuickEntry
-                  initialKind={transactionKind}
-                  onSubmit={handleCreate}
-                  onClose={() => setSheet(null)}
-                />
-              ) : (
-                <TransactionForm
-                  entryKind={transactionKind}
-                  onSubmit={handleCreate}
-                  onClose={() => setSheet(null)}
-                />
-              ))}
+            {sheet === 'add' && (
+              <TransactionForm
+                entryKind={transactionKind}
+                onSubmit={handleCreate}
+                onClose={() => setSheet(null)}
+              />
+            )}
             {sheet === 'account' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-2.5">

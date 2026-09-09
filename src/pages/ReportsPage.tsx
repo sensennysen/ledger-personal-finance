@@ -685,7 +685,7 @@ export default function ReportsPage() {
               value={preset}
               onValueChange={(v) => setPreset(v as Preset)}
             >
-              <SelectTrigger className="h-9 w-full text-[0.8125rem]">
+              <SelectTrigger className="!h-9 w-full text-[0.8125rem]">
                 <SelectValue>
                   {(v: string | null) =>
                     v ? PRESET_LABELS[v as Preset] : 'Date range'

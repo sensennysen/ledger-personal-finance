@@ -95,6 +95,7 @@ export default function SettingsPage() {
     SETTINGS_SECTIONS[0].id,
   )
   const mainRef = useRef<HTMLElement | null>(null)
+  const scrollerRef = useRef<HTMLElement | null>(null)
   // While a rail click is scrolling we pin the highlight to the target and
   // ignore the scroll spy, so it can't flash through intermediate sections.
   const spyLockRef = useRef<string | null>(null)
@@ -119,6 +120,7 @@ export default function SettingsPage() {
     )
     if (sections.length === 0) return
     const scroller = getScrollParent(root)
+    scrollerRef.current = scroller
 
     let frame = 0
     let settle: ReturnType<typeof setTimeout> | null = null
@@ -138,12 +140,13 @@ export default function SettingsPage() {
         else break
       }
 
-      // Snap to the last section once scrolled (near) the bottom, so short
-      // trailing sections can still be selected.
+      // The trailing sections can't be scrolled all the way up to the line
+      // (they're the last thing on the page), so once the scroller is at — or
+      // close to — the bottom, the last section is what the reader is on.
       if (scroller) {
-        const atBottom =
-          scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 4
-        if (atBottom) current = sections[sections.length - 1].id
+        const remaining =
+          scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+        if (remaining <= 24) current = sections[sections.length - 1].id
       }
 
       setActiveSection((prev) => (prev === current ? prev : current))
@@ -174,6 +177,7 @@ export default function SettingsPage() {
       window.removeEventListener('resize', onScroll)
       if (frame) cancelAnimationFrame(frame)
       if (settle) clearTimeout(settle)
+      scrollerRef.current = null
       recomputeRef.current = () => {}
     }
   }, [releaseLock])
@@ -187,9 +191,18 @@ export default function SettingsPage() {
       spyLockRef.current = id
       if (spyLockTimerRef.current) clearTimeout(spyLockTimerRef.current)
       spyLockTimerRef.current = setTimeout(() => releaseLock(id), 1200)
-      document
-        .getElementById(id)
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+      const scroller = scrollerRef.current
+      const isLast = id === SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1].id
+      if (isLast && scroller) {
+        // The last section can't reach the top; scroll fully to the bottom so
+        // the spy's bottom rule reliably lands on it.
+        scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' })
+      } else {
+        document
+          .getElementById(id)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
     },
     [releaseLock],
   )

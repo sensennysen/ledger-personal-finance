@@ -388,11 +388,15 @@ export default function TransactionsPage() {
               <ChevronRight className="size-4" />
             </button>
           </div>
-          <Button
+          <button
             type="button"
-            variant={selectMode ? 'secondary' : 'outline'}
-            className="h-9 shrink-0 gap-1.5 rounded-xl"
             onClick={toggleSelectMode}
+            className={cn(
+              'flex shrink-0 items-center gap-1.5 text-[13px] font-medium transition-colors',
+              selectMode
+                ? 'text-primary'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
           >
             {selectMode ? (
               <CheckSquare className="size-4" />
@@ -400,11 +404,11 @@ export default function TransactionsPage() {
               <Square className="size-4" />
             )}
             Select items
-          </Button>
+          </button>
         </div>
 
         {/* Search + type filter */}
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full sm:w-60 sm:shrink-0">
             <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -417,9 +421,9 @@ export default function TransactionsPage() {
           <Tabs
             value={filterType}
             onValueChange={setFilterType}
-            className="w-full sm:min-w-0 sm:flex-1"
+            className="w-full sm:w-auto"
           >
-            <TabsList className="w-full">
+            <TabsList className="w-full sm:w-auto [&_[data-slot=tabs-trigger]]:px-3.5 sm:[&_[data-slot=tabs-trigger]]:flex-none">
               <TabsTrigger value="all">All</TabsTrigger>
               <TabsTrigger value="income">Income</TabsTrigger>
               <TabsTrigger value="expense">Expense</TabsTrigger>

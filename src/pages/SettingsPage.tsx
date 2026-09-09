@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
+import { ChevronRight, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing, User, ShieldAlert } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
@@ -13,7 +13,7 @@ import { CURRENCIES } from '@/types'
 import { cn } from '@/lib/utils'
 import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -64,8 +64,42 @@ const ACCOUNT_VIEW_LABELS: Record<Preferences['accView'], string> = {
   flat: 'Flat Grid',
 }
 
+const SETTINGS_SECTIONS = [
+  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'preferences', label: 'Preferences', icon: Settings2 },
+  { id: 'notifications', label: 'Notifications', icon: BellRing },
+  { id: 'month-cycle', label: 'Month Cycle', icon: CalendarDays },
+  { id: 'legal', label: 'Legal', icon: ShieldCheck },
+  { id: 'account', label: 'Account', icon: ShieldAlert, danger: true },
+] as const
+
 export default function SettingsPage() {
   const { user, profile, signOut, deleteAccount, refreshProfile } = useAuth()
+  const [activeSection, setActiveSection] = useState<string>('profile')
+  const mainRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    const root = mainRef.current
+    if (!root) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+        if (visible?.target.id) setActiveSection(visible.target.id)
+      },
+      { root: null, rootMargin: '-96px 0px -55% 0px', threshold: [0, 0.25, 0.5, 1] },
+    )
+    root.querySelectorAll('section[id]').forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+
+  const jumpTo = (id: string) => {
+    document
+      .getElementById(id)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   const { theme, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
   const { prefs, set: setPref } = usePreferences()
@@ -162,15 +196,58 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="settings-grid p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold">Settings</h1>
+    <div className="mx-auto flex max-w-5xl gap-6 p-4 md:gap-8 md:p-8">
+      {/* Section rail — icons on tablet, labels on desktop */}
+      <nav
+        aria-label="Settings sections"
+        className="sticky top-6 hidden h-fit shrink-0 flex-col gap-0.5 md:flex md:w-[72px] lg:w-[200px]"
+      >
+        <h1 className="mb-3 hidden px-3 text-[20px] font-bold text-foreground lg:block">
+          Settings
+        </h1>
+        {SETTINGS_SECTIONS.map(({ id, label, icon: Icon, ...rest }) => {
+          const danger = 'danger' in rest && rest.danger
+          const active = activeSection === id
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => jumpTo(id)}
+              className={cn(
+                'flex items-center gap-2.5 rounded-[10px] px-3 text-[13px] font-medium transition-colors max-lg:flex-col max-lg:gap-1 max-lg:py-2 lg:h-[38px]',
+                danger
+                  ? 'text-expense'
+                  : active
+                    ? 'font-semibold text-on-primary-container lg:bg-primary-container'
+                    : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <span
+                className={cn(
+                  'flex items-center justify-center max-lg:size-11 max-lg:rounded-2xl',
+                  active && !danger && 'max-lg:bg-primary-container',
+                )}
+              >
+                <Icon className="size-[15px]" />
+              </span>
+              <span className="max-lg:text-[9.5px]">{label}</span>
+            </button>
+          )
+        })}
+      </nav>
 
-      {/* Profile */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>Manage your account details</CardDescription>
-        </CardHeader>
+      <main ref={mainRef} className="min-w-0 flex-1 space-y-9 lg:max-w-[640px]">
+        <h1 className="text-[22px] font-bold text-foreground md:hidden">
+          Settings
+        </h1>
+
+        {/* Profile */}
+        <section id="profile" className="scroll-mt-24">
+          <h2 className="text-[16px] font-bold text-foreground">Profile</h2>
+          <p className="mb-4 mt-0.5 text-[12.5px] text-muted-foreground">
+            Manage your account details
+          </p>
+          <Card>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4">
             <Avatar className="w-16 h-16">
@@ -232,12 +309,15 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Appearance */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>Choose your preferred colour scheme</CardDescription>
-        </CardHeader>
+        </section>
+
+        {/* Appearance */}
+        <section id="appearance" className="scroll-mt-24">
+          <h2 className="text-[16px] font-bold text-foreground">Appearance</h2>
+          <p className="mb-4 mt-0.5 text-[12.5px] text-muted-foreground">
+            Choose your preferred colour scheme
+          </p>
+          <Card>
         <CardContent>
           <div className="space-y-5">
           <div>
@@ -305,12 +385,15 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Settings2 className="w-4 h-4" /> Preferences</CardTitle>
-          <CardDescription>Number format, date display, and page views</CardDescription>
-        </CardHeader>
+        </section>
+
+        {/* Preferences */}
+        <section id="preferences" className="scroll-mt-24">
+          <h2 className="text-[16px] font-bold text-foreground">Preferences</h2>
+          <p className="mb-4 mt-0.5 text-[12.5px] text-muted-foreground">
+            Number format, date display, and page views
+          </p>
+          <Card>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -389,12 +472,15 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Notifications */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><BellRing className="w-4 h-4" /> Notifications</CardTitle>
-          <CardDescription>Enable mobile/browser reminders for credit card statement and due dates</CardDescription>
-        </CardHeader>
+        </section>
+
+        {/* Notifications */}
+        <section id="notifications" className="scroll-mt-24">
+          <h2 className="text-[16px] font-bold text-foreground">Notifications</h2>
+          <p className="mb-4 mt-0.5 text-[12.5px] text-muted-foreground">
+            Enable browser reminders for credit card statement and due dates
+          </p>
+          <Card>
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
             <div className="space-y-1">
@@ -451,14 +537,15 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Month Cycle */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarDays className="w-4 h-4" /> Month Cycle
-          </CardTitle>
-          <CardDescription>Set the day your financial month starts (e.g. payday)</CardDescription>
-        </CardHeader>
+        </section>
+
+        {/* Month Cycle */}
+        <section id="month-cycle" className="scroll-mt-24">
+          <h2 className="text-[16px] font-bold text-foreground">Month Cycle</h2>
+          <p className="mb-4 mt-0.5 text-[12.5px] text-muted-foreground">
+            Set the day your financial month starts (e.g. payday)
+          </p>
+          <Card>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-3">
             <label className="text-sm font-medium w-28">Starts on day</label>
@@ -486,13 +573,15 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Customization â€” visible on mobile where BottomNav omits Categories */}
-      {/* Legal */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Legal</CardTitle>
-          <CardDescription>Review policies and terms</CardDescription>
-        </CardHeader>
+        </section>
+
+        {/* Legal */}
+        <section id="legal" className="scroll-mt-24">
+          <h2 className="text-[16px] font-bold text-foreground">Legal</h2>
+          <p className="mb-4 mt-0.5 text-[12.5px] text-muted-foreground">
+            Review policies and terms
+          </p>
+          <Card>
         <CardContent className="p-0">
           <Link
             to="/privacy"
@@ -517,12 +606,15 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Account / Danger zone â€” always last to prevent accidental destructive actions */}
-      <Card className="border-destructive/30">
-        <CardHeader>
-          <CardTitle className="text-destructive">Account</CardTitle>
-          <CardDescription>Sign out or permanently delete your account</CardDescription>
-        </CardHeader>
+        </section>
+
+        {/* Account / Danger zone */}
+        <section id="account" className="scroll-mt-24">
+          <h2 className="text-[16px] font-bold text-expense">Account</h2>
+          <p className="mb-4 mt-0.5 text-[12.5px] text-muted-foreground">
+            Sign out or permanently delete your account
+          </p>
+          <Card className="border border-[color-mix(in_srgb,var(--expense)_30%,transparent)]">
         <CardContent className="space-y-3">
           <Button variant="outline" onClick={signOut}>Sign Out</Button>
           <Separator />
@@ -540,7 +632,9 @@ export default function SettingsPage() {
             </Button>
           </div>
         </CardContent>
-      </Card>
+          </Card>
+        </section>
+      </main>
 
       {/* Delete account confirmation dialog */}
       <AlertDialog

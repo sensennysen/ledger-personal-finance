@@ -211,3 +211,25 @@ and the Analytics tab keep their behaviour and inherit the new styling.
   delta/sub line is tinted with the card's semantic colour instead of muted grey.
 - Tabs restyled to a surface-container pill; the `h-7` / `text-xs` trigger sizing
   dropped for the standard pill size.
+
+---
+
+## Phase 9 — Settings
+
+File: `src/pages/SettingsPage.tsx`.
+
+**No feature loss** — all 7 sections (Profile, Appearance, Preferences,
+Notifications, Month Cycle, Legal, Account), every control, and the "type DELETE"
+confirmation dialog are unchanged.
+
+**Structural changes:**
+
+- Layout is now a **section rail + single content column** (was a 2-column card
+  grid on `lg`). Desktop rail shows labels with a scroll-spy active pill;
+  tablet (`md`–`lg`) shows an icon-only rail; mobile has no rail (continuous
+  scroll). `IntersectionObserver` drives the active-section highlight;
+  clicking a rail item smooth-scrolls to that `<section id>`.
+- Each section now has an **outside `<h2>` + description**; the in-card
+  `CardHeader` / `CardTitle` / `CardDescription` were removed (their text moved to
+  the section heading). Icons moved from the card titles to the rail.
+- The unused `.settings-grid` rules remain in `index.css` (harmless).

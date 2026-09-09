@@ -9,7 +9,7 @@ export const transactionSchema = z.object({
   subcategory_id: z.string().nullable(),
   amount: z.coerce.number().positive('Amount must be positive'),
   currency: z.string().min(1),
-  exchange_rate: z.coerce.number().default(1),
+  exchange_rate: z.coerce.number().positive('Exchange rate must be greater than zero').default(1),
   description: z.string(),
   notes: z.string().nullable(),
   date: z.string().min(1),
@@ -33,6 +33,14 @@ export const transactionSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Destination account is required for transfers',
+      path: ['to_account_id'],
+    })
+  }
+
+  if (data.type === 'transfer' && data.to_account_id && data.to_account_id === data.account_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Choose a different destination account',
       path: ['to_account_id'],
     })
   }

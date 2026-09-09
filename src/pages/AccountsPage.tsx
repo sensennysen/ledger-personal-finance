@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Plus, Wallet, TriangleAlert } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
+import { useExchangeRates } from '@/hooks/useExchangeRates'
 import {
   ACCOUNT_TYPE_LABELS,
   ACCOUNT_COLORS,
@@ -753,11 +754,12 @@ function LiabilityCard({ account }: { account: Account }) {
 export default function AccountsPage() {
   const { profile } = useAuth()
   const { accounts, loading, createAccount } = useAccounts()
+  const { rates } = useExchangeRates()
   const [createOpen, setCreateOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
   const defaultCurrency = profile?.default_currency ?? 'USD'
-  const summary = getBalanceSummary(accounts)
+  const summary = getBalanceSummary(accounts, { displayCurrency: defaultCurrency, rates })
   const liabilitiesTotal = summary.totalCreditCardDebt + summary.totalLoanDebt
   const assetAccounts = accounts.filter(
     (a) => !LIABILITY_TYPES.includes(a.type),
@@ -859,6 +861,13 @@ export default function AccountsPage() {
               </p>
             </div>
           </div>
+
+          {summary.excludedCurrencies.length > 0 && (
+            <p className="text-[12px] text-amber-600 dark:text-amber-500">
+              Excludes {summary.excludedCurrencies.join(', ')} — no exchange rate.
+              Add one in Settings → Exchange Rates.
+            </p>
+          )}
 
           <div className="space-y-7">
             {assetAccounts.length > 0 && (

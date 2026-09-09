@@ -16,6 +16,25 @@ function formatDateString(date: Date) {
   return `${year}-${month}-${day}`
 }
 
+/**
+ * Add whole months to a date without the overflow that `Date.setMonth` causes.
+ * Jan 31 + 1 month with `setMonth` becomes Mar 2/3 (skipping February entirely);
+ * here it lands on Feb 28/29. A date that is the last day of its month snaps to
+ * the last day of the target month so month-end schedules stay pinned to month-end.
+ */
+function addMonthsClamped(date: Date, months: number): Date {
+  const lastDayOfSourceMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  const isMonthEnd = date.getDate() === lastDayOfSourceMonth
+
+  const target = new Date(date)
+  target.setDate(1)
+  target.setMonth(target.getMonth() + months)
+
+  const lastDayOfTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate()
+  target.setDate(isMonthEnd ? lastDayOfTargetMonth : Math.min(date.getDate(), lastDayOfTargetMonth))
+  return target
+}
+
 export function addRecurringInterval(date: Date, interval: RecurringInterval): Date {
   const nextDate = new Date(date)
 
@@ -30,14 +49,11 @@ export function addRecurringInterval(date: Date, interval: RecurringInterval): D
       nextDate.setDate(nextDate.getDate() + 14)
       break
     case 'monthly':
-      nextDate.setMonth(nextDate.getMonth() + 1)
-      break
+      return addMonthsClamped(date, 1)
     case 'quarterly':
-      nextDate.setMonth(nextDate.getMonth() + 3)
-      break
+      return addMonthsClamped(date, 3)
     case 'yearly':
-      nextDate.setFullYear(nextDate.getFullYear() + 1)
-      break
+      return addMonthsClamped(date, 12)
   }
 
   return nextDate

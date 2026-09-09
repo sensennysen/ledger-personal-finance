@@ -6,6 +6,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
+import { useExchangeRates } from '@/hooks/useExchangeRates'
 import {
   useDashboardData,
   type DashboardChartPeriod,
@@ -103,6 +104,7 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
+  const { rates } = useExchangeRates()
   const { accounts, loading: accountsLoading, updateAccount } = useAccounts()
   const { transactions, loading: txLoading } = useTransactions()
   const { categories } = useCategories()
@@ -121,6 +123,7 @@ export default function DashboardPage() {
     recentTx,
     creditCards,
     creditCardsWithState,
+    excludedCurrencies,
   } = useDashboardData({
     accounts,
     categories,
@@ -130,6 +133,8 @@ export default function DashboardPage() {
     chartPeriod,
     selectedMonth,
     startDay,
+    displayCurrency: currency,
+    rates,
   })
 
   // Lock in each credit card's statement balance once its statement day passes.
@@ -242,6 +247,12 @@ export default function DashboardPage() {
           <p className="mt-2 text-[12px] text-muted-foreground">
             Assets minus liabilities
           </p>
+          {excludedCurrencies.length > 0 && (
+            <p className="mt-1 text-[12px] text-amber-600 dark:text-amber-500">
+              Approximate — amounts in {excludedCurrencies.join(', ')} are excluded.
+              Add a rate in Settings.
+            </p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div

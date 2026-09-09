@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing, User, ShieldAlert } from 'lucide-react'
+import { ChevronRight, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing, User, ShieldAlert, ArrowLeftRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { ExchangeRatesSettings } from '@/components/settings/ExchangeRatesSettings'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -70,6 +71,7 @@ const SETTINGS_SECTIONS = [
   { id: 'preferences', label: 'Preferences', icon: Settings2 },
   { id: 'notifications', label: 'Notifications', icon: BellRing },
   { id: 'month-cycle', label: 'Month Cycle', icon: CalendarDays },
+  { id: 'exchange-rates', label: 'Exchange Rates', icon: ArrowLeftRight },
   { id: 'legal', label: 'Legal', icon: ShieldCheck },
   { id: 'account', label: 'Account', icon: ShieldAlert, danger: true },
 ] as const
@@ -679,6 +681,16 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+        </section>
+
+        {/* Exchange Rates */}
+        <section id="exchange-rates" className="scroll-mt-24">
+          <h2 className="text-[16px] font-bold text-foreground">Exchange Rates</h2>
+          <p className="mb-4 mt-0.5 text-[12.5px] text-muted-foreground">
+            Used to show net worth, cash flow, budgets, and reports in your
+            default currency ({profile?.default_currency ?? 'USD'})
+          </p>
+          <ExchangeRatesSettings />
         </section>
 
         {/* Legal */}

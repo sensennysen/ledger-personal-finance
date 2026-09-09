@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { ExchangeRatesProvider } from '@/hooks/useExchangeRates'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import AppLayout from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/LoginPage'
@@ -184,19 +185,21 @@ function ProtectedRoutes() {
 
   return (
     <ErrorBoundary>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="accounts" element={<AccountsPage />} />
-          <Route path="accounts/:accountId" element={<AccountTransactionsPage />} />
-          <Route path="transactions" element={<TransactionsPage />} />
-          <Route path="categories" element={<CategoriesPage />} />
-          <Route path="budgets" element={<BudgetsPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="thirteenth-month" element={<ThirteenthMonthPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-        </Route>
-      </Routes>
+      <ExchangeRatesProvider>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="accounts" element={<AccountsPage />} />
+            <Route path="accounts/:accountId" element={<AccountTransactionsPage />} />
+            <Route path="transactions" element={<TransactionsPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
+            <Route path="budgets" element={<BudgetsPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="thirteenth-month" element={<ThirteenthMonthPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </ExchangeRatesProvider>
     </ErrorBoundary>
   )
 }

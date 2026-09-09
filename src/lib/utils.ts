@@ -38,13 +38,25 @@ export function formatCurrency(
       ...options,
     }).format(amount)
   } catch {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currencyCode,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-      ...options,
-    }).format(amount)
+    // The locale may have been the problem — retry with a known-good one.
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currencyCode,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        ...options,
+      }).format(amount)
+    } catch {
+      // The currency code itself is unusable (empty / non-ISO, e.g. from
+      // imported or legacy data). Fall back to a plain number so rendering
+      // never throws.
+      const plain = new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: options?.minimumFractionDigits ?? 2,
+        maximumFractionDigits: options?.maximumFractionDigits ?? 2,
+      }).format(amount)
+      return currencyCode ? `${currencyCode} ${plain}` : plain
+    }
   }
 }
 

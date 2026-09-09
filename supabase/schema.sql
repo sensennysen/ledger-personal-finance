@@ -169,7 +169,7 @@ create table if not exists public.transactions (
   type                  text not null check (type in ('income','expense','transfer')),
   amount                numeric(18,2) not null check (amount > 0),
   currency              text not null default 'USD',
-  exchange_rate         numeric(18,6) not null default 1,
+  exchange_rate         numeric(18,6) not null default 1 check (exchange_rate > 0),
   description           text not null,
   notes                 text,
   date                  date not null default current_date,
@@ -178,7 +178,8 @@ create table if not exists public.transactions (
   recurrence_interval   text check (recurrence_interval in ('daily','weekly','biweekly','monthly','quarterly','yearly')),
   recurrence_end_date   date,
   created_at            timestamptz not null default now(),
-  updated_at            timestamptz not null default now()
+  updated_at            timestamptz not null default now(),
+  constraint transactions_no_self_transfer check (to_account_id is null or to_account_id <> account_id)
 );
 
 alter table public.transactions enable row level security;
@@ -189,6 +190,25 @@ create policy "Users can manage own transactions"
 create index if not exists transactions_user_date_idx on public.transactions(user_id, date desc);
 create index if not exists transactions_account_idx   on public.transactions(account_id);
 create index if not exists transactions_category_idx  on public.transactions(category_id);
+
+-- ────────────────────────────────────────────────────────────
+-- EXCHANGE RATES (per user, USD-anchored)
+-- rates:     USD value of 1 unit of each ISO code, e.g. { "EUR": 1.08 }
+-- overrides: manual corrections that win over `rates` for the same code
+-- ────────────────────────────────────────────────────────────
+create table if not exists public.exchange_rates (
+  user_id     uuid primary key references public.profiles(id) on delete cascade,
+  base        text not null default 'USD',
+  rates       jsonb not null default '{}'::jsonb,
+  overrides   jsonb not null default '{}'::jsonb,
+  as_of       date,
+  updated_at  timestamptz not null default now()
+);
+
+alter table public.exchange_rates enable row level security;
+
+create policy "Users can manage own exchange rates"
+  on public.exchange_rates for all using (auth.uid() = user_id);
 
 -- ────────────────────────────────────────────────────────────
 -- CREDIT CARD PAYMENTS
@@ -252,6 +272,7 @@ create trigger set_accounts_updated_at     before update on public.accounts     
 create trigger set_categories_updated_at   before update on public.categories   for each row execute procedure public.set_updated_at();
 create trigger set_transactions_updated_at before update on public.transactions for each row execute procedure public.set_updated_at();
 create trigger set_budgets_updated_at      before update on public.budgets      for each row execute procedure public.set_updated_at();
+create trigger set_exchange_rates_updated_at before update on public.exchange_rates for each row execute procedure public.set_updated_at();
 
 -- ────────────────────────────────────────────────────────────
 -- OWNERSHIP GUARDS

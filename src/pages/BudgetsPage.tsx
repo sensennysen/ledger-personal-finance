@@ -13,6 +13,8 @@ import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { useCycle } from '@/contexts/cycleState'
 import { CycleStepper } from '@/components/layout/CycleStepper'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useExchangeRates } from '@/hooks/useExchangeRates'
+import { convertAmount } from '@/lib/currency'
 import { useSavingsGoals, type GoalWithContributions } from '@/hooks/useSavingsGoals'
 import { useCategories } from '@/hooks/useCategories'
 import { CURRENCIES, ACCOUNT_COLORS } from '@/types'
@@ -669,11 +671,10 @@ function BudgetTransactionsDialog({
   loading: boolean
   periodRange: { start: string; end: string }
 }) {
+  const { rates } = useExchangeRates()
   const total = transactions.reduce((sum, tx) => {
-    const txAmount = tx.currency === budget.currency
-      ? tx.amount
-      : tx.amount * (tx.exchange_rate ?? 1)
-    return sum + txAmount
+    const txAmount = convertAmount(tx.amount, tx.currency, budget.currency, rates)
+    return txAmount === null ? sum : sum + txAmount
   }, 0)
   const effective = budget.effective_amount ?? budget.amount
   const remaining = effective - total
@@ -727,9 +728,8 @@ function BudgetTransactionsDialog({
         <ScrollArea className="max-h-[50vh] pr-3">
           <div className="space-y-2">
             {transactions.map((tx) => {
-              const converted = tx.currency === budget.currency
-                ? tx.amount
-                : tx.amount * (tx.exchange_rate ?? 1)
+              const converted =
+                convertAmount(tx.amount, tx.currency, budget.currency, rates) ?? tx.amount
 
               return (
                 <div key={tx.id} className="rounded-lg border bg-card p-3">

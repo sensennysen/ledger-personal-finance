@@ -75,8 +75,10 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
         }))
       )
       onOpenChange(false)
-    } catch {
-      setError('Failed to split transaction. Please try again.')
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to split transaction. Please try again.',
+      )
     } finally {
       setSubmitting(false)
     }

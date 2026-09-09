@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/hooks/useExchangeRates'
 import { readCache, writeCache } from '@/lib/dataCache'
 import type { Budget, BudgetHistoryEntry } from '@/types'
 import { getCurrentCycleMonthKey } from '@/lib/utils'
+import { convertAmount } from '@/lib/currency'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 
 function localDateStr(date: Date): string {
@@ -15,6 +17,7 @@ export function useBudgets(cycle?: {
   startDay: number
 }) {
   const { user } = useAuth()
+  const { rates } = useExchangeRates()
   const selectedMonth = cycle?.selectedMonth
   const startDay = cycle?.startDay ?? 1
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -66,16 +69,15 @@ export function useBudgets(cycle?: {
           `${selectedMonth}-${String(startDay).padStart(2, '0')}T00:00:00`,
         )
       : new Date()
-    const fetchStart = localDateStr(
-      new Date(now.getFullYear(), now.getMonth() - 13, 1),
-    )
+    const fetchStartDate = new Date(now.getFullYear(), now.getMonth() - 13, 1)
+    const fetchStart = localDateStr(fetchStartDate)
     const fetchEnd = localDateStr(
       new Date(now.getFullYear() + 1, 0, Math.max(1, startDay - 1)),
     )
 
     const { data: spentData, error: spentError } = await supabase
       .from('transactions')
-      .select('category_id, amount, date, currency, exchange_rate')
+      .select('category_id, amount, date, currency')
       .eq('user_id', user.id)
       .eq('type', 'expense')
       .gte('date', fetchStart)
@@ -106,11 +108,10 @@ export function useBudgets(cycle?: {
         allTx.reduce((sum, tx) => {
           if (tx.category_id !== b.category_id) return sum
           if (tx.date < rangeStart || tx.date > rangeEnd) return sum
-          const txAmount =
-            tx.currency === b.currency
-              ? tx.amount
-              : tx.amount * (tx.exchange_rate ?? 1)
-          return sum + txAmount
+          // Convert each transaction into the budget's own currency via the
+          // USD-anchored rate map. Spend in a currency with no rate is left out.
+          const amount = convertAmount(tx.amount, tx.currency, b.currency, rates)
+          return amount === null ? sum : sum + amount
         }, 0)
 
       const spent = computeSpent(start, end)
@@ -126,6 +127,17 @@ export function useBudgets(cycle?: {
           budgetStartDate.getMonth(),
           startDay,
         )
+
+        // We only fetched spend data back to `fetchStartDate`. Iterating from an
+        // older budget start would see zero spend for every un-fetched month and
+        // wrongly bank the full budget amount as surplus, massively inflating the
+        // rollover. Clamp the loop start to the fetched window.
+        const earliestComputable = new Date(
+          fetchStartDate.getFullYear(),
+          fetchStartDate.getMonth(),
+          startDay,
+        )
+        if (d < earliestComputable) d = earliestComputable
 
         while (d < currentMonthStart) {
           const periodStart = localDateStr(d)
@@ -168,7 +180,7 @@ export function useBudgets(cycle?: {
     setBudgets(enriched)
     writeCache(cacheKey, enriched)
     setLoading(false)
-  }, [user, selectedMonth, startDay])
+  }, [user, selectedMonth, startDay, rates])
 
   useEffect(() => {
     queueMicrotask(() => {

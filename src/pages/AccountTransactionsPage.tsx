@@ -7,9 +7,11 @@ import { z } from 'zod'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
+import { useExchangeRates } from '@/hooks/useExchangeRates'
 import { useAuth } from '@/contexts/AuthContext'
 import { ACCOUNT_COLORS, ACCOUNT_TYPE_LABELS, CURRENCIES } from '@/types'
 import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
+import { convertAmount } from '@/lib/currency'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 import { formatLoanSchedule, getLoanAmountOwed } from '@/lib/loans'
 import { supabase } from '@/lib/supabase'
@@ -311,6 +313,7 @@ export default function AccountTransactionsPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
+  const { rates } = useExchangeRates()
   const { accounts, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment, deleteAccount } = useAccounts()
   const { transactions, loading, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
@@ -430,21 +433,29 @@ export default function AccountTransactionsPage() {
     return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
   }, [filtered])
 
-  // Summary stats for this account's transactions
+  const currency = account?.currency ?? profile?.default_currency ?? 'USD'
+
+  // Summary stats for this account's transactions, expressed in the account's
+  // own currency. A transaction logged in another currency is converted via the
+  // rate map; incoming transfers use the transfer's stored exchange_rate (which
+  // the form fills from the same rates) since that's what actually hit the balance.
   const stats = useMemo(() => {
-    const income = accountTransactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = accountTransactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    // Outgoing transfers debit amount + fee; incoming transfers credit amount * exchange_rate
+    const toAccount = (amount: number, from: string) => convertAmount(amount, from, currency, rates) ?? 0
+    const income = accountTransactions
+      .filter((t) => t.type === 'income')
+      .reduce((s, t) => s + toAccount(t.amount, t.currency), 0)
+    const expenses = accountTransactions
+      .filter((t) => t.type === 'expense')
+      .reduce((s, t) => s + toAccount(t.amount, t.currency), 0)
     const transfersSent = accountTransactions
       .filter((t) => t.type === 'transfer' && t.account_id === accountId)
-      .reduce((s, t) => s + t.amount + (t.transfer_fee ?? 0), 0)
+      .reduce((s, t) => s + toAccount(t.amount + (t.transfer_fee ?? 0), t.currency), 0)
     const transfersReceived = accountTransactions
       .filter((t) => t.type === 'transfer' && t.to_account_id === accountId)
       .reduce((s, t) => s + t.amount * (t.exchange_rate ?? 1), 0)
     return { income, expenses, transfersSent, transfersReceived }
-  }, [accountTransactions, accountId])
+  }, [accountTransactions, accountId, currency, rates])
 
-  const currency = account?.currency ?? profile?.default_currency ?? 'USD'
   const statementDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.statement_day) : null
   const dueDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.due_day) : null
 
@@ -478,6 +489,11 @@ export default function AccountTransactionsPage() {
     const amount = Number(paymentAmount)
     if (!amount || amount <= 0 || !effectivePaymentFromAccountId) return
 
+    // These three writes (transfer, payment record, statement bookkeeping) are
+    // not wrapped in a DB transaction. We abort on the first failure, but a
+    // failure *after* the transfer succeeds leaves the payment made with
+    // statement tracking not yet updated — the messages below say so. Moving
+    // this into a single Postgres RPC would make it truly atomic.
     const { error: transferError } = await createTransaction({
       type: 'transfer',
       account_id: effectivePaymentFromAccountId,
@@ -516,7 +532,9 @@ export default function AccountTransactionsPage() {
         payment_date: paymentDate,
       })
     if (insertError) {
-      setFormError(insertError.message)
+      setFormError(
+        `Payment transfer was recorded, but saving the payment record failed: ${insertError.message}. Statement tracking may be out of date.`,
+      )
       return
     }
 
@@ -526,7 +544,9 @@ export default function AccountTransactionsPage() {
       last_payment_date: paymentDate,
     })
     if (error) {
-      setFormError(error)
+      setFormError(
+        `Payment was recorded, but updating the statement balance failed: ${error}. Refresh to retry.`,
+      )
       return
     }
     setFormError(null)

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import {
   Download,
   TrendingUp,
@@ -30,7 +30,9 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/hooks/useExchangeRates'
 import { useReportPresets } from '@/hooks/useReportPresets'
+import { convertAmount } from '@/lib/currency'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -374,6 +376,14 @@ function StatCard({
 export default function ReportsPage() {
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
+  const { rates } = useExchangeRates()
+
+  // Convert a transaction amount into the report's display currency.
+  // Returns null when the source currency has no rate.
+  const conv = useCallback(
+    (amount: number, from: string) => convertAmount(amount, from, currency, rates),
+    [currency, rates],
+  )
 
   const { transactions, loading: txLoading } = useTransactions()
   const { accounts, loading: accLoading } = useAccounts()
@@ -423,37 +433,58 @@ export default function ReportsPage() {
     [transactions]
   )
 
+  // Currencies present in the data that can't be converted into the display
+  // currency — their amounts are left out of every rolled-up total below.
+  const excludedCurrencies = useMemo(() => {
+    const ex = new Set<string>()
+    for (const t of transactions) {
+      if (t.currency !== currency && convertAmount(1, t.currency, currency, rates) === null) {
+        ex.add(t.currency)
+      }
+    }
+    for (const a of accounts) {
+      if (a.currency !== currency && convertAmount(1, a.currency, currency, rates) === null) {
+        ex.add(a.currency)
+      }
+    }
+    return [...ex]
+  }, [transactions, accounts, currency, rates])
+
   // Summary stats
   const { totalIncome, totalExpenses, netChange } = useMemo(() => {
     let totalIncome = 0
     let totalExpenses = 0
     for (const t of filtered) {
-      if (t.type === 'income') totalIncome += t.amount * (t.exchange_rate ?? 1)
-      else if (t.type === 'expense') totalExpenses += t.amount * (t.exchange_rate ?? 1)
+      const amount = conv(t.amount, t.currency)
+      if (amount === null) continue
+      if (t.type === 'income') totalIncome += amount
+      else if (t.type === 'expense') totalExpenses += amount
     }
     return { totalIncome, totalExpenses, netChange: totalIncome - totalExpenses }
-  }, [filtered])
+  }, [filtered, conv])
 
   // Category breakdown (expenses only)
   const categoryBreakdown = useMemo(() => {
     const map = new Map<string, { name: string; color: string; amount: number }>()
     for (const t of filtered) {
       if (t.type !== 'expense') continue
+      const amount = conv(t.amount, t.currency)
+      if (amount === null) continue
       const key = t.category_id ?? '__none__'
       const cat = t.category_id ? categoryById.get(t.category_id) : undefined
       const existing = map.get(key)
       if (existing) {
-        existing.amount += t.amount * (t.exchange_rate ?? 1)
+        existing.amount += amount
       } else {
         map.set(key, {
           name: cat?.name ?? 'Uncategorized',
           color: cat?.color ?? '#888',
-          amount: t.amount * (t.exchange_rate ?? 1),
+          amount,
         })
       }
     }
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount)
-  }, [filtered, categoryById])
+  }, [filtered, categoryById, conv])
 
   const maxCategoryAmount = categoryBreakdown[0]?.amount ?? 1
 
@@ -486,7 +517,10 @@ export default function ReportsPage() {
   // ── Net Worth Over Time (last 13 months) ──
   const netWorthData = useMemo(() => {
     const now = new Date()
-    const currentNetWorth = accounts.reduce((sum, a) => sum + getAccountNetWorthContribution(a), 0)
+    const currentNetWorth = accounts.reduce(
+      (sum, a) => sum + (conv(getAccountNetWorthContribution(a), a.currency) ?? 0),
+      0,
+    )
     const boundaries: { date: string; label: string }[] = []
     for (let i = 12; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -505,15 +539,16 @@ export default function ReportsPage() {
       const boundary = boundaries[i].date
       while (txIdx < allTransactionsSorted.length && allTransactionsSorted[txIdx].date > boundary) {
         const tx = allTransactionsSorted[txIdx]
-        if (tx.type === 'income') netWorth -= tx.amount
-        else if (tx.type === 'expense' && !tx.to_account_id) netWorth += tx.amount
-        else if (tx.type === 'transfer') netWorth += (tx.transfer_fee ?? 0)
+        const amount = conv(tx.amount, tx.currency) ?? 0
+        if (tx.type === 'income') netWorth -= amount
+        else if (tx.type === 'expense' && !tx.to_account_id) netWorth += amount
+        else if (tx.type === 'transfer') netWorth += (conv(tx.transfer_fee ?? 0, tx.currency) ?? 0)
         txIdx++
       }
       data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
     }
     return data
-  }, [accounts, allTransactionsSorted])
+  }, [accounts, allTransactionsSorted, conv])
 
   // ── Monthly Income vs Expenses (last 12 months) ──
   const monthlyData = useMemo(() => {
@@ -533,8 +568,10 @@ export default function ReportsPage() {
       let expenses = 0
       for (const t of transactions) {
         if (t.date < startStr || t.date > endStr) continue
-        if (t.type === 'income') income += t.amount * (t.exchange_rate ?? 1)
-        else if (t.type === 'expense') expenses += t.amount * (t.exchange_rate ?? 1)
+        const amount = conv(t.amount, t.currency)
+        if (amount === null) continue
+        if (t.type === 'income') income += amount
+        else if (t.type === 'expense') expenses += amount
       }
       result.push({
         month: label,
@@ -543,7 +580,7 @@ export default function ReportsPage() {
       })
     }
     return result
-  }, [transactions])
+  }, [transactions, conv])
 
   // ── Spending by Merchant (top 10 from filtered period) ──
   const merchantBreakdown = (() => {
@@ -552,19 +589,21 @@ export default function ReportsPage() {
       if (t.type !== 'expense') continue
       const key = t.description.trim().toLowerCase()
       if (!key) continue
+      const amount = conv(t.amount, t.currency)
+      if (amount === null) continue
       const existing = map.get(key)
       if (existing) {
-        existing.amount += t.amount * (t.exchange_rate ?? 1)
+        existing.amount += amount
         existing.count++
       } else {
-        map.set(key, { displayName: t.description.trim(), amount: t.amount * (t.exchange_rate ?? 1), count: 1 })
+        map.set(key, { displayName: t.description.trim(), amount, count: 1 })
       }
     }
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount).slice(0, 10)
   })()
 
   const activeAccounts = accounts.filter((a) => a.is_active)
-  const balanceSummary = getBalanceSummary(activeAccounts)
+  const balanceSummary = getBalanceSummary(activeAccounts, { displayCurrency: currency, rates })
   const totalBalance = balanceSummary.netWorth
 
   const presetLabel = {
@@ -890,6 +929,13 @@ export default function ReportsPage() {
           loading={loading}
         />
       </div>
+
+      {excludedCurrencies.length > 0 && (
+        <p className="-mt-1 text-[12px] text-amber-600 dark:text-amber-500">
+          Totals are approximate — amounts in {excludedCurrencies.join(', ')} have no
+          exchange rate and are excluded. Add one in Settings → Exchange Rates.
+        </p>
+      )}
 
       <div className="grid lg:grid-cols-[1.6fr_1fr] gap-4">
           {/* Monthly Income vs Expenses */}

@@ -69,12 +69,18 @@ export async function drainQueue(): Promise<number> {
   }
   if (fresh.length === 0) return 0
 
-  const remaining: QueueItem[] = []
+  // IDs of items we've fully dealt with this pass (synced or intentionally
+  // skipped). Anything else — failures, and rows enqueued *during* this drain —
+  // must survive. We recompute the queue from a fresh read at the end rather
+  // than overwriting it with a stale snapshot, otherwise a mutation saved while
+  // this loop was awaiting the network would be silently discarded.
+  const handledIds = new Set<string>()
   let synced = 0
 
   for (const item of fresh) {
     try {
       let skipInsert = false
+      let resolvedReceiptTempId: string | null = null
 
       // Resolve any pending receipt file before the DB insert
       if (
@@ -102,12 +108,13 @@ export async function drainQueue(): Promise<number> {
             uploadErr = e
           }
           if (uploadErr) {
-            // Upload failed — keep in queue and retry next time
-            remaining.push(item)
+            // Upload failed — leave it in the queue and retry next time
             skipInsert = true
           } else {
             item.payload = { ...item.payload, receipt_url: path }
-            try { await removePendingReceipt(tempId) } catch { /* best-effort */ }
+            // Keep the local copy until the DB insert below also succeeds, so a
+            // failed insert can re-run without losing the receipt.
+            resolvedReceiptTempId = tempId
           }
         } else {
           // File missing (e.g. IndexedDB was cleared) — insert without receipt
@@ -137,6 +144,7 @@ export async function drainQueue(): Promise<number> {
               console.warn(
                 `[offlineQueue] Conflict detected for ${item.table}:${item.rowId} — skipping stale update`
               )
+              handledIds.add(item.id)
               synced++ // count as processed
               continue
             }
@@ -159,17 +167,26 @@ export async function drainQueue(): Promise<number> {
         error = err
       }
 
-      if (error) {
-        remaining.push(item)
-      } else {
+      if (!error) {
+        if (resolvedReceiptTempId) {
+          try { await removePendingReceipt(resolvedReceiptTempId) } catch { /* best-effort */ }
+        }
+        handledIds.add(item.id)
         synced++
       }
+      // On error, leave the item untracked so the reconciliation below keeps it.
     } catch {
-      // Unexpected error for this item — keep it in the queue for the next retry
-      remaining.push(item)
+      // Unexpected error for this item — leave it queued for the next retry.
     }
   }
 
-  writeQueue(remaining)
+  // Reconcile against the *current* queue, not the snapshot we started from, so
+  // items enqueued mid-drain are preserved. Also re-apply the staleness bound in
+  // case the drain itself took a long time.
+  const now2 = Date.now()
+  const stillPending = readQueue().filter(
+    (item) => !handledIds.has(item.id) && now2 - item.timestamp <= MAX_QUEUE_AGE_MS
+  )
+  writeQueue(stillPending)
   return synced
 }

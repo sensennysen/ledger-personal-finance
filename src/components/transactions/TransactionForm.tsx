@@ -9,6 +9,7 @@ import { useReceiptAttachment } from '@/hooks/useReceiptAttachment'
 import { useSavingsGoals } from '@/hooks/useSavingsGoals'
 import { useSubcategories } from '@/hooks/useSubcategories'
 import { useTransactionRules } from '@/hooks/useTransactionRules'
+import { useExchangeRates } from '@/hooks/useExchangeRates'
 import {
   transactionSchema,
   type TransactionFormInput,
@@ -24,7 +25,8 @@ import { TransactionReceiptField } from '@/components/transactions/TransactionRe
 import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { CURRENCIES } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
-import { getLocalDateString } from '@/lib/utils'
+import { formatCurrency, getLocalDateString } from '@/lib/utils'
+import { convertAmount } from '@/lib/currency'
 import { getLoanAmountOwed } from '@/lib/loans'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -59,6 +61,7 @@ export function TransactionForm({
   const { categories } = useCategories()
   const { goals } = useSavingsGoals()
   const { matchRule } = useTransactionRules()
+  const { rates } = useExchangeRates()
   const descriptionSuggestions = useDescriptionSuggestions()
   const today = getLocalDateString()
 
@@ -101,6 +104,9 @@ export function TransactionForm({
   const selectedAccount = useWatch({ control: form.control, name: 'account_id' })
   const selectedLoanId = useWatch({ control: form.control, name: 'to_account_id' })
   const selectedCategoryId = useWatch({ control: form.control, name: 'category_id' })
+  const currencyValue = useWatch({ control: form.control, name: 'currency' })
+  const amountValue = useWatch({ control: form.control, name: 'amount' })
+  const exchangeRateValue = useWatch({ control: form.control, name: 'exchange_rate' })
   const description = useWatch({ control: form.control, name: 'description' })
   const tags = useWatch({ control: form.control, name: 'tags' }) ?? []
   const notes = useWatch({ control: form.control, name: 'notes' })
@@ -171,6 +177,24 @@ export function TransactionForm({
     form.setValue('tags', tags.filter((currentTag) => currentTag !== tag))
   }
 
+  // Keep `exchange_rate` in step with a cross-currency transfer. The DB trigger
+  // credits the destination `amount * exchange_rate`, where `amount` is in the
+  // source currency — so the rate is "destination currency per 1 source unit".
+  // Same-currency transfers (and non-transfers) stay at 1.
+  const applyTransferRate = useCallback(
+    (sourceCurrency: string, toAccountId: string | null) => {
+      const setRate = (rate: number) => {
+        if (form.getValues('exchange_rate') !== rate) form.setValue('exchange_rate', rate)
+      }
+      if (form.getValues('type') !== 'transfer') return setRate(1)
+      const destCurrency = accounts.find((account) => account.id === toAccountId)?.currency
+      if (!destCurrency || destCurrency === sourceCurrency) return setRate(1)
+      const rate = convertAmount(1, sourceCurrency, destCurrency, rates)
+      setRate(rate != null ? Math.round(rate * 1e6) / 1e6 : 1)
+    },
+    [accounts, form, rates],
+  )
+
   const handleAccountChange = (accountId: string | null) => {
     if (!accountId) return
 
@@ -181,6 +205,7 @@ export function TransactionForm({
       if (repaymentLoan && repaymentLoan.currency !== selectedAccountRecord.currency) {
         form.setValue('to_account_id', null)
       }
+      applyTransferRate(selectedAccountRecord.currency, form.getValues('to_account_id'))
     }
 
     form.setValue('account_id', accountId)
@@ -216,6 +241,17 @@ export function TransactionForm({
     if (!isLoanRepayment || selectedLoanId || loanAccounts.length === 0) return
     handleLoanChange(loanAccounts[0].id)
   }, [handleLoanChange, isLoanRepayment, loanAccounts, selectedLoanId])
+
+  // Re-sync the transfer rate when the type flips, or once live rates arrive.
+  // Only touches the field while it's still at the default 1 so it never
+  // overwrites a rate already resolved for this transfer.
+  useEffect(() => {
+    if (type !== 'transfer') {
+      applyTransferRate(currencyValue ?? '', selectedLoanId)
+    } else if (exchangeRateValue === 1) {
+      applyTransferRate(currencyValue ?? '', selectedLoanId)
+    }
+  }, [type, rates, currencyValue, selectedLoanId, exchangeRateValue, applyTransferRate])
 
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
     const repaymentLoan = loanAccounts.find((account) => account.id === values.to_account_id)
@@ -376,6 +412,11 @@ export function TransactionForm({
               name="to_account_id"
               render={({ field }) => {
                 const selectedToAccount = accounts.find((account) => account.id === field.value)
+                const destCurrency = selectedToAccount?.currency
+                const crossCurrency = Boolean(destCurrency) && destCurrency !== currencyValue
+                const rate = Number(exchangeRateValue) || 1
+                const amountNum = Number(amountValue) || 0
+                const rateKnown = crossCurrency && rate !== 1
 
                 return (
                   <FormItem>
@@ -384,11 +425,32 @@ export function TransactionForm({
                       <AccountCombobox
                         accounts={accounts.filter((account) => account.id !== selectedAccount)}
                         value={selectedToAccount?.id ?? field.value}
-                        onValueChange={field.onChange}
+                        onValueChange={(value) => {
+                          field.onChange(value)
+                          applyTransferRate(form.getValues('currency'), value)
+                        }}
                         placeholder="Select account"
                         searchPlaceholder="Search destination accounts…"
                       />
                     </FormControl>
+                    {crossCurrency && (
+                      <p className="mt-1 text-[12px] text-muted-foreground">
+                        {rateKnown ? (
+                          <>
+                            Rate 1 {currencyValue} = {rate} {destCurrency}
+                            {amountNum > 0 && (
+                              <> · destination receives{' '}
+                                {formatCurrency(amountNum * rate, destCurrency ?? currencyValue)}</>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-500">
+                            No {currencyValue}→{destCurrency} rate — recorded 1:1. Add one in
+                            Settings → Exchange Rates.
+                          </span>
+                        )}
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )

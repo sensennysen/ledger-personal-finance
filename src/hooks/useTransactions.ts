@@ -289,38 +289,69 @@ export function useTransactions(filters: TransactionFilters = {}) {
       .order('date', { ascending: false })
     if (!allRecurring?.length) return 0
 
+    // Safety bound: catch up at most this many missed occurrences per template
+    // per run so a long-dormant app doesn't fire off hundreds of inserts at once.
+    const MAX_CATCH_UP = 60
+
     let generated = 0
     for (const tx of allRecurring as Transaction[]) {
       if (!tx.recurrence_interval) continue
-      const nextDate = addRecurringIntervalToDateString(tx.date, tx.recurrence_interval)
-      if (nextDate > today) continue
-      if (tx.recurrence_end_date && nextDate > tx.recurrence_end_date) continue
-      if (wasRecurringGenerated(tx.id, nextDate)) continue
 
-      const { error } = await supabase.from('transactions').insert({
-        user_id: user.id,
-        account_id: tx.account_id,
-        to_account_id: tx.to_account_id,
-        category_id: tx.category_id,
-        subcategory_id: tx.subcategory_id,
-        type: tx.type,
-        amount: tx.amount,
-        currency: tx.currency,
-        exchange_rate: tx.exchange_rate,
-        description: tx.description,
-        notes: tx.notes,
-        date: nextDate,
-        transfer_fee: tx.transfer_fee,
-        is_recurring: true,
-        recurrence_interval: tx.recurrence_interval,
-        recurrence_end_date: tx.recurrence_end_date,
-        receipt_url: null,
-        tags: tx.tags ?? [],
-        goal_id: tx.goal_id ?? null,
-      })
-      if (!error) {
+      let nextDate = addRecurringIntervalToDateString(tx.date, tx.recurrence_interval)
+      for (let step = 0; step < MAX_CATCH_UP && nextDate <= today; step++) {
+        if (tx.recurrence_end_date && nextDate > tx.recurrence_end_date) break
+
+        if (wasRecurringGenerated(tx.id, nextDate)) {
+          nextDate = addRecurringIntervalToDateString(nextDate, tx.recurrence_interval)
+          continue
+        }
+
+        // Self-healing idempotency: the localStorage marker can be lost (cleared
+        // site data, another device). Before inserting, check the DB for an
+        // identical occurrence so we don't create duplicates.
+        const { data: dupes } = await supabase
+          .from('transactions')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('account_id', tx.account_id)
+          .eq('type', tx.type)
+          .eq('amount', tx.amount)
+          .eq('description', tx.description)
+          .eq('date', nextDate)
+          .eq('is_recurring', true)
+          .limit(1)
+        if (dupes && dupes.length > 0) {
+          markRecurringGenerated(tx.id, nextDate)
+          nextDate = addRecurringIntervalToDateString(nextDate, tx.recurrence_interval)
+          continue
+        }
+
+        const { error } = await supabase.from('transactions').insert({
+          user_id: user.id,
+          account_id: tx.account_id,
+          to_account_id: tx.to_account_id,
+          category_id: tx.category_id,
+          subcategory_id: tx.subcategory_id,
+          type: tx.type,
+          amount: tx.amount,
+          currency: tx.currency,
+          exchange_rate: tx.exchange_rate,
+          description: tx.description,
+          notes: tx.notes,
+          date: nextDate,
+          transfer_fee: tx.transfer_fee,
+          is_recurring: true,
+          recurrence_interval: tx.recurrence_interval,
+          recurrence_end_date: tx.recurrence_end_date,
+          receipt_url: null,
+          tags: tx.tags ?? [],
+          goal_id: tx.goal_id ?? null,
+        })
+        if (error) break // stop this template; retry on the next run
+
         markRecurringGenerated(tx.id, nextDate)
         generated++
+        nextDate = addRecurringIntervalToDateString(nextDate, tx.recurrence_interval)
       }
     }
     if (generated > 0) await fetch()

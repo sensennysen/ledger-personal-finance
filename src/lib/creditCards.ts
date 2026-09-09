@@ -1,11 +1,24 @@
 import type { Account } from '@/types'
 import { getLoanAmountOwed, normalizeLiabilityBalanceForStorage } from '@/lib/loans'
+import { convertAmount, type RateMap } from '@/lib/currency'
 
 export interface BalanceSummary {
   totalAssets: number
   totalCreditCardDebt: number
   totalLoanDebt: number
   netWorth: number
+}
+
+export interface BalanceSummaryOptions {
+  /** Currency every figure in the summary should be expressed in. */
+  displayCurrency: string
+  /** USD-anchored rate map (see src/lib/currency.ts). */
+  rates: RateMap
+}
+
+export type BalanceSummaryResult = BalanceSummary & {
+  /** Currencies that had no rate and were left out of the totals. */
+  excludedCurrencies: string[]
 }
 
 export function getCreditCardSpending(account: Account): number {
@@ -38,17 +51,47 @@ export function getAccountNetWorthContribution(account: Account): number {
     : account.balance
 }
 
-export function getBalanceSummary(accounts: Account[]): BalanceSummary {
-  return accounts.reduce<BalanceSummary>(
-    (summary, account) => {
-      summary.totalAssets += getAccountAssetBalance(account)
-      summary.totalCreditCardDebt += getCreditCardSpending(account)
-      summary.totalLoanDebt += getLoanAmountOwed(account)
-      summary.netWorth += getAccountNetWorthContribution(account)
-      return summary
-    },
-    { totalAssets: 0, totalCreditCardDebt: 0, totalLoanDebt: 0, netWorth: 0 },
-  )
+/**
+ * Roll account balances up into a single summary. Pass `options` to express
+ * every figure in one display currency; accounts whose currency has no rate are
+ * excluded from the totals and reported in `excludedCurrencies`. Without
+ * `options` the raw balances are summed as-is (legacy, single-currency) behaviour.
+ */
+export function getBalanceSummary(
+  accounts: Account[],
+  options?: BalanceSummaryOptions,
+): BalanceSummaryResult {
+  const excluded = new Set<string>()
+
+  const conv = (value: number, currency: string): number | null => {
+    if (!options || value === 0) return value
+    const converted = convertAmount(value, currency, options.displayCurrency, options.rates)
+    if (converted === null) excluded.add(currency)
+    return converted
+  }
+
+  const summary: BalanceSummary = {
+    totalAssets: 0,
+    totalCreditCardDebt: 0,
+    totalLoanDebt: 0,
+    netWorth: 0,
+  }
+
+  for (const account of accounts) {
+    const asset = conv(getAccountAssetBalance(account), account.currency)
+    if (asset !== null) summary.totalAssets += asset
+
+    const ccDebt = conv(getCreditCardSpending(account), account.currency)
+    if (ccDebt !== null) summary.totalCreditCardDebt += ccDebt
+
+    const loanDebt = conv(getLoanAmountOwed(account), account.currency)
+    if (loanDebt !== null) summary.totalLoanDebt += loanDebt
+
+    const netWorth = conv(getAccountNetWorthContribution(account), account.currency)
+    if (netWorth !== null) summary.netWorth += netWorth
+  }
+
+  return { ...summary, excludedCurrencies: [...excluded] }
 }
 
 export function normalizeCreditCardBalanceForStorage<T extends { type: string; balance: number }>(values: T): T {

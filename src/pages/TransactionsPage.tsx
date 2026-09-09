@@ -275,8 +275,12 @@ export default function TransactionsPage() {
 
   const handleSplitConfirm = async (splits: SplitInput[]) => {
     if (!splittingTx) return
+    // Create every split first; only delete the original once they've all
+    // landed. If a split fails we abort with the original still intact rather
+    // than deleting it and losing money. (Throwing lets the dialog surface the
+    // error and stay open.)
     for (const s of splits) {
-      await createTransaction({
+      const { error } = await createTransaction({
         type: splittingTx.type,
         account_id: splittingTx.account_id,
         to_account_id: null,
@@ -293,9 +297,21 @@ export default function TransactionsPage() {
         recurrence_interval: null,
         recurrence_end_date: null,
         receipt_url: null,
+        tags: splittingTx.tags ?? [],
+        goal_id: splittingTx.goal_id ?? null,
       })
+      if (error) {
+        throw new Error(
+          `Couldn't create split "${s.description}": ${error}. The original transaction was left untouched.`,
+        )
+      }
     }
-    await deleteTransaction(splittingTx.id)
+    const { error: deleteError } = await deleteTransaction(splittingTx.id)
+    if (deleteError) {
+      throw new Error(
+        `Splits were created, but removing the original failed: ${deleteError}. Please delete "${splittingTx.description}" manually.`,
+      )
+    }
     setSplittingTx(null)
   }
 

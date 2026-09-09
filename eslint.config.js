@@ -22,7 +22,7 @@ export default defineConfig([
       'react-refresh/only-export-components': [
         'error',
         {
-          allowExportNames: ['useAuth', 'useTheme'],
+          allowExportNames: ['useAuth', 'useTheme', 'useExchangeRates'],
         },
       ],
     },

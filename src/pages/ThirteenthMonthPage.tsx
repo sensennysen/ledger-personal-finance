@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { CalendarCheck, Info, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/hooks/useExchangeRates'
+import { convertAmount } from '@/lib/currency'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -46,10 +48,6 @@ function monthKey(date: string) {
   return date.slice(0, 7)
 }
 
-function txAmt(tx: Transaction) {
-  return tx.amount * (tx.exchange_rate ?? 1)
-}
-
 // --- SummaryCard ---
 
 function SummaryCard({
@@ -81,8 +79,15 @@ function SummaryCard({
 
 export default function ThirteenthMonthPage() {
   const { profile, user } = useAuth()
+  const { rates } = useExchangeRates()
   const currency = profile?.default_currency ?? 'PHP'
   const userId = user?.id ?? ''
+
+  // Salary record amount, converted into the display currency (0 if no rate).
+  const txAmt = useCallback(
+    (tx: Transaction) => convertAmount(tx.amount, tx.currency, currency, rates) ?? 0,
+    [currency, rates],
+  )
 
   const [year, setYear] = useState(CURRENT_YEAR)
   const [included, setIncluded] = useState<Set<string> | null>(() => loadSelection(userId, CURRENT_YEAR))
@@ -123,16 +128,24 @@ export default function ThirteenthMonthPage() {
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
   }, [transactions])
 
-  const { totalIncluded, monthsWithIncome } = useMemo(() => {
+  const { totalIncluded, monthsWithIncome, excludedCurrencies } = useMemo(() => {
     let totalIncluded = 0
     const monthsSet = new Set<string>()
+    const excluded = new Set<string>()
     for (const tx of transactions) {
       if (!effectiveIncluded.has(tx.id)) continue
+      if (tx.currency !== currency && convertAmount(1, tx.currency, currency, rates) === null) {
+        excluded.add(tx.currency)
+      }
       totalIncluded += txAmt(tx)
       monthsSet.add(monthKey(tx.date))
     }
-    return { totalIncluded, monthsWithIncome: monthsSet.size }
-  }, [transactions, effectiveIncluded])
+    return {
+      totalIncluded,
+      monthsWithIncome: monthsSet.size,
+      excludedCurrencies: [...excluded],
+    }
+  }, [transactions, effectiveIncluded, txAmt, currency, rates])
 
   const thirteenthMonthPay = totalIncluded / 12
 
@@ -199,6 +212,12 @@ export default function ThirteenthMonthPage() {
       </div>
 
       <section className="rounded-3xl bg-accent text-accent-foreground p-6"><p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p><p className="money text-[40px] leading-tight mt-3">{loading ? '…' : formatCurrency(thirteenthMonthPay,currency)}</p><p className="text-sm mt-3">{formatCurrency(totalIncluded,currency)} basic salary ÷ 12</p></section>
+      {excludedCurrencies.length > 0 && (
+        <p className="-mt-2 text-[12px] text-amber-600 dark:text-amber-500">
+          Salary records in {excludedCurrencies.join(', ')} are excluded — no exchange
+          rate. Add one in Settings → Exchange Rates.
+        </p>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <SummaryCard
           label="Total Basic Salary"

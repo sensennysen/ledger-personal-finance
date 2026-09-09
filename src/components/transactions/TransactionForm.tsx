@@ -626,7 +626,7 @@ export function TransactionForm({
           )}
         </div>
 
-        <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-popover/95 px-0 py-3 backdrop-blur supports-backdrop-filter:bg-popover/80 sm:static sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-0">
+        <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end sm:pt-0">
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>

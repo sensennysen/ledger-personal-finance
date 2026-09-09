@@ -1,12 +1,19 @@
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { useEffect, useState } from 'react'
-import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal } from 'lucide-react'
+import {
+  Pencil,
+  Trash2,
+  RepeatIcon,
+  ImageIcon,
+  CloudUpload,
+  Scissors,
+  Bookmark,
+  MoreVertical,
+} from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, cn } from '@/lib/utils'
 import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
-import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -17,6 +24,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { Transaction } from '@/types'
@@ -25,20 +33,11 @@ interface TransactionRowProps {
   tx: Transaction
   onEdit: (tx: Transaction) => void
   onDelete: (id: string) => Promise<void>
-  /** Called when the scissors button is clicked. Only shown when provided and tx.type !== 'transfer'. */
   onSplit?: (tx: Transaction) => void
-  /** Called when the user wants to save this transaction as a template. */
   onSaveTemplate?: (tx: Transaction) => void
-  /** When true, a checkbox is shown for bulk selection. */
   selectable?: boolean
-  /** Controlled checked state of the checkbox. */
   selected?: boolean
-  /** Called when the checkbox changes. */
   onSelect?: (id: string) => void
-  /**
-   * When provided, amount display and transfer direction labels are shown
-   * relative to this account (used in AccountTransactionsPage).
-   */
   contextAccountId?: string
 }
 
@@ -58,16 +57,23 @@ export function TransactionRow({
   const [resolvedReceiptUrl, setResolvedReceiptUrl] = useState<string | null>(null)
   const [receiptLoading, setReceiptLoading] = useState(false)
   const Icon = TRANSACTION_TYPE_ICON[tx.type]
-  const isIncoming = (tx.type === 'transfer' || tx.type === 'expense') && tx.to_account_id === contextAccountId
+  const isIncoming =
+    (tx.type === 'transfer' || tx.type === 'expense') &&
+    tx.to_account_id === contextAccountId
   const isLoanRepayment = tx.type === 'expense' && Boolean(tx.to_account_id)
-  const hasReceipt = !!tx.receipt_url && !isPendingReceiptReference(tx.receipt_url)
+  const hasReceipt =
+    !!tx.receipt_url && !isPendingReceiptReference(tx.receipt_url)
   const displayedReceiptUrl = receiptOpen ? resolvedReceiptUrl : null
+  const canSplit = Boolean(onSplit) && tx.type !== 'transfer' && !isLoanRepayment
 
   useEffect(() => {
-    if (!receiptOpen || !tx.receipt_url || isPendingReceiptReference(tx.receipt_url)) return
-
+    if (
+      !receiptOpen ||
+      !tx.receipt_url ||
+      isPendingReceiptReference(tx.receipt_url)
+    )
+      return
     let cancelled = false
-
     resolveReceiptUrl(tx.receipt_url)
       .then((url) => {
         if (!cancelled) setResolvedReceiptUrl(url)
@@ -75,7 +81,6 @@ export function TransactionRow({
       .finally(() => {
         if (!cancelled) setReceiptLoading(false)
       })
-
     return () => {
       cancelled = true
     }
@@ -93,7 +98,7 @@ export function TransactionRow({
     tx.type === 'income' || (contextAccountId !== undefined && isIncoming)
       ? '+'
       : tx.type === 'expense'
-        ? '-'
+        ? '−'
         : ''
 
   const displayAmount =
@@ -101,184 +106,140 @@ export function TransactionRow({
       ? tx.amount * (tx.exchange_rate ?? 1)
       : tx.amount
 
+  const metaBits: string[] = []
+  if (contextAccountId === undefined && tx.account) metaBits.push(tx.account.name)
+  else if (contextAccountId !== undefined && (tx.type === 'transfer' || isLoanRepayment))
+    metaBits.push(
+      isIncoming
+        ? `← ${tx.account?.name ?? ''}`
+        : `→ ${tx.to_account?.name ?? ''}`,
+    )
+
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-card border hover:bg-accent/50 transition-colors group">
-      {/* Checkbox (bulk select) */}
-      {selectable && (
+    <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 px-4 py-3.5 sm:px-[18px]">
+      {selectable ? (
         <input
           type="checkbox"
           checked={!!selected}
           onChange={() => onSelect?.(tx.id)}
-          onClick={(e) => e.stopPropagation()}
-          className="w-4 h-4 rounded shrink-0 accent-primary cursor-pointer"
+          className="size-4 shrink-0 cursor-pointer rounded accent-primary"
           aria-label="Select transaction"
         />
-      )}
-      {/* Icon */}
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-base"
-        style={{ backgroundColor: 'var(--'+tx.type+'-container)' }}
-      >
-        {tx.category ? tx.category.icon : <Icon className={`w-4 h-4 ${TRANSACTION_TYPE_COLOR[tx.type]}`} />}
-      </div>
-
-      {/* Two-row text block */}
-      <div className="flex-1 min-w-0 space-y-0.5">
-        {/* Row 1: description | amount */}
-        <div className="flex items-baseline justify-between gap-2">
-          <button type="button" className="text-sm font-medium truncate text-left py-1" onClick={()=>openDetail ? openDetail(tx,()=>onEdit(tx)) : onEdit(tx)}>{tx.description}</button>
-          <p className={`money text-sm font-semibold shrink-0 ${amountColorClass}`}>
-            {amountPrefix}{formatCurrency(displayAmount, tx.currency)}
-          </p>
-        </div>
-        {/* Row 2: labels | currency */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {contextAccountId !== undefined ? (
-              (tx.type === 'transfer' || isLoanRepayment) && (
-                <span className="text-xs text-muted-foreground">
-                  {isIncoming
-                    ? `← from ${tx.account?.name ?? ''}`
-                    : `→ to ${tx.to_account?.name ?? ''}`}
-                </span>
-              )
-            ) : (
-              <>
-                {tx.account && (
-                  <span className="text-xs text-muted-foreground">{tx.account.name}</span>
-                )}
-                {(tx.type === 'transfer' || isLoanRepayment) && tx.to_account && (
-                  <span className="text-xs text-muted-foreground">→ {tx.to_account.name}</span>
-                )}
-              </>
-            )}
-            {tx.category && (
-              <Badge variant="secondary" className="text-xs py-0 px-1.5">{tx.category.name}</Badge>
-            )}
-            {tx.subcategory && (
-              <Badge variant="outline" className="text-xs py-0 px-1.5">{tx.subcategory.name}</Badge>
-            )}
-            {tx.tags && tx.tags.length > 0 && tx.tags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-[0.625rem] py-0 px-1.5 h-4 text-muted-foreground gap-0.5">
-                # {tag}
-              </Badge>
-            ))}
-            {tx.is_recurring && (
-              <Badge variant="outline" className="text-xs py-0 px-1.5 gap-1">
-                <RepeatIcon className="w-2.5 h-2.5" />{tx.recurrence_interval}
-              </Badge>
-            )}
-            {tx.type === 'transfer' && tx.transfer_fee != null && tx.transfer_fee > 0 && (
-              <span className="text-xs text-muted-foreground">
-                Fee: {formatCurrency(tx.transfer_fee, tx.currency)}
-              </span>
-            )}
-            {tx.receipt_url && (
-              isPendingReceiptReference(tx.receipt_url) ? (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <CloudUpload className="w-3 h-3" />Receipt (syncing…)
-                </span>
-              ) : hasReceipt ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReceiptLoading(true)
-                    setReceiptOpen(true)
-                  }}
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  <ImageIcon className="w-3 h-3" />Receipt
-                </button>
-              ) : null
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground shrink-0">{tx.currency}</p>
-        </div>
-      </div>
-
-      {/* Action buttons — inline on sm+, dropdown on mobile */}
-      <div className="hidden sm:flex items-center gap-1 shrink-0">
-        {/* Edit */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-          onClick={() => onEdit(tx)}
+      ) : (
+        <div
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl text-base"
+          style={{ backgroundColor: `var(--${tx.type}-container)` }}
         >
-          <Pencil className="w-3 h-3" />
-        </Button>
-
-        {/* Split — always reserves space when onSplit is provided */}
-        {onSplit && (
-          tx.type !== 'transfer' && !isLoanRepayment ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-              title="Split transaction"
-              onClick={() => onSplit(tx)}
-            >
-              <Scissors className="w-3 h-3" />
-            </Button>
+          {tx.category ? (
+            tx.category.icon
           ) : (
-            <div className="h-7 w-7 shrink-0" aria-hidden />
-          )
+            <Icon className={cn('size-[17px]', TRANSACTION_TYPE_COLOR[tx.type])} />
+          )}
+        </div>
+      )}
+
+      <button
+        type="button"
+        className="min-w-0 text-left"
+        onClick={() =>
+          openDetail ? openDetail(tx, () => onEdit(tx)) : onEdit(tx)
+        }
+      >
+        <span className="block truncate text-[14px] font-semibold text-foreground">
+          {tx.description}
+        </span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+          {tx.category && (
+            <span className="rounded-full bg-surface-container px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+              {tx.category.name}
+            </span>
+          )}
+          {metaBits.map((bit) => (
+            <span key={bit} className="text-[11px] text-muted-foreground">
+              {bit}
+            </span>
+          ))}
+          {tx.is_recurring && (
+            <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground">
+              <RepeatIcon className="size-2.5" />
+              {tx.recurrence_interval}
+            </span>
+          )}
+          {tx.receipt_url &&
+            (isPendingReceiptReference(tx.receipt_url) ? (
+              <span className="inline-flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                <CloudUpload className="size-2.5" />
+                syncing…
+              </span>
+            ) : hasReceipt ? (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setReceiptLoading(true)
+                  setReceiptOpen(true)
+                }}
+                className="inline-flex items-center gap-0.5 text-[11px] text-primary"
+              >
+                <ImageIcon className="size-2.5" />
+                Receipt
+              </span>
+            ) : null)}
+        </span>
+      </button>
+
+      <p
+        className={cn(
+          'money shrink-0 whitespace-nowrap text-[14px] font-bold',
+          amountColorClass,
         )}
-        {/* Save as template */}
-        {onSaveTemplate && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-            title="Save as template"
-            onClick={() => onSaveTemplate(tx)}
-          >
-            <Bookmark className="w-3 h-3" />
-          </Button>
-        )}
-        {/* Delete */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-          onClick={async () => { await onDelete(tx.id) }}
+      >
+        {amountPrefix}
+        {formatCurrency(displayAmount, tx.currency)}
+      </p>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className={buttonVariants({
+            variant: 'ghost',
+            size: 'icon-sm',
+            className: 'size-8 rounded-full text-muted-foreground',
+          })}
+          aria-label="Transaction actions"
         >
-          <Trash2 className="w-3 h-3" />
-        </Button>
-      </div>
-
-      {/* Mobile: collapsed actions dropdown */}
-      <div className="sm:hidden shrink-0">
-        <DropdownMenu>
-          <DropdownMenuTrigger className={buttonVariants({ variant: 'ghost', size: 'icon', className: 'h-7 w-7 text-muted-foreground hover:text-foreground' })}>
-            <MoreHorizontal className="w-4 h-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(tx)}>
-              <Pencil className="w-4 h-4" />
-              Edit
+          <MoreVertical className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onEdit(tx)}>
+            <Pencil className="size-4" />
+            Edit
+          </DropdownMenuItem>
+          {canSplit && (
+            <DropdownMenuItem onClick={() => onSplit?.(tx)}>
+              <Scissors className="size-4" />
+              Split
             </DropdownMenuItem>
-            {onSplit && tx.type !== 'transfer' && !isLoanRepayment && (
-              <DropdownMenuItem onClick={() => onSplit(tx)}>
-                <Scissors className="w-4 h-4" />
-                Split
-              </DropdownMenuItem>
-            )}
-            {onSaveTemplate && (
-              <DropdownMenuItem onClick={() => onSaveTemplate(tx)}>
-                <Bookmark className="w-4 h-4" />
-                Save as template
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem variant="destructive" onClick={async () => { await onDelete(tx.id) }}>
-              <Trash2 className="w-4 h-4" />
-              Delete
+          )}
+          {onSaveTemplate && (
+            <DropdownMenuItem onClick={() => onSaveTemplate(tx)}>
+              <Bookmark className="size-4" />
+              Save as template
             </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={async () => {
+              await onDelete(tx.id)
+            }}
+          >
+            <Trash2 className="size-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-      {/* Receipt viewer */}
       {hasReceipt && (
         <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
           <DialogContent className="max-w-lg">
@@ -289,7 +250,7 @@ export function TransactionRow({
               <img
                 src={displayedReceiptUrl}
                 alt={`Receipt for ${tx.description}`}
-                className="w-full rounded-lg object-contain max-h-[70vh]"
+                className="max-h-[70vh] w-full rounded-lg object-contain"
               />
             ) : (
               <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">

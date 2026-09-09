@@ -142,3 +142,33 @@ toast).
 
 **Added (restores a Phase 4 loss):** "Delete account" in the hero ⋯ menu, with a
 confirm dialog ("Delete "X"?" → archive explanation → red **Delete Account**).
+
+---
+
+## Phase 6 — Activity
+
+Files: `src/pages/TransactionsPage.tsx` rewritten; `TransactionRow.tsx` reworked.
+
+**Removed:**
+
+- **Import CSV** — `ImportCSVDialog` is no longer surfaced (file kept on disk).
+  `handleImport` / `bulkCreateTransactions` usage removed from the page.
+- **Bulk re-categorize** — the multi-select "Re-categorize" action + its dialog.
+  Bulk **delete** + select-all/deselect are kept. `bulkUpdateCategory` unused here.
+- **Tag filter chips** (desktop chip row) and `activeTagFilter` filtering.
+- **Flat vs. grouped list view** toggle (`prefs.txView`). Activity is always
+  grouped by date now.
+- **Mobile filter sheet** (`filtersOpen` bottom sheet: period / type / tag / view /
+  import / select). Mobile now wraps the same search + segmented + month pill +
+  Select controls inline.
+- **Keyboard-shortcut hint badge** ("⌨ N") in the header. The `n` shortcut still
+  works.
+- **`TransactionRow` always-visible action icons** (Edit / Split / Save template /
+  Delete on ≥sm) collapsed to a single ⋯ menu on every breakpoint. The mobile ⋯
+  is a dropdown menu, **not a bottom sheet** (the mockup shows a bottom sheet).
+- **`TransactionRow` meta**: dropped the **subcategory** badge, the per-tag
+  **`#tag`** badges, and the inline **transfer-fee** text. Category is a plain
+  pill; recurring + receipt indicators kept (condensed).
+
+**Retained beyond the mockup:** the templates "Quick add" strip (the handoff
+doesn't show it) so the row's "Save as template" action still has a consumer.

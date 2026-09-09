@@ -1,0 +1,17 @@
+# Supabase
+.branches
+.temp
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local
+
+# Local-only copy of production data (real personal financial data — never commit)
+seed.sql
+*.dump
+prod_*.sql
+
+# Local baseline schema, regenerated from prod via `supabase db dump --linked`.
+# Un-ignore + commit this if you need `supabase start` to work on a fresh clone.
+migrations/00000000000000_remote_schema.sql

@@ -41,6 +41,13 @@ import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -62,6 +69,17 @@ function localDateStr(date: Date) {
 }
 
 type Preset = 'this_month' | 'last_month' | 'last_3m' | 'last_6m' | 'this_year' | 'all_time' | 'custom'
+
+const PRESET_OPTIONS: [Preset, string][] = [
+  ['this_month', 'This Month'],
+  ['last_month', 'Last Month'],
+  ['last_3m', 'Last 3 Months'],
+  ['last_6m', 'Last 6 Months'],
+  ['this_year', 'This Year'],
+  ['all_time', 'All Time'],
+  ['custom', 'Custom'],
+]
+const PRESET_LABELS = Object.fromEntries(PRESET_OPTIONS) as Record<Preset, string>
 
 function resolvePreset(preset: Preset): { start: string; end: string } {
   const now = new Date()
@@ -370,7 +388,6 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [presetName, setPresetName] = useState('')
   const { presets: savedPresets, savePreset, deletePreset } = useReportPresets()
-  const [dateRangeOpen, setDateRangeOpen] = useState(false)
   const [presetsOpen, setPresetsOpen] = useState(false)
 
   const { start, end } = useMemo(() => {
@@ -658,34 +675,79 @@ export default function ReportsPage() {
 
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
       {/* Mobile-only controls row */}
-      <div className="flex items-end gap-3 md:hidden">
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <span className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground px-0.5">Date Range</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 w-full justify-start"
-            onClick={() => setDateRangeOpen(true)}
-          >
-            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">{presetLabel}</span>
-          </Button>
+      <div className="flex flex-col gap-3 md:hidden">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="px-0.5 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              Date Range
+            </span>
+            <Select
+              value={preset}
+              onValueChange={(v) => setPreset(v as Preset)}
+            >
+              <SelectTrigger className="h-9 w-full text-[0.8125rem]">
+                <SelectValue>
+                  {(v: string | null) =>
+                    v ? PRESET_LABELS[v as Preset] : 'Date range'
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {PRESET_OPTIONS.map(([p, label]) => (
+                  <SelectItem key={p} value={p}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="px-0.5 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              Saved Presets
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 w-full justify-start gap-1.5"
+              onClick={() => setPresetsOpen(true)}
+            >
+              <Bookmark className="size-3.5 shrink-0" />
+              <span className="truncate">Presets</span>
+              {savedPresets.length > 0 && (
+                <span className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[0.625rem]">
+                  {savedPresets.length}
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <span className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground px-0.5">Saved Presets</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 w-full justify-start"
-            onClick={() => setPresetsOpen(true)}
-          >
-            <Bookmark className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Presets</span>
-            {savedPresets.length > 0 && (
-              <span className="ml-auto text-[0.625rem] bg-muted rounded px-1.5 py-0.5">{savedPresets.length}</span>
+        {preset === 'custom' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
+              <Input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="h-9 w-full min-w-0 text-[0.8125rem]"
+              />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
+              <Input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="h-9 w-full min-w-0 text-[0.8125rem]"
+              />
+            </div>
+            {customStart && customEnd && customStart > customEnd && (
+              <p className="col-span-2 text-xs text-destructive">
+                Start date must be on or before end date.
+              </p>
             )}
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Date controls */}
@@ -696,21 +758,13 @@ export default function ReportsPage() {
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
           <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Date Range</span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {([
-            ['this_month', 'This Month'],
-            ['last_month', 'Last Month'],
-            ['last_3m', 'Last 3 Months'],
-            ['last_6m', 'Last 6 Months'],
-            ['this_year', 'This Year'],
-            ['all_time', 'All Time'],
-            ['custom', 'Custom'],
-          ] as [Preset, string][]).map(([p, label]) => (
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+          {PRESET_OPTIONS.map(([p, label]) => (
             <button
               key={p}
               onClick={() => setPreset(p)}
               className={cn(
-                'px-3 py-1.5 rounded-lg text-[0.6875rem] font-medium tracking-wide border transition-all duration-150',
+                'shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-[0.6875rem] font-medium tracking-wide transition-all duration-150',
                 preset === p
                   ? 'border-transparent'
                   : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
@@ -1222,72 +1276,6 @@ export default function ReportsPage() {
           <ThirteenthMonthPage />
         </TabsContent>
       </Tabs>
-
-      {/* Mobile: Date Range modal */}
-      <Dialog open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Date Range</DialogTitle>
-          </DialogHeader>
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-            {([
-              ['this_month', 'This Month'],
-              ['last_month', 'Last Month'],
-              ['last_3m', 'Last 3 Months'],
-              ['last_6m', 'Last 6 Months'],
-              ['this_year', 'This Year'],
-              ['all_time', 'All Time'],
-              ['custom', 'Custom'],
-            ] as [Preset, string][]).map(([p, label]) => (
-              <button
-                key={p}
-                onClick={() => { setPreset(p); if (p !== 'custom') setDateRangeOpen(false) }}
-                className={cn(
-                  'shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-[0.6875rem] font-medium tracking-wide transition-all duration-150',
-                  preset === p
-                    ? 'border-transparent'
-                    : 'border-border/60 text-muted-foreground hover:border-border hover:text-foreground'
-                )}
-                style={preset === p ? { background: GOLD, color: 'var(--primary-foreground)' } : {}}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {preset === 'custom' && (
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
-                  <Input
-                    type="date"
-                    value={customStart}
-                    onChange={(e) => setCustomStart(e.target.value)}
-                    className="h-9 w-full min-w-0 text-[0.8125rem]"
-                  />
-                </div>
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
-                  <Input
-                    type="date"
-                    value={customEnd}
-                    onChange={(e) => setCustomEnd(e.target.value)}
-                    className="h-9 w-full min-w-0 text-[0.8125rem]"
-                  />
-                </div>
-              </div>
-              {customStart && customEnd && customStart > customEnd && (
-                <p className="text-xs text-destructive">
-                  Start date must be on or before end date.
-                </p>
-              )}
-            </div>
-          )}
-          <Button size="sm" className="w-full" onClick={() => setDateRangeOpen(false)}>
-            Done
-          </Button>
-        </DialogContent>
-      </Dialog>
 
       {/* Mobile: Saved Presets modal */}
       <Dialog open={presetsOpen} onOpenChange={setPresetsOpen}>

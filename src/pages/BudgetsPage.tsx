@@ -1036,7 +1036,7 @@ export default function BudgetsPage() {
       <CycleStepper className="hidden md:flex" />
       {budgetError && <p role="alert" className="rounded-xl bg-expense-container text-expense p-4 text-sm">{budgetError}</p>}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full border-transparent bg-surface-container sm:w-fit">
+        <TabsList className="w-full border-transparent bg-surface-container sm:w-fit sm:self-end">
           <TabsTrigger
             value="budgets"
             className="gap-1.5 whitespace-nowrap px-2.5 sm:px-4"

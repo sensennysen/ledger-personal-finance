@@ -833,34 +833,28 @@ export default function AccountsPage() {
       ) : (
         <>
           {/* Breakdown */}
-          <div className="flex flex-col gap-3 rounded-[20px] bg-card p-5 sm:flex-row sm:items-center sm:gap-5 sm:px-7">
-            <div className="flex min-w-0 items-baseline justify-between gap-3 sm:flex-1 sm:flex-col sm:items-start sm:gap-0">
+          <div className="flex flex-col gap-3 rounded-[20px] bg-card p-5 lg:flex-row lg:items-center lg:gap-6 lg:px-7">
+            <div className="flex min-w-0 items-baseline justify-between gap-3 lg:flex-1 lg:flex-col lg:items-start lg:gap-0">
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-income">
                 Assets
               </span>
-              <p className="money min-w-0 truncate text-[18px] font-bold text-foreground sm:mt-1.5 sm:text-[24px]">
+              <p className="money min-w-0 truncate text-[18px] font-bold text-foreground lg:mt-1.5 lg:text-[22px] xl:text-[26px]">
                 {formatCurrency(summary.totalAssets, defaultCurrency)}
               </p>
             </div>
-            <span className="hidden text-[22px] font-light text-muted-foreground sm:block">
-              &minus;
-            </span>
-            <div className="flex min-w-0 items-baseline justify-between gap-3 sm:flex-1 sm:flex-col sm:items-start sm:gap-0">
+            <div className="flex min-w-0 items-baseline justify-between gap-3 lg:flex-1 lg:flex-col lg:items-start lg:gap-0">
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-expense">
                 Liabilities
               </span>
-              <p className="money min-w-0 truncate text-[18px] font-bold text-foreground sm:mt-1.5 sm:text-[24px]">
+              <p className="money min-w-0 truncate text-[18px] font-bold text-foreground lg:mt-1.5 lg:text-[22px] xl:text-[26px]">
                 {formatCurrency(liabilitiesTotal, defaultCurrency)}
               </p>
             </div>
-            <span className="hidden text-[22px] font-light text-muted-foreground sm:block">
-              =
-            </span>
-            <div className="flex min-w-0 items-baseline justify-between gap-3 border-t border-outline-variant pt-3 sm:flex-1 sm:flex-col sm:items-start sm:gap-0 sm:border-l-2 sm:border-t-0 sm:pl-5 sm:pt-0">
+            <div className="flex min-w-0 items-baseline justify-between gap-3 border-t border-outline-variant pt-3 lg:flex-1 lg:flex-col lg:items-start lg:gap-0 lg:border-l-2 lg:border-t-0 lg:pl-6 lg:pt-0">
               <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
                 Net Worth
               </span>
-              <p className="money min-w-0 truncate text-[19px] font-bold text-foreground sm:mt-1.5 sm:text-[26px]">
+              <p className="money min-w-0 truncate text-[19px] font-bold text-foreground lg:mt-1.5 lg:text-[24px] xl:text-[28px]">
                 {formatCurrency(summary.netWorth, defaultCurrency)}
               </p>
             </div>

@@ -172,3 +172,24 @@ Files: `src/pages/TransactionsPage.tsx` rewritten; `TransactionRow.tsx` reworked
 
 **Retained beyond the mockup:** the templates "Quick add" strip (the handoff
 doesn't show it) so the row's "Save as template" action still has a consumer.
+
+---
+
+## Phase 7 — Budgets & Goals
+
+File: `src/pages/BudgetsPage.tsx` — mostly a **restyle** (the handoff keeps all
+three tabs and every modal). Goal cards, the history table, and all modals inherit
+the new primitive + token styling with no structural change.
+
+**Removed / changed on the budget card:**
+
+- Separate Edit + Delete icon buttons consolidated into one ⋯ menu.
+- The detailed rollover breakdown box (Base budget / Rollover surplus rows)
+  replaced with a single "+$X rolled in" line (per the mockup).
+- The explicit "Effective: $X" / "Budget: $X" line and the "View covered
+  transactions" hint line removed. The whole card is still clickable to open the
+  covered-transactions dialog.
+- "Warning" threshold badge now uses `--gold`; rollover badge uses `--transfer`.
+- Tabs restyled to a `w-fit` surface-container pill (was a full-width 3-col grid).
+- `CycleStepper` kept on desktop Budgets even though the mockup shows no month
+  control (period selection has to come from somewhere).

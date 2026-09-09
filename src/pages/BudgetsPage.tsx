@@ -19,7 +19,15 @@ import { CURRENCIES, ACCOUNT_COLORS } from '@/types'
 import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
 import { INCOME, EXPENSE } from '@/constants/colors'
 import { BUDGET_WARNING_THRESHOLD, DEFAULT_CURRENCY } from '@/constants/accounts'
+import { MoreVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -1001,20 +1009,26 @@ export default function BudgetsPage() {
   const monthlyBudgets = budgets.filter((b) => b.period === 'monthly')
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-6xl space-y-5 p-4 md:p-8">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Budgets & Goals</h1>
-          <p className="text-muted-foreground text-sm">Track spending limits and savings targets</p>
+          <h1 className="text-[26px] font-bold tracking-[-0.01em] text-foreground">
+            Budgets &amp; Goals
+          </h1>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            Track spending limits and savings targets
+          </p>
         </div>
         {activeTab === 'budgets' && (
-          <Button className="gap-2" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4" />Add Budget
+          <Button className="shrink-0 gap-2 max-md:size-10 max-md:p-0" onClick={() => setCreateOpen(true)}>
+            <Plus className="size-4" />
+            <span className="hidden md:inline">Add Budget</span>
           </Button>
         )}
         {activeTab === 'goals' && (
-          <Button className="gap-2" size="sm" onClick={() => setCreateGoalOpen(true)}>
-            <Plus className="w-4 h-4" />Add Goal
+          <Button className="shrink-0 gap-2 max-md:size-10 max-md:p-0" onClick={() => setCreateGoalOpen(true)}>
+            <Plus className="size-4" />
+            <span className="hidden md:inline">Add Goal</span>
           </Button>
         )}
       </div>
@@ -1022,15 +1036,15 @@ export default function BudgetsPage() {
       <CycleStepper className="hidden md:flex" />
       {budgetError && <p role="alert" className="rounded-xl bg-expense-container text-expense p-4 text-sm">{budgetError}</p>}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="budgets" className="gap-1.5">
-            <Target className="w-3.5 h-3.5" />Budgets
+        <TabsList className="w-fit border-transparent bg-surface-container">
+          <TabsTrigger value="budgets" className="gap-1.5 px-4">
+            <Target className="size-3.5" />Budgets
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-1.5">
-            <History className="w-3.5 h-3.5" />Budget history
+          <TabsTrigger value="history" className="gap-1.5 px-4">
+            <History className="size-3.5" />Budget History
           </TabsTrigger>
-          <TabsTrigger value="goals" className="gap-1.5">
-            <PiggyBank className="w-3.5 h-3.5" />Savings Goals
+          <TabsTrigger value="goals" className="gap-1.5 px-4">
+            <PiggyBank className="size-3.5" />Savings Goals
           </TabsTrigger>
         </TabsList>
 
@@ -1057,11 +1071,11 @@ export default function BudgetsPage() {
               const hasRollover = budget.rollover_enabled && rollover !== 0
 
               return (
-                <Card
+                <div
                   key={budget.id}
                   role="button"
                   tabIndex={0}
-                  className="animate-fade-up cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="animate-fade-up cursor-pointer rounded-[20px] bg-card p-[18px] shadow-[var(--el1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties}
                   onClick={() => setSelectedBudget(budget)}
                   onKeyDown={(event) => {
@@ -1071,122 +1085,102 @@ export default function BudgetsPage() {
                     }
                   }}
                 >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        {budget.category && <span className="text-xl">{budget.category.icon}</span>}
-                        <div>
-                          <CardTitle className="text-base">{budget.name}</CardTitle>
-                          <div className="flex gap-1 mt-0.5 flex-wrap">
-                            <Badge variant="outline" className="text-xs">{BUDGET_PERIOD_LABELS[budget.period]}</Badge>
-                            {budget.category && (
-                              <Badge variant="secondary" className="text-xs">{budget.category.name}</Badge>
-                            )}
-                            {budget.rollover_enabled && (
-                              <Badge variant="outline" className="text-xs gap-0.5 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                                <RefreshCw className="w-2.5 h-2.5" />Rollover
-                              </Badge>
-                            )}
-                            {over && (
-                              <Badge variant="destructive" className="text-xs">Over budget</Badge>
-                            )}
-                            {!over && pct >= BUDGET_WARNING_THRESHOLD * 100 && (
-                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700">Warning</Badge>
-                            )}
-                          </div>
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      {budget.category && <span className="text-[22px]">{budget.category.icon}</span>}
+                      <div>
+                        <p className="text-[14px] font-semibold text-foreground">{budget.name}</p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          <span className="rounded-full border border-outline px-2 py-px text-[10.5px] font-semibold text-muted-foreground">
+                            {BUDGET_PERIOD_LABELS[budget.period]}
+                          </span>
+                          {budget.category && (
+                            <span className="rounded-full bg-surface-container px-2 py-px text-[10.5px] font-semibold text-muted-foreground">
+                              {budget.category.name}
+                            </span>
+                          )}
+                          {budget.rollover_enabled && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-transfer-container px-2 py-px text-[10.5px] font-semibold text-transfer">
+                              <RefreshCw className="size-2.5" />Rollover
+                            </span>
+                          )}
+                          {over && (
+                            <span className="rounded-full bg-expense-container px-2 py-px text-[10.5px] font-bold text-expense">
+                              Over budget
+                            </span>
+                          )}
+                          {!over && pct >= BUDGET_WARNING_THRESHOLD * 100 && (
+                            <span className="rounded-full bg-gold-container px-2 py-px text-[10.5px] font-bold text-gold">
+                              Warning
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={(event) => {
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        onClick={(event) => event.stopPropagation()}
+                        className={buttonVariants({ variant: 'ghost', size: 'icon-sm', className: 'size-7 rounded-full text-muted-foreground' })}
+                        aria-label={`Actions for ${budget.name}`}
+                      >
+                        <MoreVertical className="size-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(event) => { event.stopPropagation(); setEditBudget(budget) }}>
+                          <Pencil className="size-4" />Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={async (event) => {
                             event.stopPropagation()
-                            setEditBudget(budget)
+                            const { error } = await deleteBudget(budget.id)
+                            if (error) console.error('Failed to delete budget:', error)
                           }}
                         >
-                          <Pencil className="w-3 h-3" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger render={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive"
-                              onClick={(event) => event.stopPropagation()}
-                            />
-                          }>
-                            <Trash2 className="w-3 h-3" />
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete budget?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete "{budget.name}".
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={async () => {
-                                const { error } = await deleteBudget(budget.id)
-                                if (error) console.error('Failed to delete budget:', error)
-                              }}>Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
+                          <Trash2 className="size-4" />Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <div className="space-y-2">
                     {hasRollover && (
-                      <div className="flex flex-col gap-0.5 text-xs mb-1 p-2 rounded-md bg-muted/50">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Base budget</span>
-                          <span>{formatCurrency(budget.amount, budget.currency)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="flex items-center gap-1 text-muted-foreground">
-                            <RefreshCw className="w-2.5 h-2.5" />
-                            {rollover >= 0 ? 'Rollover surplus' : 'Rollover debt'}
-                          </span>
-                          <span className={rollover >= 0 ? 'text-income dark:text-income' : 'text-destructive'}>
-                            {rollover >= 0 ? '+' : ''}{formatCurrency(rollover, budget.currency)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    <Progress
-                      value={pct}
-                      className={over ? '[&>div]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-yellow-500' : ''}
-                    />
-                    {budget.currency !== defaultCurrency && (
-                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                        Budget is in {budget.currency} — transactions in other currencies are converted using their exchange rate.
+                      <p className="text-[11px] text-income">
+                        {rollover >= 0 ? '+' : ''}
+                        {formatCurrency(rollover, budget.currency)} rolled in
                       </p>
                     )}
-                    <div className="flex justify-between text-sm">
-                      <span className={over ? 'text-destructive font-medium' : 'text-muted-foreground'}>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-container">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.min(100, pct)}%`,
+                          background: over ? 'var(--expense)' : 'var(--income)',
+                        }}
+                      />
+                    </div>
+                    {budget.currency !== defaultCurrency && (
+                      <p className="text-[11px] text-gold">
+                        Budget is in {budget.currency} — other currencies are converted at their exchange rate.
+                      </p>
+                    )}
+                    <div className="flex justify-between text-[12.5px]">
+                      <span className="money text-foreground">
                         {formatCurrency(spent, budget.currency)} spent
                       </span>
-                      <span className="font-medium">
-                        {over
-                          ? <span className="text-destructive">{formatCurrency(Math.abs(remaining), budget.currency)} over</span>
-                          : <span style={{ color: INCOME }}>{formatCurrency(remaining, budget.currency)} left</span>
-                        }
+                      <span className="money font-semibold">
+                        {over ? (
+                          <span className="text-expense">
+                            +{formatCurrency(Math.abs(remaining), budget.currency)} over
+                          </span>
+                        ) : (
+                          <span className="text-income">
+                            {formatCurrency(remaining, budget.currency)} left
+                          </span>
+                        )}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground text-right">
-                      {hasRollover
-                        ? `Effective: ${formatCurrency(effective, budget.currency)}`
-                        : `Budget: ${formatCurrency(budget.amount, budget.currency)}`}
-                    </p>
-                    <p className="flex items-center justify-end gap-1 text-xs text-primary">
-                      <CalendarDays className="h-3 w-3" />
-                      View covered transactions
-                    </p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               )
             })
           )}

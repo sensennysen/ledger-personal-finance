@@ -26,3 +26,12 @@ dist-ssr
 
 # Local-only codebase atlas
 .codebase-map/
+
+# Environment secrets
+.env
+
+# Local database dumps (contain production data)
+supabase/prod_dump_*.sql
+
+# Graphify output
+graphify-out/

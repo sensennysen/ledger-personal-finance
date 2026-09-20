@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import type { CreateLoanPurchaseValues } from '@/hooks/useLoanPurchases'
 import { calculateFlatMonthlyInstallment, roundMoney } from '@/lib/loanInstallments'
+import { MAX_MONTHLY_INTEREST_PCT, monthlyRateSchema } from '@/lib/loanRate'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import type { Category, LoanPurchase } from '@/types'
 
@@ -17,7 +18,7 @@ const purchaseSchema = z.object({
   category_id: z.string().min(1, 'Expense category is required'),
   principal_amount: z.coerce.number().positive('Purchase amount must be positive'),
   term_months: z.coerce.number().int().min(1).max(120),
-  monthly_interest_rate: z.coerce.number().min(0, 'Interest cannot be negative'),
+  monthly_interest_rate: monthlyRateSchema,
   monthly_installment: z.coerce.number().positive('Monthly installment must be positive'),
   opening_installments_paid: z.coerce.number().int().min(0, 'Paid installments cannot be negative'),
   first_due_date: z.string().min(1, 'First due date is required'),
@@ -64,10 +65,22 @@ export function LoanPurchaseForm({ accountId, currency, categories, initialValue
   const installment = useWatch({ control: form.control, name: 'monthly_installment' })
   const installmentsPaid = useWatch({ control: form.control, name: 'opening_installments_paid' })
 
+  const rateValue = Number(rate)
+  const computedInstallment = calculateFlatMonthlyInstallment(
+    Number(principal),
+    Number(termMonths),
+    rateValue > MAX_MONTHLY_INTEREST_PCT ? 0 : rateValue,
+  )
+
   useEffect(() => {
     if (installmentEdited) return
-    form.setValue('monthly_installment', calculateFlatMonthlyInstallment(Number(principal), Number(termMonths), Number(rate)))
-  }, [form, installmentEdited, principal, rate, termMonths])
+    form.setValue('monthly_installment', computedInstallment)
+  }, [form, installmentEdited, computedInstallment])
+
+  const recalculateInstallment = () => {
+    setInstallmentEdited(false)
+    form.setValue('monthly_installment', computedInstallment, { shouldDirty: true, shouldValidate: true })
+  }
 
   const totalPayable = roundMoney(Number(installment || 0) * Number(termMonths || 0))
   const openingPaidAmount = roundMoney(Math.min(totalPayable, Number(installment || 0) * Number(installmentsPaid || 0)))
@@ -192,7 +205,12 @@ export function LoanPurchaseForm({ accountId, currency, categories, initialValue
                 </FormItem>
               )} />
             </div>
-            <p className="text-xs text-muted-foreground">Estimated using flat monthly interest. You can replace it with the lender's quoted installment.</p>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs text-muted-foreground">Estimated using flat monthly interest. You can replace it with the lender's quoted installment.</p>
+              {installmentEdited && Number(installment) !== computedInstallment && (
+                <Button type="button" variant="link" size="sm" className="h-auto shrink-0 p-0 text-xs" onClick={recalculateInstallment}>Recalculate</Button>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <FormField control={form.control} name="first_due_date" render={({ field }) => (
                 <FormItem>

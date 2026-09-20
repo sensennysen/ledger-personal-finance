@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Download,
   TrendingUp,
@@ -10,6 +11,7 @@ import {
   Bookmark,
   BookmarkPlus,
   Trash2,
+  ArrowUpRight,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -43,7 +45,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { InlineLoadError } from '@/components/ui/error-state'
 import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
-import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
+import { resolveReportTab } from '@/lib/reportTabs'
 import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
@@ -607,9 +609,15 @@ export default function ReportsPage() {
             <TabsList className="h-8">
               <TabsTrigger value="overview" className="text-xs h-7 px-3">Overview</TabsTrigger>
               <TabsTrigger value="analytics" className="text-xs h-7 px-3">Analytics</TabsTrigger>
-              <TabsTrigger value="thirteenth" className="text-xs h-7 px-3">13th Month</TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
+              <Link
+                to="/thirteenth-month"
+                className="inline-flex items-center gap-1 shrink-0 text-xs font-medium text-muted-foreground hover:text-primary"
+              >
+                13th Month Pay
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
               <Button
                 onClick={handleExport}
                 disabled={loading || filtered.length === 0}
@@ -752,7 +760,7 @@ export default function ReportsPage() {
                   onClick={() => {
                     setPreset(p.preset as Preset)
                     if (p.preset === 'custom') { setCustomStart(p.startDate ?? ''); setCustomEnd(p.endDate ?? '') }
-                    setActiveTab(p.activeTab ?? 'overview')
+                    setActiveTab(resolveReportTab(p.activeTab))
                   }}
                 >{p.name}</button>
                 <button className="ml-1 text-muted-foreground hover:text-destructive" onClick={() => deletePreset(p.id)}>
@@ -1203,10 +1211,6 @@ export default function ReportsPage() {
           </div>
 
         </TabsContent>
-
-        <TabsContent value="thirteenth" className="mt-0 -mx-4 md:-mx-6">
-          <ThirteenthMonthPage />
-        </TabsContent>
       </Tabs>
 
       {/* Mobile: Date Range modal */}
@@ -1294,7 +1298,7 @@ export default function ReportsPage() {
                     onClick={() => {
                       setPreset(p.preset as Preset)
                       if (p.preset === 'custom') { setCustomStart(p.startDate ?? ''); setCustomEnd(p.endDate ?? '') }
-                      setActiveTab(p.activeTab ?? 'overview')
+                      setActiveTab(resolveReportTab(p.activeTab))
                       setPresetsOpen(false)
                     }}
                   >{p.name}</button>

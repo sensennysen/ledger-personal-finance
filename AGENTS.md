@@ -3,11 +3,12 @@
 Ledger: a self-hostable personal finance app. React 19 + TypeScript + Vite + Supabase + Tailwind. Deployed on Vercel.
 
 ## Commands
-- `npm ci` — install (npm + `package-lock.json` only; `.npmrc` sets `legacy-peer-deps`). Do not commit pnpm files.
-- `npm run dev` — local server.
-- `npm run lint` — ESLint.
-- `npm run build` — `tsc -b` then `vite build`.
-- `npm test` — all `tests/*.test.mjs` via `node --test`, then `tests/redesign.mjs`.
+- `pnpm install` — install (pnpm + `pnpm-lock.yaml` only; CI uses `--frozen-lockfile`). Do not use npm or commit `package-lock.json`. pnpm settings/overrides live in `pnpm-workspace.yaml`.
+- `pnpm dev` — local Vite server. `pnpm dev:all` — start local Supabase, then Vite.
+- `pnpm lint` — ESLint.
+- `pnpm build` — `tsc -b` then `vite build`.
+- `pnpm test` — all `tests/*.test.mjs` via `node --test`, then `tests/redesign.mjs`.
+- `pnpm db:start|stop|status|reset|migrate|new|diff` — local Supabase (see README). `pnpm db:push:remote` touches the linked remote; never run it without being asked.
 
 CI (`.github/workflows/ci.yml`) runs lint, build and test on every PR and on push to `main`. Keep all three green.
 

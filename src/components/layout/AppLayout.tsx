@@ -11,6 +11,7 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { TopBar } from './TopBar'
+import { PageHeader } from './PageHeader'
 import BottomNav from './BottomNav'
 import { OfflineBanner } from './OfflineBanner'
 import { QueueReviewSheet } from './QueueReviewSheet'
@@ -140,6 +141,7 @@ function LayoutShell() {
     >
       <div className="flex h-dvh w-full max-w-full flex-col bg-background overflow-hidden">
         <TopBar avatar={avatar} onAvatarClick={() => setSheet('account')} />
+        <PageHeader />
         <div className="flex flex-1 min-h-0 min-w-0">
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
           <OfflineBanner status={networkStatus} onReview={() => setReviewOpen(true)} />

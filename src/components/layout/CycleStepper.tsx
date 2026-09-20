@@ -3,7 +3,13 @@ import { useCycle } from '@/contexts/cycleState'
 import { getCurrentCycleMonthKey, getCustomMonthRange } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
-export function CycleStepper({ className = '' }: { className?: string }) {
+export function CycleStepper({
+  className = '',
+  variant = 'full',
+}: {
+  className?: string
+  variant?: 'full' | 'bar'
+}) {
   const { selectedMonth, setSelectedMonth, startDay } = useCycle()
   const current = selectedMonth >= getCurrentCycleMonthKey(startDay)
   const [year, month] = selectedMonth.split('-').map(Number)
@@ -17,6 +23,37 @@ export function CycleStepper({ className = '' }: { className?: string }) {
     const date = new Date(year, month - 1 + delta, 1)
     setSelectedMonth(
       `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+    )
+  }
+  if (variant === 'bar') {
+    return (
+      <div
+        className={`flex items-center gap-1 ${className}`}
+        role="group"
+        aria-label="Cycle"
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Previous cycle"
+          onClick={() => move(-1)}
+        >
+          <ChevronLeft />
+        </Button>
+        <span className="min-w-36 text-center text-[0.8125rem] font-semibold">
+          {label(range.start)} – {label(range.end)} ·{' '}
+          {current ? 'Open' : 'Closed'}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Next cycle"
+          disabled={current}
+          onClick={() => move(1)}
+        >
+          <ChevronRight />
+        </Button>
+      </div>
     )
   }
   return (

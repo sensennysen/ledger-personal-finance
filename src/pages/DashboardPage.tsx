@@ -2,7 +2,6 @@ import { WidgetDragContext } from '@/contexts/widgetDragState'
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
-  ChevronLeft,
   ChevronRight,
   Plus,
   TrendingDown,
@@ -39,6 +38,7 @@ import { DashboardUpcomingBillsCard } from '@/components/dashboard/DashboardUpco
 import { DashboardCashFlowForecastCard } from '@/components/dashboard/DashboardCashFlowForecastCard'
 import { getCreditCardSpending } from '@/lib/creditCards'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
+import { PageActions } from '@/components/layout/PageActions'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 
 function StatCard({
@@ -129,19 +129,9 @@ function StatCard({
   )
 }
 
-function getMonthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
-
 function formatMonthLabel(key: string) {
   const [year, month] = key.split('-').map(Number)
   return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-}
-
-function addMonths(key: string, delta: number) {
-  const [year, month] = key.split('-').map(Number)
-  const date = new Date(year, month - 1 + delta, 1)
-  return getMonthKey(date)
 }
 
 export default function DashboardPage() {
@@ -153,7 +143,7 @@ export default function DashboardPage() {
   const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
   const { categories } = useCategories()
   const { purchases: loanPurchases, allocations: loanAllocations, loading: loansLoading, error: loansError, refetch: refetchLoans } = useLoanPurchases()
-  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
+  const { startDay, selectedMonth } = useCycle()
   const { budgets } = useBudgets({ selectedMonth, startDay })
   const [chartPeriod, setChartPeriod] = useState<DashboardChartPeriod>('month')
   const [detailView, setDetailView] = useState<DashboardDetailView>(null)
@@ -288,32 +278,17 @@ export default function DashboardPage() {
         style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }}
       />
 
-      <div className="hidden md:flex items-center gap-2 lg:col-span-2">
-        <div className="flex items-center gap-1 bg-muted/40 rounded-xl px-2 py-1.5 flex-1">
-          <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => setSelectedMonth((month) => addMonths(month, -1))}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-sm font-semibold flex-1 text-center">{monthLabel}</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Next month"
-            onClick={() => setSelectedMonth((month) => addMonths(month, 1))}
-            disabled={isCurrentMonth}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
+      <PageActions>
         <TransactionKindMenu
           onSelect={openAddTransactionModal}
           trigger={
-            <Button className="hidden md:inline-flex gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0">
+            <Button className="gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0">
               <Plus className="w-3.5 h-3.5" />
               Add Transaction
             </Button>
           }
         />
-      </div>
+      </PageActions>
 
       {loadFailed && !loading && (
         <div className="lg:col-span-2" style={{ order: -1 }}>

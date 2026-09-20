@@ -34,6 +34,7 @@ export interface Profile {
   avatar_url: string | null
   default_currency: string
   month_start_day: number
+  budget_deficit_behaviour?: 'carry' | 'reset' | null
   dashboard_widget_order?: string[] | null
   account_group_order?: AccountType[] | null
   account_view_mode?: 'all' | AccountType | null

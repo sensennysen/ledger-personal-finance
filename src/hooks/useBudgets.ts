@@ -6,7 +6,7 @@ import type { Budget, BudgetHistoryEntry } from '@/types'
 import { getCurrentCycleMonthKey } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { sumBudgetSpend } from '@/lib/budgetSpend'
-import { canRollover, nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
+import { canRollover, isDeficitBehaviour, nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 
 function localDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -17,10 +17,11 @@ export function useBudgets(
     selectedMonth: string
     startDay: number
   },
-  // TODO(LED-20): read the global budget_deficit_behaviour setting
-  deficitBehaviour: DeficitBehaviour = 'carry',
+  deficitOverride?: DeficitBehaviour,
 ) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
+  const deficitBehaviour: DeficitBehaviour =
+    deficitOverride ?? (isDeficitBehaviour(profile?.budget_deficit_behaviour) ? profile.budget_deficit_behaviour : 'carry')
   const selectedMonth = cycle?.selectedMonth
   const startDay = cycle?.startDay ?? 1
   const [budgets, setBudgets] = useState<Budget[]>([])

@@ -19,6 +19,8 @@ import { CycleStepper } from './CycleStepper'
 import { CycleProvider } from '@/contexts/CycleContext'
 import { EntryContext } from '@/contexts/EntryContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { InlineLoadError } from '@/components/ui/error-state'
+import { authErrorActionLabel } from '@/lib/authErrors'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -59,7 +61,7 @@ export default function AppLayout() {
 function LayoutShell() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, refreshProfile, authError } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const mobile = useMediaQuery('(max-width: 767px)')
   const desktop = useMediaQuery('(min-width: 1024px)')
@@ -141,6 +143,19 @@ function LayoutShell() {
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
           <OfflineBanner status={networkStatus} onReview={() => setReviewOpen(true)} />
           <QueueReviewSheet open={reviewOpen} onOpenChange={setReviewOpen} status={networkStatus} />
+          {authError && (
+            <div className="shrink-0 px-4 pt-3 md:px-6">
+              <InlineLoadError
+                message={authError.message}
+                actionLabel={authErrorActionLabel(authError.kind)}
+                onRetry={() => {
+                  if (authError.kind === 'signout') void signOut()
+                  else if (authError.kind === 'profile') void refreshProfile()
+                  else window.location.reload()
+                }}
+              />
+            </div>
+          )}
           <header className="md:hidden shrink-0 bg-background">
             <div className="flex items-center justify-between gap-3 h-16 px-4">
               <div className="min-w-0">
@@ -334,7 +349,7 @@ function LayoutShell() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => void signOut()}
+                  onClick={() => void signOut().then((ok) => { if (!ok) setSheet(null) })}
                   className="w-full text-expense"
                 >
                   <LogOut />

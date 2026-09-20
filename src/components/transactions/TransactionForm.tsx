@@ -24,8 +24,15 @@ import { TransactionReceiptField } from '@/components/transactions/TransactionRe
 import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { CURRENCIES } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
-import { getLocalDateString } from '@/lib/utils'
+import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
+import { daysUntilDayOfMonth } from '@/lib/creditCards'
+import {
+  defaultCardPaymentDescription,
+  getCardPaymentPresets,
+  getCardPaymentSummary,
+  isCardPaymentDescription,
+} from '@/lib/cardPayment'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -41,6 +48,7 @@ interface TransactionFormProps {
   onClose: () => void
   lockedAccountId?: string
   lockedLoanAccountId?: string
+  lockedCardAccountId?: string
   submitLabel?: string
   entryKind?: TransactionKind
 }
@@ -51,6 +59,7 @@ export function TransactionForm({
   onClose,
   lockedAccountId,
   lockedLoanAccountId,
+  lockedCardAccountId,
   submitLabel = 'Save Transaction',
   entryKind,
 }: TransactionFormProps) {
@@ -72,7 +81,7 @@ export function TransactionForm({
     defaultValues: {
       type: entryKind && entryKind !== 'loan-repayment' && entryKind !== 'card-payment' ? entryKind : 'expense',
       account_id: lockedAccountId ?? accounts[0]?.id ?? '',
-      to_account_id: lockedLoanAccountId ?? null,
+      to_account_id: lockedLoanAccountId ?? lockedCardAccountId ?? null,
       category_id: null,
       subcategory_id: null,
       amount: 0,
@@ -105,18 +114,30 @@ export function TransactionForm({
   const tags = useWatch({ control: form.control, name: 'tags' }) ?? []
   const notes = useWatch({ control: form.control, name: 'notes' })
   const goalId = useWatch({ control: form.control, name: 'goal_id' })
+  const amountValue = useWatch({ control: form.control, name: 'amount' })
   const loanAccounts = useMemo(() => accounts.filter((account) => account.type === 'loan'), [accounts])
+  const cardAccounts = useMemo(() => accounts.filter((account) => account.type === 'credit_card'), [accounts])
+  // An edited expense with a target is a payment against a liability; the target's type says which.
+  const editTargetType = defaultValues?.type === 'expense' && defaultValues.to_account_id
+    ? accounts.find((account) => account.id === defaultValues.to_account_id)?.type
+    : undefined
+  const isCardPayment =
+    entryKind === 'card-payment' || Boolean(lockedCardAccountId) || editTargetType === 'credit_card'
   const isLoanRepayment =
-    entryKind === 'loan-repayment' ||
-    Boolean(lockedLoanAccountId) ||
-    (defaultValues?.type === 'expense' && Boolean(defaultValues.to_account_id))
+    !isCardPayment &&
+    (entryKind === 'loan-repayment' ||
+      Boolean(lockedLoanAccountId) ||
+      (defaultValues?.type === 'expense' && Boolean(defaultValues.to_account_id)))
+  const isLiabilityPayment = isLoanRepayment || isCardPayment
   const selectedLoan = loanAccounts.find((account) => account.id === selectedLoanId)
+  const selectedCard = cardAccounts.find((account) => account.id === selectedLoanId)
+  const paymentTarget = selectedLoan ?? selectedCard
   const paymentSourceAccounts = accounts.filter(
     (account) =>
       account.type !== 'loan' &&
       account.type !== 'credit_card' &&
       account.id !== selectedLoan?.id &&
-      (!selectedLoan || account.currency === selectedLoan.currency)
+      (!paymentTarget || account.currency === paymentTarget.currency)
   )
 
   const { subcategories } = useSubcategories(selectedCategoryId)
@@ -212,6 +233,36 @@ export function TransactionForm({
     form.clearErrors(['account_id', 'to_account_id', 'amount'])
   }, [accounts, form, loanAccounts])
 
+  const handleCardChange = useCallback((cardId: string) => {
+    const card = cardAccounts.find((account) => account.id === cardId)
+    if (!card) return
+
+    const currentDescription = form.getValues('description').trim()
+    const currentAccountId = form.getValues('account_id')
+    const compatibleSources = accounts.filter(
+      (account) =>
+        account.type !== 'loan' &&
+        account.type !== 'credit_card' &&
+        account.currency === card.currency
+    )
+
+    form.setValue('type', 'expense')
+    form.setValue('to_account_id', card.id)
+    form.setValue('currency', card.currency)
+    if (!compatibleSources.some((account) => account.id === currentAccountId)) {
+      form.setValue('account_id', compatibleSources[0]?.id ?? '')
+    }
+    if (!currentDescription || isCardPaymentDescription(currentDescription)) {
+      form.setValue('description', defaultCardPaymentDescription(card.name))
+    }
+    form.clearErrors(['account_id', 'to_account_id', 'amount'])
+  }, [accounts, cardAccounts, form])
+
+  useEffect(() => {
+    if (!isCardPayment || selectedLoanId || cardAccounts.length === 0) return
+    handleCardChange((cardAccounts.find((account) => account.balance < 0) ?? cardAccounts[0]).id)
+  }, [cardAccounts, handleCardChange, isCardPayment, selectedLoanId])
+
   useEffect(() => {
     if (!isLoanRepayment || selectedLoanId || loanAccounts.length === 0) return
     handleLoanChange(loanAccounts[0].id)
@@ -221,6 +272,10 @@ export function TransactionForm({
     const repaymentLoan = loanAccounts.find((account) => account.id === values.to_account_id)
     if (isLoanRepayment && !repaymentLoan) {
       form.setError('to_account_id', { message: 'Choose the loan you are repaying' })
+      return
+    }
+    if (isCardPayment && !cardAccounts.some((account) => account.id === values.to_account_id)) {
+      form.setError('to_account_id', { message: 'Choose the card you are paying' })
       return
     }
     if (repaymentLoan) {
@@ -237,13 +292,22 @@ export function TransactionForm({
     await onSubmit({ ...values, receipt_url })
   }
 
+  const cardSummary =
+    isCardPayment && selectedCard && !defaultValues?.amount
+      ? getCardPaymentSummary(selectedCard.balance, selectedCard.credit_limit, Number(amountValue))
+      : null
+  const cardPresets = cardSummary && selectedCard ? getCardPaymentPresets(selectedCard) : null
+  const cardDueIn = daysUntilDayOfMonth(selectedCard?.due_day)
+  const cardCurrency = selectedCard?.currency ?? DEFAULT_CURRENCY
+  const setCardAmount = (value: number) => form.setValue('amount', value, { shouldValidate: true })
+
   const hasExtraDetails =
     Boolean(notes?.trim()) ||
     tags.length > 0 ||
     Boolean(goalId) ||
     isRecurring ||
     hasReceipt(receiptReference)
-  const effectiveSubmitLabel = isLoanRepayment && submitLabel === 'Save Transaction' ? 'Record Payment' : submitLabel
+  const effectiveSubmitLabel = isLiabilityPayment && submitLabel === 'Save Transaction' ? 'Record Payment' : submitLabel
 
   return (
     <Form {...form}>
@@ -272,6 +336,65 @@ export function TransactionForm({
           />
         )}
 
+        {isCardPayment && (
+          <FormField
+            control={form.control}
+            name="to_account_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Card to pay</FormLabel>
+                <FormControl>
+                  <AccountCombobox
+                    accounts={cardAccounts}
+                    value={field.value}
+                    onValueChange={handleCardChange}
+                    placeholder="Choose a card"
+                    searchPlaceholder="Search cards…"
+                    emptyMessage="No credit cards found."
+                    disabled={Boolean(lockedCardAccountId)}
+                  />
+                </FormControl>
+                {selectedCard && (selectedCard.statement_day || selectedCard.due_day) && (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedCard.statement_day ? `Statement closes day ${selectedCard.statement_day}` : ''}
+                    {selectedCard.statement_day && selectedCard.due_day ? ' · ' : ''}
+                    {selectedCard.due_day
+                      ? `payment due day ${selectedCard.due_day}${cardDueIn != null ? ` (in ${cardDueIn}d)` : ''}`
+                      : ''}
+                  </p>
+                )}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {cardSummary && (
+          <dl className="grid grid-cols-3 gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+            <div>
+              <dt className="text-xs text-muted-foreground">Current balance</dt>
+              <dd className="font-semibold">{formatCurrency(cardSummary.owed, cardCurrency)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">Available credit</dt>
+              <dd className="font-semibold">
+                {cardSummary.available == null ? '—' : formatCurrency(cardSummary.available, cardCurrency)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">After this payment</dt>
+              <dd className="font-semibold">
+                {cardSummary.afterBalance > 0
+                  ? `+${formatCurrency(cardSummary.afterBalance, cardCurrency)}`
+                  : formatCurrency(Math.abs(cardSummary.afterBalance), cardCurrency)}
+              </dd>
+              {cardSummary.afterBalance > 0 && (
+                <dd className="text-xs text-muted-foreground">statement credit</dd>
+              )}
+            </div>
+          </dl>
+        )}
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           <FormField
             control={form.control}
@@ -279,15 +402,15 @@ export function TransactionForm({
             render={({ field }) => {
               return (
                 <FormItem>
-                  <FormLabel>{type === 'transfer' ? 'From account' : isLoanRepayment ? 'Pay from' : 'Account'}</FormLabel>
+                  <FormLabel>{type === 'transfer' ? 'From account' : isLiabilityPayment ? 'Pay from' : 'Account'}</FormLabel>
                   <FormControl>
                     <AccountCombobox
-                      accounts={isLoanRepayment ? paymentSourceAccounts : accounts}
+                      accounts={isLiabilityPayment ? paymentSourceAccounts : accounts}
                       value={field.value}
                       onValueChange={handleAccountChange}
-                      placeholder={isLoanRepayment ? 'Choose payment account' : 'Select account'}
+                      placeholder={isLiabilityPayment ? 'Choose payment account' : 'Select account'}
                       searchPlaceholder="Search accounts…"
-                      emptyMessage={isLoanRepayment ? 'No compatible accounts found.' : 'No accounts found.'}
+                      emptyMessage={isLiabilityPayment ? 'No compatible accounts found.' : 'No accounts found.'}
                       disabled={Boolean(lockedAccountId) && type !== 'transfer'}
                     />
                   </FormControl>
@@ -451,7 +574,7 @@ export function TransactionForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Currency</FormLabel>
-                <Select modal={false} onValueChange={field.onChange} value={field.value} disabled={isLoanRepayment}>
+                <Select modal={false} onValueChange={field.onChange} value={field.value} disabled={isLiabilityPayment}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue />
@@ -469,6 +592,56 @@ export function TransactionForm({
             )}
           />
         </div>
+
+        {cardSummary && cardPresets && (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={cardPresets.full <= 0}
+                onClick={() => setCardAmount(cardPresets.full)}
+              >
+                Full balance
+              </Button>
+              {cardPresets.statement != null && cardPresets.statement > 0 && (
+                <Button type="button" size="sm" variant="outline" onClick={() => setCardAmount(cardPresets.statement ?? 0)}>
+                  Statement balance
+                </Button>
+              )}
+              <span className="text-xs text-muted-foreground">or type a custom amount</span>
+            </div>
+            {selectedCard?.credit_limit ? (
+              <p className="text-xs text-muted-foreground">
+                Utilisation {cardSummary.utilisationBefore.toFixed(1)}% → {cardSummary.utilisationAfter.toFixed(1)}%
+              </p>
+            ) : null}
+            {cardSummary.overpayment > 0 && (
+              <div
+                role="status"
+                className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-snug"
+              >
+                This is {formatCurrency(cardSummary.overpayment, cardCurrency)} more than the card owes. The extra
+                becomes a statement credit and the card&apos;s balance goes positive, which is allowed but shows as an
+                asset on the Accounts page.{' '}
+                {cardSummary.owed > 0 && (
+                  <button
+                    type="button"
+                    className="font-medium underline underline-offset-2"
+                    onClick={() => setCardAmount(cardSummary.owed)}
+                  >
+                    Pay {formatCurrency(cardSummary.owed, cardCurrency)} instead
+                  </button>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Ledger tracks one running balance per card, not a statement balance. Full balance clears everything owed
+              today, including purchases made after the statement closed.
+            </p>
+          </div>
+        )}
 
         {type === 'transfer' && (
           <FormField

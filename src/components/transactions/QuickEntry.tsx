@@ -26,7 +26,7 @@ export function QuickEntry({
   const { transactions } = useTransactions()
   const { user } = useAuth()
   const [type, setType] = useState<'expense' | 'income' | 'transfer'>(
-    initialKind === 'loan-repayment' ? 'expense' : initialKind,
+    initialKind === 'loan-repayment' || initialKind === 'card-payment' ? 'expense' : initialKind,
   )
   const [amount, setAmount] = useState('0')
   const [categoryId, setCategoryId] = useState<string | null>(null)

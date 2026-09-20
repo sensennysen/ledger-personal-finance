@@ -3,6 +3,8 @@ import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Layers3, MoreVert
 import { LoanPurchaseForm } from '@/components/accounts/LoanPurchaseForm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { resolveLoadState } from '@/lib/loadState'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -31,7 +33,8 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
   const [expandedDeadline, setExpandedDeadline] = useState<string | null>(null)
   const { categories } = useCategories()
   const internalLoanData = useLoanPurchases(account.id, !loanData)
-  const { purchases, allocations, deadlines, loading, error, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
+  const { purchases, allocations, deadlines, loading, error, refetch, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
+  const loadState = resolveLoadState({ loading, error, hasData: purchases.length > 0 })
   const expenseCategories = categories.filter((category) => category.type === 'expense' || category.type === 'both')
   const purchaseById = useMemo(() => new Map(purchases.map((purchase) => [purchase.id, purchase])), [purchases])
   const recentAllocations = useMemo(
@@ -59,9 +62,14 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
         </Button>
       </div>
 
-      {(error || formError) && <p role="alert" className="text-sm text-destructive">{formError ?? error}</p>}
+      {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
+      {loadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh your financed purchases. Showing what was last loaded." onRetry={() => void refetch()} />
+      )}
 
-      {loading ? (
+      {loadState === 'error' ? (
+        <ErrorState title="Couldn't load your financed purchases" detail={error} onRetry={() => void refetch()} />
+      ) : loading ? (
         <div className="space-y-2" aria-busy="true" aria-label="Loading financed purchases">
           {[0, 1].map((item) => <Skeleton key={item} className="h-24 rounded-xl" />)}
         </div>
@@ -238,7 +246,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Add Financed Purchase</DialogTitle></DialogHeader>
           {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
-          {purchases.length === 0 && getLoanAmountOwed(account) > 0 && (
+          {loadState !== 'error' && purchases.length === 0 && getLoanAmountOwed(account) > 0 && (
             <p className="rounded-lg border border-yellow-400/60 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
               This account already has {formatCurrency(getLoanAmountOwed(account), account.currency)} of unitemized opening debt. A financed purchase will be added on top; set the account’s loan amount to 0 first if this purchase represents that same debt.
             </p>

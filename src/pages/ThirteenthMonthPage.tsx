@@ -5,10 +5,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { InlineLoadError } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { INCOME, EXPENSE, GOLD } from '@/constants/colors'
+import { INCOME, GOLD } from '@/constants/colors'
 import type { Transaction } from '@/types'
 
 // --- constants ---
@@ -91,7 +92,7 @@ export default function ThirteenthMonthPage() {
   const startDate = `${year}-01-01`
   const endDate = `${year}-12-31`
 
-  const { transactions, loading } = useTransactions({ startDate, endDate, type: 'income' })
+  const { transactions, loading, error, refetch } = useTransactions({ startDate, endDate, type: 'income' })
 
   const handleYearChange = (v: string) => {
     if (!v) return
@@ -180,7 +181,7 @@ export default function ThirteenthMonthPage() {
           13th Month Pay Estimator
         </h1>
         <p className="text-sm text-muted-foreground">
-          Computed under PD 851 � Select which income records count as basic salary
+          Computed under PD 851 – Select which income records count as basic salary
         </p>
       </div>
 
@@ -197,6 +198,13 @@ export default function ThirteenthMonthPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {error && !loading && transactions.length === 0 && (
+        <InlineLoadError
+          message="Couldn't load your income records, so this estimate is not final."
+          onRetry={() => void refetch()}
+        />
+      )}
 
       <section className="rounded-3xl bg-accent text-accent-foreground p-6"><p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p><p className="money text-[40px] leading-tight mt-3">{loading ? '…' : formatCurrency(thirteenthMonthPay,currency)}</p><p className="text-sm mt-3">{formatCurrency(totalIncluded,currency)} basic salary ÷ 12</p></section>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -218,7 +226,7 @@ export default function ThirteenthMonthPage() {
           label="Records Included"
           value={loading ? '-' : `${effectiveIncluded.size} / ${transactions.length}`}
           sub="Tap rows below to toggle"
-          color={EXPENSE}
+          color="var(--muted-foreground)"
           loading={loading}
         />
       </div>
@@ -227,7 +235,7 @@ export default function ThirteenthMonthPage() {
         <Info className="w-4 h-4 mt-0.5 shrink-0" />
         <p>
           All income transactions for the year are shown below. Check only the records that qualify
-          as <strong className="text-foreground">basic salary</strong> under PD 851 � exclude bonuses,
+          as <strong className="text-foreground">basic salary</strong> under PD 851 – exclude bonuses,
           allowances, overtime, and non-covered sources. Your selection is saved locally and never
           affects your account balances.
         </p>
@@ -239,7 +247,7 @@ export default function ThirteenthMonthPage() {
             <div className="min-w-0">
               <CardTitle className="text-base flex items-center gap-2">
                 <CalendarCheck className="w-4 h-4" style={{ color: INCOME }} />
-                Income Records � {year}
+                Income Records – {year}
               </CardTitle>
               <CardDescription>Select the records that count as basic salary</CardDescription>
             </div>
@@ -356,7 +364,7 @@ export default function ThirteenthMonthPage() {
                                   <span>{formatDate(tx.date)}</span>
                                   {tx.category && (
                                     <>
-                                      <span className="text-border">�</span>
+                                      <span className="text-border">–</span>
                                       <span>{tx.category.icon} {tx.category.name}</span>
                                     </>
                                   )}

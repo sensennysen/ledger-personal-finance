@@ -27,6 +27,7 @@ import { useCycle } from '@/contexts/cycleState'
 import { INCOME, EXPENSE, GOLD } from '@/constants/colors'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { InlineLoadError } from '@/components/ui/error-state'
 import { DashboardDetailDialogs, type DashboardDetailView } from '@/components/dashboard/DashboardDetailDialogs'
 import { DashboardWidgetSettingsSheet } from '@/components/dashboard/DashboardWidgetSettingsSheet'
 import { DashboardCreditCardMonitor } from '@/components/dashboard/DashboardCreditCardMonitor'
@@ -148,10 +149,10 @@ export default function DashboardPage() {
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
   const currencySymbol = getCurrencySymbol(currency)
-  const { accounts, loading: accountsLoading, updateAccount } = useAccounts()
-  const { transactions, loading: txLoading } = useTransactions()
+  const { accounts, loading: accountsLoading, error: accountsError, refetch: refetchAccounts, updateAccount } = useAccounts()
+  const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
   const { categories } = useCategories()
-  const { purchases: loanPurchases, allocations: loanAllocations, loading: loansLoading } = useLoanPurchases()
+  const { purchases: loanPurchases, allocations: loanAllocations, loading: loansLoading, error: loansError, refetch: refetchLoans } = useLoanPurchases()
   const { startDay, selectedMonth, setSelectedMonth } = useCycle()
   const { budgets } = useBudgets({ selectedMonth, startDay })
   const [chartPeriod, setChartPeriod] = useState<DashboardChartPeriod>('month')
@@ -183,6 +184,13 @@ export default function DashboardPage() {
 
   const monthLabel = formatMonthLabel(selectedMonth)
   const loading = accountsLoading || txLoading || loansLoading
+  // Figures below are sums over these sources; a failed source would read as zero, so say so once.
+  const loadFailed = !!(accountsError || txError || loansError)
+  const retryFailedSources = () => {
+    if (accountsError) void refetchAccounts()
+    if (txError) void refetchTransactions()
+    if (loansError) void refetchLoans()
+  }
   const { widgets, widgetOrder, toggle, moveWidget, reorderWidget } = useDashboardPrefs()
   const { prefs } = usePreferences()
   const alerts = useSpendingAlerts(budgets, transactions, prefs.largeTransactionThreshold)
@@ -306,6 +314,15 @@ export default function DashboardPage() {
           }
         />
       </div>
+
+      {loadFailed && !loading && (
+        <div className="lg:col-span-2" style={{ order: -1 }}>
+          <InlineLoadError
+            message="Some of your data didn't load, so totals below may be incomplete."
+            onRetry={retryFailedSources}
+          />
+        </div>
+      )}
 
       {(visibleAlerts.length > 0 || widgets.upcomingBills) && (
         <div className="lg:col-span-2" style={{ order: 1 }}>

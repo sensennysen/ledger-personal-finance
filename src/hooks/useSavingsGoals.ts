@@ -64,6 +64,7 @@ export function useSavingsGoals() {
       }
     })
 
+    setError(null)
     setGoals(enriched)
     writeCache(cacheKey, enriched)
     setLoading(false)

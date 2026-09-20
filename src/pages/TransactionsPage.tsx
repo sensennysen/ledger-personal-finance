@@ -3,6 +3,7 @@ import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, ChevronDown, U
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCycle } from '@/contexts/cycleState'
 import { useCategories } from '@/hooks/useCategories'
+import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { usePreferences } from '@/hooks/usePreferences'
@@ -15,6 +16,8 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { resolveLoadState } from '@/lib/loadState'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
@@ -69,6 +72,7 @@ export default function TransactionsPage() {
 
   // ── Templates ─────────────────────────────────────────────
   const { templates, addTemplate, removeTemplate } = useTransactionTemplates()
+  const { accounts } = useAccounts()
   // tx pending "save as template" name input
   const [templateSourceTx, setTemplateSourceTx] = useState<Transaction | null>(null)
   const [templateName, setTemplateName] = useState('')
@@ -83,6 +87,8 @@ export default function TransactionsPage() {
   const {
     transactions,
     loading,
+    error,
+    refetch,
     createTransaction,
     updateTransaction,
     deleteTransaction,
@@ -92,6 +98,7 @@ export default function TransactionsPage() {
   } = useTransactions()
 
   const { categories } = useCategories()
+  const loadState = resolveLoadState({ loading, error, hasData: transactions.length > 0 })
 
   // ── Helpers ────────────────────────────────────────────────
 
@@ -146,7 +153,8 @@ export default function TransactionsPage() {
       ...t.values,
       date: getLocalDateString(),
     })
-    setTransactionKind(inferTransactionKind(t.values.type, t.values.to_account_id))
+    const toAccountType = accounts.find((a) => a.id === t.values.to_account_id)?.type
+    setTransactionKind(inferTransactionKind(t.values.type, t.values.to_account_id, toAccountType))
     setCreateOpen(true)
   }
 
@@ -654,7 +662,12 @@ export default function TransactionsPage() {
       </Sheet>
 
       {/* Transaction list */}
-      {loading ? (
+      {loadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh your transactions. Showing what was last loaded." onRetry={() => void refetch()} />
+      )}
+      {loadState === 'error' ? (
+        <ErrorState title="Couldn't load your transactions" detail={error} onRetry={() => void refetch()} />
+      ) : loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : filtered.length === 0 ? (
         <EmptyState

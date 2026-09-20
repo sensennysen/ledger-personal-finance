@@ -1,14 +1,11 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
-import { useForm, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { useAuth } from '@/contexts/AuthContext'
-import { ACCOUNT_COLORS, ACCOUNT_TYPE_LABELS, CURRENCIES } from '@/types'
+import { ACCOUNT_TYPE_LABELS } from '@/types'
 import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 import { formatLoanSchedule, getLoanAmountOwed } from '@/lib/loans'
@@ -20,290 +17,28 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { resolveLoadState } from '@/lib/loadState'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
-import { ColorPicker } from '@/components/ui/color-picker'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
-import { DEFAULT_CURRENCY } from '@/constants/accounts'
-import type { Account, AccountType, CreditCardPayment, Transaction } from '@/types'
-
-const accountSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(50),
-  type: z.enum(['cash', 'digital_wallet', 'credit_card', 'savings', 'checking', 'investment', 'loan', 'other']),
-  currency: z.string().min(1),
-  balance: z.coerce.number(),
-  color: z.string(),
-  credit_limit: z.coerce.number().nullable(),
-  statement_day: z.coerce.number().int().min(1).max(31).nullable(),
-  due_day: z.coerce.number().int().min(1).max(31).nullable(),
-  utilization_target_pct: z.coerce.number().min(1).max(100).nullable(),
-  payment_reminder_days: z.coerce.number().int().min(0).max(30).nullable(),
-  notes: z.string().nullable(),
-})
-
-type AccountFormValues = z.infer<typeof accountSchema>
-
-function EditAccountForm({
-  account,
-  onSubmit,
-  onClose,
-}: {
-  account: Account
-  onSubmit: (values: AccountFormValues) => Promise<void>
-  onClose: () => void
-}) {
-  // This form is used as a "template" with fairly loose typing from react-hook-form/zodResolver,
-  // and Cursor's current TS/ESLint config tends to over-warn on the explicit generic types.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const form = useForm<AccountFormValues, any, AccountFormValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(accountSchema) as any,
-    defaultValues: {
-      ...account,
-      balance: account.type === 'credit_card'
-        ? getCreditCardSpending(account)
-        : account.type === 'loan'
-          ? getLoanAmountOwed(account)
-          : account.balance,
-      currency: account.currency || DEFAULT_CURRENCY,
-      utilization_target_pct: account.utilization_target_pct ?? 30,
-      payment_reminder_days: account.payment_reminder_days ?? 3,
-    },
-  })
-
-  const type = useWatch({ control: form.control, name: 'type' })
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Account Name</FormLabel>
-              <FormControl><Input placeholder="e.g. My Savings" {...field} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Type</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue>{(v: string | null) => v ? ACCOUNT_TYPE_LABELS[v as AccountType] : 'Select type'}</SelectValue></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {Object.entries(ACCOUNT_TYPE_LABELS).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Currency</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue>{(v: string | null) => v ?? 'Select currency'}</SelectValue></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {CURRENCIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>{c.code} - {c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        <FormField
-          control={form.control}
-          name="balance"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{type === 'loan' ? 'Loan Amount' : type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</FormLabel>
-              <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-              <FormMessage />
-              {(type === 'credit_card' || type === 'loan') && (
-                <p className="text-xs text-muted-foreground">
-                  {type === 'loan'
-                    ? 'Use 0 when financed purchases are tracked below. Any amount here is additional unitemized opening debt.'
-                    : 'Enter the amount owed. It will reduce net worth instead of increasing total assets.'}
-                </p>
-              )}
-            </FormItem>
-          )}
-        />
-        {type === 'credit_card' && (
-          <div className="space-y-4 rounded-lg border border-border/60 p-3">
-            <FormField
-              control={form.control}
-              name="credit_limit"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Credit Limit</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="statement_day"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Statement Day</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={31}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="due_day"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Due Day</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={31}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="utilization_target_pct"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Utilization Target %</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="payment_reminder_days"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Remind Days Before Due</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={30}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-        )}
-        <FormField
-          control={form.control}
-          name="color"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Color</FormLabel>
-              <FormControl>
-                <ColorPicker
-                  value={field.value}
-                  onChange={field.onChange}
-                  palette={ACCOUNT_COLORS}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes (optional)</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Any notes about this account..."
-                  value={field.value ?? ''}
-                  onChange={(e) => field.onChange(e.target.value || null)}
-                  rows={2}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-        <div className="flex gap-2 justify-end pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? 'Saving...' : 'Save Account'}
-          </Button>
-        </div>
-      </form>
-    </Form>
-  )
-}
+import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
+import type { CreditCardPayment, Transaction } from '@/types'
 
 export default function AccountTransactionsPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
-  const { accounts, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment } = useAccounts()
-  const { transactions, loading, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
+  const { accounts, error: accountsError, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment } = useAccounts()
+  const { transactions, loading, error: txError, refetch: refetchTransactions, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
+  const loadState = resolveLoadState({ loading, error: txError, hasData: transactions.length > 0 })
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -662,6 +397,10 @@ export default function AccountTransactionsPage() {
         </Tabs>
       )}
 
+      {accountsError && !account && (
+        <InlineLoadError message="Couldn't load this account's details." onRetry={() => void refetchAccounts()} />
+      )}
+
       {/* Account balance card */}
       {account && (account.type !== 'loan' || loanSection === 'summary') && (
         <div
@@ -874,7 +613,7 @@ export default function AccountTransactionsPage() {
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
           {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {account && (
-            <EditAccountForm
+            <AccountForm
               account={account}
               onSubmit={handleAccountEdit}
               onClose={() => { setEditAccountOpen(false); setFormError(null) }}
@@ -905,7 +644,12 @@ export default function AccountTransactionsPage() {
       </div>}
 
       {/* Transaction list */}
-      {(account?.type !== 'loan' || loanSection === 'activity') && (loading ? (
+      {(account?.type !== 'loan' || loanSection === 'activity') && loadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh your transactions. Showing what was last loaded." onRetry={() => void refetchTransactions()} />
+      )}
+      {(account?.type !== 'loan' || loanSection === 'activity') && (loadState === 'error' ? (
+        <ErrorState title="Couldn't load your transactions" detail={txError} onRetry={() => void refetchTransactions()} />
+      ) : loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : filtered.length === 0 ? (
         <EmptyState

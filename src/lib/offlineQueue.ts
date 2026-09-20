@@ -1,24 +1,18 @@
 import { supabase } from './supabase'
 import { PENDING_RECEIPT_PREFIX, getPendingReceipt, removePendingReceipt } from './receiptStore'
 import { buildReceiptObjectPath } from './receiptUrls'
+import {
+  applyKeepMine,
+  isFlagged,
+  isPending,
+  markExpired,
+  removeFlagged,
+  type QueueItem,
+} from './queueState'
 
-export type QueueOperation = 'insert' | 'update' | 'delete'
-
-export interface QueueItem {
-  id: string
-  table: string
-  operation: QueueOperation
-  payload: Record<string, unknown>
-  /** For update/delete: the row id to target */
-  rowId?: string
-  userId: string
-  timestamp: number
-}
+export type { QueueItem, QueueOperation, QueueStatus } from './queueState'
 
 const QUEUE_KEY = 'ledger_offline_queue'
-
-/** Queue items older than this are dropped on drain to avoid stale mutations. */
-const MAX_QUEUE_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
 // localStorage is used here only for resilient device-local sync state.
 // Queue contents should be treated as local user data, not secure storage.
@@ -32,12 +26,25 @@ function readQueue(): QueueItem[] {
   }
 }
 
+type QueueListener = () => void
+const queueListeners = new Set<QueueListener>()
+
+/** Subscribe to queue changes (enqueue, drain, resolve). Returns an unsubscribe fn. */
+export function subscribeQueue(cb: QueueListener): () => void {
+  queueListeners.add(cb)
+  return () => {
+    queueListeners.delete(cb)
+  }
+}
+
 function writeQueue(items: QueueItem[]): void {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(items))
+  queueListeners.forEach((cb) => cb())
 }
 
 export function clearOfflineQueue(): void {
   localStorage.removeItem(QUEUE_KEY)
+  queueListeners.forEach((cb) => cb())
 }
 
 export function enqueue(item: Omit<QueueItem, 'id' | 'timestamp'>): void {
@@ -46,30 +53,57 @@ export function enqueue(item: Omit<QueueItem, 'id' | 'timestamp'>): void {
   writeQueue(queue)
 }
 
+/** Items still waiting to sync (excludes conflicted and expired items). */
 export function pendingCount(): number {
-  return readQueue().length
+  return readQueue().filter(isPending).length
+}
+
+/** Items the user must review: conflicted or expired. */
+export function flaggedCount(): number {
+  return readQueue().filter(isFlagged).length
+}
+
+export function listQueue(): QueueItem[] {
+  return readQueue()
+}
+
+/** Keep the local edit: it is retried on the next drain, bypassing the conflict check. */
+export function keepMine(id: string): void {
+  writeQueue(applyKeepMine(readQueue(), id, Date.now()))
+}
+
+/** Keep the server version: discard the local item (and any pending receipt blob). */
+export async function keepTheirs(id?: string): Promise<void> {
+  const { kept, removed } = removeFlagged(readQueue(), id)
+  writeQueue(kept)
+  for (const item of removed) await discardReceipt(item)
+}
+
+async function discardReceipt(item: QueueItem): Promise<void> {
+  const url = item.payload.receipt_url
+  if (item.operation === 'insert' && typeof url === 'string' && url.startsWith(PENDING_RECEIPT_PREFIX)) {
+    try { await removePendingReceipt(url.slice(PENDING_RECEIPT_PREFIX.length)) } catch { /* best-effort */ }
+  }
 }
 
 /**
- * Replays all queued operations against Supabase in order.
+ * Replays all pending operations against Supabase in order.
  * Removes items that succeed; leaves failed items in the queue.
+ * Items past the max age are flagged 'expired' and updates whose server row
+ * changed are flagged 'conflict'; both are retained for user review and skipped.
  * Returns the number of successfully synced items.
  */
 export async function drainQueue(): Promise<number> {
-  const queue = readQueue()
+  const queue = markExpired(readQueue(), Date.now())
   if (queue.length === 0) return 0
 
-  // Drop items that are too old to be reliably replayed
-  const now = Date.now()
-  const fresh = queue.filter((item) => now - item.timestamp <= MAX_QUEUE_AGE_MS)
-  const staleCount = queue.length - fresh.length
-  if (staleCount > 0) {
-    console.warn(`[offlineQueue] Dropping ${staleCount} stale item(s) older than 30 days`)
-    writeQueue(fresh)
+  const fresh = queue.filter(isPending)
+  if (fresh.length === 0) {
+    writeQueue(queue)
+    return 0
   }
-  if (fresh.length === 0) return 0
 
-  const remaining: QueueItem[] = []
+  const remaining: QueueItem[] = queue.filter(isFlagged)
   let synced = 0
 
   for (const item of fresh) {
@@ -124,7 +158,7 @@ export async function drainQueue(): Promise<number> {
       } else if (item.operation === 'update' && item.rowId) {
         // Conflict detection: if the server record's updated_at is newer than when
         // we queued this change, a concurrent edit happened — skip to avoid overwrite.
-        try {
+        if (!item.force) try {
           const { data: serverRow } = await supabase
             .from(item.table)
             .select('updated_at')
@@ -134,10 +168,7 @@ export async function drainQueue(): Promise<number> {
           if (serverRow?.updated_at) {
             const serverMs = new Date(serverRow.updated_at as string).getTime()
             if (serverMs > item.timestamp) {
-              console.warn(
-                `[offlineQueue] Conflict detected for ${item.table}:${item.rowId} — skipping stale update`
-              )
-              synced++ // count as processed
+              remaining.push({ ...item, status: 'conflict' })
               continue
             }
           }

@@ -37,6 +37,7 @@ export function useAccounts() {
     if (error) {
       setError(error.message)
     } else {
+      setError(null)
       setAccounts(data as Account[])
       writeCache(cacheKey, data)
     }

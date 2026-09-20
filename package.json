@@ -7,6 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:offline": "node --test tests/offlineQueue.test.mjs",
+    "test:accounts": "node --test tests/accountSchema.test.mjs",
+    "test:loan": "node --test tests/loanRate.test.mjs",
+    "test:kinds": "node --test tests/transactionKinds.test.mjs",
+    "test:rollover": "node --test tests/budgetRollover.test.mjs",
+    "test:auth": "node --test tests/authErrors.test.mjs",
     "test:redesign": "node tests/redesign.mjs",
     "preview": "vite preview"
   },

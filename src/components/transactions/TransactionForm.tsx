@@ -70,7 +70,7 @@ export function TransactionForm({
   const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
-      type: entryKind && entryKind !== 'loan-repayment' ? entryKind : 'expense',
+      type: entryKind && entryKind !== 'loan-repayment' && entryKind !== 'card-payment' ? entryKind : 'expense',
       account_id: lockedAccountId ?? accounts[0]?.id ?? '',
       to_account_id: lockedLoanAccountId ?? null,
       category_id: null,

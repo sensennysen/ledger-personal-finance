@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Info, TriangleAlert } from 'lucide-react'
+import { Info, TriangleAlert } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { useOverspending } from '@/hooks/useOverspending'
 import { resolveLoadState } from '@/lib/loadState'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
-import { formatCurrency, formatDateShort, getCurrentCycleMonthKey, cn } from '@/lib/utils'
+import { formatCurrency, formatDateShort, cn } from '@/lib/utils'
 import {
   computeOverspending,
   deficitSettingLabel,
@@ -21,18 +21,16 @@ import type { Category } from '@/types'
 interface OverspendingCardProps {
   categories: Category[]
   startDay: number
+  month: string
   deficitBehaviour: DeficitBehaviour
 }
 
 /**
  * D1b: the record of what went over budget, shown under either deficit
- * setting. Owns its cycle stepper until Reports follows the global cycle (LED-21).
+ * setting. Follows the global cycle chosen in the top-bar stepper (LED-21).
  */
-export function OverspendingCard({ categories, startDay, deficitBehaviour }: OverspendingCardProps) {
+export function OverspendingCard({ categories, startDay, month, deficitBehaviour }: OverspendingCardProps) {
   const { budgets, txs, loading, error, refetch } = useOverspending()
-  const currentMonth = getCurrentCycleMonthKey(startDay)
-  const [month, setMonth] = useState(currentMonth)
-  const isCurrent = month >= currentMonth
 
   const range = monthCycleRange(month, startDay)
   const result = useMemo(
@@ -63,27 +61,8 @@ export function OverspendingCard({ categories, startDay, deficitBehaviour }: Ove
           <TriangleAlert className="w-4 h-4" />
           Overspending
         </span>
-        <span className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label="Previous cycle"
-            className="p-1 rounded-full text-muted-foreground hover:bg-muted"
-            onClick={() => setMonth((m) => shiftMonthKey(m, -1))}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span className="text-xs text-muted-foreground min-w-[8.5rem] text-center">
-            {formatDateShort(range.start)} – {formatDateShort(range.end)}
-          </span>
-          <button
-            type="button"
-            aria-label="Next cycle"
-            disabled={isCurrent}
-            className="p-1 rounded-full text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent"
-            onClick={() => setMonth((m) => shiftMonthKey(m, 1))}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+        <span className="text-xs text-muted-foreground">
+          {formatDateShort(range.start)} – {formatDateShort(range.end)}
         </span>
       </div>
 

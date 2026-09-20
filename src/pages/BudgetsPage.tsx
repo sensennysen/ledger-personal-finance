@@ -36,6 +36,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { resolveLoadState } from '@/lib/loadState'
 import { Textarea } from '@/components/ui/textarea'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -655,11 +657,15 @@ function BudgetTransactionsDialog({
   budget,
   transactions,
   loading,
+  error,
+  onRetry,
   periodRange,
 }: {
   budget: Budget
   transactions: ReturnType<typeof useTransactions>['transactions']
   loading: boolean
+  error: string | null
+  onRetry: () => void
   periodRange: { start: string; end: string }
 }) {
   const total = transactions.reduce((sum, tx) => {
@@ -670,9 +676,18 @@ function BudgetTransactionsDialog({
   }, 0)
   const effective = budget.effective_amount ?? budget.amount
   const remaining = effective - total
+  const loadState = resolveLoadState({ loading, error, hasData: transactions.length > 0 })
+
+  // Spent/Left are derived from these rows, so a failed read must not show them as zero.
+  if (loadState === 'error') {
+    return <ErrorState title="Couldn't load these transactions" detail={error} onRetry={onRetry} />
+  }
 
   return (
     <div className="space-y-4">
+      {loadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh these transactions. Showing what was last loaded." onRetry={onRetry} />
+      )}
       <div className="rounded-lg border bg-muted/30 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -936,7 +951,8 @@ export default function BudgetsPage() {
   const { profile } = useAuth()
   const { selectedMonth, startDay } = useCycle()
   const { budgets, loading, error: budgetError, createBudget, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
-  const { goals, loading: goalsLoading, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
+  const { goals, loading: goalsLoading, error: goalsError, refetch: refetchGoals, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
+  const goalsLoadState = resolveLoadState({ loading: goalsLoading, error: goalsError, hasData: goals.length > 0 })
 
   const [activeTab, setActiveTab] = useState('budgets')
   const [createOpen, setCreateOpen] = useState(false)
@@ -956,6 +972,8 @@ export default function BudgetsPage() {
   const {
     transactions: selectedBudgetTransactions,
     loading: selectedBudgetTransactionsLoading,
+    error: selectedBudgetTransactionsError,
+    refetch: refetchSelectedBudgetTransactions,
   } = useTransactions({
     categoryId: selectedBudget?.category_id ?? '__no_budget_selected__',
     type: 'expense',
@@ -1238,7 +1256,12 @@ export default function BudgetsPage() {
 
         {/* Savings Goals tab */}
         <TabsContent value="goals" className="mt-4 space-y-4">
-          {goalsLoading ? (
+          {goalsLoadState === 'stale-error' && (
+            <InlineLoadError message="Couldn't refresh your savings goals. Showing what was last loaded." onRetry={() => void refetchGoals()} />
+          )}
+          {goalsLoadState === 'error' ? (
+            <ErrorState title="Couldn't load your savings goals" detail={goalsError} onRetry={() => void refetchGoals()} />
+          ) : goalsLoading ? (
             <div className="space-y-4">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-40" />)}</div>
           ) : goals.length === 0 ? (
             <Card className="text-center py-16">
@@ -1295,6 +1318,8 @@ export default function BudgetsPage() {
               budget={selectedBudget}
               transactions={selectedBudgetTransactions}
               loading={selectedBudgetTransactionsLoading}
+              error={selectedBudgetTransactionsError}
+              onRetry={() => void refetchSelectedBudgetTransactions()}
               periodRange={selectedBudgetRange}
             />
           )}

@@ -86,6 +86,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (error) {
       setError(error.message)
     } else {
+      setError(null)
       setTransactions(data as Transaction[])
       writeCache(cacheKey, data)
     }

@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { InlineLoadError } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
@@ -91,7 +92,7 @@ export default function ThirteenthMonthPage() {
   const startDate = `${year}-01-01`
   const endDate = `${year}-12-31`
 
-  const { transactions, loading } = useTransactions({ startDate, endDate, type: 'income' })
+  const { transactions, loading, error, refetch } = useTransactions({ startDate, endDate, type: 'income' })
 
   const handleYearChange = (v: string) => {
     if (!v) return
@@ -197,6 +198,13 @@ export default function ThirteenthMonthPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {error && !loading && transactions.length === 0 && (
+        <InlineLoadError
+          message="Couldn't load your income records, so this estimate is not final."
+          onRetry={() => void refetch()}
+        />
+      )}
 
       <section className="rounded-3xl bg-accent text-accent-foreground p-6"><p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p><p className="money text-[40px] leading-tight mt-3">{loading ? '…' : formatCurrency(thirteenthMonthPay,currency)}</p><p className="text-sm mt-3">{formatCurrency(totalIncluded,currency)} basic salary ÷ 12</p></section>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

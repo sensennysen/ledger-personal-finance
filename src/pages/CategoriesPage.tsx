@@ -46,6 +46,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ColorPicker } from '@/components/ui/color-picker'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { resolveLoadState } from '@/lib/loadState'
 import type { Category, Subcategory } from '@/types'
 
 const CATEGORY_COLORS = [
@@ -463,7 +465,8 @@ function SubcategoryPanel({ category }: { category: Category }) {
 }
 
 export default function CategoriesPage() {
-  const { categories, loading, createCategory, updateCategory, deleteCategory, updateCategoryOrder } = useCategories()
+  const { categories, loading, error, refetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder } = useCategories()
+  const loadState = resolveLoadState({ loading, error, hasData: categories.length > 0 })
   const [createOpen, setCreateOpen] = useState(false)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
@@ -703,7 +706,12 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {loading ? (
+      {loadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh your categories. Showing what was last loaded." onRetry={() => void refetch()} />
+      )}
+      {loadState === 'error' ? (
+        <ErrorState title="Couldn't load your categories" detail={error} onRetry={() => void refetch()} />
+      ) : loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : (
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'expense' | 'income')}>

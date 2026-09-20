@@ -6,7 +6,9 @@ import {
   isFlagged,
   isPending,
   markExpired,
+  mergeDrainResult,
   removeFlagged,
+  rowKey,
   type QueueItem,
 } from './queueState'
 
@@ -94,7 +96,8 @@ async function discardReceipt(item: QueueItem): Promise<void> {
  * Returns the number of successfully synced items.
  */
 export async function drainQueue(): Promise<number> {
-  const queue = markExpired(readQueue(), Date.now())
+  const stored = readQueue()
+  const queue = markExpired(stored, Date.now())
   if (queue.length === 0) return 0
 
   const fresh = queue.filter(isPending)
@@ -104,6 +107,11 @@ export async function drainQueue(): Promise<number> {
   }
 
   const remaining: QueueItem[] = queue.filter(isFlagged)
+  const seenIds = new Set(queue.map((i) => i.id))
+  const flaggedAtStart = new Set(stored.filter(isFlagged).map((i) => i.id))
+  // Rows this drain has already updated: our own write bumps updated_at, so a
+  // later queued edit to the same row must not be flagged as a conflict.
+  const updatedRows = new Set<string>()
   let synced = 0
 
   for (const item of fresh) {
@@ -158,7 +166,7 @@ export async function drainQueue(): Promise<number> {
       } else if (item.operation === 'update' && item.rowId) {
         // Conflict detection: if the server record's updated_at is newer than when
         // we queued this change, a concurrent edit happened — skip to avoid overwrite.
-        if (!item.force) try {
+        if (!item.force && !updatedRows.has(rowKey(item))) try {
           const { data: serverRow } = await supabase
             .from(item.table)
             .select('updated_at')
@@ -194,6 +202,7 @@ export async function drainQueue(): Promise<number> {
         remaining.push(item)
       } else {
         synced++
+        if (item.operation === 'update') updatedRows.add(rowKey(item))
       }
     } catch {
       // Unexpected error for this item — keep it in the queue for the next retry
@@ -201,6 +210,7 @@ export async function drainQueue(): Promise<number> {
     }
   }
 
-  writeQueue(remaining)
+  // Re-read: the user may have resolved or enqueued items while we awaited the network.
+  writeQueue(mergeDrainResult(remaining, readQueue(), seenIds, flaggedAtStart))
   return synced
 }

@@ -43,6 +43,36 @@ export function applyKeepMine(queue: QueueItem[], id: string, now: number): Queu
   })
 }
 
+/** Key identifying the server row an update/delete targets. */
+export const rowKey = (item: QueueItem) => `${item.table}:${item.rowId}`
+
+/**
+ * Combines a drain's result with the queue as it is now, so changes made while
+ * the drain was awaiting the network are not overwritten.
+ *
+ * - `remaining`: items the drain wants to keep (unsynced, failed, flagged).
+ * - `flaggedAtStart`: ids that were already flagged in storage when the drain began;
+ *   the user may have resolved these mid-drain, so the current copy wins.
+ * - Items no longer in `current` (resolved via keep-theirs or cleared) are dropped.
+ * - Items in `current` that the drain never saw (enqueued mid-drain) are appended.
+ */
+export function mergeDrainResult(
+  remaining: QueueItem[],
+  current: QueueItem[],
+  seenIds: Set<string>,
+  flaggedAtStart: Set<string>
+): QueueItem[] {
+  const currentById = new Map(current.map((i) => [i.id, i]))
+  const merged: QueueItem[] = []
+  for (const item of remaining) {
+    const cur = currentById.get(item.id)
+    if (!cur) continue
+    merged.push(flaggedAtStart.has(item.id) ? cur : item)
+  }
+  for (const item of current) if (!seenIds.has(item.id)) merged.push(item)
+  return merged
+}
+
 /** Removes the given flagged item (or every flagged item when id is omitted). Returns the rest and the removed items. */
 export function removeFlagged(queue: QueueItem[], id?: string) {
   const removed = queue.filter((i) => i.status && (id === undefined || i.id === id))

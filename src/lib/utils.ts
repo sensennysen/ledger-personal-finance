@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { CURRENCIES } from "@/types"
+import { monthCycleRange } from "./cycleRange"
 import type { Transaction, Category } from "@/types"
 
 export function cn(...inputs: ClassValue[]) {
@@ -86,14 +87,8 @@ export function getCustomMonthRange(
   monthKey: string,
   startDay: number = 1,
 ): { start: string; end: string } {
-  const [year, month] = monthKey.split('-').map(Number)
-  const start = new Date(year, month - 1, startDay)
   // end = one day before the same startDay in the following month
-  const end = new Date(year, month, startDay - 1)
-  return {
-    start: getLocalDateString(start),
-    end: getLocalDateString(end),
-  }
+  return monthCycleRange(monthKey, startDay)
 }
 
 /**

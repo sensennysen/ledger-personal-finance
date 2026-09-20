@@ -20,3 +20,16 @@ export function nextRollover(
   if (behaviour === 'reset') return current + Math.max(0, surplus)
   return Math.max(-budgetAmount, current + surplus)
 }
+
+export function isDeficitBehaviour(value: unknown): value is DeficitBehaviour {
+  return value === 'carry' || value === 'reset'
+}
+
+/** The limit the next cycle opens at after spending `spent` against `budgetAmount`. */
+export function deficitOutcome(
+  budgetAmount: number,
+  spent: number,
+  behaviour: DeficitBehaviour,
+): number {
+  return budgetAmount + nextRollover(0, budgetAmount - spent, budgetAmount, behaviour)
+}

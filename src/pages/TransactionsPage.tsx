@@ -730,6 +730,7 @@ export default function TransactionsPage() {
           {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editingTx && (
             <TransactionForm
+              isEditing
               defaultValues={{
                 type: editingTx.type,
                 account_id: editingTx.account_id,

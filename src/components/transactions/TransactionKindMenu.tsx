@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react'
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign } from 'lucide-react'
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, CreditCard } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import {
   DropdownMenu,
@@ -18,6 +18,7 @@ interface TransactionKindMenuProps {
   align?: 'start' | 'center' | 'end'
   side?: 'top' | 'bottom' | 'left' | 'right' | 'inline-start' | 'inline-end'
   showLoanRepayment?: boolean
+  showCardPayment?: boolean
 }
 
 const transactionKinds = [
@@ -50,9 +51,12 @@ export function TransactionKindMenu({
   align = 'end',
   side = 'bottom',
   showLoanRepayment = true,
+  showCardPayment = true,
 }: TransactionKindMenuProps) {
   const { accounts } = useAccounts()
   const hasLoans = showLoanRepayment && accounts.some((account) => account.type === 'loan')
+  const hasCardBalance =
+    showCardPayment && accounts.some((account) => account.type === 'credit_card' && account.balance !== 0)
 
   return (
     <DropdownMenu>
@@ -72,9 +76,9 @@ export function TransactionKindMenu({
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
+        {(hasLoans || hasCardBalance) && <DropdownMenuSeparator />}
         {hasLoans && (
           <>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onSelect('loan-repayment')} className="items-start gap-3 px-2 py-2.5">
               <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
                 <CircleDollarSign className="text-primary" />
@@ -87,6 +91,19 @@ export function TransactionKindMenu({
               </span>
             </DropdownMenuItem>
           </>
+        )}
+        {hasCardBalance && (
+          <DropdownMenuItem onClick={() => onSelect('card-payment')} className="items-start gap-3 px-2 py-2.5">
+            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
+              <CreditCard className="text-expense" />
+            </span>
+            <span className="min-w-0">
+              <span className="block font-medium leading-tight">Card payment</span>
+              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                Pay down a credit card from another account
+              </span>
+            </span>
+          </DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

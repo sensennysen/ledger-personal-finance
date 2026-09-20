@@ -7,6 +7,7 @@ import { getCurrentCycleMonthKey } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { sumBudgetSpend } from '@/lib/budgetSpend'
 import { canRollover, nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
+import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 
 function localDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -17,10 +18,12 @@ export function useBudgets(
     selectedMonth: string
     startDay: number
   },
-  // TODO(LED-20): read the global budget_deficit_behaviour setting
-  deficitBehaviour: DeficitBehaviour = 'carry',
+  deficitOverride?: DeficitBehaviour,
 ) {
   const { user } = useAuth()
+  const profileDeficitBehaviour = useDeficitBehaviour()
+  // null = profile still loading; wait rather than computing rollover with a guessed setting.
+  const deficitBehaviour = deficitOverride ?? profileDeficitBehaviour
   const selectedMonth = cycle?.selectedMonth
   const startDay = cycle?.startDay ?? 1
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -33,6 +36,10 @@ export function useBudgets(
     setError(null)
     if (!user) {
       setLoading(false)
+      return
+    }
+    if (!deficitBehaviour) {
+      setLoading(true)
       return
     }
     const cacheKey = `${user.id}:budgets${selectedMonth ? `:${selectedMonth}:${startDay}` : ''}:${deficitBehaviour}`

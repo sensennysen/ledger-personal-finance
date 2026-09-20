@@ -524,7 +524,7 @@ export default function SettingsPage() {
           <CardDescription>Sign out or permanently delete your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button variant="outline" onClick={signOut}>Sign Out</Button>
+          <Button variant="outline" onClick={() => void signOut()}>Sign Out</Button>
           <Separator />
           <div>
             <p className="text-sm font-medium text-destructive mb-1">Delete Account</p>

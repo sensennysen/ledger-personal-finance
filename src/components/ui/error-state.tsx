@@ -36,10 +36,11 @@ export function ErrorState({ title, description = DEFAULT_DESCRIPTION, detail, o
 interface InlineLoadErrorProps {
   message: string
   onRetry: () => void
+  actionLabel?: string
 }
 
 /** Non-blocking banner: a refetch failed but data is already on screen. */
-export function InlineLoadError({ message, onRetry }: InlineLoadErrorProps) {
+export function InlineLoadError({ message, onRetry, actionLabel = 'Retry' }: InlineLoadErrorProps) {
   return (
     <div
       role="alert"
@@ -50,7 +51,7 @@ export function InlineLoadError({ message, onRetry }: InlineLoadErrorProps) {
         {message}
       </span>
       <Button variant="ghost" size="sm" onClick={onRetry}>
-        Retry
+        {actionLabel}
       </Button>
     </div>
   )

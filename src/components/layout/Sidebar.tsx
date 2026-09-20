@@ -155,7 +155,7 @@ export default function Sidebar() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={signOut}
+                onClick={() => void signOut()}
                 className={cn('w-full text-muted-foreground hover:text-foreground hover:bg-white/4', collapsed ? 'px-2' : 'justify-start gap-2')}
               />
             )}>

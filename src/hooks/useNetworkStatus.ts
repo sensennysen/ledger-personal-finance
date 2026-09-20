@@ -1,14 +1,18 @@
 import { useEffect, useState, useCallback } from 'react'
-import { drainQueue, pendingCount } from '@/lib/offlineQueue'
+import { drainQueue, flaggedCount, keepMine, keepTheirs, pendingCount, subscribeQueue } from '@/lib/offlineQueue'
 
 interface NetworkStatus {
   isOnline: boolean
   isSyncing: boolean
   pendingCount: number
+  /** Conflicted or expired items awaiting the user's keep-mine / keep-theirs decision */
+  flaggedCount: number
   /** Manually trigger a sync attempt */
   syncNow: () => Promise<void>
   /** Re-read the pending count from storage */
   refreshCount: () => void
+  /** Resolve a flagged queue item */
+  resolve: (id: string, choice: 'mine' | 'theirs') => Promise<void>
 }
 
 /**
@@ -19,9 +23,11 @@ export function useNetworkStatus(): NetworkStatus {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   const [isSyncing, setIsSyncing] = useState(false)
   const [count, setCount] = useState(() => pendingCount())
+  const [flagged, setFlagged] = useState(() => flaggedCount())
 
   const refreshCount = useCallback(() => {
     setCount(pendingCount())
+    setFlagged(flaggedCount())
   }, [])
 
   const syncNow = useCallback(async () => {
@@ -36,10 +42,25 @@ export function useNetworkStatus(): NetworkStatus {
       // drainQueue itself failed — count will be refreshed in finally
     } finally {
       // Always refresh the displayed count, even if the drain partially failed
-      setCount(pendingCount())
+      refreshCount()
       setIsSyncing(false)
     }
-  }, [isSyncing])
+  }, [isSyncing, refreshCount])
+
+  useEffect(() => subscribeQueue(refreshCount), [refreshCount])
+
+  const resolve = useCallback(
+    async (id: string, choice: 'mine' | 'theirs') => {
+      if (choice === 'theirs') {
+        await keepTheirs(id)
+        notifySyncListeners()
+        return
+      }
+      keepMine(id)
+      await syncNow()
+    },
+    [syncNow]
+  )
 
   useEffect(() => {
     const handleOnline = () => {
@@ -56,7 +77,7 @@ export function useNetworkStatus(): NetworkStatus {
     }
   }, [syncNow])
 
-  return { isOnline, isSyncing, pendingCount: count, syncNow, refreshCount }
+  return { isOnline, isSyncing, pendingCount: count, flaggedCount: flagged, syncNow, refreshCount, resolve }
 }
 
 // ---------------------------------------------------------------------------

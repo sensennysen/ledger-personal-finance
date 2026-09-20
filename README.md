@@ -122,7 +122,7 @@ supabase/
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and on pushes to `main`. Contributor conventions are in `AGENTS.md`.
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and on pushes to `main`. A separate `db` job starts a fresh local Supabase, applies all migrations and the seed, lints database functions and replays the migrations from scratch, so a migration that fails on an empty database fails CI. Contributor conventions are in `AGENTS.md`.
 
 ## Philosophy
 

@@ -20,6 +20,8 @@ import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { resolveLoadState } from '@/lib/loadState'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
@@ -301,9 +303,10 @@ export default function AccountTransactionsPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
-  const { accounts, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment } = useAccounts()
-  const { transactions, loading, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
+  const { accounts, error: accountsError, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment } = useAccounts()
+  const { transactions, loading, error: txError, refetch: refetchTransactions, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
+  const loadState = resolveLoadState({ loading, error: txError, hasData: transactions.length > 0 })
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -662,6 +665,10 @@ export default function AccountTransactionsPage() {
         </Tabs>
       )}
 
+      {accountsError && !account && (
+        <InlineLoadError message="Couldn't load this account's details." onRetry={() => void refetchAccounts()} />
+      )}
+
       {/* Account balance card */}
       {account && (account.type !== 'loan' || loanSection === 'summary') && (
         <div
@@ -905,7 +912,12 @@ export default function AccountTransactionsPage() {
       </div>}
 
       {/* Transaction list */}
-      {(account?.type !== 'loan' || loanSection === 'activity') && (loading ? (
+      {(account?.type !== 'loan' || loanSection === 'activity') && loadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh your transactions. Showing what was last loaded." onRetry={() => void refetchTransactions()} />
+      )}
+      {(account?.type !== 'loan' || loanSection === 'activity') && (loadState === 'error' ? (
+        <ErrorState title="Couldn't load your transactions" detail={txError} onRetry={() => void refetchTransactions()} />
+      ) : loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : filtered.length === 0 ? (
         <EmptyState

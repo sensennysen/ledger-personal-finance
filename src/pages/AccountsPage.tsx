@@ -26,6 +26,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { resolveLoadState } from '@/lib/loadState'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
 import { daysUntilDayOfMonth, getBalanceSummary, getCreditCardSpending, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
@@ -438,7 +440,8 @@ function AccountForm({
 
 export default function AccountsPage() {
   const { user, profile, refreshProfile } = useAuth()
-  const { accounts, loading, createAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder } = useAccounts()
+  const { accounts, loading, error, refetch, createAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder } = useAccounts()
+  const loadState = resolveLoadState({ loading, error, hasData: accounts.length > 0 })
   const { prefs, set: setPref } = usePreferences()
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
@@ -806,7 +809,12 @@ export default function AccountsPage() {
         </div>
       )}
 
-      {loading ? (
+      {loadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh your accounts. Showing what was last loaded." onRetry={() => void refetch()} />
+      )}
+      {loadState === 'error' ? (
+        <ErrorState title="Couldn't load your accounts" detail={error} onRetry={() => void refetch()} />
+      ) : loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
         </div>

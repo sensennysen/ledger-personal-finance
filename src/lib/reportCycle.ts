@@ -1,15 +1,10 @@
+import { dateStr, monthCycleDates } from './cycleRange.ts'
+
 export interface ReportRange {
   start: string
   end: string
   label: string
   filenameLabel: string
-}
-
-function dateStr(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
 }
 
 function shortDate(date: Date): string {
@@ -21,9 +16,7 @@ function shortDate(date: Date): string {
  * ("YYYY-MM" key plus the user's month start day).
  */
 export function getReportRange(selectedMonth: string, startDay: number): ReportRange {
-  const [year, month] = selectedMonth.split('-').map(Number)
-  const start = new Date(year, month - 1, startDay)
-  const end = new Date(year, month, startDay - 1)
+  const { start, end } = monthCycleDates(selectedMonth, startDay)
   const startStr = dateStr(start)
   const endStr = dateStr(end)
   const sameYear = start.getFullYear() === end.getFullYear()

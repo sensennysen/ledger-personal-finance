@@ -4,6 +4,7 @@ import {
   defaultCardPaymentDescription,
   getCardPaymentPresets,
   getCardPaymentSummary,
+  isAutoCardPaymentDescription,
 } from '../src/lib/cardPayment.ts'
 
 test('paying the full balance clears the card', () => {
@@ -71,4 +72,14 @@ test('statement preset is clamped between zero and the balance owed', () => {
 
 test('default description uses the card name', () => {
   assert.equal(defaultCardPaymentDescription('BPI Visa'), 'Card payment - BPI Visa')
+})
+
+test('description is replaceable only when empty or the generated one for the previous card', () => {
+  assert.equal(isAutoCardPaymentDescription(''), true)
+  assert.equal(isAutoCardPaymentDescription('   '), true)
+  assert.equal(isAutoCardPaymentDescription('Card payment - Visa', 'Visa'), true)
+  // User-typed text is kept, even when it starts with the generated prefix.
+  assert.equal(isAutoCardPaymentDescription('Card payment - March top-up', 'Visa'), false)
+  assert.equal(isAutoCardPaymentDescription('Card payment - Visa'), false)
+  assert.equal(isAutoCardPaymentDescription('Groceries', 'Visa'), false)
 })

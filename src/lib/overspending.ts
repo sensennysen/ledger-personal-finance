@@ -1,5 +1,8 @@
 import { nextRollover, canRollover, type DeficitBehaviour } from './budgetRollover.ts'
 import { sumBudgetSpend, type BudgetSpendTx } from './budgetSpend.ts'
+import { monthCycleRange, type DateRange as Range } from './cycleRange.ts'
+
+const pad = (n: number) => String(n).padStart(2, '0')
 
 export interface OverspendingBudget {
   id: string
@@ -28,23 +31,6 @@ export interface OverspendingResult {
   rows: OverspendingRow[]
   totals: { currency: string; over: number; uncarried: number }[]
   unrated: string[]
-}
-
-interface Range {
-  start: string
-  end: string
-}
-
-const pad = (n: number) => String(n).padStart(2, '0')
-const dateStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-
-/** Same cycle boundaries as getCustomMonthRange, kept here so this module stays pure. */
-export function monthCycleRange(monthKey: string, startDay: number): Range {
-  const [year, month] = monthKey.split('-').map(Number)
-  return {
-    start: dateStr(new Date(year, month - 1, startDay)),
-    end: dateStr(new Date(year, month, startDay - 1)),
-  }
 }
 
 /** "YYYY-MM" of the first cycle a budget applies to, mirroring useBudgets' history walk. */

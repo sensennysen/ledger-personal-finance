@@ -4,7 +4,6 @@ import {
   computeOverspending,
   streakLabel,
   shiftMonthKey,
-  monthCycleRange,
 } from '../src/lib/overspending.ts'
 
 const budget = (o = {}) => ({
@@ -99,5 +98,4 @@ test('helpers', () => {
   assert.equal(streakLabel(1), '1st')
   assert.equal(streakLabel(3), '3 in a row')
   assert.equal(shiftMonthKey('2026-01', -1), '2025-12')
-  assert.deepEqual(monthCycleRange('2026-09', 15), { start: '2026-09-15', end: '2026-10-14' })
 })

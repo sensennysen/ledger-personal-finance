@@ -26,12 +26,13 @@ import { CURRENCIES } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
+import { resolveEditTarget } from '@/lib/editTarget'
 import { daysUntilDayOfMonth } from '@/lib/creditCards'
 import {
   defaultCardPaymentDescription,
   getCardPaymentPresets,
   getCardPaymentSummary,
-  isCardPaymentDescription,
+  isAutoCardPaymentDescription,
 } from '@/lib/cardPayment'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -51,6 +52,8 @@ interface TransactionFormProps {
   lockedCardAccountId?: string
   submitLabel?: string
   entryKind?: TransactionKind
+  /** True when editing a saved transaction rather than creating one. */
+  isEditing?: boolean
 }
 
 export function TransactionForm({
@@ -62,6 +65,7 @@ export function TransactionForm({
   lockedCardAccountId,
   submitLabel = 'Save Transaction',
   entryKind,
+  isEditing = false,
 }: TransactionFormProps) {
   const { user } = useAuth()
   const { accounts } = useAccounts()
@@ -118,16 +122,17 @@ export function TransactionForm({
   const loanAccounts = useMemo(() => accounts.filter((account) => account.type === 'loan'), [accounts])
   const cardAccounts = useMemo(() => accounts.filter((account) => account.type === 'credit_card'), [accounts])
   // An edited expense with a target is a payment against a liability; the target's type says which.
-  const editTargetType = defaultValues?.type === 'expense' && defaultValues.to_account_id
-    ? accounts.find((account) => account.id === defaultValues.to_account_id)?.type
-    : undefined
-  const isCardPayment =
-    entryKind === 'card-payment' || Boolean(lockedCardAccountId) || editTargetType === 'credit_card'
+  // If the target is not in the loaded list (still loading, archived, filtered out) we do not
+  // guess: the form falls back to a plain expense and keeps to_account_id untouched.
+  const editTarget = resolveEditTarget(
+    isEditing && defaultValues?.type === 'expense' ? defaultValues.to_account_id : null,
+    accounts,
+  )
+  const editTargetMissing = editTarget === 'missing'
+  const isCardPayment = entryKind === 'card-payment' || Boolean(lockedCardAccountId) || editTarget === 'card'
   const isLoanRepayment =
     !isCardPayment &&
-    (entryKind === 'loan-repayment' ||
-      Boolean(lockedLoanAccountId) ||
-      (defaultValues?.type === 'expense' && Boolean(defaultValues.to_account_id)))
+    (entryKind === 'loan-repayment' || Boolean(lockedLoanAccountId) || editTarget === 'loan')
   const isLiabilityPayment = isLoanRepayment || isCardPayment
   const selectedLoan = loanAccounts.find((account) => account.id === selectedLoanId)
   const selectedCard = cardAccounts.find((account) => account.id === selectedLoanId)
@@ -238,6 +243,7 @@ export function TransactionForm({
     if (!card) return
 
     const currentDescription = form.getValues('description').trim()
+    const previousCard = cardAccounts.find((account) => account.id === form.getValues('to_account_id'))
     const currentAccountId = form.getValues('account_id')
     const compatibleSources = accounts.filter(
       (account) =>
@@ -252,7 +258,7 @@ export function TransactionForm({
     if (!compatibleSources.some((account) => account.id === currentAccountId)) {
       form.setValue('account_id', compatibleSources[0]?.id ?? '')
     }
-    if (!currentDescription || isCardPaymentDescription(currentDescription)) {
+    if (isAutoCardPaymentDescription(currentDescription, previousCard?.name)) {
       form.setValue('description', defaultCardPaymentDescription(card.name))
     }
     form.clearErrors(['account_id', 'to_account_id', 'amount'])
@@ -293,7 +299,7 @@ export function TransactionForm({
   }
 
   const cardSummary =
-    isCardPayment && selectedCard && !defaultValues?.amount
+    isCardPayment && selectedCard && !isEditing
       ? getCardPaymentSummary(selectedCard.balance, selectedCard.credit_limit, Number(amountValue))
       : null
   const cardPresets = cardSummary && selectedCard ? getCardPaymentPresets(selectedCard) : null
@@ -312,6 +318,12 @@ export function TransactionForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmitWithUpload)} className="space-y-3 sm:space-y-4">
+        {editTargetMissing && (
+          <p className="text-xs text-muted-foreground" role="status">
+            The account this payment went to is not available, so it is shown as a plain expense. Its target is kept when you save.
+          </p>
+        )}
+
         {isLoanRepayment && (
           <FormField
             control={form.control}

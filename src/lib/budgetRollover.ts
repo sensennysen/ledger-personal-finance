@@ -1,5 +1,10 @@
 export type DeficitBehaviour = 'carry' | 'reset'
 
+/** Rollover history is computed per monthly cycle, so only monthly budgets can roll over. */
+export function canRollover(period: string): boolean {
+  return period === 'monthly'
+}
+
 /**
  * Next cycle's carried rollover after a period ends.
  * - reset: only surplus is carried; an overspend starts the next cycle fresh.

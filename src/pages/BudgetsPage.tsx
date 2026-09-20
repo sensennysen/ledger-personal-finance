@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { useBudgets } from '@/hooks/useBudgets'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { useCycle } from '@/contexts/cycleState'
@@ -1165,6 +1166,7 @@ export default function BudgetsPage() {
                         Budget is in {budget.currency} — transactions in other currencies are converted using their exchange rate.
                       </p>
                     )}
+                    <UnratedCurrencyNotice currencies={budget.unrated_currencies ?? []} />
                     <div className="flex justify-between text-sm">
                       <span className={over ? 'text-destructive font-medium' : 'text-muted-foreground'}>
                         {formatCurrency(spent, budget.currency)} spent

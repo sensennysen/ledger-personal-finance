@@ -5,6 +5,7 @@ import { readCache, writeCache } from '@/lib/dataCache'
 import type { Budget, BudgetHistoryEntry } from '@/types'
 import { getCurrentCycleMonthKey } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
+import { sumBudgetSpend } from '@/lib/budgetSpend'
 import { nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 
 function localDateStr(date: Date): string {
@@ -108,17 +109,9 @@ export function useBudgets(
       )
 
       const computeSpent = (rangeStart: string, rangeEnd: string) =>
-        allTx.reduce((sum, tx) => {
-          if (tx.category_id !== b.category_id) return sum
-          if (tx.date < rangeStart || tx.date > rangeEnd) return sum
-          const txAmount =
-            tx.currency === b.currency
-              ? tx.amount
-              : tx.amount * (tx.exchange_rate ?? 1)
-          return sum + txAmount
-        }, 0)
+        sumBudgetSpend(allTx, b, rangeStart, rangeEnd)
 
-      const spent = computeSpent(start, end)
+      const { spent, unrated } = computeSpent(start, end)
 
       // Compute monthly rollover and history
       let rolloverAmount = 0
@@ -137,7 +130,7 @@ export function useBudgets(
           const periodEnd = localDateStr(
             new Date(d.getFullYear(), d.getMonth() + 1, startDay - 1),
           )
-          const periodSpent = computeSpent(periodStart, periodEnd)
+          const { spent: periodSpent } = computeSpent(periodStart, periodEnd)
           const surplus = b.amount - periodSpent
 
           history.push({
@@ -171,6 +164,7 @@ export function useBudgets(
       return {
         ...b,
         spent,
+        unrated_currencies: unrated,
         rollover_amount: rolloverAmount,
         effective_amount: effectiveAmount,
         history: recentHistory,
@@ -197,6 +191,7 @@ export function useBudgets(
       | 'updated_at'
       | 'category'
       | 'spent'
+      | 'unrated_currencies'
       | 'rollover_amount'
       | 'effective_amount'
       | 'history'

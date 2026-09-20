@@ -149,6 +149,7 @@ export interface Budget {
   // joined / computed
   category?: Category
   spent?: number
+  unrated_currencies?: string[]
   rollover_amount?: number
   effective_amount?: number
   history?: BudgetHistoryEntry[]

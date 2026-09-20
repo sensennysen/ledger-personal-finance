@@ -5,15 +5,20 @@ import { readCache, writeCache } from '@/lib/dataCache'
 import type { Budget, BudgetHistoryEntry } from '@/types'
 import { getCurrentCycleMonthKey } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
+import { nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 
 function localDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-export function useBudgets(cycle?: {
-  selectedMonth: string
-  startDay: number
-}) {
+export function useBudgets(
+  cycle?: {
+    selectedMonth: string
+    startDay: number
+  },
+  // TODO(LED-20): read the global budget_deficit_behaviour setting
+  deficitBehaviour: DeficitBehaviour = 'carry',
+) {
   const { user } = useAuth()
   const selectedMonth = cycle?.selectedMonth
   const startDay = cycle?.startDay ?? 1
@@ -29,7 +34,7 @@ export function useBudgets(cycle?: {
       setLoading(false)
       return
     }
-    const cacheKey = `${user.id}:budgets${selectedMonth ? `:${selectedMonth}:${startDay}` : ''}`
+    const cacheKey = `${user.id}:budgets${selectedMonth ? `:${selectedMonth}:${startDay}` : ''}:${deficitBehaviour}`
     const cached = readCache<Budget[]>(cacheKey)
     if (cached) {
       setBudgets(cached)
@@ -145,7 +150,12 @@ export function useBudgets(cycle?: {
           })
 
           if (b.rollover_enabled) {
-            rolloverAmount += surplus
+            rolloverAmount = nextRollover(
+              rolloverAmount,
+              surplus,
+              b.amount,
+              deficitBehaviour,
+            )
           }
 
           d = new Date(d.getFullYear(), d.getMonth() + 1, startDay)
@@ -153,8 +163,10 @@ export function useBudgets(cycle?: {
       }
 
       const recentHistory = history.slice(-6)
-      const effectiveAmount =
-        b.amount + (b.rollover_enabled ? rolloverAmount : 0)
+      const effectiveAmount = Math.max(
+        0,
+        b.amount + (b.rollover_enabled ? rolloverAmount : 0),
+      )
 
       return {
         ...b,
@@ -168,7 +180,7 @@ export function useBudgets(cycle?: {
     setBudgets(enriched)
     writeCache(cacheKey, enriched)
     setLoading(false)
-  }, [user, selectedMonth, startDay])
+  }, [user, selectedMonth, startDay, deficitBehaviour])
 
   useEffect(() => {
     queueMicrotask(() => {

@@ -37,3 +37,30 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+  db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      # Starting the stack applies every file in supabase/migrations, then
+      # supabase/seed.sql, against a fresh database. A migration that does not
+      # apply cleanly from scratch fails this step. Only the services the
+      # migrations depend on (auth, storage, API) are started.
+      - name: Start local Supabase and apply migrations
+        run: supabase start -x studio,imgproxy,mailpit,vector,logflare,edge-runtime,supavisor,postgres-meta,realtime
+
+      - name: Lint database functions
+        run: supabase db lint --local --level warning --fail-on error
+
+      - name: Replay migrations from scratch
+        run: supabase db reset --local
+
+      - name: Stop
+        if: always()
+        run: supabase stop --no-backup

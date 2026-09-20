@@ -670,7 +670,7 @@ export default function CategoriesPage() {
     <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
       <div className="space-y-3">
         <div>
-          <h1 className="text-2xl font-bold">Categories</h1>
+          <h1 className="text-2xl font-bold md:hidden">Categories</h1>
           <p className="text-muted-foreground text-sm">Customize your transaction categories</p>
         </div>
         <div className="flex items-center justify-end gap-2">

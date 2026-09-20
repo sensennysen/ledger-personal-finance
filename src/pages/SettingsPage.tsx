@@ -183,7 +183,7 @@ export default function SettingsPage() {
 
   return (
     <div className="settings-grid p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <h1 className="text-2xl font-bold md:hidden">Settings</h1>
 
       {/* Profile */}
       <Card>

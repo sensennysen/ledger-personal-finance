@@ -601,7 +601,7 @@ export default function ReportsPage() {
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold">Reports</h1>
+            <h1 className="text-2xl font-bold md:hidden">Reports</h1>
             <p className="text-xs text-muted-foreground">{rangeLabel}</p>
           </div>
 

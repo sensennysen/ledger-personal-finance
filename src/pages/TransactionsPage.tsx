@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
-import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
+import { Plus, Search, ArrowLeftRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCycle } from '@/contexts/cycleState'
 import { useCategories } from '@/hooks/useCategories'
@@ -21,6 +21,7 @@ import { resolveLoadState } from '@/lib/loadState'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
+import { PageActions } from '@/components/layout/PageActions'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { inferTransactionKind, TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
@@ -30,25 +31,10 @@ import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import type { Transaction } from '@/types'
 
-function getMonthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-}
-
-function formatMonthLabel(key: string) {
-  const [year, month] = key.split('-').map(Number)
-  return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
-}
-
-function addMonths(key: string, delta: number) {
-  const [year, month] = key.split('-').map(Number)
-  const d = new Date(year, month - 1 + delta, 1)
-  return getMonthKey(d)
-}
-
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
-  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
+  const { startDay, selectedMonth } = useCycle()
   const [createOpen, setCreateOpen] = useState(false)
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
@@ -347,7 +333,7 @@ export default function TransactionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold">Activity</h1>
+          <h1 className="text-2xl font-bold md:hidden">Activity</h1>
           <span
             className="hidden sm:inline-flex items-center gap-1 text-[0.625rem] text-muted-foreground border border-border rounded px-1.5 py-0.5 select-none"
             title="Keyboard shortcuts: N = new transaction"
@@ -355,7 +341,7 @@ export default function TransactionsPage() {
             <Keyboard className="w-2.5 h-2.5" />N
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
+        <PageActions>
           <Button
             variant="ghost"
             size="sm"
@@ -390,7 +376,7 @@ export default function TransactionsPage() {
               />
             </DialogContent>
           </Dialog>
-        </div>
+        </PageActions>
       </div>
 
       {/* Bulk action bar / Filter row */}
@@ -460,22 +446,6 @@ export default function TransactionsPage() {
           </Tabs>
         </div>
       )}
-
-      {/* Month navigation */}
-      <div className="hidden items-center justify-between gap-2 bg-muted/40 rounded-xl px-3 py-2 md:flex">
-        <Button variant="ghost" size="icon" onClick={() => setSelectedMonth((m) => addMonths(m, -1))}>
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <span className="text-sm font-semibold flex-1 text-center">{formatMonthLabel(selectedMonth)}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSelectedMonth((m) => addMonths(m, 1))}
-          disabled={selectedMonth >= getCurrentCycleMonthKey(startDay)}
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
 
       {/* Templates strip */}
       {templates.length > 0 && (
@@ -589,25 +559,6 @@ export default function TransactionsPage() {
             <SheetDescription>Choose what appears in the transaction list.</SheetDescription>
           </SheetHeader>
           <div className="space-y-5 overflow-y-auto px-4 pb-2">
-            <div className="space-y-2">
-              <Label>Period</Label>
-              <div className="flex items-center justify-between gap-2 rounded-xl bg-muted/40 px-2 py-1.5">
-                <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => setSelectedMonth((month) => addMonths(month, -1))}>
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-sm font-semibold">{formatMonthLabel(selectedMonth)}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Next month"
-                  onClick={() => setSelectedMonth((month) => addMonths(month, 1))}
-                  disabled={selectedMonth >= getCurrentCycleMonthKey(startDay)}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
             <div className="space-y-2">
               <Label>Transaction type</Label>
               <Tabs value={filterType} onValueChange={setFilterType}>

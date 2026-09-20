@@ -13,7 +13,7 @@ import { useBudgets } from '@/hooks/useBudgets'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { canRollover } from '@/lib/budgetRollover'
 import { useCycle } from '@/contexts/cycleState'
-import { CycleStepper } from '@/components/layout/CycleStepper'
+import { PageActions } from '@/components/layout/PageActions'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useSavingsGoals, type GoalWithContributions } from '@/hooks/useSavingsGoals'
 import { useCategories } from '@/hooks/useCategories'
@@ -1040,22 +1040,23 @@ export default function BudgetsPage() {
     <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Budgets & Goals</h1>
+          <h1 className="text-2xl font-bold md:hidden">Budgets & Goals</h1>
           <p className="text-muted-foreground text-sm">Track spending limits and savings targets</p>
         </div>
-        {activeTab === 'budgets' && (
-          <Button className="gap-2" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4" />Add Budget
-          </Button>
-        )}
-        {activeTab === 'goals' && (
-          <Button className="gap-2" size="sm" onClick={() => setCreateGoalOpen(true)}>
-            <Plus className="w-4 h-4" />Add Goal
-          </Button>
-        )}
+        <PageActions>
+          {activeTab === 'budgets' && (
+            <Button className="gap-2" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="w-4 h-4" />Add Budget
+            </Button>
+          )}
+          {activeTab === 'goals' && (
+            <Button className="gap-2" size="sm" onClick={() => setCreateGoalOpen(true)}>
+              <Plus className="w-4 h-4" />Add Goal
+            </Button>
+          )}
+        </PageActions>
       </div>
 
-      <CycleStepper className="hidden md:flex" />
       {budgetError && <p role="alert" className="rounded-xl bg-expense-container text-expense p-4 text-sm">{budgetError}</p>}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">

@@ -6,7 +6,7 @@ import type { Budget, BudgetHistoryEntry } from '@/types'
 import { getCurrentCycleMonthKey } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { sumBudgetSpend } from '@/lib/budgetSpend'
-import { nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
+import { canRollover, nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 
 function localDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -114,10 +114,11 @@ export function useBudgets(
       const { spent, unrated } = computeSpent(start, end)
 
       // Compute monthly rollover and history
+      const rolloverActive = b.rollover_enabled && canRollover(b.period)
       let rolloverAmount = 0
       const history: BudgetHistoryEntry[] = []
 
-      if (b.period === 'monthly') {
+      if (canRollover(b.period)) {
         const budgetStartDate = new Date(b.start_date + 'T00:00:00')
         let d = new Date(
           budgetStartDate.getFullYear(),
@@ -138,11 +139,11 @@ export function useBudgets(
             period_end: periodEnd,
             budget_amount: b.amount,
             spent_amount: periodSpent,
-            rollover_in: b.rollover_enabled ? rolloverAmount : 0,
+            rollover_in: rolloverActive ? rolloverAmount : 0,
             currency: b.currency,
           })
 
-          if (b.rollover_enabled) {
+          if (rolloverActive) {
             rolloverAmount = nextRollover(
               rolloverAmount,
               surplus,
@@ -158,7 +159,7 @@ export function useBudgets(
       const recentHistory = history.slice(-6)
       const effectiveAmount = Math.max(
         0,
-        b.amount + (b.rollover_enabled ? rolloverAmount : 0),
+        b.amount + (rolloverActive ? rolloverAmount : 0),
       )
 
       return {

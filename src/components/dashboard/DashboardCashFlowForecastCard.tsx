@@ -1,4 +1,4 @@
-import { ArrowRight, BarChart3, TrendingDown, TrendingUp } from 'lucide-react'
+import { ArrowRight, BarChart3, Repeat, TrendingDown, TrendingUp } from 'lucide-react'
 import { EXPENSE, INCOME } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { DashboardCashFlowForecast } from '@/hooks/useDashboardData'
@@ -88,7 +88,9 @@ export function DashboardCashFlowForecastCard({
               <p className="text-[0.625rem] text-muted-foreground uppercase tracking-wider mb-2">Recurring items</p>
               {forecast.forecastItems.slice(0, 4).map((item, index) => (
                 <div key={index} className="flex items-center gap-2 py-1 text-xs">
-                  <span className="text-[0.8125rem] shrink-0">{item.tx.category?.icon ?? 'Recur'}</span>
+                  <span className="w-4 flex justify-center shrink-0 text-[0.8125rem]">
+                    {item.tx.category?.icon ?? <Repeat className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />}
+                  </span>
                   <span className="flex-1 truncate text-muted-foreground">{item.tx.description}</span>
                   {item.occurrences > 1 && (
                     <span className="text-[0.625rem] text-muted-foreground/50 shrink-0">x{item.occurrences}</span>

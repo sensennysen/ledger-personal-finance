@@ -153,6 +153,14 @@ export function TopBar({
           >
             <Search />
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            onClick={toggleTheme}
+          >
+            {theme === 'dark' ? <Sun /> : <Moon />}
+          </Button>
           <button
             type="button"
             aria-label="Open account menu"

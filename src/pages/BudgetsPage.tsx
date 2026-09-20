@@ -8,8 +8,10 @@ import {
 } from 'lucide-react'
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { useBudgets } from '@/hooks/useBudgets'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
+import { canRollover } from '@/lib/budgetRollover'
 import { useCycle } from '@/contexts/cycleState'
 import { CycleStepper } from '@/components/layout/CycleStepper'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -35,6 +37,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { resolveLoadState } from '@/lib/loadState'
 import { Textarea } from '@/components/ui/textarea'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -96,10 +100,21 @@ function BudgetForm({
   })
 
   const period = useWatch({ control: form.control, name: 'period' })
+  const rolloverAllowed = canRollover(period)
+  const initialPeriod = defaultValues?.period ?? 'monthly'
+
+  // Only clear the flag when the user moves a budget off monthly in this edit;
+  // untouched legacy non-monthly rows keep their stored value.
+  const handleValidSubmit = (values: BudgetFormValues) =>
+    onSubmit(
+      values.period !== initialPeriod && !canRollover(values.period)
+        ? { ...values, rollover_enabled: false }
+        : values,
+    )
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleValidSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="name"
@@ -234,28 +249,32 @@ function BudgetForm({
             )}
           />
         </div>
-        {period === 'monthly' && (
-          <FormField
-            control={form.control}
-            name="rollover_enabled"
-            render={({ field }) => (
-              <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                <div className="space-y-0.5">
-                  <FormLabel className="flex items-center gap-1.5 cursor-pointer">
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    Rollover unused budget
-                  </FormLabel>
-                  <p className="text-xs text-muted-foreground">
-                    Carry surplus (or debt) to the following month
-                  </p>
-                </div>
-                <FormControl>
-                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-        )}
+        <FormField
+          control={form.control}
+          name="rollover_enabled"
+          render={({ field }) => (
+            <FormItem className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <FormLabel className="flex items-center gap-1.5 cursor-pointer">
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Rollover unused budget
+                </FormLabel>
+                <p className="text-xs text-muted-foreground">
+                  {rolloverAllowed
+                    ? 'Carry surplus (or debt) to the following month'
+                    : 'Rollover only applies to monthly budgets'}
+                </p>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={rolloverAllowed && field.value}
+                  onCheckedChange={field.onChange}
+                  disabled={!rolloverAllowed}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
         <div className="flex gap-2 justify-end pt-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={form.formState.isSubmitting}>
@@ -569,6 +588,7 @@ function ContributionDialog({
 
 function BudgetHistoryCard({ budget }: { budget: Budget }) {
   const history = budget.history ?? []
+  const showRollover = budget.rollover_enabled && canRollover(budget.period)
   if (history.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-6">
@@ -583,11 +603,11 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
         <thead>
           <tr className="border-b text-muted-foreground text-xs">
             <th className="text-left py-2 pr-3 font-medium">Month</th>
-            {budget.rollover_enabled && (
+            {showRollover && (
               <th className="text-right py-2 px-3 font-medium">Rollover</th>
             )}
             <th className="text-right py-2 px-3 font-medium">Budget</th>
-            {budget.rollover_enabled && (
+            {showRollover && (
               <th className="text-right py-2 px-3 font-medium">Effective</th>
             )}
             <th className="text-right py-2 px-3 font-medium">Spent</th>
@@ -607,7 +627,7 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
             return (
               <tr key={entry.period_start} className="border-b last:border-0">
                 <td className="py-2 pr-3 font-medium">{month}</td>
-                {budget.rollover_enabled && (
+                {showRollover && (
                   <td className={`text-right py-2 px-3 text-xs ${entry.rollover_in >= 0 ? 'text-income dark:text-income' : 'text-destructive'}`}>
                     {entry.rollover_in >= 0 ? '+' : ''}{formatCurrency(entry.rollover_in, entry.currency)}
                   </td>
@@ -615,7 +635,7 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
                 <td className="text-right py-2 px-3 text-muted-foreground">
                   {formatCurrency(entry.budget_amount, entry.currency)}
                 </td>
-                {budget.rollover_enabled && (
+                {showRollover && (
                   <td className="text-right py-2 px-3 font-medium">
                     {formatCurrency(effective, entry.currency)}
                   </td>
@@ -654,11 +674,15 @@ function BudgetTransactionsDialog({
   budget,
   transactions,
   loading,
+  error,
+  onRetry,
   periodRange,
 }: {
   budget: Budget
   transactions: ReturnType<typeof useTransactions>['transactions']
   loading: boolean
+  error: string | null
+  onRetry: () => void
   periodRange: { start: string; end: string }
 }) {
   const total = transactions.reduce((sum, tx) => {
@@ -669,9 +693,18 @@ function BudgetTransactionsDialog({
   }, 0)
   const effective = budget.effective_amount ?? budget.amount
   const remaining = effective - total
+  const loadState = resolveLoadState({ loading, error, hasData: transactions.length > 0 })
+
+  // Spent/Left are derived from these rows, so a failed read must not show them as zero.
+  if (loadState === 'error') {
+    return <ErrorState title="Couldn't load these transactions" detail={error} onRetry={onRetry} />
+  }
 
   return (
     <div className="space-y-4">
+      {loadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh these transactions. Showing what was last loaded." onRetry={onRetry} />
+      )}
       <div className="rounded-lg border bg-muted/30 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -935,7 +968,8 @@ export default function BudgetsPage() {
   const { profile } = useAuth()
   const { selectedMonth, startDay } = useCycle()
   const { budgets, loading, error: budgetError, createBudget, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
-  const { goals, loading: goalsLoading, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
+  const { goals, loading: goalsLoading, error: goalsError, refetch: refetchGoals, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
+  const goalsLoadState = resolveLoadState({ loading: goalsLoading, error: goalsError, hasData: goals.length > 0 })
 
   const [activeTab, setActiveTab] = useState('budgets')
   const [createOpen, setCreateOpen] = useState(false)
@@ -955,6 +989,8 @@ export default function BudgetsPage() {
   const {
     transactions: selectedBudgetTransactions,
     loading: selectedBudgetTransactionsLoading,
+    error: selectedBudgetTransactionsError,
+    refetch: refetchSelectedBudgetTransactions,
   } = useTransactions({
     categoryId: selectedBudget?.category_id ?? '__no_budget_selected__',
     type: 'expense',
@@ -1054,7 +1090,8 @@ export default function BudgetsPage() {
               const over = spent > effective
               const remaining = effective - spent
               const rollover = budget.rollover_amount ?? 0
-              const hasRollover = budget.rollover_enabled && rollover !== 0
+              const rolloverActive = budget.rollover_enabled && canRollover(budget.period)
+              const hasRollover = rolloverActive && rollover !== 0
 
               return (
                 <Card
@@ -1082,7 +1119,7 @@ export default function BudgetsPage() {
                             {budget.category && (
                               <Badge variant="secondary" className="text-xs">{budget.category.name}</Badge>
                             )}
-                            {budget.rollover_enabled && (
+                            {rolloverActive && (
                               <Badge variant="outline" className="text-xs gap-0.5 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
                                 <RefreshCw className="w-2.5 h-2.5" />Rollover
                               </Badge>
@@ -1165,6 +1202,7 @@ export default function BudgetsPage() {
                         Budget is in {budget.currency} — transactions in other currencies are converted using their exchange rate.
                       </p>
                     )}
+                    <UnratedCurrencyNotice currencies={budget.unrated_currencies ?? []} />
                     <div className="flex justify-between text-sm">
                       <span className={over ? 'text-destructive font-medium' : 'text-muted-foreground'}>
                         {formatCurrency(spent, budget.currency)} spent
@@ -1216,7 +1254,7 @@ export default function BudgetsPage() {
                       <CardTitle className="text-base">{budget.name}</CardTitle>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {budget.category?.name} · Last 6 months
-                        {budget.rollover_enabled && ' · Rollover enabled'}
+                        {budget.rollover_enabled && canRollover(budget.period) && ' · Rollover enabled'}
                       </p>
                     </div>
                   </div>
@@ -1236,7 +1274,12 @@ export default function BudgetsPage() {
 
         {/* Savings Goals tab */}
         <TabsContent value="goals" className="mt-4 space-y-4">
-          {goalsLoading ? (
+          {goalsLoadState === 'stale-error' && (
+            <InlineLoadError message="Couldn't refresh your savings goals. Showing what was last loaded." onRetry={() => void refetchGoals()} />
+          )}
+          {goalsLoadState === 'error' ? (
+            <ErrorState title="Couldn't load your savings goals" detail={goalsError} onRetry={() => void refetchGoals()} />
+          ) : goalsLoading ? (
             <div className="space-y-4">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-40" />)}</div>
           ) : goals.length === 0 ? (
             <Card className="text-center py-16">
@@ -1293,6 +1336,8 @@ export default function BudgetsPage() {
               budget={selectedBudget}
               transactions={selectedBudgetTransactions}
               loading={selectedBudgetTransactionsLoading}
+              error={selectedBudgetTransactionsError}
+              onRetry={() => void refetchSelectedBudgetTransactions()}
               periodRange={selectedBudgetRange}
             />
           )}

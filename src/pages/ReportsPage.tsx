@@ -40,6 +40,7 @@ import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { InlineLoadError } from '@/components/ui/error-state'
 import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
@@ -346,11 +347,16 @@ export default function ReportsPage() {
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
 
-  const { transactions, loading: txLoading } = useTransactions()
-  const { accounts, loading: accLoading } = useAccounts()
+  const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
+  const { accounts, loading: accLoading, error: accError, refetch: refetchAccounts } = useAccounts()
   const { categories } = useCategories()
 
   const loading = txLoading || accLoading
+  const loadFailed = !!(txError || accError)
+  const retryFailedSources = () => {
+    if (txError) void refetchTransactions()
+    if (accError) void refetchAccounts()
+  }
 
   // Date range state
   const [preset, setPreset] = useState<Preset>('this_month')
@@ -584,6 +590,12 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 md:pb-6">
+      {loadFailed && !loading && (
+        <InlineLoadError
+          message="Some of your data didn't load, so these reports may be incomplete."
+          onRetry={retryFailedSources}
+        />
+      )}
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>

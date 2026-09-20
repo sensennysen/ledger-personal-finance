@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<nav style="display:flex; height:80px; border-top:1px solid #D9D7DE; background:#F3F2F6; padding-top:10px; font-family:'Roboto',system-ui,sans-serif">
+  <sc-for list="{{ items }}" as="item" hint-placeholder-count="5">
+    <span style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; font-size:11px; font-weight:500; color:{{ item.label }}">
+      <span style="width:56px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:16px; background:{{ item.bg }}; color:{{ item.icoColor }}"><i data-lucide="{{ item.icon }}"></i></span>
+      {{ item.text }}
+    </span>
+  </sc-for>
+</nav>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:80},&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Home&quot;,&quot;Accounts&quot;,&quot;Activity&quot;,&quot;Budgets&quot;,&quot;More&quot;],&quot;default&quot;:&quot;Home&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const ITEMS = [
+  { icon: 'house', text: 'Home' },
+  { icon: 'wallet', text: 'Accounts' },
+  { icon: 'arrow-left-right', text: 'Activity' },
+  { icon: 'target', text: 'Budgets' },
+  { icon: 'more-horizontal', text: 'More' },
+]
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'Home'
+    return {
+      items: ITEMS.map((i) => ({
+        ...i,
+        label: i.text === active ? '#2B2A30' : '#6B6A72',
+        bg: i.text === active ? '#E4E7F5' : 'transparent',
+        icoColor: i.text === active ? '#2E3A63' : '#6B6A72',
+      })),
+    }
+  }
+}
+</script>
+</body>
+</html>

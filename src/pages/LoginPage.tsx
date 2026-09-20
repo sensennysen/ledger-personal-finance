@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
 
 export default function LoginPage() {
-  const { signInWithGoogle, loading } = useAuth()
+  const { signInWithGoogle, loading, authError: sessionError } = useAuth()
   const { theme } = useTheme()
 
   const params = new URLSearchParams(window.location.search)
@@ -51,7 +51,7 @@ export default function LoginPage() {
         </div>
 
         {/* ── Auth error ── */}
-        {authError && (
+        {(authError || sessionError) && (
           <div
             className="mb-5 rounded-xl border px-4 py-3 text-sm"
             style={{
@@ -60,7 +60,7 @@ export default function LoginPage() {
               color: 'var(--expense)',
             }}
           >
-            {authError}
+            {authError || sessionError?.message}
           </div>
         )}
 

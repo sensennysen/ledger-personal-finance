@@ -35,6 +35,7 @@ export function useCategories() {
     if (error) {
       setError(error.message)
     } else {
+      setError(null)
       setCategories(data as Category[])
       writeCache(cacheKey, data)
     }

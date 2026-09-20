@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/modernist-3206b644-98f4-42a0-9078-32b6d7fd0570/styles.css">
+<script src="_ds/modernist-3206b644-98f4-42a0-9078-32b6d7fd0570/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.474.0/dist/umd/lucide.min.js"></script>
+<style>
+  body { margin:0; background:#DEDDE3; }
+  .money { font-family:'DM Mono',monospace; font-variant-numeric:tabular-nums; letter-spacing:-0.025em; }
+  .mono-num { font-variant-numeric:tabular-nums; }
+  svg.lu { width:18px; height:18px; stroke-width:2; }
+  .sans { font-family:'Roboto',system-ui,sans-serif; color:#2B2A30; }
+  .m3, .m3 * { font-family:'Roboto',system-ui,sans-serif; }
+  .m3 .money, .money { font-family:'DM Mono',monospace; }
+</style>
+</helmet>
+
+<section class="sans" style="display:flex; flex-direction:column; gap:40px; padding:56px">
+  <div style="display:flex; flex-direction:column; gap:10px; max-width:900px">
+    <h1 style="margin:0; font-size:34px; font-weight:700; letter-spacing:-0.02em">2B — Activity, two visual languages</h1>
+    <p style="margin:0; font-size:15px; line-height:1.5; color:#6B6A72">Same navigation model in both: seven destinations as top-bar tabs, no rail, period + Add on a second row, and the 1920 width spent on the list instead of a sidebar. <a href="#3a">3a</a> keeps the branch's M3 tokens; <a href="#3b">3b</a> is the attached Modernist system.</p>
+  </div>
+
+  <div id="3a" class="m3" style="display:flex; flex-direction:column; gap:20px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <span style="background:#2B2A30; color:#FAF9FB; font-size:12px; font-weight:700; letter-spacing:0.12em; padding:5px 10px; border-radius:999px">3a</span>
+      <h2 style="margin:0; font-size:22px; font-weight:700">M3 version</h2>
+      <span style="font-size:14px; color:#6B6A72">Existing tokens, radii and pill controls — shippable as a nav-only diff.</span>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start">
+
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <span style="font-size:12px; font-weight:600; color:#6B6A72">Desktop 1920 × 1080</span>
+        <div style="width:1920px; height:1080px; display:flex; flex-direction:column; background:#EFEEF2; border:1px solid #B6B4BD; border-radius:12px; overflow:hidden">
+          <header style="flex-shrink:0; background:#F3F2F6; border-bottom:1px solid #D9D7DE">
+            <div style="height:64px; display:flex; align-items:center; gap:24px; padding:0 32px">
+              <div style="display:flex; align-items:center; gap:10px">
+                <div style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:8px; background:#55659A; color:#FFFFFF; font-size:14px; font-weight:700">L</div>
+                <span style="font-size:14px; font-weight:600; letter-spacing:0.04em">Ledger</span>
+              </div>
+              <nav style="display:flex; align-items:center; gap:4px">
+                <span style="display:flex; align-items:center; gap:8px; height:40px; border-radius:999px; padding:0 16px; font-size:13px; font-weight:500; color:#6B6A72"><i data-lucide="house"></i>Home</span>
+                <span style="display:flex; align-items:center; gap:8px; height:40px; border-radius:999px; padding:0 16px; font-size:13px; font-weight:500; color:#6B6A72"><i data-lucide="wallet"></i>Accounts</span>
+                <span style="display:flex; align-items:center; gap:8px; height:40px; border-radius:999px; padding:0 16px; font-size:13px; font-weight:600; background:#E4E7F5; color:#2E3A63"><i data-lucide="arrow-left-right"></i>Activity</span>
+                <span style="display:flex; align-items:center; gap:8px; height:40px; border-radius:999px; padding:0 16px; font-size:13px; font-weight:500; color:#6B6A72"><i data-lucide="target"></i>Budgets</span>
+                <span style="display:flex; align-items:center; gap:8px; height:40px; border-radius:999px; padding:0 16px; font-size:13px; font-weight:500; color:#6B6A72"><i data-lucide="tag"></i>Categories</span>
+                <span style="display:flex; align-items:center; gap:8px; height:40px; border-radius:999px; padding:0 16px; font-size:13px; font-weight:500; color:#6B6A72"><i data-lucide="file-bar-chart-2"></i>Reports</span>
+              </nav>
+              <div style="flex:1"></div>
+              <div style="display:flex; align-items:center; gap:10px; width:280px; height:40px; border-radius:999px; background:#EFEEF2; border:1px solid #D9D7DE; padding:0 14px; color:#6B6A72">
+                <i data-lucide="search" style="width:16px;height:16px"></i><span style="flex:1; font-size:13px">Search…</span><span style="border-radius:6px; background:#E7E5EA; padding:2px 6px; font-size:11px; font-weight:600">⌘K</span>
+              </div>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:999px; color:#6B6A72"><i data-lucide="moon"></i></span>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:999px; color:#6B6A72"><i data-lucide="settings"></i></span>
+              <div style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#E4E7F5; color:#2E3A63; font-size:12px; font-weight:700">SR</div>
+            </div>
+            <div style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 32px; border-top:1px solid #D9D7DE">
+              <div style="display:flex; align-items:center; gap:12px">
+                <p style="margin:0; font-size:20px; font-weight:700; letter-spacing:-0.01em">Activity</p>
+                <span style="font-size:13px; color:#6B6A72">18 transactions</span>
+                <div style="display:flex; align-items:center; gap:2px; border-radius:999px; background:#EFEEF2; padding:4px 6px">
+                  <span style="width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:999px; color:#6B6A72"><i data-lucide="chevron-left" style="width:16px;height:16px"></i></span>
+                  <span style="min-width:150px; text-align:center; font-size:13px; font-weight:600">Sep 1 – Sep 30 · Open</span>
+                  <span style="width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:999px; color:#6B6A72; opacity:0.4"><i data-lucide="chevron-right" style="width:16px;height:16px"></i></span>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px">
+                <div style="display:flex; align-items:center; gap:4px; height:40px; border:1px solid #B6B4BD; border-radius:999px; padding:4px">
+                  <span style="display:flex; align-items:center; border-radius:999px; padding:0 14px; height:100%; font-size:13px; font-weight:600; background:#E4E7F5; color:#2E3A63">All</span>
+                  <span style="display:flex; align-items:center; border-radius:999px; padding:0 14px; height:100%; font-size:13px; color:#6B6A72">Income</span>
+                  <span style="display:flex; align-items:center; border-radius:999px; padding:0 14px; height:100%; font-size:13px; color:#6B6A72">Expense</span>
+                  <span style="display:flex; align-items:center; border-radius:999px; padding:0 14px; height:100%; font-size:13px; color:#6B6A72">Transfer</span>
+                </div>
+                <span style="display:flex; align-items:center; gap:6px; height:40px; border:1px solid #D9D7DE; border-radius:999px; padding:0 16px; font-size:13px; font-weight:500; color:#6B6A72"><i data-lucide="square" style="width:16px;height:16px"></i>Select items</span>
+                <button style="display:flex; align-items:center; gap:8px; height:40px; border:0; border-radius:999px; background:#55659A; padding:0 20px; font-family:inherit; font-size:14px; font-weight:600; color:#FFFFFF"><i data-lucide="plus" style="width:16px;height:16px"></i>Add Transaction</button>
+              </div>
+            </div>
+          </header>
+          <div style="flex:1; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) 380px">
+            <div style="padding:24px 32px; display:flex; flex-direction:column; gap:20px; overflow:hidden">
+              <div>
+                <div style="margin-bottom:8px; display:flex; align-items:baseline; justify-content:space-between">
+                  <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6B6A72">Today</span>
+                  <span style="font-size:12px; color:#6B6A72">2 transactions · −$586.40</span>
+                </div>
+                <div style="border-radius:18px; background:#FAF9FB; overflow:hidden">
+                  <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 160px auto; align-items:center; gap:16px; padding:14px 20px">
+                    <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#F5DEDA; font-size:16px">🛒</div>
+                    <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">Grocery run</span><span style="display:block; margin-top:2px; font-size:11px; color:#6B6A72">Weekly shop · #household</span></div>
+                    <span style="border-radius:999px; background:#F1F0F4; padding:4px 10px; font-size:11px; font-weight:600; color:#6B6A72; justify-self:start">Groceries</span>
+                    <span style="font-size:12px; color:#6B6A72">BPI Rewards Visa</span>
+                    <p class="money" style="margin:0; font-size:15px; font-weight:700; color:#B4574A; justify-self:end">−$86.40</p>
+                  </div>
+                  <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 160px auto; align-items:center; gap:16px; padding:14px 20px; border-top:1px solid #D9D7DE">
+                    <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#DCEAF2; font-size:16px">🔁</div>
+                    <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">To Savings</span><span style="display:block; margin-top:2px; font-size:11px; color:#6B6A72">Everyday Checking → Emergency Fund</span></div>
+                    <span style="justify-self:start"></span>
+                    <span style="font-size:12px; color:#6B6A72">Everyday Checking</span>
+                    <p class="money" style="margin:0; font-size:15px; font-weight:700; color:#3F6E93; justify-self:end">$500.00</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div style="margin-bottom:8px; display:flex; align-items:baseline; justify-content:space-between">
+                  <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6B6A72">Yesterday</span>
+                  <span style="font-size:12px; color:#6B6A72">3 transactions · +$3,053.15</span>
+                </div>
+                <div style="border-radius:18px; background:#FAF9FB; overflow:hidden">
+                  <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 160px auto; align-items:center; gap:16px; padding:14px 20px">
+                    <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#DCEEDF; font-size:16px">💼</div>
+                    <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">Salary</span><span style="display:block; margin-top:2px; font-size:11px; color:#6B6A72">September, first half</span></div>
+                    <span style="border-radius:999px; background:#F1F0F4; padding:4px 10px; font-size:11px; font-weight:600; color:#6B6A72; justify-self:start">Income</span>
+                    <span style="font-size:12px; color:#6B6A72">Everyday Checking</span>
+                    <p class="money" style="margin:0; font-size:15px; font-weight:700; color:#3D7A4A; justify-self:end">+$3,200.00</p>
+                  </div>
+                  <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 160px auto; align-items:center; gap:16px; padding:14px 20px; border-top:1px solid #D9D7DE">
+                    <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#F5DEDA; font-size:16px">💡</div>
+                    <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">Electricity bill</span><span style="display:block; margin-top:2px; display:flex; align-items:center; gap:4px; font-size:11px; color:#6B6A72"><i data-lucide="repeat" style="width:10px;height:10px"></i>monthly</span></div>
+                    <span style="border-radius:999px; background:#F1F0F4; padding:4px 10px; font-size:11px; font-weight:600; color:#6B6A72; justify-self:start">Utilities</span>
+                    <span style="font-size:12px; color:#6B6A72">Everyday Checking</span>
+                    <p class="money" style="margin:0; font-size:15px; font-weight:700; color:#B4574A; justify-self:end">−$142.10</p>
+                  </div>
+                  <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 160px auto; align-items:center; gap:16px; padding:14px 20px; border-top:1px solid #D9D7DE">
+                    <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#F5DEDA; font-size:16px">☕</div>
+                    <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">Coffee</span><span style="display:block; margin-top:2px; display:flex; align-items:center; gap:4px; font-size:11px; color:#55659A"><i data-lucide="image" style="width:10px;height:10px"></i>Receipt</span></div>
+                    <span style="border-radius:999px; background:#F1F0F4; padding:4px 10px; font-size:11px; font-weight:600; color:#6B6A72; justify-self:start">Dining</span>
+                    <span style="font-size:12px; color:#6B6A72">Cash</span>
+                    <p class="money" style="margin:0; font-size:15px; font-weight:700; color:#B4574A; justify-self:end">−$4.75</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <aside style="border-left:1px solid #D9D7DE; background:#F3F2F6; padding:24px; display:flex; flex-direction:column; gap:16px">
+              <div style="display:flex; align-items:center; justify-content:space-between">
+                <h2 style="margin:0; font-size:15px; font-weight:600">Entry detail</h2>
+                <span style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:999px; color:#6B6A72"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+              </div>
+              <div style="border-radius:18px; background:#FAF9FB; padding:20px">
+                <div style="display:flex; align-items:center; gap:12px">
+                  <div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:14px; background:#F5DEDA; font-size:18px">🛒</div>
+                  <div><p style="margin:0; font-size:15px; font-weight:600">Grocery run</p><p style="margin:2px 0 0; font-size:12px; color:#6B6A72">Sep 9, 2026</p></div>
+                </div>
+                <p class="money" style="margin:16px 0 0; font-size:32px; font-weight:700; color:#B4574A">−$86.40</p>
+                <div style="margin-top:16px; display:flex; flex-direction:column; gap:10px; font-size:12px">
+                  <div style="display:flex; justify-content:space-between"><span style="color:#6B6A72">Account</span><span style="font-weight:600">BPI Rewards Visa</span></div>
+                  <div style="display:flex; justify-content:space-between"><span style="color:#6B6A72">Category</span><span style="font-weight:600">Groceries</span></div>
+                  <div style="display:flex; justify-content:space-between"><span style="color:#6B6A72">Tags</span><span style="font-weight:600">#household</span></div>
+                </div>
+                <div style="margin-top:20px; display:flex; gap:8px">
+                  <span style="flex:1; display:flex; align-items:center; justify-content:center; height:40px; border-radius:999px; background:#E4E7F5; color:#2E3A63; font-size:13px; font-weight:600">Edit</span>
+                  <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#F5DEDA; color:#B4574A"><i data-lucide="trash-2" style="width:16px;height:16px"></i></span>
+                </div>
+              </div>
+              <p style="margin:0; font-size:12px; line-height:1.5; color:#6B6A72">The detail pane is <code>lg:</code>-only today. In 2B it has room at 1920 without pushing the list under a rail.</p>
+            </aside>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <span style="font-size:12px; font-weight:600; color:#6B6A72">Tablet 768 × 1024</span>
+        <div style="width:768px; height:1024px; display:flex; flex-direction:column; background:#EFEEF2; border:1px solid #B6B4BD; border-radius:12px; overflow:hidden">
+          <header style="flex-shrink:0; background:#F3F2F6; border-bottom:1px solid #D9D7DE">
+            <div style="height:64px; display:flex; align-items:center; gap:12px; padding:0 16px">
+              <div style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:8px; background:#55659A; color:#FFFFFF; font-size:14px; font-weight:700">L</div>
+              <p style="margin:0; font-size:20px; font-weight:700; letter-spacing:-0.01em; flex:1">Activity</p>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:1px solid #D9D7DE; border-radius:999px; color:#2B2A30"><i data-lucide="search" style="width:16px;height:16px"></i></span>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:999px; color:#6B6A72"><i data-lucide="moon"></i></span>
+              <div style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#E4E7F5; color:#2E3A63; font-size:12px; font-weight:700">SR</div>
+            </div>
+            <div style="height:52px; display:flex; align-items:center; gap:4px; padding:0 16px; overflow:hidden">
+              <span style="display:flex; align-items:center; gap:8px; height:36px; border-radius:999px; padding:0 14px; font-size:13px; color:#6B6A72; flex-shrink:0"><i data-lucide="house"></i>Home</span>
+              <span style="display:flex; align-items:center; gap:8px; height:36px; border-radius:999px; padding:0 14px; font-size:13px; color:#6B6A72; flex-shrink:0"><i data-lucide="wallet"></i>Accounts</span>
+              <span style="display:flex; align-items:center; gap:8px; height:36px; border-radius:999px; padding:0 14px; font-size:13px; font-weight:600; background:#E4E7F5; color:#2E3A63; flex-shrink:0"><i data-lucide="arrow-left-right"></i>Activity</span>
+              <span style="display:flex; align-items:center; gap:8px; height:36px; border-radius:999px; padding:0 14px; font-size:13px; color:#6B6A72; flex-shrink:0"><i data-lucide="target"></i>Budgets</span>
+              <span style="display:flex; align-items:center; gap:8px; height:36px; border-radius:999px; padding:0 14px; font-size:13px; color:#6B6A72; flex-shrink:0"><i data-lucide="tag"></i>Cate…</span>
+            </div>
+            <div style="height:56px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 16px; border-top:1px solid #D9D7DE">
+              <div style="flex:1; display:flex; align-items:center; gap:2px; border-radius:999px; background:#EFEEF2; padding:4px 6px; max-width:250px">
+                <span style="width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:#6B6A72"><i data-lucide="chevron-left" style="width:16px;height:16px"></i></span>
+                <span style="flex:1; text-align:center; font-size:13px; font-weight:600">Sep 1 – Sep 30 · Open</span>
+                <span style="width:28px; height:28px; display:flex; align-items:center; justify-content:center; color:#6B6A72; opacity:0.4"><i data-lucide="chevron-right" style="width:16px;height:16px"></i></span>
+              </div>
+              <button style="display:flex; align-items:center; gap:8px; height:40px; border:0; border-radius:999px; background:#55659A; padding:0 18px; font-family:inherit; font-size:14px; font-weight:600; color:#FFFFFF"><i data-lucide="plus" style="width:16px;height:16px"></i>Add</button>
+            </div>
+          </header>
+          <div style="flex:1; padding:16px; display:flex; flex-direction:column; gap:16px">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+              <div style="display:flex; align-items:center; gap:4px; height:40px; border:1px solid #B6B4BD; border-radius:999px; padding:4px">
+                <span style="display:flex; align-items:center; border-radius:999px; padding:0 14px; height:100%; font-size:13px; font-weight:600; background:#E4E7F5; color:#2E3A63">All</span>
+                <span style="display:flex; align-items:center; border-radius:999px; padding:0 14px; height:100%; font-size:13px; color:#6B6A72">Income</span>
+                <span style="display:flex; align-items:center; border-radius:999px; padding:0 14px; height:100%; font-size:13px; color:#6B6A72">Expense</span>
+                <span style="display:flex; align-items:center; border-radius:999px; padding:0 14px; height:100%; font-size:13px; color:#6B6A72">Transfer</span>
+              </div>
+              <span style="display:flex; align-items:center; gap:6px; font-size:13px; color:#6B6A72"><i data-lucide="square" style="width:16px;height:16px"></i>Select</span>
+            </div>
+            <div>
+              <div style="margin-bottom:8px; display:flex; align-items:baseline; justify-content:space-between">
+                <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6B6A72">Today</span>
+                <span style="font-size:12px; color:#6B6A72">2 · −$586.40</span>
+              </div>
+              <div style="border-radius:18px; background:#FAF9FB; overflow:hidden">
+                <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:14px; padding:14px 18px">
+                  <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#F5DEDA; font-size:16px">🛒</div>
+                  <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">Grocery run</span><span style="margin-top:2px; display:flex; align-items:center; gap:6px"><span style="border-radius:999px; background:#F1F0F4; padding:2px 8px; font-size:11px; font-weight:600; color:#6B6A72">Groceries</span><span style="font-size:11px; color:#6B6A72">BPI Rewards Visa</span></span></div>
+                  <p class="money" style="margin:0; font-size:14px; font-weight:700; color:#B4574A">−$86.40</p>
+                </div>
+                <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:14px; padding:14px 18px; border-top:1px solid #D9D7DE">
+                  <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#DCEAF2; font-size:16px">🔁</div>
+                  <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">To Savings</span><span style="margin-top:2px; display:block; font-size:11px; color:#6B6A72">Everyday Checking → Emergency Fund</span></div>
+                  <p class="money" style="margin:0; font-size:14px; font-weight:700; color:#3F6E93">$500.00</p>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="margin-bottom:8px; display:flex; align-items:baseline; justify-content:space-between">
+                <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6B6A72">Yesterday</span>
+                <span style="font-size:12px; color:#6B6A72">3 · +$3,053.15</span>
+              </div>
+              <div style="border-radius:18px; background:#FAF9FB; overflow:hidden">
+                <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:14px; padding:14px 18px">
+                  <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#DCEEDF; font-size:16px">💼</div>
+                  <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">Salary</span><span style="margin-top:2px; display:flex; align-items:center; gap:6px"><span style="border-radius:999px; background:#F1F0F4; padding:2px 8px; font-size:11px; font-weight:600; color:#6B6A72">Income</span><span style="font-size:11px; color:#6B6A72">Everyday Checking</span></span></div>
+                  <p class="money" style="margin:0; font-size:14px; font-weight:700; color:#3D7A4A">+$3,200.00</p>
+                </div>
+                <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:14px; padding:14px 18px; border-top:1px solid #D9D7DE">
+                  <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#F5DEDA; font-size:16px">💡</div>
+                  <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">Electricity bill</span><span style="margin-top:2px; display:flex; align-items:center; gap:6px"><span style="border-radius:999px; background:#F1F0F4; padding:2px 8px; font-size:11px; font-weight:600; color:#6B6A72">Utilities</span><span style="display:inline-flex; align-items:center; gap:2px; font-size:11px; color:#6B6A72"><i data-lucide="repeat" style="width:10px;height:10px"></i>monthly</span></span></div>
+                  <p class="money" style="margin:0; font-size:14px; font-weight:700; color:#B4574A">−$142.10</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <span style="font-size:12px; font-weight:600; color:#6B6A72">Mobile 390 × 844</span>
+        <div style="width:390px; height:844px; position:relative; display:flex; flex-direction:column; background:#EFEEF2; border:1px solid #B6B4BD; border-radius:12px; overflow:hidden">
+          <header style="flex-shrink:0">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; height:64px; padding:0 16px">
+              <p style="margin:0; font-size:22px; font-weight:700; letter-spacing:-0.01em; flex:1">Activity</p>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:999px; color:#2B2A30"><i data-lucide="search" style="width:20px;height:20px"></i></span>
+              <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#E4E7F5; color:#2E3A63; font-size:13px">SR</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; padding:0 16px 12px">
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:1px solid #D9D7DE; border-radius:999px; color:#2B2A30"><i data-lucide="chevron-left" style="width:16px;height:16px"></i></span>
+              <span style="flex:1; border-radius:999px; background:#E4E7F5; color:#2E3A63; padding:8px 12px; text-align:center; font-size:12px; font-weight:600">Sep 1 – Sep 30 · Open</span>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:1px solid #D9D7DE; border-radius:999px; color:#2B2A30; opacity:0.5"><i data-lucide="chevron-right" style="width:16px;height:16px"></i></span>
+            </div>
+          </header>
+          <main style="flex:1; overflow:hidden; padding:0 16px 100px; display:flex; flex-direction:column; gap:16px">
+            <div style="display:flex; align-items:center; gap:4px; height:40px; border:1px solid #B6B4BD; border-radius:999px; padding:4px">
+              <span style="flex:1; display:flex; align-items:center; justify-content:center; border-radius:999px; height:100%; font-size:13px; font-weight:600; background:#E4E7F5; color:#2E3A63">All</span>
+              <span style="flex:1; display:flex; align-items:center; justify-content:center; border-radius:999px; height:100%; font-size:13px; color:#6B6A72">Income</span>
+              <span style="flex:1; display:flex; align-items:center; justify-content:center; border-radius:999px; height:100%; font-size:13px; color:#6B6A72">Expense</span>
+              <span style="flex:1; display:flex; align-items:center; justify-content:center; border-radius:999px; height:100%; font-size:13px; color:#6B6A72">Transfer</span>
+            </div>
+            <div>
+              <div style="margin-bottom:8px; display:flex; align-items:baseline; justify-content:space-between">
+                <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6B6A72">Today</span>
+                <span style="font-size:12px; color:#6B6A72">−$586.40</span>
+              </div>
+              <div style="border-radius:18px; background:#FAF9FB; overflow:hidden">
+                <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; padding:14px 16px">
+                  <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#F5DEDA; font-size:16px">🛒</div>
+                  <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">Grocery run</span><span style="margin-top:2px; display:flex; flex-wrap:wrap; align-items:center; gap:6px"><span style="border-radius:999px; background:#F1F0F4; padding:2px 8px; font-size:11px; font-weight:600; color:#6B6A72">Groceries</span><span style="font-size:11px; color:#6B6A72">BPI Visa</span></span></div>
+                  <p class="money" style="margin:0; font-size:14px; font-weight:700; color:#B4574A">−$86.40</p>
+                </div>
+                <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; padding:14px 16px; border-top:1px solid #D9D7DE">
+                  <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#DCEAF2; font-size:16px">🔁</div>
+                  <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">To Savings</span><span style="margin-top:2px; display:block; font-size:11px; color:#6B6A72">Everyday Checking</span></div>
+                  <p class="money" style="margin:0; font-size:14px; font-weight:700; color:#3F6E93">$500.00</p>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="margin-bottom:8px; display:flex; align-items:baseline; justify-content:space-between">
+                <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#6B6A72">Yesterday</span>
+                <span style="font-size:12px; color:#6B6A72">+$3,053.15</span>
+              </div>
+              <div style="border-radius:18px; background:#FAF9FB; overflow:hidden">
+                <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px; padding:14px 16px">
+                  <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#DCEEDF; font-size:16px">💼</div>
+                  <div style="min-width:0"><span style="display:block; font-size:14px; font-weight:600">Salary</span><span style="margin-top:2px; display:block; font-size:11px; color:#6B6A72">Everyday Checking</span></div>
+                  <p class="money" style="margin:0; font-size:14px; font-weight:700; color:#3D7A4A">+$3,200.00</p>
+                </div>
+              </div>
+            </div>
+          </main>
+          <button style="position:absolute; right:16px; bottom:96px; width:56px; height:56px; border:0; border-radius:16px; background:#55659A; color:#FFFFFF; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 8px rgba(0,0,0,0.20)"><i data-lucide="plus" style="width:28px;height:28px"></i></button>
+          <dc-import name="LedgerBottomNav" active="Activity" hint-size="100%,80px"></dc-import>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="3b" style="display:flex; flex-direction:column; gap:20px; border-top:2px solid #201e1d; padding-top:40px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <span style="background:#ec3013; color:#ffffff; font-size:12px; font-weight:800; letter-spacing:0.12em; padding:5px 10px">3b</span>
+      <h2 style="margin:0; font-size:22px; font-weight:700">Modernist version</h2>
+      <span style="font-size:14px; color:#6B6A72">Same 2B structure on the attached system: Archivo, zero radius, 2px rules, flush-left labels, red as the single accent. Money reads as ink for income, accent for spend.</span>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start">
+
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <span style="font-size:12px; font-weight:600; color:#6B6A72">Desktop 1920 × 1080</span>
+        <div style="width:1920px; height:1080px; display:flex; flex-direction:column; background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); border:2px solid var(--color-text); overflow:hidden">
+          <header style="flex-shrink:0; border-bottom:2px solid var(--color-text)">
+            <div style="height:64px; display:flex; align-items:center; gap:var(--space-8); padding:0 var(--space-8)">
+              <span style="font-family:var(--font-heading); font-weight:800; font-size:20px; letter-spacing:-0.01em">LEDGER</span>
+              <nav style="display:flex; align-items:stretch; height:100%; margin-left:var(--space-4)">
+                <span style="display:flex; align-items:center; gap:8px; padding:0 var(--space-4); font-size:13px; font-weight:500; color:var(--color-neutral-700)"><i data-lucide="house"></i>Home</span>
+                <span style="display:flex; align-items:center; gap:8px; padding:0 var(--space-4); font-size:13px; font-weight:500; color:var(--color-neutral-700)"><i data-lucide="wallet"></i>Accounts</span>
+                <span style="display:flex; align-items:center; gap:8px; padding:0 var(--space-4); font-size:13px; font-weight:700; color:var(--color-text); box-shadow:inset 0 -4px 0 var(--color-accent)"><i data-lucide="arrow-left-right"></i>Activity</span>
+                <span style="display:flex; align-items:center; gap:8px; padding:0 var(--space-4); font-size:13px; font-weight:500; color:var(--color-neutral-700)"><i data-lucide="target"></i>Budgets</span>
+                <span style="display:flex; align-items:center; gap:8px; padding:0 var(--space-4); font-size:13px; font-weight:500; color:var(--color-neutral-700)"><i data-lucide="tag"></i>Categories</span>
+                <span style="display:flex; align-items:center; gap:8px; padding:0 var(--space-4); font-size:13px; font-weight:500; color:var(--color-neutral-700)"><i data-lucide="file-bar-chart-2"></i>Reports</span>
+              </nav>
+              <div style="flex:1"></div>
+              <div style="display:flex; align-items:center; gap:10px; width:280px; height:40px; border:2px solid var(--color-text); padding:0 var(--space-3); color:var(--color-neutral-700)">
+                <i data-lucide="search" style="width:16px;height:16px"></i><span style="flex:1; font-size:13px">Search</span><span style="font-size:11px; font-weight:700; letter-spacing:0.06em">⌘K</span>
+              </div>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; color:var(--color-neutral-700)"><i data-lucide="moon"></i></span>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; color:var(--color-neutral-700)"><i data-lucide="settings"></i></span>
+              <div style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:var(--color-text); color:var(--color-bg); font-size:12px; font-weight:800">SR</div>
+            </div>
+            <div style="height:64px; display:flex; align-items:center; justify-content:space-between; gap:var(--space-6); padding:0 var(--space-8); border-top:2px solid var(--color-text)">
+              <div style="display:flex; align-items:baseline; gap:var(--space-6)">
+                <p style="margin:0; font-family:var(--font-heading); font-size:26px; font-weight:800; letter-spacing:-0.02em; text-transform:uppercase">Activity</p>
+                <span class="mono-num" style="font-size:13px; color:var(--color-neutral-700)">18 entries</span>
+                <div style="display:flex; align-items:center; border:2px solid var(--color-text)">
+                  <span style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-right:2px solid var(--color-text)"><i data-lucide="chevron-left" style="width:16px;height:16px"></i></span>
+                  <span class="mono-num" style="min-width:190px; padding:0 var(--space-3); font-size:13px; font-weight:600">SEP 1 – SEP 30 · OPEN</span>
+                  <span style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-left:2px solid var(--color-text); color:var(--color-neutral-400)"><i data-lucide="chevron-right" style="width:16px;height:16px"></i></span>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:var(--space-3)">
+                <div style="display:flex; align-items:stretch; height:40px; border:2px solid var(--color-text)">
+                  <span style="display:flex; align-items:center; padding:0 var(--space-4); font-size:13px; font-weight:700; background:var(--color-text); color:var(--color-bg)">All</span>
+                  <span style="display:flex; align-items:center; padding:0 var(--space-4); font-size:13px; border-left:2px solid var(--color-text)">Income</span>
+                  <span style="display:flex; align-items:center; padding:0 var(--space-4); font-size:13px; border-left:2px solid var(--color-text)">Expense</span>
+                  <span style="display:flex; align-items:center; padding:0 var(--space-4); font-size:13px; border-left:2px solid var(--color-text)">Transfer</span>
+                </div>
+                <button class="btn btn-secondary" type="button">Select items</button>
+                <button class="btn btn-primary" type="button">Add transaction</button>
+              </div>
+            </div>
+          </header>
+          <div style="flex:1; overflow:hidden; display:grid; grid-template-columns:minmax(0,1fr) 380px">
+            <div style="padding:var(--space-8); display:flex; flex-direction:column; gap:var(--space-8); overflow:hidden">
+              <div>
+                <div style="display:flex; align-items:baseline; justify-content:space-between; padding-bottom:var(--space-2); border-bottom:2px solid var(--color-text)">
+                  <span style="font-family:var(--font-heading); font-size:13px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase">Today</span>
+                  <span class="mono-num" style="font-size:13px; font-weight:600; color:var(--color-accent-700)">−586.40</span>
+                </div>
+                <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 200px 150px; align-items:center; gap:var(--space-6); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                  <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">🛒</span>
+                  <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">Grocery run</span><span style="display:block; margin-top:2px; font-size:12px; color:var(--color-neutral-700)">Weekly shop</span></div>
+                  <span class="tag tag-outline" style="justify-self:start">Groceries</span>
+                  <span style="font-size:13px; color:var(--color-neutral-700)">BPI Rewards Visa</span>
+                  <span class="mono-num" style="justify-self:end; font-size:17px; font-weight:700; color:var(--color-accent-700)">−86.40</span>
+                </div>
+                <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 200px 150px; align-items:center; gap:var(--space-6); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                  <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">🔁</span>
+                  <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">To Savings</span><span style="display:block; margin-top:2px; font-size:12px; color:var(--color-neutral-700)">Everyday Checking → Emergency Fund</span></div>
+                  <span class="tag tag-neutral" style="justify-self:start">Transfer</span>
+                  <span style="font-size:13px; color:var(--color-neutral-700)">Everyday Checking</span>
+                  <span class="mono-num" style="justify-self:end; font-size:17px; font-weight:700; color:var(--color-neutral-700)">500.00</span>
+                </div>
+              </div>
+              <div>
+                <div style="display:flex; align-items:baseline; justify-content:space-between; padding-bottom:var(--space-2); border-bottom:2px solid var(--color-text)">
+                  <span style="font-family:var(--font-heading); font-size:13px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase">Yesterday</span>
+                  <span class="mono-num" style="font-size:13px; font-weight:600">+3,053.15</span>
+                </div>
+                <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 200px 150px; align-items:center; gap:var(--space-6); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                  <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">💼</span>
+                  <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">Salary</span><span style="display:block; margin-top:2px; font-size:12px; color:var(--color-neutral-700)">September, first half</span></div>
+                  <span class="tag tag-outline" style="justify-self:start">Income</span>
+                  <span style="font-size:13px; color:var(--color-neutral-700)">Everyday Checking</span>
+                  <span class="mono-num" style="justify-self:end; font-size:17px; font-weight:700">+3,200.00</span>
+                </div>
+                <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 200px 150px; align-items:center; gap:var(--space-6); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                  <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">💡</span>
+                  <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">Electricity bill</span><span style="display:block; margin-top:2px; display:flex; align-items:center; gap:4px; font-size:12px; color:var(--color-neutral-700)"><i data-lucide="repeat" style="width:12px;height:12px"></i>monthly</span></div>
+                  <span class="tag tag-outline" style="justify-self:start">Utilities</span>
+                  <span style="font-size:13px; color:var(--color-neutral-700)">Everyday Checking</span>
+                  <span class="mono-num" style="justify-self:end; font-size:17px; font-weight:700; color:var(--color-accent-700)">−142.10</span>
+                </div>
+                <div style="display:grid; grid-template-columns:auto minmax(0,2fr) 200px 200px 150px; align-items:center; gap:var(--space-6); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                  <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">☕</span>
+                  <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">Coffee</span><span style="display:block; margin-top:2px; display:flex; align-items:center; gap:4px; font-size:12px; color:var(--color-neutral-700)"><i data-lucide="image" style="width:12px;height:12px"></i>Receipt</span></div>
+                  <span class="tag tag-outline" style="justify-self:start">Dining</span>
+                  <span style="font-size:13px; color:var(--color-neutral-700)">Cash</span>
+                  <span class="mono-num" style="justify-self:end; font-size:17px; font-weight:700; color:var(--color-accent-700)">−4.75</span>
+                </div>
+              </div>
+            </div>
+            <aside style="border-left:2px solid var(--color-text); padding:var(--space-8); display:flex; flex-direction:column; gap:var(--space-6)">
+              <div style="display:flex; align-items:center; justify-content:space-between">
+                <h2 style="margin:0; font-family:var(--font-heading); font-size:13px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase">Entry detail</h2>
+                <span style="width:32px; height:32px; display:flex; align-items:center; justify-content:center"><i data-lucide="x" style="width:16px;height:16px"></i></span>
+              </div>
+              <div style="border:2px solid var(--color-text); padding:var(--space-6)">
+                <div style="display:flex; align-items:center; gap:var(--space-3)">
+                  <span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:18px">🛒</span>
+                  <div><p style="margin:0; font-size:16px; font-weight:700">Grocery run</p><p class="mono-num" style="margin:2px 0 0; font-size:12px; color:var(--color-neutral-700)">SEP 9, 2026</p></div>
+                </div>
+                <p class="mono-num" style="margin:var(--space-6) 0 0; font-family:var(--font-heading); font-size:38px; font-weight:800; line-height:1; color:var(--color-accent-700)">−86.40</p>
+                <div class="hr" style="margin:var(--space-6) 0"></div>
+                <div style="display:flex; flex-direction:column; gap:var(--space-3); font-size:13px">
+                  <div style="display:flex; justify-content:space-between"><span style="color:var(--color-neutral-700)">Account</span><span style="font-weight:700">BPI Rewards Visa</span></div>
+                  <div style="display:flex; justify-content:space-between"><span style="color:var(--color-neutral-700)">Category</span><span style="font-weight:700">Groceries</span></div>
+                  <div style="display:flex; justify-content:space-between"><span style="color:var(--color-neutral-700)">Tags</span><span style="font-weight:700">#household</span></div>
+                </div>
+                <div style="margin-top:var(--space-6); display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:var(--space-2)">
+                  <button class="btn btn-primary" type="button" style="width:100%; justify-content:flex-start; text-align:left">Edit entry</button>
+                  <button class="btn btn-secondary" type="button">Delete</button>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <span style="font-size:12px; font-weight:600; color:#6B6A72">Tablet 768 × 1024</span>
+        <div style="width:768px; height:1024px; display:flex; flex-direction:column; background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); border:2px solid var(--color-text); overflow:hidden">
+          <header style="flex-shrink:0; border-bottom:2px solid var(--color-text)">
+            <div style="height:64px; display:flex; align-items:center; gap:var(--space-3); padding:0 var(--space-4)">
+              <span style="font-family:var(--font-heading); font-weight:800; font-size:18px; flex:1">LEDGER</span>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text)"><i data-lucide="search" style="width:16px;height:16px"></i></span>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; color:var(--color-neutral-700)"><i data-lucide="moon"></i></span>
+              <div style="width:36px; height:36px; display:flex; align-items:center; justify-content:center; background:var(--color-text); color:var(--color-bg); font-size:12px; font-weight:800">SR</div>
+            </div>
+            <div style="height:52px; display:flex; align-items:stretch; border-top:2px solid var(--color-text); overflow:hidden">
+              <span style="display:flex; align-items:center; gap:6px; padding:0 var(--space-4); font-size:13px; color:var(--color-neutral-700); flex-shrink:0"><i data-lucide="house"></i>Home</span>
+              <span style="display:flex; align-items:center; gap:6px; padding:0 var(--space-4); font-size:13px; color:var(--color-neutral-700); flex-shrink:0; border-left:1px solid var(--color-divider)"><i data-lucide="wallet"></i>Accounts</span>
+              <span style="display:flex; align-items:center; gap:6px; padding:0 var(--space-4); font-size:13px; font-weight:700; flex-shrink:0; border-left:1px solid var(--color-divider); box-shadow:inset 0 -4px 0 var(--color-accent)"><i data-lucide="arrow-left-right"></i>Activity</span>
+              <span style="display:flex; align-items:center; gap:6px; padding:0 var(--space-4); font-size:13px; color:var(--color-neutral-700); flex-shrink:0; border-left:1px solid var(--color-divider)"><i data-lucide="target"></i>Budgets</span>
+              <span style="display:flex; align-items:center; gap:6px; padding:0 var(--space-4); font-size:13px; color:var(--color-neutral-700); flex-shrink:0; border-left:1px solid var(--color-divider)"><i data-lucide="tag"></i>Cate…</span>
+            </div>
+            <div style="height:60px; display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:0 var(--space-4); border-top:2px solid var(--color-text)">
+              <div style="display:flex; align-items:center; border:2px solid var(--color-text)">
+                <span style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-right:2px solid var(--color-text)"><i data-lucide="chevron-left" style="width:16px;height:16px"></i></span>
+                <span class="mono-num" style="min-width:170px; padding:0 var(--space-3); font-size:13px; font-weight:600">SEP 1 – SEP 30 · OPEN</span>
+                <span style="width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-left:2px solid var(--color-text); color:var(--color-neutral-400)"><i data-lucide="chevron-right" style="width:16px;height:16px"></i></span>
+              </div>
+              <button class="btn btn-primary" type="button">Add transaction</button>
+            </div>
+          </header>
+          <div style="flex:1; padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-6)">
+            <div style="display:flex; align-items:stretch; height:40px; border:2px solid var(--color-text)">
+              <span style="flex:1; display:flex; align-items:center; padding:0 var(--space-3); font-size:13px; font-weight:700; background:var(--color-text); color:var(--color-bg)">All</span>
+              <span style="flex:1; display:flex; align-items:center; padding:0 var(--space-3); font-size:13px; border-left:2px solid var(--color-text)">Income</span>
+              <span style="flex:1; display:flex; align-items:center; padding:0 var(--space-3); font-size:13px; border-left:2px solid var(--color-text)">Expense</span>
+              <span style="flex:1; display:flex; align-items:center; padding:0 var(--space-3); font-size:13px; border-left:2px solid var(--color-text)">Transfer</span>
+            </div>
+            <div>
+              <div style="display:flex; align-items:baseline; justify-content:space-between; padding-bottom:var(--space-2); border-bottom:2px solid var(--color-text)">
+                <span style="font-family:var(--font-heading); font-size:13px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase">Today</span>
+                <span class="mono-num" style="font-size:13px; font-weight:600; color:var(--color-accent-700)">−586.40</span>
+              </div>
+              <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--space-4); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">🛒</span>
+                <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">Grocery run</span><span style="display:block; margin-top:4px; display:flex; align-items:center; gap:var(--space-2)"><span class="tag tag-outline">Groceries</span><span style="font-size:12px; color:var(--color-neutral-700)">BPI Rewards Visa</span></span></div>
+                <span class="mono-num" style="font-size:17px; font-weight:700; color:var(--color-accent-700)">−86.40</span>
+              </div>
+              <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--space-4); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">🔁</span>
+                <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">To Savings</span><span style="display:block; margin-top:4px; font-size:12px; color:var(--color-neutral-700)">Everyday Checking → Emergency Fund</span></div>
+                <span class="mono-num" style="font-size:17px; font-weight:700; color:var(--color-neutral-700)">500.00</span>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex; align-items:baseline; justify-content:space-between; padding-bottom:var(--space-2); border-bottom:2px solid var(--color-text)">
+                <span style="font-family:var(--font-heading); font-size:13px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase">Yesterday</span>
+                <span class="mono-num" style="font-size:13px; font-weight:600">+3,053.15</span>
+              </div>
+              <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--space-4); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">💼</span>
+                <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">Salary</span><span style="display:block; margin-top:4px; display:flex; align-items:center; gap:var(--space-2)"><span class="tag tag-outline">Income</span><span style="font-size:12px; color:var(--color-neutral-700)">Everyday Checking</span></span></div>
+                <span class="mono-num" style="font-size:17px; font-weight:700">+3,200.00</span>
+              </div>
+              <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--space-4); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">💡</span>
+                <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">Electricity bill</span><span style="display:block; margin-top:4px; display:flex; align-items:center; gap:var(--space-2)"><span class="tag tag-outline">Utilities</span><span style="font-size:12px; color:var(--color-neutral-700)">monthly</span></span></div>
+                <span class="mono-num" style="font-size:17px; font-weight:700; color:var(--color-accent-700)">−142.10</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <span style="font-size:12px; font-weight:600; color:#6B6A72">Mobile 390 × 844</span>
+        <div style="width:390px; height:844px; position:relative; display:flex; flex-direction:column; background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); border:2px solid var(--color-text); overflow:hidden">
+          <header style="flex-shrink:0; border-bottom:2px solid var(--color-text)">
+            <div style="display:flex; align-items:center; gap:var(--space-2); height:64px; padding:0 var(--space-4)">
+              <p style="margin:0; font-family:var(--font-heading); font-size:24px; font-weight:800; letter-spacing:-0.02em; text-transform:uppercase; flex:1">Activity</p>
+              <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center"><i data-lucide="search" style="width:20px;height:20px"></i></span>
+              <div style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; background:var(--color-text); color:var(--color-bg); font-size:12px; font-weight:800">SR</div>
+            </div>
+            <div style="display:flex; align-items:center; border-top:2px solid var(--color-text)">
+              <span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-right:2px solid var(--color-text)"><i data-lucide="chevron-left" style="width:16px;height:16px"></i></span>
+              <span class="mono-num" style="flex:1; text-align:center; font-size:13px; font-weight:600">SEP 1 – SEP 30 · OPEN</span>
+              <span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-left:2px solid var(--color-text); color:var(--color-neutral-400)"><i data-lucide="chevron-right" style="width:16px;height:16px"></i></span>
+            </div>
+          </header>
+          <main style="flex:1; overflow:hidden; padding:var(--space-4) var(--space-4) 100px; display:flex; flex-direction:column; gap:var(--space-6)">
+            <div style="display:flex; align-items:stretch; height:40px; border:2px solid var(--color-text)">
+              <span style="flex:1; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; background:var(--color-text); color:var(--color-bg)">All</span>
+              <span style="flex:1; display:flex; align-items:center; justify-content:center; font-size:13px; border-left:2px solid var(--color-text)">In</span>
+              <span style="flex:1; display:flex; align-items:center; justify-content:center; font-size:13px; border-left:2px solid var(--color-text)">Out</span>
+              <span style="flex:1; display:flex; align-items:center; justify-content:center; font-size:13px; border-left:2px solid var(--color-text)">Transfer</span>
+            </div>
+            <div>
+              <div style="display:flex; align-items:baseline; justify-content:space-between; padding-bottom:var(--space-2); border-bottom:2px solid var(--color-text)">
+                <span style="font-family:var(--font-heading); font-size:12px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase">Today</span>
+                <span class="mono-num" style="font-size:13px; font-weight:600; color:var(--color-accent-700)">−586.40</span>
+              </div>
+              <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--space-3); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">🛒</span>
+                <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">Grocery run</span><span style="display:block; margin-top:4px; font-size:12px; color:var(--color-neutral-700)">Groceries · BPI Visa</span></div>
+                <span class="mono-num" style="font-size:16px; font-weight:700; color:var(--color-accent-700)">−86.40</span>
+              </div>
+              <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--space-3); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">🔁</span>
+                <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">To Savings</span><span style="display:block; margin-top:4px; font-size:12px; color:var(--color-neutral-700)">Everyday Checking</span></div>
+                <span class="mono-num" style="font-size:16px; font-weight:700; color:var(--color-neutral-700)">500.00</span>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex; align-items:baseline; justify-content:space-between; padding-bottom:var(--space-2); border-bottom:2px solid var(--color-text)">
+                <span style="font-family:var(--font-heading); font-size:12px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase">Yesterday</span>
+                <span class="mono-num" style="font-size:13px; font-weight:600">+3,053.15</span>
+              </div>
+              <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--space-3); padding:var(--space-4) 0; border-bottom:1px solid var(--color-divider)">
+                <span style="width:40px; height:40px; display:flex; align-items:center; justify-content:center; border:2px solid var(--color-text); font-size:16px">💼</span>
+                <div style="min-width:0"><span style="display:block; font-size:15px; font-weight:700">Salary</span><span style="display:block; margin-top:4px; font-size:12px; color:var(--color-neutral-700)">Income · Everyday Checking</span></div>
+                <span class="mono-num" style="font-size:16px; font-weight:700">+3,200.00</span>
+              </div>
+            </div>
+          </main>
+          <button style="position:absolute; right:var(--space-4); bottom:96px; width:56px; height:56px; border:2px solid var(--color-text); background:var(--color-accent); color:#ffffff; display:flex; align-items:center; justify-content:center"><i data-lucide="plus" style="width:28px;height:28px"></i></button>
+          <nav style="flex-shrink:0; display:flex; align-items:stretch; height:80px; border-top:2px solid var(--color-text)">
+            <span style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:11px; color:var(--color-neutral-700)"><i data-lucide="house"></i>Home</span>
+            <span style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:11px; color:var(--color-neutral-700); border-left:1px solid var(--color-divider)"><i data-lucide="wallet"></i>Accounts</span>
+            <span style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:11px; font-weight:700; border-left:1px solid var(--color-divider); box-shadow:inset 0 4px 0 var(--color-accent)"><i data-lucide="arrow-left-right"></i>Activity</span>
+            <span style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:11px; color:var(--color-neutral-700); border-left:1px solid var(--color-divider)"><i data-lucide="target"></i>Budgets</span>
+            <span style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:11px; color:var(--color-neutral-700); border-left:1px solid var(--color-divider)"><i data-lucide="file-bar-chart-2"></i>Reports</span>
+          </nav>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() {
+    this.tick = 0
+    this.timer = setInterval(() => {
+      if (window.lucide) window.lucide.createIcons({ attrs: { class: 'lu' } })
+      if (++this.tick > 40) clearInterval(this.timer)
+    }, 400)
+  }
+  componentWillUnmount() { clearInterval(this.timer) }
+  renderVals() { return {} }
+}
+</script>
+</body>
+</html>

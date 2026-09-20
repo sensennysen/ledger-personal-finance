@@ -84,6 +84,11 @@ const routeMeta: RouteMetaEntry[] = [
     title: 'Data Deletion Instructions',
     description: 'Request permanent deletion of your Ledger account and all associated personal data.',
   },
+  {
+    test: (pathname) => pathname === '/terms',
+    title: 'Terms of Service',
+    description: 'Read the terms that govern your use of Ledger, including eligibility, responsibilities, and data handling.',
+  },
 ]
 
 function upsertMetaByName(name: string, content: string) {

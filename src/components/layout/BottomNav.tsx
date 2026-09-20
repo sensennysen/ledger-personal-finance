@@ -1,19 +1,29 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Wallet, ArrowLeftRight, PieChart } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Wallet,
+  ArrowLeftRight,
+  PieChart,
+  type LucideIcon,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
-const items = [
-  { to: '/', label: 'Home', icon: LayoutDashboard, exact: true },
-  { to: '/accounts', label: 'Accounts', icon: Wallet },
-  { to: '/transactions', label: 'Activity', icon: ArrowLeftRight },
-  { to: '/budgets', label: 'Budgets', icon: PieChart },
-]
+import { BOTTOM_NAV_TABS, type NavIconKey } from '@/lib/navDestinations'
+
+const ICONS: Partial<Record<NavIconKey, LucideIcon>> = {
+  home: LayoutDashboard,
+  accounts: Wallet,
+  activity: ArrowLeftRight,
+  budgets: PieChart,
+}
 export default function BottomNav() {
   return (
     <nav
       aria-label="Main navigation"
       className="md:hidden fixed bottom-0 inset-x-0 z-40 flex h-[calc(88px+env(safe-area-inset-bottom))] rounded-t-[28px] border-t border-sidebar-border bg-sidebar pt-3 pb-[env(safe-area-inset-bottom)]"
     >
-      {items.map(({ to, label, icon: Icon, exact }) => (
+      {BOTTOM_NAV_TABS.map(({ to, label, icon, exact }) => {
+        const Icon = ICONS[icon] ?? LayoutDashboard
+        return (
         <NavLink key={to} to={to} end={exact} className="flex-1 min-w-0">
           {({ isActive }) => (
             <span
@@ -35,7 +45,8 @@ export default function BottomNav() {
             </span>
           )}
         </NavLink>
-      ))}
+        )
+      })}
     </nav>
   )
 }

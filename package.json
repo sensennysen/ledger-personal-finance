@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:rollover": "node --test tests/budgetRollover.test.mjs",
     "test:redesign": "node tests/redesign.mjs",
     "preview": "vite preview"
   },

@@ -46,6 +46,8 @@ import { InlineLoadError } from '@/components/ui/error-state'
 import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import { resolveReportTab } from '@/lib/reportTabs'
+import { OverspendingCard } from '@/components/reports/OverspendingCard'
+import { isDeficitBehaviour } from '@/lib/budgetRollover'
 import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
@@ -651,6 +653,11 @@ export default function ReportsPage() {
         </div>
 
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
+          <OverspendingCard
+            categories={categories}
+            startDay={profile?.month_start_day ?? 1}
+            deficitBehaviour={isDeficitBehaviour(profile?.budget_deficit_behaviour) ? profile.budget_deficit_behaviour : 'carry'}
+          />
       {/* Mobile-only controls row */}
       <div className="flex items-end gap-3 md:hidden">
         <div className="flex flex-col gap-1 flex-1 min-w-0">

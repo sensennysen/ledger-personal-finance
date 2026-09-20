@@ -10,7 +10,7 @@ import {
   LogOut,
   CalendarDays,
 } from 'lucide-react'
-import Sidebar from './Sidebar'
+import { TopBar } from './TopBar'
 import BottomNav from './BottomNav'
 import { OfflineBanner } from './OfflineBanner'
 import { QueueReviewSheet } from './QueueReviewSheet'
@@ -138,8 +138,9 @@ function LayoutShell() {
         setSheet('detail')
       }}
     >
-      <div className="flex h-dvh w-full max-w-full bg-background overflow-hidden">
-        <Sidebar />
+      <div className="flex h-dvh w-full max-w-full flex-col bg-background overflow-hidden">
+        <TopBar avatar={avatar} onAvatarClick={() => setSheet('account')} />
+        <div className="flex flex-1 min-h-0 min-w-0">
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
           <OfflineBanner status={networkStatus} onReview={() => setReviewOpen(true)} />
           <QueueReviewSheet open={reviewOpen} onOpenChange={setReviewOpen} status={networkStatus} />
@@ -234,6 +235,7 @@ function LayoutShell() {
             />
           </aside>
         )}
+        </div>
         <BottomNav />
         {mobile && !sheet && location.pathname !== '/settings' && (
           <button

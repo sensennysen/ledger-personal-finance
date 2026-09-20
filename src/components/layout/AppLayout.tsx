@@ -13,6 +13,7 @@ import {
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
 import { OfflineBanner } from './OfflineBanner'
+import { QueueReviewSheet } from './QueueReviewSheet'
 import { PWAInstallBanner } from './PWAInstallBanner'
 import { CycleStepper } from './CycleStepper'
 import { CycleProvider } from '@/contexts/CycleContext'
@@ -73,6 +74,7 @@ function LayoutShell() {
     transaction: Transaction
     onEdit?: () => void
   } | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   useEffect(() => {
     if (sheet !== 'detail' || !desktop) return
@@ -137,7 +139,8 @@ function LayoutShell() {
       <div className="flex h-dvh w-full max-w-full bg-background overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
-          <OfflineBanner status={networkStatus} />
+          <OfflineBanner status={networkStatus} onReview={() => setReviewOpen(true)} />
+          <QueueReviewSheet open={reviewOpen} onOpenChange={setReviewOpen} status={networkStatus} />
           <header className="md:hidden shrink-0 bg-background">
             <div className="flex items-center justify-between gap-3 h-16 px-4">
               <div className="min-w-0">

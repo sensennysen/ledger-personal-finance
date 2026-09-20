@@ -1,14 +1,33 @@
 import type { useNetworkStatus } from '@/hooks/useNetworkStatus'
-import { CloudOff } from 'lucide-react'
+import { AlertTriangle, CloudOff } from 'lucide-react'
 
 export function OfflineBanner({
   status,
+  onReview,
 }: {
   status: ReturnType<typeof useNetworkStatus>
+  onReview: () => void
 }) {
-  const { isOnline, isSyncing, pendingCount } = status
+  const { isOnline, isSyncing, pendingCount, flaggedCount } = status
 
-  if (isOnline && pendingCount === 0) return null
+  if (isOnline && pendingCount === 0 && flaggedCount === 0) return null
+
+  if (flaggedCount > 0) {
+    return (
+      <div
+        role="alert"
+        className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-[0.6875rem] font-medium tracking-wide"
+        style={{ background: 'var(--expense-container)', color: 'var(--expense)' }}
+      >
+        <AlertTriangle className="size-4 shrink-0" />
+        {flaggedCount} change{flaggedCount !== 1 ? 's' : ''} didn't sync and need
+        {flaggedCount === 1 ? 's' : ''} your review
+        <button type="button" onClick={onReview} className="underline underline-offset-2 font-semibold">
+          Review
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div

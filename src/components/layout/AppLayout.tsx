@@ -5,8 +5,6 @@ import {
   FileBarChart2,
   Settings,
   Plus,
-  Sun,
-  Moon,
   LogOut,
   CalendarDays,
 } from 'lucide-react'
@@ -22,7 +20,6 @@ import { EntryContext } from '@/contexts/EntryContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { authErrorActionLabel } from '@/lib/authErrors'
-import { useTheme } from '@/contexts/ThemeContext'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
@@ -63,7 +60,6 @@ function LayoutShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, profile, signOut, refreshProfile, authError } = useAuth()
-  const { theme, toggleTheme } = useTheme()
   const mobile = useMediaQuery('(max-width: 767px)')
   const desktop = useMediaQuery('(min-width: 1024px)')
   const networkStatus = useNetworkStatus()
@@ -326,14 +322,6 @@ function LayoutShell() {
                     </button>
                   ))}
                 </div>
-                <Button
-                  variant="ghost"
-                  onClick={toggleTheme}
-                  className="w-full justify-start h-14"
-                >
-                  {theme === 'dark' ? <Sun /> : <Moon />}
-                  {theme === 'dark' ? 'Light' : 'Dark'} theme
-                </Button>
                 <Button
                   variant="outline"
                   onClick={() => void signOut().then((ok) => { if (!ok) setSheet(null) })}

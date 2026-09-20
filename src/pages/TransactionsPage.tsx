@@ -3,6 +3,7 @@ import { Plus, Search, ArrowLeftRight, ChevronLeft, ChevronRight, ChevronDown, U
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCycle } from '@/contexts/cycleState'
 import { useCategories } from '@/hooks/useCategories'
+import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { usePreferences } from '@/hooks/usePreferences'
@@ -71,6 +72,7 @@ export default function TransactionsPage() {
 
   // ── Templates ─────────────────────────────────────────────
   const { templates, addTemplate, removeTemplate } = useTransactionTemplates()
+  const { accounts } = useAccounts()
   // tx pending "save as template" name input
   const [templateSourceTx, setTemplateSourceTx] = useState<Transaction | null>(null)
   const [templateName, setTemplateName] = useState('')
@@ -151,7 +153,8 @@ export default function TransactionsPage() {
       ...t.values,
       date: getLocalDateString(),
     })
-    setTransactionKind(inferTransactionKind(t.values.type, t.values.to_account_id))
+    const toAccountType = accounts.find((a) => a.id === t.values.to_account_id)?.type
+    setTransactionKind(inferTransactionKind(t.values.type, t.values.to_account_id, toAccountType))
     setCreateOpen(true)
   }
 

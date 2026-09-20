@@ -1,0 +1,2 @@
+-- Intentionally empty. `pnpm db:reset` applies this after migrations.
+-- Add local-only sample data here; never commit prod dumps.

@@ -1,0 +1,10 @@
+allowBuilds:
+  core-js: false
+
+overrides:
+  '@babel/plugin-transform-modules-systemjs': '7.29.4'
+  'express-rate-limit': '8.5.1'
+  'fast-uri': '3.1.2'
+  'hono': '4.12.18'
+  'ip-address': '10.2.0'
+  'serialize-javascript': '^7.0.5'

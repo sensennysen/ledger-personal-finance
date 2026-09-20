@@ -47,7 +47,7 @@ import { InlineLoadError } from '@/components/ui/error-state'
 import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import { OverspendingCard } from '@/components/reports/OverspendingCard'
-import { isDeficitBehaviour } from '@/lib/budgetRollover'
+import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
@@ -392,6 +392,7 @@ function IncomeExpenseCard({
 
 export default function ReportsPage() {
   const { profile } = useAuth()
+  const deficitBehaviour = useDeficitBehaviour()
   const currency = profile?.default_currency ?? 'USD'
 
   const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
@@ -654,7 +655,7 @@ export default function ReportsPage() {
             categories={categories}
             startDay={startDay}
             month={selectedMonth}
-            deficitBehaviour={isDeficitBehaviour(profile?.budget_deficit_behaviour) ? profile.budget_deficit_behaviour : 'carry'}
+            deficitBehaviour={deficitBehaviour}
           />
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">

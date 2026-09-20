@@ -6,12 +6,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { useOverspending } from '@/hooks/useOverspending'
 import { resolveLoadState } from '@/lib/loadState'
+import { monthCycleRange } from '@/lib/cycleRange'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { formatCurrency, formatDateShort, cn } from '@/lib/utils'
 import {
   computeOverspending,
   deficitSettingLabel,
-  monthCycleRange,
   shiftMonthKey,
   streakLabel,
 } from '@/lib/overspending'
@@ -22,7 +22,8 @@ interface OverspendingCardProps {
   categories: Category[]
   startDay: number
   month: string
-  deficitBehaviour: DeficitBehaviour
+  /** Null while the profile is still loading; the card waits instead of guessing. */
+  deficitBehaviour: DeficitBehaviour | null
 }
 
 /**
@@ -30,9 +31,9 @@ interface OverspendingCardProps {
  * setting. Follows the global cycle chosen in the top-bar stepper (LED-21).
  */
 export function OverspendingCard({ categories, startDay, month, deficitBehaviour }: OverspendingCardProps) {
-  const { budgets, txs, loading, error, refetch } = useOverspending()
-
+  const behaviour: DeficitBehaviour = deficitBehaviour ?? 'carry'
   const range = monthCycleRange(month, startDay)
+  const { budgets, txs, loading, error, refetch } = useOverspending(range.end)
   const result = useMemo(
     () =>
       computeOverspending({
@@ -40,14 +41,14 @@ export function OverspendingCard({ categories, startDay, month, deficitBehaviour
         txs,
         month,
         startDay,
-        behaviour: deficitBehaviour,
+        behaviour,
         rangeFor: (period) => getBudgetCycleRange(period, month, startDay),
       }),
-    [budgets, txs, month, startDay, deficitBehaviour],
+    [budgets, txs, month, startDay, behaviour],
   )
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
-  const state = resolveLoadState({ loading, error, hasData: budgets.length > 0 })
+  const state = resolveLoadState({ loading: loading || !deficitBehaviour, error, hasData: budgets.length > 0 && Boolean(deficitBehaviour) })
   const nextMonthLabel = new Date(`${shiftMonthKey(month, 1)}-01T00:00:00`).toLocaleDateString(
     'en-US',
     { month: 'long' },
@@ -160,8 +161,8 @@ export function OverspendingCard({ categories, startDay, month, deficitBehaviour
         <div className="flex items-start gap-2.5 rounded-[14px] bg-muted px-3 py-2.5 text-xs leading-snug text-muted-foreground">
           <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
-            Your setting is <strong className="text-foreground">{deficitSettingLabel(deficitBehaviour)}</strong>
-            {deficitBehaviour === 'reset'
+            Your setting is <strong className="text-foreground">{deficitSettingLabel(behaviour)}</strong>
+            {behaviour === 'reset'
               ? `, so ${nextMonthLabel} opens at the full budget. This is the record of what was overspent. `
               : `, so an overspend lowers ${nextMonthLabel}'s budget. `}
             <Link to="/settings" className="font-semibold text-primary hover:underline">

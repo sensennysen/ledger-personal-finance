@@ -55,6 +55,13 @@ export function defaultCardPaymentDescription(cardName: string) {
   return `Card payment - ${cardName}`
 }
 
-export function isCardPaymentDescription(description: string) {
-  return description.startsWith('Card payment - ')
+/**
+ * A description may be replaced when the user switches card only if it is empty or is
+ * exactly the one we generated for the previously selected card. Anything the user typed
+ * (even something starting with "Card payment - ") is left alone.
+ */
+export function isAutoCardPaymentDescription(description: string, previousCardName?: string | null) {
+  const current = description.trim()
+  if (!current) return true
+  return Boolean(previousCardName) && current === defaultCardPaymentDescription(previousCardName as string)
 }

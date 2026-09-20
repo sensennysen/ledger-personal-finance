@@ -8,19 +8,25 @@ const PAGE = 1000
 
 /**
  * Raw inputs for the Overspending report: active budgets and every expense
- * since the earliest budget started, so consecutive-cycle counts are never
- * cut off by a fetch window. Read-only; there is no write path.
+ * from the earliest budget start up to `until` (the end of the selected cycle),
+ * so consecutive-cycle counts are never cut off at the start. Nothing after the
+ * selected cycle can change its result, so it is not fetched. Read-only.
  */
-export function useOverspending() {
+export function useOverspending(until: string) {
   const { user } = useAuth()
   const [budgets, setBudgets] = useState<OverspendingBudget[]>([])
   const [txs, setTxs] = useState<BudgetSpendTx[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // The cycle end the loaded data covers; data for an earlier cycle must not be shown for a later one.
+  const [loadedUntil, setLoadedUntil] = useState<string | null>(null)
   const requestId = useRef(0)
 
   const load = useCallback(async () => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
     const request = ++requestId.current
     setLoading(true)
     setError(null)
@@ -48,6 +54,7 @@ export function useOverspending() {
           .eq('user_id', user.id)
           .eq('type', 'expense')
           .gte('date', earliest)
+          .lte('date', until)
           .order('date', { ascending: true })
           .order('id', { ascending: true })
           .range(from, from + PAGE - 1)
@@ -64,8 +71,9 @@ export function useOverspending() {
 
     setBudgets(activeBudgets)
     setTxs(all)
+    setLoadedUntil(until)
     setLoading(false)
-  }, [user])
+  }, [user, until])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -73,5 +81,13 @@ export function useOverspending() {
     })
   }, [load])
 
-  return { budgets, txs, loading, error, refetch: load }
+  // Until data for this cycle arrives, expose nothing so the card shows its loading or error state.
+  const fresh = loadedUntil === until
+  return {
+    budgets: fresh ? budgets : [],
+    txs: fresh ? txs : [],
+    loading,
+    error,
+    refetch: load,
+  }
 }

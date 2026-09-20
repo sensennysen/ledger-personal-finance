@@ -11,7 +11,8 @@ import { usePreferences, type DateFormat, type NumberLocale, type Preferences } 
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
 import { cn, formatCurrency } from '@/lib/utils'
-import { deficitOutcome, isDeficitBehaviour, type DeficitBehaviour } from '@/lib/budgetRollover'
+import { deficitOutcome, type DeficitBehaviour } from '@/lib/budgetRollover'
+import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -141,12 +142,10 @@ export default function SettingsPage() {
   }
 
   const currency = profile?.default_currency ?? 'USD'
-  const deficitBehaviour: DeficitBehaviour = isDeficitBehaviour(profile?.budget_deficit_behaviour)
-    ? profile.budget_deficit_behaviour
-    : 'carry'
+  const deficitBehaviour = useDeficitBehaviour()
 
   const onDeficitChange = async (next: DeficitBehaviour) => {
-    if (!user || next === deficitBehaviour || deficitSaving) return
+    if (!user || !deficitBehaviour || next === deficitBehaviour || deficitSaving) return
     setDeficitSaving(true)
     setDeficitError(null)
     const { error } = await supabase.from('profiles').update({ budget_deficit_behaviour: next }).eq('id', user.id)
@@ -514,18 +513,18 @@ export default function SettingsPage() {
           <CardDescription>What happens to the amount you went over by, when the next cycle opens.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <fieldset className="space-y-2" disabled={deficitSaving}>
+          <fieldset className="space-y-2" disabled={deficitSaving || !deficitBehaviour}>
             <legend className="text-sm font-medium mb-2">When you overspend</legend>
             {([
               {
                 value: 'reset',
                 label: 'Start the next cycle fresh',
-                detail: `October opens at the full ${formatCurrency(deficitOutcome(600, 742.3, 'reset'), currency)}. The overspend is recorded in Reports.`,
+                detail: `Example: a ${formatCurrency(600, currency)} budget with ${formatCurrency(742.3, currency)} spent. The next cycle opens at the full ${formatCurrency(deficitOutcome(600, 742.3, 'reset'), currency)}. The overspend is recorded in Reports.`,
               },
               {
                 value: 'carry',
                 label: "Reduce next cycle's budget",
-                detail: `October opens at ${formatCurrency(deficitOutcome(600, 742.3, 'carry'), currency)} \u2014 the budget minus what you went over. This is the current behaviour.`,
+                detail: `Example: a ${formatCurrency(600, currency)} budget with ${formatCurrency(742.3, currency)} spent. The next cycle opens at ${formatCurrency(deficitOutcome(600, 742.3, 'carry'), currency)} \u2014 the budget minus what you went over. This is the current behaviour.`,
               },
             ] as const).map((option) => (
               <label

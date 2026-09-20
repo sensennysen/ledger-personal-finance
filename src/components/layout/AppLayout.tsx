@@ -16,7 +16,7 @@ import BottomNav from './BottomNav'
 import { OfflineBanner } from './OfflineBanner'
 import { QueueReviewSheet } from './QueueReviewSheet'
 import { PWAInstallBanner } from './PWAInstallBanner'
-import { CycleStepper } from './CycleStepper'
+import { resolveHeaderMeta } from '@/lib/pageChrome'
 import { CycleProvider } from '@/contexts/CycleContext'
 import { EntryContext } from '@/contexts/EntryContext'
 import { useAuth } from '@/contexts/AuthContext'
@@ -140,7 +140,22 @@ function LayoutShell() {
       }}
     >
       <div className="flex h-dvh w-full max-w-full flex-col bg-background overflow-hidden">
-        <TopBar avatar={avatar} onAvatarClick={() => setSheet('account')} />
+        <TopBar
+          avatar={avatar}
+          onAvatarClick={() => setSheet('account')}
+          mobileTitle={
+            location.pathname === '/'
+              ? 'Good day, ' + (profile?.full_name?.split(' ')[0] ?? 'there')
+              : resolveHeaderMeta(location.pathname).title
+          }
+          mobileStatus={
+            !isOnline
+              ? 'Working offline'
+              : pendingCount
+                ? pendingCount + ' changes pending'
+                : 'Your money, at a glance'
+          }
+        />
         <PageHeader />
         <div className="flex flex-1 min-h-0 min-w-0">
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
@@ -159,38 +174,6 @@ function LayoutShell() {
               />
             </div>
           )}
-          <header className="md:hidden shrink-0 bg-background">
-            <div className="flex items-center justify-between gap-3 h-16 px-4">
-              <div className="min-w-0">
-                <p className="text-lg font-medium truncate">
-                  {location.pathname === '/'
-                    ? 'Good day, ' +
-                      (profile?.full_name?.split(' ')[0] ?? 'there')
-                    : 'Ledger'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {!isOnline
-                    ? 'Working offline'
-                    : pendingCount
-                      ? pendingCount + ' changes pending'
-                      : 'Your money, at a glance'}
-                </p>
-              </div>
-              <div className="flex items-center gap-1">
-                <div id="mobile-dashboard-tools" />
-                <button
-                  aria-label="Open account menu"
-                  onClick={() => setSheet('account')}
-                  className="rounded-full focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {avatar}
-                </button>
-              </div>
-            </div>
-            {['/', '/transactions', '/budgets', '/reports'].includes(location.pathname) && (
-              <CycleStepper className="px-4 pb-3" />
-            )}
-          </header>
           <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(176px+env(safe-area-inset-bottom))] md:pb-0">
             <div
               key={location.pathname}

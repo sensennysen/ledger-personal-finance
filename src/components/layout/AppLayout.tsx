@@ -139,7 +139,7 @@ function LayoutShell() {
         setSheet('detail')
       }}
     >
-      <div className="flex h-dvh w-full max-w-full flex-col bg-background overflow-hidden">
+      <div className="flex h-dvh w-full max-w-full flex-col bg-background overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
         <TopBar
           avatar={avatar}
           onAvatarClick={() => setSheet('account')}
@@ -158,7 +158,7 @@ function LayoutShell() {
         />
         <PageHeader />
         <div className="flex flex-1 min-h-0 min-w-0">
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <OfflineBanner status={networkStatus} onReview={() => setReviewOpen(true)} />
           <QueueReviewSheet open={reviewOpen} onOpenChange={setReviewOpen} status={networkStatus} />
           {authError && (

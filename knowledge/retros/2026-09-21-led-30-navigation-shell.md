@@ -22,3 +22,10 @@ Delivered as four commits (S1 to S4 below), app green after each.
 - Home keeps its greeting block in content; Dashboard's widget-settings trigger still sits there on desktop.
 - FAB and the 176px bottom padding untouched (LED-34); `AppLayout` wrapper divs are not re-indented (kept the diff small).
 - Skeleton-free shell (LED-95) holds for the header; the page bodies are unchanged.
+
+## Validate findings
+- Fixed: Dashboard's Add Transaction rendered inline on mobile once it moved into `PageActions` (it was desktop-only; the FAB covers mobile). `PageActions` now takes `desktopOnly`.
+- Fixed: the iOS safe-area top inset sat on the old content column, so the mobile header would have slid under the notch. It is now on the shell wrapper.
+- Backlog: at md+ `/accounts/:id` and `/thirteenth-month` show the row-2 title plus their own page `<h1>` (two headings, different text). Decide whether row 2 should take the account name.
+- Backlog: on mobile the header now sits above `OfflineBanner`/auth error (was below); check it reads correctly in the browser.
+- Pattern: a page can hand buttons to the shell header with `PageActions` and keep its own dialog state. Use `desktopOnly` when the button was never shown on mobile.

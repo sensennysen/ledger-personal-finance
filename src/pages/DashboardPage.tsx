@@ -278,7 +278,7 @@ export default function DashboardPage() {
         style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }}
       />
 
-      <PageActions>
+      <PageActions desktopOnly>
         <TransactionKindMenu
           onSelect={openAddTransactionModal}
           trigger={

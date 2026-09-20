@@ -14,7 +14,8 @@
     "test:rollover": "node --test tests/budgetRollover.test.mjs",
     "test:auth": "node --test tests/authErrors.test.mjs",
     "test:redesign": "node tests/redesign.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.mjs && node tests/redesign.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

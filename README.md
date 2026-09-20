@@ -1,5 +1,7 @@
 # Ledger
 
+[![CI](https://github.com/sensennysen/ledger-personal-finance/actions/workflows/ci.yml/badge.svg)](https://github.com/sensennysen/ledger-personal-finance/actions/workflows/ci.yml)
+
 I made this because I hate being paywalled.
 
 Personal finance tools love to start friendly, then quietly slide the useful bits behind a subscription screen: budgets, reports, exports, custom categories, account history, the very basic dignity of seeing where your money went. Ledger is my answer to that. It is a self-hostable personal wallet app for tracking accounts, spending, budgets, credit cards, and reports without asking a monthly toll to remember your own groceries.
@@ -88,7 +90,12 @@ supabase/
 - `npm run dev` starts the local Vite server.
 - `npm run build` type-checks and builds the app.
 - `npm run lint` runs ESLint.
+- `npm test` runs the node test suite.
 - `npm run preview` serves the built app locally.
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and on pushes to `main`. Contributor conventions are in `AGENTS.md`.
 
 ## Philosophy
 

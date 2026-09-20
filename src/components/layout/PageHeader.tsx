@@ -8,6 +8,10 @@ export function PageHeader() {
   const { pathname } = useLocation()
   const { title, showStepper } = resolveHeaderMeta(pathname)
   return (
+    <>
+    {showStepper && (
+      <CycleStepper className="md:hidden px-4 pb-3" />
+    )}
     <div className="hidden md:flex shrink-0 h-14 items-center justify-between gap-4 border-b border-border bg-background px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-4">
         <h1 className="text-xl font-bold tracking-tight truncate">{title}</h1>
@@ -18,5 +22,6 @@ export function PageHeader() {
         className="flex shrink-0 items-center gap-1.5 empty:hidden"
       />
     </div>
+    </>
   )
 }

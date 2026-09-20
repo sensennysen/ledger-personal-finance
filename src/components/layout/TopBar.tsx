@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   ArrowLeftRight,
@@ -36,14 +36,25 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
 export function TopBar({
   avatar,
   onAvatarClick,
+  mobileTitle,
+  mobileStatus,
 }: {
   avatar: ReactNode
   onAvatarClick: () => void
+  mobileTitle: string
+  mobileStatus: string
 }) {
   const { pathname } = useLocation()
+  const tabStrip = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    tabStrip.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [pathname])
   const { theme, toggleTheme } = useTheme()
   const SettingsIcon = ICONS[SETTINGS_DESTINATION.icon]
   return (
+    <>
     <header className="hidden md:flex shrink-0 h-16 items-center gap-6 border-b border-border bg-sidebar px-6 lg:px-8">
       <NavLink to="/" className="flex items-center gap-2.5 shrink-0">
         <img
@@ -52,7 +63,7 @@ export function TopBar({
           className="size-8 object-contain"
         />
         <span
-          className="text-sm font-semibold tracking-[0.08em] uppercase text-foreground/80"
+          className="hidden lg:inline text-sm font-semibold tracking-[0.08em] uppercase text-foreground/80"
           style={{ fontFamily: '"Roboto", sans-serif' }}
         >
           Ledger
@@ -68,15 +79,16 @@ export function TopBar({
               to={tab.to}
               end={tab.exact}
               aria-current={active ? 'page' : undefined}
+              title={tab.label}
               className={cn(
-                'flex h-10 items-center gap-2 rounded-full px-4 text-[0.8125rem] font-medium transition-colors press-scale',
+                'flex h-10 items-center gap-2 rounded-full px-3 lg:px-4 text-[0.8125rem] font-medium transition-colors press-scale',
                 active
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/4',
               )}
             >
               <Icon className="size-4 shrink-0" />
-              {tab.label}
+              <span className="sr-only lg:not-sr-only">{tab.label}</span>
             </NavLink>
           )
         })}
@@ -86,11 +98,11 @@ export function TopBar({
         type="button"
         disabled
         aria-label="Search (coming soon)"
-        className="flex h-10 w-60 items-center gap-2.5 rounded-full border border-border bg-background px-3.5 text-[0.8125rem] text-muted-foreground disabled:cursor-default"
+        className="flex h-10 w-10 lg:w-60 items-center justify-center lg:justify-start gap-2.5 rounded-full border border-border bg-background lg:px-3.5 text-[0.8125rem] text-muted-foreground disabled:cursor-default"
       >
         <Search className="size-4" />
-        <span className="flex-1 text-left">Search…</span>
-        <kbd className="rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold">
+        <span className="hidden lg:block flex-1 text-left">Search…</span>
+        <kbd className="hidden lg:block rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold">
           ⌘K
         </kbd>
       </button>
@@ -125,5 +137,58 @@ export function TopBar({
         </button>
       </div>
     </header>
+    <header className="md:hidden shrink-0 bg-background">
+      <div className="flex items-center justify-between gap-3 h-16 px-4">
+        <div className="min-w-0">
+          <p className="text-lg font-medium truncate">{mobileTitle}</p>
+          <p className="text-xs text-muted-foreground">{mobileStatus}</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <div id="mobile-dashboard-tools" />
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled
+            aria-label="Search (coming soon)"
+          >
+            <Search />
+          </Button>
+          <button
+            type="button"
+            aria-label="Open account menu"
+            onClick={onAvatarClick}
+            className="rounded-full focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {avatar}
+          </button>
+        </div>
+      </div>
+      <nav
+        ref={tabStrip}
+        aria-label="Sections"
+        className="flex gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none]"
+      >
+        {NAV_TABS.map((tab) => {
+          const active = isDestinationActive(pathname, tab)
+          return (
+            <NavLink
+              key={tab.to}
+              to={tab.to}
+              end={tab.exact}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'shrink-0 rounded-full px-4 py-2 text-[0.8125rem] font-medium transition-colors',
+                active
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
+                  : 'text-muted-foreground',
+              )}
+            >
+              {tab.label}
+            </NavLink>
+          )
+        })}
+      </nav>
+    </header>
+    </>
   )
 }

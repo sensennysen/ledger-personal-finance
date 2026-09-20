@@ -184,7 +184,7 @@ function LayoutShell() {
                 </button>
               </div>
             </div>
-            {['/', '/transactions', '/budgets'].includes(location.pathname) && (
+            {['/', '/transactions', '/budgets', '/reports'].includes(location.pathname) && (
               <CycleStepper className="px-4 pb-3" />
             )}
           </header>

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { canRollover, nextRollover } from '../src/lib/budgetRollover.ts'
+import { canRollover, nextRollover, deficitOutcome, isDeficitBehaviour } from '../src/lib/budgetRollover.ts'
 
 const run = (spends, budget, b) =>
   spends.reduce((r, s) => nextRollover(r, budget - s, budget, b), 0)
@@ -28,4 +28,22 @@ test('overspend larger than whole budget opens next cycle at zero', () => {
 test('only monthly budgets can roll over', () => {
   assert.equal(canRollover('monthly'), true)
   for (const p of ['weekly', 'quarterly', 'yearly']) assert.equal(canRollover(p), false)
+})
+
+test('deficitOutcome: the figure each radio shows', () => {
+  assert.equal(deficitOutcome(600, 742.3, 'reset'), 600)
+  assert.equal(Math.round(deficitOutcome(600, 742.3, 'carry') * 100), 45770)
+})
+
+test('deficitOutcome: carry never opens negative', () => {
+  // overspend of $900 (spent $1500) exceeds the $600 budget: opens at 0, $300 is uncarried
+  assert.equal(deficitOutcome(600, 1500, 'carry'), 0)
+  assert.equal(deficitOutcome(600, 1200, 'carry'), 0)
+  assert.equal(deficitOutcome(600, 1201, 'carry'), 0)
+})
+
+test('isDeficitBehaviour accepts only the two values', () => {
+  assert.equal(isDeficitBehaviour('carry'), true)
+  assert.equal(isDeficitBehaviour('reset'), true)
+  for (const v of [null, undefined, '', 'CARRY', 1]) assert.equal(isDeficitBehaviour(v), false)
 })

@@ -20,6 +20,8 @@ create table if not exists public.profiles (
   account_group_order jsonb not null default '["cash","digital_wallet","credit_card","savings","checking","investment","loan","other"]'::jsonb,
   account_view_mode text not null default 'all'
     check (account_view_mode in ('all','cash','digital_wallet','credit_card','savings','checking','investment','loan','other')),
+  budget_deficit_behaviour text not null default 'reset'
+    check (budget_deficit_behaviour in ('carry','reset')),
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );

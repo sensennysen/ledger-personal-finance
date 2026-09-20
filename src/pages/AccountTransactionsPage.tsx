@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, Search, Plus, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Search, Plus, CreditCard, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
@@ -21,6 +21,7 @@ import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { resolveLoadState } from '@/lib/loadState'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
+import { defaultCardPaymentDescription } from '@/lib/cardPayment'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
@@ -336,7 +337,22 @@ export default function AccountTransactionsPage() {
             <Plus className="w-4 h-4" />Make payment
           </Button>
         ) : (
+          <div className="flex shrink-0 items-center gap-2">
+          {account?.type === 'credit_card' && (
+            <Button
+              variant="outline"
+              className="gap-2 shrink-0"
+              onClick={() => {
+                setFormError(null)
+                setTransactionKind('card-payment')
+                setCreateOpen(true)
+              }}
+            >
+              <CreditCard className="w-4 h-4" />Pay card
+            </Button>
+          )}
           <TransactionKindMenu
+            showCardPayment={account?.type !== 'credit_card'}
             showLoanRepayment={Boolean(
               account &&
               account.type !== 'credit_card' &&
@@ -353,6 +369,7 @@ export default function AccountTransactionsPage() {
               </Button>
             }
           />
+          </div>
         )}
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
@@ -366,7 +383,10 @@ export default function AccountTransactionsPage() {
               entryKind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
               onSubmit={handleCreate}
               onClose={() => { setCreateOpen(false); setFormError(null) }}
-              lockedAccountId={account?.type === 'loan' ? undefined : accountId}
+              lockedAccountId={account?.type === 'loan' || transactionKind === 'card-payment' ? undefined : accountId}
+              lockedCardAccountId={
+                account?.type === 'credit_card' && transactionKind === 'card-payment' ? account.id : undefined
+              }
               lockedLoanAccountId={account?.type === 'loan' ? account.id : undefined}
               submitLabel={account?.type === 'loan' ? 'Record Payment' : 'Save Transaction'}
               defaultValues={account?.type === 'loan'
@@ -378,7 +398,17 @@ export default function AccountTransactionsPage() {
                     currency: account.currency,
                     description: `Loan payment - ${account.name}`,
                   }
-                : { account_id: accountId }}
+                : account?.type === 'credit_card' && transactionKind === 'card-payment'
+                  ? {
+                      type: 'expense',
+                      account_id: '',
+                      to_account_id: account.id,
+                      currency: account.currency,
+                      description: defaultCardPaymentDescription(account.name),
+                    }
+                  : transactionKind === 'card-payment'
+                    ? { account_id: accountId, type: 'expense' }
+                    : { account_id: accountId }}
             />
             {account?.type === 'loan' && !loanPaymentSource && (
               <p className="text-xs text-muted-foreground">Add a cash, wallet, checking, or savings account in {account.currency} to record this payment.</p>
@@ -692,6 +722,7 @@ export default function AccountTransactionsPage() {
           {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
           {editingTx && (
             <TransactionForm
+              isEditing
               defaultValues={{
                 type: editingTx.type,
                 account_id: editingTx.account_id,

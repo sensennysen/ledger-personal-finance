@@ -10,7 +10,9 @@ import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { usePreferences, type DateFormat, type NumberLocale, type Preferences } from '@/hooks/usePreferences'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
+import { deficitOutcome, type DeficitBehaviour } from '@/lib/budgetRollover'
+import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -70,6 +72,8 @@ export default function SettingsPage() {
   const { startDay, setStartDay } = useMonthCycle()
   const { prefs, set: setPref } = usePreferences()
   const [saved, setSaved] = useState(false)
+  const [deficitSaving, setDeficitSaving] = useState(false)
+  const [deficitError, setDeficitError] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -135,6 +139,22 @@ export default function SettingsPage() {
     await refreshProfile()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const currency = profile?.default_currency ?? 'USD'
+  const deficitBehaviour = useDeficitBehaviour()
+
+  const onDeficitChange = async (next: DeficitBehaviour) => {
+    if (!user || !deficitBehaviour || next === deficitBehaviour || deficitSaving) return
+    setDeficitSaving(true)
+    setDeficitError(null)
+    const { error } = await supabase.from('profiles').update({ budget_deficit_behaviour: next }).eq('id', user.id)
+    if (error) {
+      setDeficitError(`Couldn't save this setting: ${error.message}`)
+    } else {
+      await refreshProfile()
+    }
+    setDeficitSaving(false)
   }
 
   const requestNotificationPermission = async () => {
@@ -482,6 +502,56 @@ export default function SettingsPage() {
             {startDay === 1
               ? 'Your month runs from the 1st to the last day of each calendar month.'
               : `Your month runs from the ${startDay}th of one month to the ${startDay - 1}th of the next.`}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Budgets */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Budgets</CardTitle>
+          <CardDescription>What happens to the amount you went over by, when the next cycle opens.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <fieldset className="space-y-2" disabled={deficitSaving || !deficitBehaviour}>
+            <legend className="text-sm font-medium mb-2">When you overspend</legend>
+            {([
+              {
+                value: 'reset',
+                label: 'Start the next cycle fresh',
+                detail: `Example: a ${formatCurrency(600, currency)} budget with ${formatCurrency(742.3, currency)} spent. The next cycle opens at the full ${formatCurrency(deficitOutcome(600, 742.3, 'reset'), currency)}. The overspend is recorded in Reports.`,
+              },
+              {
+                value: 'carry',
+                label: "Reduce next cycle's budget",
+                detail: `Example: a ${formatCurrency(600, currency)} budget with ${formatCurrency(742.3, currency)} spent. The next cycle opens at ${formatCurrency(deficitOutcome(600, 742.3, 'carry'), currency)} \u2014 the budget minus what you went over. This is the current behaviour.`,
+              },
+            ] as const).map((option) => (
+              <label
+                key={option.value}
+                className={cn(
+                  'flex items-start gap-3 rounded-md border p-3 cursor-pointer',
+                  deficitBehaviour === option.value && 'border-primary bg-primary/5',
+                )}
+              >
+                <input
+                  type="radio"
+                  name="budget_deficit_behaviour"
+                  value={option.value}
+                  checked={deficitBehaviour === option.value}
+                  onChange={() => onDeficitChange(option.value)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-medium">{option.label}</span>
+                  <span className="block text-xs text-muted-foreground">{option.detail}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          {deficitError && <p role="alert" className="text-sm text-destructive">{deficitError}</p>}
+          <p className="text-xs text-muted-foreground">
+            Separate from each budget's Rollover unused budget toggle, which decides whether a surplus carries. The two work independently.
           </p>
         </CardContent>
       </Card>

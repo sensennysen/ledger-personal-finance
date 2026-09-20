@@ -1,15 +1,13 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Download,
   TrendingUp,
   TrendingDown,
   Wallet,
   FileBarChart2,
-  CalendarDays,
   Store,
-  Bookmark,
-  BookmarkPlus,
-  Trash2,
+  ArrowUpRight,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -29,21 +27,27 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
-import { useReportPresets } from '@/hooks/useReportPresets'
+import { useCycle } from '@/contexts/cycleState'
+import { getReportRange } from '@/lib/reportCycle'
+import {
+  DEFAULT_LOOKBACK,
+  LOOKBACK_OPTIONS,
+  getLookbackBuckets,
+  getLookbackSubtitle,
+  type Lookback,
+} from '@/lib/reportLookback'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
-import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
+import { OverspendingCard } from '@/components/reports/OverspendingCard'
+import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
@@ -53,39 +57,6 @@ function localDateStr(date: Date) {
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
-}
-
-type Preset = 'this_month' | 'last_month' | 'last_3m' | 'last_6m' | 'this_year' | 'all_time' | 'custom'
-
-function resolvePreset(preset: Preset): { start: string; end: string } {
-  const now = new Date()
-  const today = localDateStr(now)
-  switch (preset) {
-    case 'this_month': {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1)
-      return { start: localDateStr(start), end: today }
-    }
-    case 'last_month': {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const end = new Date(now.getFullYear(), now.getMonth(), 0)
-      return { start: localDateStr(start), end: localDateStr(end) }
-    }
-    case 'last_3m': {
-      const start = new Date(now.getFullYear(), now.getMonth() - 2, 1)
-      return { start: localDateStr(start), end: today }
-    }
-    case 'last_6m': {
-      const start = new Date(now.getFullYear(), now.getMonth() - 5, 1)
-      return { start: localDateStr(start), end: today }
-    }
-    case 'this_year': {
-      return { start: `${now.getFullYear()}-01-01`, end: today }
-    }
-    case 'all_time':
-    case 'custom':
-    default:
-      return { start: '', end: '' }
-  }
 }
 
 // ─── csv export ───────────────────────────────────────────────────────────────
@@ -341,10 +312,87 @@ function StatCard({
   )
 }
 
+// ─── income vs expenses trend card ────────────────────────────────────────────
+
+function IncomeExpenseCard({
+  data,
+  lookback,
+  onLookbackChange,
+  loading,
+  currency,
+}: {
+  data: { month: string; income: number; expenses: number }[]
+  lookback: Lookback
+  onLookbackChange: (value: Lookback) => void
+  loading: boolean
+  currency: string
+}) {
+  return (
+    <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
+          <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
+            Income vs. Expenses — {getLookbackSubtitle(lookback, new Date())}
+          </p>
+        </div>
+        <select
+          aria-label="Trend chart lookback"
+          value={lookback}
+          onChange={(e) => onLookbackChange(e.target.value as Lookback)}
+          className="h-7 rounded-md border border-border bg-background px-2 text-xs"
+        >
+          {LOOKBACK_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+  {loading ? (
+        <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
+      ) : (
+        <div className="h-52">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v: number) => formatCurrency(v, currency)}
+                width={72}
+              />
+              <Tooltip
+                formatter={(v, name) => [formatCurrency(v as number, currency), name as string]}
+                contentStyle={{
+                  fontSize: 11,
+                  background: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  color: 'var(--foreground)',
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+              <Bar dataKey="income" name="Income" fill={INCOME} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
   const { profile } = useAuth()
+  const deficitBehaviour = useDeficitBehaviour()
   const currency = profile?.default_currency ?? 'USD'
 
   const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
@@ -358,29 +406,12 @@ export default function ReportsPage() {
     if (accError) void refetchAccounts()
   }
 
-  // Date range state
-  const [preset, setPreset] = useState<Preset>('this_month')
-  const [customStart, setCustomStart] = useState('')
-  const [customEnd, setCustomEnd] = useState('')
+  const { startDay, selectedMonth } = useCycle()
   const [activeTab, setActiveTab] = useState('overview')
-  const [presetName, setPresetName] = useState('')
-  const { presets: savedPresets, savePreset, deletePreset } = useReportPresets()
-  const [dateRangeOpen, setDateRangeOpen] = useState(false)
-  const [presetsOpen, setPresetsOpen] = useState(false)
-
-  const { start, end } = useMemo(() => {
-    if (preset === 'custom') {
-      // Guard against inverted ranges which would match nothing (or everything)
-      if (customStart && customEnd && customStart > customEnd) {
-        return { start: '', end: '' }
-      }
-      return { start: customStart, end: customEnd }
-    }
-    if (preset === 'all_time') {
-      return { start: '', end: '' }
-    }
-    return resolvePreset(preset)
-  }, [preset, customStart, customEnd])
+  const { start, end, label: rangeLabel, filenameLabel } = useMemo(
+    () => getReportRange(selectedMonth, startDay),
+    [selectedMonth, startDay],
+  )
 
   // Filtered transactions
   const filtered = useMemo(() => {
@@ -435,14 +466,6 @@ export default function ReportsPage() {
 
   const maxCategoryAmount = categoryBreakdown[0]?.amount ?? 1
 
-  // Date range label for filename
-  const filenameLabel = useMemo(() => {
-    if (preset === 'all_time') return 'all-time'
-    if (start && end) return `${start}_to_${end}`
-    if (start) return `from_${start}`
-    return 'report'
-  }, [preset, start, end])
-
   const handleExport = () => {
     exportToCsv(sortedTransactions, `ledger-report_${filenameLabel}.csv`, txBalanceMap)
   }
@@ -454,7 +477,7 @@ export default function ReportsPage() {
       totalExpenses,
       netChange,
       currency,
-      presetLabel,
+      rangeLabel,
       categoryBreakdown,
       merchantBreakdown,
       filenameLabel,
@@ -493,35 +516,24 @@ export default function ReportsPage() {
     return data
   }, [accounts, allTransactionsSorted])
 
-  // ── Monthly Income vs Expenses (last 12 months) ──
+  // ── Income vs Expenses trend (own lookback, independent of the cycle) ──
+  const [lookback, setLookback] = useState<Lookback>(DEFAULT_LOOKBACK)
   const monthlyData = useMemo(() => {
-    const now = new Date()
-    const result: { month: string; income: number; expenses: number }[] = []
-    for (let i = 11; i >= 0; i--) {
-      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthEnd = i === 0
-        ? now
-        : new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0)
-      const startStr = localDateStr(monthStart)
-      const endStr = localDateStr(monthEnd)
-      const label = monthStart.getFullYear() !== now.getFullYear()
-        ? monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-        : monthStart.toLocaleDateString('en-US', { month: 'short' })
+    return getLookbackBuckets(lookback, new Date()).map((bucket) => {
       let income = 0
       let expenses = 0
       for (const t of transactions) {
-        if (t.date < startStr || t.date > endStr) continue
+        if (t.date < bucket.start || t.date > bucket.end) continue
         if (t.type === 'income') income += t.amount * (t.exchange_rate ?? 1)
         else if (t.type === 'expense') expenses += t.amount * (t.exchange_rate ?? 1)
       }
-      result.push({
-        month: label,
+      return {
+        month: bucket.label,
         income: Math.round(income * 100) / 100,
         expenses: Math.round(expenses * 100) / 100,
-      })
-    }
-    return result
-  }, [transactions])
+      }
+    })
+  }, [transactions, lookback])
 
   // ── Spending by Merchant (top 10 from filtered period) ──
   const merchantBreakdown = (() => {
@@ -544,16 +556,6 @@ export default function ReportsPage() {
   const activeAccounts = accounts.filter((a) => a.is_active)
   const balanceSummary = getBalanceSummary(activeAccounts)
   const totalBalance = balanceSummary.netWorth
-
-  const presetLabel = {
-    this_month: 'This Month',
-    last_month: 'Last Month',
-    last_3m: 'Last 3 Months',
-    last_6m: 'Last 6 Months',
-    this_year: 'This Year',
-    all_time: 'All Time',
-    custom: 'Custom Range',
-  }[preset]
 
   // Sorted transactions for table (newest first)
   const sortedTransactions = [...filtered].sort(
@@ -600,16 +602,22 @@ export default function ReportsPage() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold">Reports</h1>
-            <p className="text-xs text-muted-foreground">{presetLabel}</p>
+            <p className="text-xs text-muted-foreground">{rangeLabel}</p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
             <TabsList className="h-8">
               <TabsTrigger value="overview" className="text-xs h-7 px-3">Overview</TabsTrigger>
               <TabsTrigger value="analytics" className="text-xs h-7 px-3">Analytics</TabsTrigger>
-              <TabsTrigger value="thirteenth" className="text-xs h-7 px-3">13th Month</TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
+              <Link
+                to="/thirteenth-month"
+                className="inline-flex items-center gap-1 shrink-0 text-xs font-medium text-muted-foreground hover:text-primary"
+              >
+                13th Month Pay
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
               <Button
                 onClick={handleExport}
                 disabled={loading || filtered.length === 0}
@@ -643,150 +651,12 @@ export default function ReportsPage() {
         </div>
 
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
-      {/* Mobile-only controls row */}
-      <div className="flex items-end gap-3 md:hidden">
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <span className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground px-0.5">Date Range</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 w-full justify-start"
-            onClick={() => setDateRangeOpen(true)}
-          >
-            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">{presetLabel}</span>
-          </Button>
-        </div>
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <span className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground px-0.5">Saved Presets</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 w-full justify-start"
-            onClick={() => setPresetsOpen(true)}
-          >
-            <Bookmark className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Presets</span>
-            {savedPresets.length > 0 && (
-              <span className="ml-auto text-[0.625rem] bg-muted rounded px-1.5 py-0.5">{savedPresets.length}</span>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* Date controls */}
-      <div
-        className="hidden md:flex rounded-[20px] border border-border bg-card p-4 flex-col gap-4"
-      >
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Date Range</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {([
-            ['this_month', 'This Month'],
-            ['last_month', 'Last Month'],
-            ['last_3m', 'Last 3 Months'],
-            ['last_6m', 'Last 6 Months'],
-            ['this_year', 'This Year'],
-            ['all_time', 'All Time'],
-            ['custom', 'Custom'],
-          ] as [Preset, string][]).map(([p, label]) => (
-            <button
-              key={p}
-              onClick={() => setPreset(p)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-[0.6875rem] font-medium tracking-wide border transition-all duration-150',
-                preset === p
-                  ? 'border-transparent'
-                  : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
-              )}
-              style={preset === p ? { background: GOLD, color: 'var(--primary-foreground)' } : {}}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {preset === 'custom' && (
-          <div className="flex flex-wrap gap-4 pt-1">
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
-              <Input
-                type="date"
-                value={customStart}
-                onChange={(e) => setCustomStart(e.target.value)}
-                className="w-40 text-[0.8125rem] h-8"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
-              <Input
-                type="date"
-                value={customEnd}
-                onChange={(e) => setCustomEnd(e.target.value)}
-                className="w-40 text-[0.8125rem] h-8"
-              />
-            </div>
-            {customStart && customEnd && customStart > customEnd && (
-              <p className="self-end pb-1 text-xs text-destructive">
-                Start date must be on or before end date.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Saved presets */}
-      <div className="hidden md:flex rounded-[20px] border border-border bg-card p-4 flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Bookmark className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Saved Presets</span>
-        </div>
-        {savedPresets.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {savedPresets.map((p) => (
-              <div key={p.id} className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/40 px-2 py-1">
-                <button
-                  className="text-[0.6875rem] font-medium text-foreground hover:text-primary"
-                  onClick={() => {
-                    setPreset(p.preset as Preset)
-                    if (p.preset === 'custom') { setCustomStart(p.startDate ?? ''); setCustomEnd(p.endDate ?? '') }
-                    setActiveTab(p.activeTab ?? 'overview')
-                  }}
-                >{p.name}</button>
-                <button className="ml-1 text-muted-foreground hover:text-destructive" onClick={() => deletePreset(p.id)}>
-                  <Trash2 className="w-2.5 h-2.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center gap-2">
-          <Input
-            className="h-7 text-xs w-40"
-            placeholder="Preset name…"
-            value={presetName}
-            onChange={(e) => setPresetName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && presetName.trim()) {
-                savePreset(presetName.trim(), preset, customStart, customEnd, activeTab)
-                setPresetName('')
-              }
-            }}
+          <OverspendingCard
+            categories={categories}
+            startDay={startDay}
+            month={selectedMonth}
+            deficitBehaviour={deficitBehaviour}
           />
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs gap-1"
-            disabled={!presetName.trim()}
-            onClick={() => { savePreset(presetName.trim(), preset, customStart, customEnd, activeTab); setPresetName('') }}
-          >
-            <BookmarkPlus className="w-3 h-3" />Save
-          </Button>
-        </div>
-      </div>
-
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
@@ -824,50 +694,14 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid lg:grid-cols-[1.6fr_1fr] gap-4">
-          {/* Monthly Income vs Expenses */}
-          <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
-              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Monthly Income vs. Expenses — Last 12 Months</p>
-            </div>
-            {loading ? (
-              <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
-            ) : (
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: number) => formatCurrency(v, currency)}
-                      width={72}
-                    />
-                    <Tooltip
-                      formatter={(v, name) => [formatCurrency(v as number, currency), name as string]}
-                      contentStyle={{
-                        fontSize: 11,
-                        background: 'var(--card)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        color: 'var(--foreground)',
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-                    <Bar dataKey="income" name="Income" fill={INCOME} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+          {/* Income vs Expenses trend */}
+          <IncomeExpenseCard
+            data={monthlyData}
+            lookback={lookback}
+            onLookbackChange={setLookback}
+            loading={loading}
+            currency={currency}
+          />
 
 
         {/* Account balances */}
@@ -1066,7 +900,7 @@ export default function ReportsPage() {
           <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-3.5 h-3.5" style={{ color: INCOME }} />
-              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time</p>
+              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time — Last 13 months · monthly</p>
             </div>
             {loading ? (
               <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
@@ -1112,50 +946,14 @@ export default function ReportsPage() {
             )}
           </div>
 
-          {/* Monthly Income vs Expenses */}
-          <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
-              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Monthly Income vs. Expenses — Last 12 Months</p>
-            </div>
-            {loading ? (
-              <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
-            ) : (
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: number) => formatCurrency(v, currency)}
-                      width={72}
-                    />
-                    <Tooltip
-                      formatter={(v, name) => [formatCurrency(v as number, currency), name as string]}
-                      contentStyle={{
-                        fontSize: 11,
-                        background: 'var(--card)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        color: 'var(--foreground)',
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-                    <Bar dataKey="income" name="Income" fill={INCOME} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+          {/* Income vs Expenses trend */}
+          <IncomeExpenseCard
+            data={monthlyData}
+            lookback={lookback}
+            onLookbackChange={setLookback}
+            loading={loading}
+            currency={currency}
+          />
 
           {/* Spending by Merchant */}
           <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
@@ -1164,7 +962,7 @@ export default function ReportsPage() {
                 <Store className="w-3.5 h-3.5" style={{ color: EXPENSE }} />
                 <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Spending by Merchant</p>
               </div>
-              <span className="text-[0.6875rem] text-muted-foreground">{presetLabel}</span>
+              <span className="text-[0.6875rem] text-muted-foreground">{rangeLabel}</span>
             </div>
             {loading ? (
               <div className="flex flex-col gap-2">
@@ -1203,133 +1001,7 @@ export default function ReportsPage() {
           </div>
 
         </TabsContent>
-
-        <TabsContent value="thirteenth" className="mt-0 -mx-4 md:-mx-6">
-          <ThirteenthMonthPage />
-        </TabsContent>
       </Tabs>
-
-      {/* Mobile: Date Range modal */}
-      <Dialog open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Date Range</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-wrap gap-2">
-            {([
-              ['this_month', 'This Month'],
-              ['last_month', 'Last Month'],
-              ['last_3m', 'Last 3 Months'],
-              ['last_6m', 'Last 6 Months'],
-              ['this_year', 'This Year'],
-              ['all_time', 'All Time'],
-              ['custom', 'Custom'],
-            ] as [Preset, string][]).map(([p, label]) => (
-              <button
-                key={p}
-                onClick={() => { setPreset(p); if (p !== 'custom') setDateRangeOpen(false) }}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg text-[0.6875rem] font-medium tracking-wide border transition-all duration-150',
-                  preset === p
-                    ? 'border-transparent'
-                    : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
-                )}
-                style={preset === p ? { background: GOLD, color: 'var(--primary-foreground)' } : {}}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {preset === 'custom' && (
-            <div className="flex flex-wrap gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
-                <Input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="w-40 text-[0.8125rem] h-8"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
-                <Input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="w-40 text-[0.8125rem] h-8"
-                />
-              </div>
-              {customStart && customEnd && customStart > customEnd && (
-                <p className="self-end pb-1 text-xs text-destructive">
-                  Start date must be on or before end date.
-                </p>
-              )}
-            </div>
-          )}
-          <Button size="sm" className="w-full" onClick={() => setDateRangeOpen(false)}>
-            Done
-          </Button>
-        </DialogContent>
-      </Dialog>
-
-      {/* Mobile: Saved Presets modal */}
-      <Dialog open={presetsOpen} onOpenChange={setPresetsOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Saved Presets</DialogTitle>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Save your current date range and active tab as a named preset. Tap a saved preset to instantly restore those settings — useful for reports you check regularly.
-          </p>
-          {savedPresets.length === 0 && (
-            <p className="text-xs text-muted-foreground italic">No presets saved yet.</p>
-          )}
-          {savedPresets.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {savedPresets.map((p) => (
-                <div key={p.id} className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/40 px-2 py-1">
-                  <button
-                    className="text-[0.6875rem] font-medium text-foreground hover:text-primary"
-                    onClick={() => {
-                      setPreset(p.preset as Preset)
-                      if (p.preset === 'custom') { setCustomStart(p.startDate ?? ''); setCustomEnd(p.endDate ?? '') }
-                      setActiveTab(p.activeTab ?? 'overview')
-                      setPresetsOpen(false)
-                    }}
-                  >{p.name}</button>
-                  <button className="ml-1 text-muted-foreground hover:text-destructive" onClick={() => deletePreset(p.id)}>
-                    <Trash2 className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <Input
-              className="h-7 text-xs flex-1"
-              placeholder="Preset name…"
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && presetName.trim()) {
-                  savePreset(presetName.trim(), preset, customStart, customEnd, activeTab)
-                  setPresetName('')
-                }
-              }}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs gap-1 shrink-0"
-              disabled={!presetName.trim()}
-              onClick={() => { savePreset(presetName.trim(), preset, customStart, customEnd, activeTab); setPresetName('') }}
-            >
-              <BookmarkPlus className="w-3 h-3" />Save
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

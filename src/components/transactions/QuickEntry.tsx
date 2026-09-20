@@ -41,7 +41,7 @@ export function QuickEntry({
   const [date, setDate] = useState(getLocalDateString)
   const [note, setNote] = useState('')
   const [expanded, setExpanded] = useState(false)
-  const [fullForm, setFullForm] = useState(initialKind === 'loan-repayment')
+  const [fullForm, setFullForm] = useState(initialKind === 'loan-repayment' || initialKind === 'card-payment')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const account =
@@ -65,10 +65,13 @@ export function QuickEntry({
     subcategory_id: null,
     currency: account?.currency ?? 'USD',
     exchange_rate: 1,
+    // The card-payment form prefills "Card payment - {card}" only when this is empty.
     description:
       note ||
       category?.name ||
-      (type === 'transfer'
+      (initialKind === 'card-payment'
+        ? ''
+        : type === 'transfer'
         ? 'Transfer'
         : type === 'income'
           ? 'Income'
@@ -86,7 +89,7 @@ export function QuickEntry({
   if (fullForm)
     return (
       <TransactionForm
-        entryKind={initialKind === 'loan-repayment' ? initialKind : type}
+        entryKind={initialKind === 'loan-repayment' || initialKind === 'card-payment' ? initialKind : type}
         defaultValues={values}
         onSubmit={onSubmit}
         onClose={onClose}

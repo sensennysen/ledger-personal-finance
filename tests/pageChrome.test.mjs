@@ -31,5 +31,11 @@ test('unknown paths fall back to the app name without a stepper', () => {
   assert.deepEqual(resolveHeaderMeta('/nope'), {
     title: 'Ledger',
     showStepper: false,
+    titleIsHeading: true,
   })
+})
+
+test('account detail leaves the visible heading to the page', () => {
+  assert.equal(resolveHeaderMeta('/accounts/abc').titleIsHeading, false)
+  assert.equal(resolveHeaderMeta('/accounts').titleIsHeading, true)
 })

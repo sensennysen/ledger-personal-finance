@@ -177,7 +177,7 @@ export default function ThirteenthMonthPage() {
   return (
     <div className="p-4 md:p-6 lg:px-8 space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">
+        <h1 className="text-2xl font-bold md:hidden">
           13th Month Pay Estimator
         </h1>
         <p className="text-sm text-muted-foreground max-w-prose">

@@ -3,6 +3,8 @@ export const PAGE_ACTIONS_ID = 'page-actions'
 export interface HeaderMeta {
   title: string
   showStepper: boolean
+  // false when the page owns the visible heading (e.g. the account name)
+  titleIsHeading: boolean
 }
 
 const STEPPER_PATHS = ['/', '/transactions', '/budgets', '/reports']
@@ -20,10 +22,11 @@ const TITLES: Record<string, string> = {
 
 export function resolveHeaderMeta(pathname: string): HeaderMeta {
   if (/^\/accounts\/[^/]+$/.test(pathname)) {
-    return { title: 'Account', showStepper: false }
+    return { title: 'Account', showStepper: false, titleIsHeading: false }
   }
   return {
     title: TITLES[pathname] ?? 'Ledger',
     showStepper: STEPPER_PATHS.includes(pathname),
+    titleIsHeading: true,
   }
 }

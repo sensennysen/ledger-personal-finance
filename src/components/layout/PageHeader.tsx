@@ -6,7 +6,7 @@ import { CycleStepper } from './CycleStepper'
 // so it is interactive from the first frame.
 export function PageHeader() {
   const { pathname } = useLocation()
-  const { title, showStepper } = resolveHeaderMeta(pathname)
+  const { title, showStepper, titleIsHeading } = resolveHeaderMeta(pathname)
   return (
     <>
     {showStepper && (
@@ -14,7 +14,11 @@ export function PageHeader() {
     )}
     <div className="hidden md:flex shrink-0 h-14 items-center justify-between gap-4 border-b border-border bg-background px-6 lg:px-8">
       <div className="flex min-w-0 items-center gap-4">
-        <h1 className="text-xl font-bold tracking-tight truncate">{title}</h1>
+        {titleIsHeading ? (
+          <h1 className="text-xl font-bold tracking-tight truncate">{title}</h1>
+        ) : (
+          <p className="text-xl font-bold tracking-tight truncate">{title}</p>
+        )}
         {showStepper && <CycleStepper variant="bar" />}
       </div>
       <div

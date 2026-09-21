@@ -13,3 +13,6 @@ The FAB was already `position: fixed`, so it never scrolled out of reach. The de
 - The ticket says the FAB "scrolls out of reach", which the code does not show; the wording is likely from an older layout.
 - `undo-toast` uses `bottom-18` (72px), which overlaps the 88px bottom nav. Pre-existing, out of scope.
 - No test covers `AppLayout` geometry.
+
+## Update 2026-09-22
+The first Backlog item was confirmed: at scroll end the FAB covered the last row's trailing controls. Fixed by hiding the FAB within 80px of scroll end (`src/lib/scrollEnd.ts`); `undo-toast` now sits above the FAB. See the Epic 2 wrap-up.

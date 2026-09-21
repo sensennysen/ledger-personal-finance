@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { isNearScrollEnd } from '@/lib/scrollEnd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Tag,
@@ -74,6 +75,11 @@ function LayoutShell() {
     onEdit?: () => void
   } | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [fabHidden, setFabHidden] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
+  const syncFab = () => {
+    if (mainRef.current) setFabHidden(isNearScrollEnd(mainRef.current))
+  }
   const [formError, setFormError] = useState<string | null>(null)
   useEffect(() => {
     if (sheet !== 'detail' || !desktop) return
@@ -83,6 +89,17 @@ function LayoutShell() {
     window.addEventListener('keydown', close)
     return () => window.removeEventListener('keydown', close)
   }, [sheet, desktop])
+  // Re-check when the page changes or its content grows (async loads).
+  useEffect(() => {
+    const main = mainRef.current
+    const content = main?.firstElementChild
+    if (!main || !content) return
+    const sync = () => setFabHidden(isNearScrollEnd(main))
+    sync()
+    const observer = new ResizeObserver(sync)
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [location.pathname])
   const touchStart = useRef<number | null>(null)
   const openAddTransactionModal = (kind: TransactionKind) => {
     setFormError(null)
@@ -170,7 +187,11 @@ function LayoutShell() {
               />
             </div>
           )}
-          <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
+          <main
+            ref={mainRef}
+            onScroll={syncFab}
+            className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0"
+          >
             <div
               key={location.pathname}
               className="animate-page-in min-h-full min-w-0 w-full max-w-full"
@@ -222,7 +243,12 @@ function LayoutShell() {
           <button
             aria-label="Add transaction"
             onClick={() => openAddTransactionModal('expense')}
-            className="fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center"
+            aria-hidden={fabHidden}
+            tabIndex={fabHidden ? -1 : 0}
+            className={cn(
+              'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-200',
+              fabHidden && 'opacity-0 pointer-events-none',
+            )}
           >
             <Plus className="size-7" />
           </button>

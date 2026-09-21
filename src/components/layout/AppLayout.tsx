@@ -170,7 +170,7 @@ function LayoutShell() {
               />
             </div>
           )}
-          <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(176px+env(safe-area-inset-bottom))] md:pb-0">
+          <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
             <div
               key={location.pathname}
               className="animate-page-in min-h-full min-w-0 w-full max-w-full"

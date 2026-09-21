@@ -23,6 +23,12 @@ test('bottom nav keeps the four mobile destinations', () => {
   )
 })
 
+test('Categories is a tab at every size, not only a bottom-nav overflow', () => {
+  assert.equal(tab('Categories').to, '/categories')
+  assert.ok(BOTTOM_NAV_TABS.every((b) => NAV_TABS.some((t) => t.to === b.to)))
+  assert.equal(isDestinationActive('/categories', tab('Categories')), true)
+})
+
 test('Home matches only the root path', () => {
   assert.equal(isDestinationActive('/', tab('Home')), true)
   assert.equal(isDestinationActive('/accounts', tab('Home')), false)

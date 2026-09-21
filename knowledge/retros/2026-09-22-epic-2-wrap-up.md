@@ -15,13 +15,22 @@ Six routes at 1920 / 1280 / 1024 / 768 / 390. Verified:
 - At 390 the active tab scrolls into view (Reports, Categories); theme toggle works from row 1.
 - 13th Month at 1920 has no width cap, with the summary column beside the records card. Reports at 1024 lays out cleanly.
 
+## Follow-up fixes (after the first browser pass)
+- 13th Month page `<h1>` is `md:hidden`; row 2 carries the title. `/accounts/:id` row 2 renders its title as a `<p>` (`titleIsHeading: false`), so the account name is the single `<h1>`.
+- Removed the `⌘K` hint from the disabled search until LED-40.
+- `undo-toast` moved to `184px + safe-area` above the FAB and install banner (was `bottom-18`, overlapping the bottom nav).
+- FAB: with the 88px padding, the FAB covered the last row's trailing controls at scroll end (seen on Activity and Accounts with seeded data). The FAB now fades out and stops taking pointer events within 80px of scroll end (`src/lib/scrollEnd.ts`) and returns on scroll up. Pages that do not scroll keep it. Chosen over restoring the 176px spacer.
+- Tests: `layoutGeometry.test.mjs` (source-level: main padding = bottom nav height; FAB/toast/banner clear the nav), `scrollEnd.test.mjs`, `pageChrome.test.mjs`.
+
+## Second browser pass (headless Chrome, 9 seeded accounts, 54 transactions)
+- Accounts 1920, Reports 1920 and 13th Month 1920/1440: no overflow; 13th Month has one heading and its DOM order equals the visual order (the summary column has no focusable elements).
+- Under throttled network (800ms latency, 60KB/s) the header and all tabs render at the first sample with no skeletons.
+- FAB at 390: visible at top and mid-scroll, hidden at scroll end, back after scrolling up (Activity, Accounts); Budgets does not scroll so it stays.
+
 ## Backlog
-- Confirmed: `/thirteenth-month` shows row-2 "13th Month" and the page `<h1>` "13th Month Pay Estimator" at md+ (same for `/accounts/:id`). Decide whether row 2 takes the page title.
-- Search shows a `⌘K` hint but is a disabled placeholder until LED-40.
-- Only an empty account was tested: last rows against the FAB, populated Accounts 4-col grid, Reports cards on wide rows, and 13th Month keyboard order with records are still unverified.
-- Not checked: real iOS safe-area behaviour, tablet tab overflow design, shell rendering before data loads on a slow network.
-- `undo-toast` (`bottom-18`) overlaps the 88px bottom nav. Pre-existing.
-- No test covers `AppLayout` geometry.
+- Real iOS safe-area insets are unverified; headless Chrome reports 0.
+- Tablet tab overflow (icon-only tabs at md-lg) has no design frame; it is an interpretation.
+- Seed data was one month of simple transactions: Reports charts and Accounts at 2xl (4 columns) were checked for overflow only, not for visual polish.
 
 ## Hand-offs
 - LED-40: search field is a disabled placeholder, no Cmd+K listener.

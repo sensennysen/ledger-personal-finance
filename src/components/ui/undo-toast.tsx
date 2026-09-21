@@ -30,7 +30,7 @@ export function UndoToast({ message, duration = 5000, onUndo, onDismiss }: UndoT
   }, [duration])
 
   return (
-    <div className="fixed bottom-18 md:bottom-4 left-1/2 -translate-x-1/2 z-50 w-[min(calc(100vw-2rem),380px)] pointer-events-auto">
+    <div className="fixed bottom-[calc(184px+env(safe-area-inset-bottom))] md:bottom-4 left-1/2 -translate-x-1/2 z-50 w-[min(calc(100vw-2rem),380px)] pointer-events-auto">
       <div className="bg-foreground text-background rounded-xl shadow-2xl overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3">
           <span className="flex-1 text-sm font-medium">{message}</span>

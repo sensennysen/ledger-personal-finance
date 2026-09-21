@@ -1,13 +1,21 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  Activity,
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
   ArrowRight,
+  BarChart3,
+  CalendarClock,
+  Landmark,
+  PiggyBank,
   Receipt,
+  Settings,
+  Upload,
   Tag,
   Wallet,
+  type LucideIcon,
 } from 'lucide-react'
 import {
   Command,
@@ -21,7 +29,7 @@ import {
 import { InlineLoadError } from '@/components/ui/error-state'
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { useGlobalSearch } from '@/hooks/useGlobalSearch'
-import type { SearchAction, SearchScope } from '@/lib/globalSearch'
+import { DESTINATIONS, type SearchAction, type SearchScope } from '@/lib/globalSearch'
 import { cn, formatCurrency, formatDateShort } from '@/lib/utils'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import type { Transaction } from '@/types'
@@ -31,6 +39,16 @@ const ACTIONS: (SearchAction & { kind: TransactionKind; icon: typeof ArrowUpRigh
   { id: 'income', kind: 'income', label: 'New income', keywords: ['add', 'earn', 'record'], key: 'I', icon: ArrowDownLeft },
   { id: 'transfer', kind: 'transfer', label: 'New transfer', keywords: ['add', 'move', 'record'], key: 'T', icon: ArrowLeftRight },
 ]
+
+const DESTINATION_ICONS: Record<string, LucideIcon> = {
+  accounts: Wallet,
+  activity: Activity,
+  budgets: PiggyBank,
+  categories: Tag,
+  reports: BarChart3,
+  settings: Settings,
+  'import-csv': Upload,
+}
 
 interface SearchPaletteProps {
   open: boolean
@@ -70,13 +88,14 @@ function SearchBody({
   // search that starts with one of those letters is never hijacked.
   const [navigated, setNavigated] = useState(false)
 
-  const { results, range, isAmountQuery, loadState, error, refetch } = useGlobalSearch(
+  const { results, range, isAmountQuery, loadState, error, refetch, dueSoon, loanSummary } = useGlobalSearch(
     query,
     scope,
     ACTIONS,
   )
   const actions = results.actions as typeof ACTIONS
   const trimmed = query.trim()
+  const isEmptyQuery = trimmed === ''
 
   const go = (path: string) => {
     close()
@@ -132,23 +151,25 @@ function SearchBody({
           setQuery(value)
           setNavigated(false)
         }}
-        placeholder="Search transactions, accounts, categories…"
+        placeholder="Search transactions, accounts, categories — or type a command"
       />
-      <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-        <span>
-          {scope === 'cycle'
-            ? `This cycle · ${formatDateShort(range.start)} – ${formatDateShort(range.end)}`
-            : 'Searching all time'}
-        </span>
-        <button
-          type="button"
-          aria-pressed={scope === 'all'}
-          onClick={() => setScope((current) => (current === 'cycle' ? 'all' : 'cycle'))}
-          className="rounded-md px-2 py-1 font-medium text-foreground hover:bg-muted"
-        >
-          {scope === 'cycle' ? 'Search all time' : 'Limit to this cycle'}
-        </button>
-      </div>
+      {!isEmptyQuery && (
+        <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+          <span>
+            {scope === 'cycle'
+              ? `This cycle · ${formatDateShort(range.start)} – ${formatDateShort(range.end)}`
+              : 'Searching all time'}
+          </span>
+          <button
+            type="button"
+            aria-pressed={scope === 'all'}
+            onClick={() => setScope((current) => (current === 'cycle' ? 'all' : 'cycle'))}
+            className="rounded-md px-2 py-1 font-medium text-foreground hover:bg-muted"
+          >
+            {scope === 'cycle' ? 'Search all time' : 'Limit to this cycle'}
+          </button>
+        </div>
+      )}
       {error && loadState !== 'loading' && (
         <div className="px-1 pb-1">
           <InlineLoadError message={`Search data failed to load: ${error}`} onRetry={refetch} />
@@ -157,6 +178,74 @@ function SearchBody({
       <CommandList className="max-h-96">
         {loadState === 'loading' && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading…</p>
+        )}
+        {showResults && isEmptyQuery && (
+          <>
+            <CommandGroup heading="Record">
+              {ACTIONS.map((action) => {
+                const Icon = action.icon
+                return (
+                  <CommandItem
+                    key={action.id}
+                    value={`action:${action.id}`}
+                    onSelect={() => runAction(action.kind)}
+                  >
+                    <Icon className="size-4 text-muted-foreground" />
+                    <span>{action.label}</span>
+                    {action.key && <CommandShortcut>{action.key}</CommandShortcut>}
+                  </CommandItem>
+                )
+              })}
+              <CommandItem value="action:loan-repayment" onSelect={() => runAction('loan-repayment')}>
+                <Landmark className="size-4 text-muted-foreground" />
+                <span>Loan repayment</span>
+                {loanSummary.count > 0 && (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {loanSummary.count} {loanSummary.count === 1 ? 'loan' : 'loans'},{' '}
+                    {formatCurrency(loanSummary.owed)} owed
+                  </span>
+                )}
+              </CommandItem>
+            </CommandGroup>
+            {dueSoon.length > 0 && (
+              <CommandGroup heading="Due soon">
+                {dueSoon.map((row) => (
+                  <CommandItem
+                    key={row.id}
+                    value={`due:${row.id}`}
+                    onSelect={() => go(row.accountId ? `/accounts/${row.accountId}` : '/accounts')}
+                  >
+                    <CalendarClock className="size-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate">{row.label}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {formatDateShort(row.dueDate)} ·{' '}
+                        {row.daysAway === 0
+                          ? 'today'
+                          : `in ${row.daysAway} ${row.daysAway === 1 ? 'day' : 'days'}`}
+                      </p>
+                    </div>
+                    <span className="shrink-0 tabular-nums">{formatCurrency(row.amount)}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            <CommandGroup heading="Jump to">
+              {DESTINATIONS.map((destination) => {
+                const Icon = DESTINATION_ICONS[destination.id] ?? ArrowRight
+                return (
+                  <CommandItem
+                    key={destination.id}
+                    value={`jump:${destination.id}`}
+                    onSelect={() => go(destination.path)}
+                  >
+                    <Icon className="size-4 text-muted-foreground" />
+                    <span>{destination.label}</span>
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          </>
         )}
         {showResults && trimmed && !anyResult && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
@@ -215,7 +304,7 @@ function SearchBody({
             ))}
           </CommandGroup>
         )}
-        {actions.length > 0 && (
+        {!isEmptyQuery && actions.length > 0 && (
           <CommandGroup heading="Actions">
             {actions.map((action) => {
               const Icon = action.icon

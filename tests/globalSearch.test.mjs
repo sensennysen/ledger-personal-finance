@@ -7,6 +7,9 @@ import {
   matchActions,
   capGroup,
   inScope,
+  DESTINATIONS,
+  buildDueSoon,
+  summarizeLoans,
 } from '../src/lib/globalSearch.ts'
 
 const range = { start: '2026-09-01', end: '2026-09-30' }
@@ -133,4 +136,53 @@ test('capGroup limits drawn rows but keeps the true total', () => {
   const group = capGroup([1, 2, 3, 4, 5], 3)
   assert.deepEqual(group.items, [1, 2, 3])
   assert.equal(group.total, 5)
+})
+
+const deadline = (dueDate, ...items) => ({
+  dueDate,
+  total: items.reduce((sum, item) => sum + item.remainingAmount, 0),
+  items: items.map(([purchaseId, purchaseName, remainingAmount]) => ({ purchaseId, purchaseName, remainingAmount })),
+})
+
+test('DESTINATIONS lists all seven, including Categories and Import CSV', () => {
+  assert.equal(DESTINATIONS.length, 7)
+  const labels = DESTINATIONS.map((d) => d.label)
+  assert.ok(labels.includes('Categories'))
+  assert.ok(labels.includes('Import CSV'))
+})
+
+test('buildDueSoon keeps today through the window, drops past and later', () => {
+  const rows = buildDueSoon(
+    [
+      deadline('2026-09-14', ['a', 'Past', 1]),
+      deadline('2026-09-15', ['b', 'Today', 2]),
+      deadline('2026-09-29', ['c', 'Edge', 3]),
+      deadline('2026-09-30', ['d', 'Later', 4]),
+    ],
+    '2026-09-15',
+  )
+  assert.deepEqual(rows.map((r) => [r.label, r.daysAway]), [['Today', 0], ['Edge', 14]])
+})
+
+test('buildDueSoon orders by date and splits same-day installments', () => {
+  const rows = buildDueSoon(
+    [deadline('2026-09-20', ['b', 'Zed', 5], ['a', 'Car', 6]), deadline('2026-09-16', ['c', 'Phone', 7])],
+    '2026-09-15',
+  )
+  assert.deepEqual(rows.map((r) => r.label), ['Phone', 'Car', 'Zed'])
+  assert.equal(rows[0].daysAway, 1)
+})
+
+test('buildDueSoon is empty with no deadlines and crosses month ends', () => {
+  assert.deepEqual(buildDueSoon([], '2026-09-15'), [])
+  assert.equal(buildDueSoon([deadline('2026-10-02', ['a', 'Car', 1])], '2026-09-30')[0].daysAway, 2)
+})
+
+test('summarizeLoans counts distinct purchases and totals what is owed', () => {
+  const summary = summarizeLoans([
+    deadline('2026-09-20', ['a', 'Car', 100.1], ['b', 'Phone', 50.2]),
+    deadline('2026-10-20', ['a', 'Car', 100.1]),
+  ])
+  assert.deepEqual(summary, { count: 2, owed: 250.4 })
+  assert.deepEqual(summarizeLoans([]), { count: 0, owed: 0 })
 })

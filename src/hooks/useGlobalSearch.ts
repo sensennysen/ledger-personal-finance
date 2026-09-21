@@ -3,14 +3,17 @@ import { useCycle } from '@/contexts/cycleState'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
+import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { getCustomMonthRange } from '@/lib/utils'
 import { resolveLoadState } from '@/lib/loadState'
 import {
+  buildDueSoon,
   capGroup,
   matchActions,
   parseAmountQuery,
   searchNamed,
   searchTransactions,
+  summarizeLoans,
   type SearchAction,
   type SearchScope,
 } from '@/lib/globalSearch'
@@ -25,6 +28,9 @@ export function useGlobalSearch(query: string, scope: SearchScope, actions: Sear
   const transactions = useTransactions()
   const accounts = useAccounts()
   const categories = useCategories()
+  // Loans only feed the before-you-type state, so they load only while the query is empty.
+  const emptyQuery = query.trim() === ''
+  const loans = useLoanPurchases(undefined, emptyQuery)
 
   const range = useMemo(
     () => getCustomMonthRange(selectedMonth, startDay),
@@ -43,9 +49,21 @@ export function useGlobalSearch(query: string, scope: SearchScope, actions: Sear
     }
   }, [transactions.transactions, accounts.accounts, categories.categories, query, scope, range, actions])
 
-  const error = transactions.error ?? accounts.error ?? categories.error
+  const deadlines = loans.deadlines
+  const dueSoon = useMemo(() => {
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const accountByPurchase = new Map(loans.purchases.map((purchase) => [purchase.id, purchase.account_id]))
+    return buildDueSoon(deadlines, today).map((row) => ({
+      ...row,
+      accountId: accountByPurchase.get(row.purchaseId) ?? null,
+    }))
+  }, [deadlines, loans.purchases])
+  const loanSummary = useMemo(() => summarizeLoans(deadlines), [deadlines])
+
+  const error = transactions.error ?? accounts.error ?? categories.error ?? loans.error
   const loadState = resolveLoadState({
-    loading: transactions.loading || accounts.loading || categories.loading,
+    loading: transactions.loading || accounts.loading || categories.loading || loans.loading,
     error,
     hasData:
       transactions.transactions.length > 0 ||
@@ -57,11 +75,14 @@ export function useGlobalSearch(query: string, scope: SearchScope, actions: Sear
     void transactions.refetch()
     void accounts.refetch()
     void categories.refetch()
+    void loans.refetch()
   }
 
   return {
     results,
     range,
+    dueSoon,
+    loanSummary,
     isAmountQuery: parseAmountQuery(query) !== null,
     loadState,
     error,

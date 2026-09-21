@@ -134,3 +134,83 @@ export interface Group<T> {
 export function capGroup<T>(rows: T[], cap: number = GROUP_CAP): Group<T> {
   return { items: rows.slice(0, cap), total: rows.length }
 }
+
+export interface SearchDestination {
+  id: string
+  label: string
+  path: string
+}
+
+// Design 16a "Jump to" order. Import CSV is a dialog on Activity, so it
+// lands there.
+export const DESTINATIONS: SearchDestination[] = [
+  { id: 'accounts', label: 'Accounts', path: '/accounts' },
+  { id: 'activity', label: 'Activity', path: '/transactions' },
+  { id: 'budgets', label: 'Budgets', path: '/budgets' },
+  { id: 'categories', label: 'Categories', path: '/categories' },
+  { id: 'reports', label: 'Reports', path: '/reports' },
+  { id: 'settings', label: 'Settings', path: '/settings' },
+  { id: 'import-csv', label: 'Import CSV', path: '/transactions' },
+]
+
+export const DUE_SOON_DAYS = 14
+
+// Structural shape of getLoanDeadlines() output, so this module needs no app imports.
+export interface DeadlineLike {
+  dueDate: string
+  total: number
+  items: { purchaseId: string; purchaseName: string; remainingAmount: number }[]
+}
+
+export interface DueSoonRow {
+  id: string
+  purchaseId: string
+  label: string
+  dueDate: string
+  daysAway: number
+  amount: number
+}
+
+function dayNumber(date: string): number {
+  const [year, month, day] = date.slice(0, 10).split('-').map(Number)
+  return Math.round(Date.UTC(year, month - 1, day) / 86400000)
+}
+
+// Installments due from `today` through `windowDays` ahead, soonest first.
+// `today` is an argument (YYYY-MM-DD) so the caller owns the clock.
+export function buildDueSoon(
+  deadlines: DeadlineLike[],
+  today: string,
+  windowDays: number = DUE_SOON_DAYS,
+): DueSoonRow[] {
+  const base = dayNumber(today)
+  const rows: DueSoonRow[] = []
+  for (const deadline of deadlines) {
+    const daysAway = dayNumber(deadline.dueDate) - base
+    if (daysAway < 0 || daysAway > windowDays) continue
+    for (const item of deadline.items) {
+      rows.push({
+        id: `${item.purchaseId}:${deadline.dueDate}`,
+        purchaseId: item.purchaseId,
+        label: item.purchaseName,
+        dueDate: deadline.dueDate,
+        daysAway,
+        amount: item.remainingAmount,
+      })
+    }
+  }
+  return rows.sort((a, b) => a.daysAway - b.daysAway || a.label.localeCompare(b.label))
+}
+
+// How many loan purchases still owe something, and how much in total.
+export function summarizeLoans(deadlines: DeadlineLike[]): { count: number; owed: number } {
+  const purchases = new Set<string>()
+  let owed = 0
+  for (const deadline of deadlines) {
+    for (const item of deadline.items) {
+      purchases.add(item.purchaseId)
+      owed += item.remainingAmount
+    }
+  }
+  return { count: purchases.size, owed: Math.round((owed + Number.EPSILON) * 100) / 100 }
+}

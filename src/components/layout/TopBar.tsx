@@ -102,9 +102,6 @@ export function TopBar({
       >
         <Search className="size-4" />
         <span className="hidden lg:block flex-1 text-left">Search…</span>
-        <kbd className="hidden lg:block rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold">
-          ⌘K
-        </kbd>
       </button>
       <div className="flex items-center gap-1">
         <Button

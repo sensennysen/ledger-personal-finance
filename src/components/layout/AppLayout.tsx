@@ -41,6 +41,7 @@ import {
   TRANSACTION_KIND_DIALOG_TITLES,
   type TransactionKind,
 } from '@/components/transactions/transactionKinds'
+import { SearchPalette } from '@/components/search/SearchPalette'
 import { EntryDetail } from '@/components/transactions/EntryDetail'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -75,6 +76,7 @@ function LayoutShell() {
     onEdit?: () => void
   } | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [fabHidden, setFabHidden] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
   const syncFab = () => {
@@ -106,6 +108,16 @@ function LayoutShell() {
     setTransactionKind(kind)
     setSheet('add')
   }
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setSearchOpen((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
   useCreditCardNotifications()
   useEffect(() => {
     if (!hasGenerated.current) {
@@ -156,6 +168,7 @@ function LayoutShell() {
         <TopBar
           avatar={avatar}
           onAvatarClick={() => setSheet('account')}
+          onSearch={() => setSearchOpen(true)}
           mobileTitle={
             location.pathname === '/'
               ? 'Good day, ' + (profile?.full_name?.split(' ')[0] ?? 'there')
@@ -254,6 +267,11 @@ function LayoutShell() {
           </button>
         )}
         <PWAInstallBanner hidden={sheet !== null} />
+        <SearchPalette
+          open={searchOpen}
+          onOpenChange={setSearchOpen}
+          onAddTransaction={openAddTransactionModal}
+        />
         <Dialog
           open={sheet !== null && !(desktop && sheet === 'detail')}
           onOpenChange={(open) => {

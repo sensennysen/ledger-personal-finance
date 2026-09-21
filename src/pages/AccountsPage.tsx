@@ -341,7 +341,7 @@ export default function AccountsPage() {
 
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 lg:px-8 space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold md:hidden">Accounts</h1>
@@ -402,7 +402,7 @@ export default function AccountsPage() {
       {loadState === 'error' ? (
         <ErrorState title="Couldn't load your accounts" detail={error} onRetry={() => void refetch()} />
       ) : loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
         </div>
       ) : accounts.length === 0 ? (
@@ -412,7 +412,7 @@ export default function AccountsPage() {
           description="Add your first account to get started"
         />
       ) : prefs.accView === 'flat' ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {accounts.map((account, idx) => renderAccountCard(account, idx, { flatRearrange: rearrangeMode }))}
         </div>
       ) : (
@@ -486,7 +486,7 @@ export default function AccountsPage() {
                   </p>
                 </div>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {groupAccounts.map((account, idx) => renderAccountCard(account, idx))}
               </div>
             </div>

@@ -175,12 +175,12 @@ export default function ThirteenthMonthPage() {
   const allChecked = transactions.length > 0 && transactions.every((t) => effectiveIncluded.has(t.id))
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6 lg:px-8 space-y-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold">
           13th Month Pay Estimator
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground max-w-prose">
           Computed under PD 851 – Select which income records count as basic salary
         </p>
       </div>
@@ -206,8 +206,10 @@ export default function ThirteenthMonthPage() {
         />
       )}
 
+      <div className="space-y-6 xl:grid xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start xl:gap-6 xl:space-y-0">
+      <div className="space-y-6 xl:order-2 xl:sticky xl:top-6">
       <section className="rounded-3xl bg-accent text-accent-foreground p-6"><p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p><p className="money text-[40px] leading-tight mt-3">{loading ? '…' : formatCurrency(thirteenthMonthPay,currency)}</p><p className="text-sm mt-3">{formatCurrency(totalIncluded,currency)} basic salary ÷ 12</p></section>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3">
         <SummaryCard
           label="Total Basic Salary"
           value={formatCurrency(totalIncluded, currency)}
@@ -233,15 +235,16 @@ export default function ThirteenthMonthPage() {
 
       <div className="flex items-start gap-2.5 rounded-xl bg-transfer-container p-4 text-sm text-transfer">
         <Info className="w-4 h-4 mt-0.5 shrink-0" />
-        <p>
+        <p className="max-w-prose">
           All income transactions for the year are shown below. Check only the records that qualify
           as <strong className="text-foreground">basic salary</strong> under PD 851 – exclude bonuses,
           allowances, overtime, and non-covered sources. Your selection is saved locally and never
           affects your account balances.
         </p>
       </div>
+      </div>
 
-      <Card>
+      <Card className="xl:order-1">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -405,6 +408,7 @@ export default function ThirteenthMonthPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

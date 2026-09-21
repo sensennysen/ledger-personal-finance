@@ -591,7 +591,7 @@ export default function ReportsPage() {
   })()
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 md:pb-6">
+    <div className="flex flex-col gap-6 p-4 md:p-6 lg:px-8 pb-24 md:pb-6">
       {loadFailed && !loading && (
         <InlineLoadError
           message="Some of your data didn't load, so these reports may be incomplete."
@@ -693,7 +693,7 @@ export default function ReportsPage() {
         />
       </div>
 
-      <div className="grid lg:grid-cols-[1.6fr_1fr] gap-4">
+      <div className="grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-4">
           {/* Income vs Expenses trend */}
           <IncomeExpenseCard
             data={monthlyData}

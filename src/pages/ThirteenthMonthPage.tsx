@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { CalendarCheck, Info, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react'
+import { CalendarCheck, Info, CheckSquare, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -93,6 +95,7 @@ export default function ThirteenthMonthPage() {
   const endDate = `${year}-12-31`
 
   const { transactions, loading, error, refetch } = useTransactions({ startDate, endDate, type: 'income' })
+  const { transactions: anyIncomeEver, loading: anyIncomeLoading } = useTransactions({ type: 'income', limit: 1 })
 
   const handleYearChange = (v: string) => {
     if (!v) return
@@ -281,10 +284,21 @@ export default function ThirteenthMonthPage() {
                 </div>
               ))}
             </div>
+          ) : transactions.length === 0 && !anyIncomeLoading && anyIncomeEver.length === 0 ? (
+            <EmptyState icon={TrendingUp} title="Nothing recorded yet" bare />
           ) : transactions.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-              No income transactions found for {year}.
-            </div>
+            <EmptyState
+              icon={TrendingUp}
+              title={`No income transactions found for ${year}`}
+              bare
+              action={
+                year > CURRENT_YEAR - YEAR_OPTIONS.length + 1 ? (
+                  <Button variant="outline" size="sm" onClick={() => handleYearChange(String(year - 1))}>
+                    Try {year - 1}
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="divide-y divide-border/50">
               {byMonth.map(([key, txs]) => {

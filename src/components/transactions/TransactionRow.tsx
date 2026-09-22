@@ -1,6 +1,6 @@
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { useEffect, useState } from 'react'
-import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal } from 'lucide-react'
+import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal, Clock } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
 import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
@@ -134,6 +134,11 @@ export function TransactionRow({
         {/* Row 2: labels | currency */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
+            {tx.queued && (
+              <span className="inline-flex items-center gap-1 text-xs text-primary">
+                <Clock className="w-3 h-3" />Not synced yet
+              </span>
+            )}
             {contextAccountId !== undefined ? (
               (tx.type === 'transfer' || isLoanRepayment) && (
                 <span className="text-xs text-muted-foreground">

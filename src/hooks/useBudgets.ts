@@ -206,6 +206,7 @@ export function useBudgets(
     >,
   ) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to add a budget.' }
     const { error } = await supabase
       .from('budgets')
       .insert({ ...values, user_id: user.id })
@@ -215,6 +216,7 @@ export function useBudgets(
 
   const updateBudget = async (id: string, values: Partial<Budget>) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to edit this budget.' }
     const { error } = await supabase
       .from('budgets')
       .update(values)
@@ -226,6 +228,7 @@ export function useBudgets(
 
   const deleteBudget = async (id: string) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to remove this budget.' }
     const { error } = await supabase
       .from('budgets')
       .delete()

@@ -52,6 +52,7 @@ export function useCategories() {
     values: Omit<Category, 'id' | 'user_id' | 'is_default' | 'created_at' | 'updated_at'>
   ) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to add a category.' }
     const { error } = await supabase
       .from('categories')
       .insert({ ...values, user_id: user.id, is_default: false, sort_order: categories.length })
@@ -61,6 +62,7 @@ export function useCategories() {
 
   const updateCategory = async (id: string, values: Partial<Category>) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to edit this category.' }
     const { error } = await supabase.from('categories').update(values).eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
@@ -68,6 +70,7 @@ export function useCategories() {
 
   const deleteCategory = async (id: string) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to remove this category.' }
     const { error } = await supabase.from('categories').delete().eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }

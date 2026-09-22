@@ -61,6 +61,7 @@ export function useAccounts() {
 
   const createAccount = async (values: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to add an account.' }
     const { error } = await supabase.from('accounts').insert({
       sort_order: accounts.length,
       ...values,
@@ -72,6 +73,7 @@ export function useAccounts() {
 
   const updateAccount = async (id: string, values: Partial<Account>) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to edit this account.' }
     const { error } = await supabase.from('accounts').update(values).eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
@@ -79,6 +81,7 @@ export function useAccounts() {
 
   const updateAccountWithAdjustment = async (id: string, values: Partial<Account>, oldBalance: number) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to edit this account.' }
     const newBalance = values.balance ?? oldBalance
 
     // Update account fields; if balance changed, omit it — the transaction trigger handles it
@@ -112,6 +115,7 @@ export function useAccounts() {
 
   const deleteAccount = async (id: string) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to remove this account.' }
     const targetAccount = accounts.find((account) => account.id === id)
 
     if (targetAccount?.type !== 'loan') {

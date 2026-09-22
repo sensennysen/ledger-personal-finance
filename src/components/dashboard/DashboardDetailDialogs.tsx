@@ -1,3 +1,5 @@
+import type { LucideIcon } from 'lucide-react'
+import { PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { EXPENSE, INCOME } from '@/constants/colors'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { getAccountNetWorthContribution } from '@/lib/creditCards'
@@ -7,6 +9,7 @@ import type { Account, Transaction } from '@/types'
 import { DialogHeader } from '@/components/ui/dialog'
 import { DetailSurface as Dialog, DetailContent as DialogContent, DetailTitle as DialogTitle } from './DashboardDetailSurface'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { EmptyState } from '@/components/ui/empty-state'
 import { DashboardSummaryValueRow } from '@/components/dashboard/DashboardSummaryValueRow'
 import { DashboardTransactionRow } from '@/components/dashboard/DashboardTransactionRow'
 
@@ -28,6 +31,7 @@ function TransactionListDialog({
   open,
   onOpenChange,
   title,
+  emptyIcon,
   emptyMessage,
   totalLabel,
   totalValue,
@@ -38,6 +42,7 @@ function TransactionListDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
+  emptyIcon: LucideIcon
   emptyMessage: string
   totalLabel: string
   totalValue: number
@@ -72,7 +77,7 @@ function TransactionListDialog({
               />
             ))}
             {transactions.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">{emptyMessage}</p>
+              <EmptyState icon={emptyIcon} title={emptyMessage} bare />
             )}
           </div>
         </ScrollArea>
@@ -135,7 +140,7 @@ export function DashboardDetailDialogs({
                   </div>
                 )
               })}
-              {accounts.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No accounts yet</p>}
+              {accounts.length === 0 && <EmptyState icon={Wallet} title="No accounts yet" bare />}
             </div>
           </ScrollArea>
           {accounts.length > 0 && (
@@ -167,6 +172,7 @@ export function DashboardDetailDialogs({
         open={detailView === 'income'}
         onOpenChange={(open) => !open && setDetailView(null)}
         title={`Income - ${monthLabel}`}
+        emptyIcon={TrendingUp}
         emptyMessage="No income this month"
         totalLabel="Total Income"
         totalValue={stats.income}
@@ -179,6 +185,7 @@ export function DashboardDetailDialogs({
         open={detailView === 'expenses'}
         onOpenChange={(open) => !open && setDetailView(null)}
         title={`Expenses - ${monthLabel}`}
+        emptyIcon={TrendingDown}
         emptyMessage="No expenses this month"
         totalLabel="Total Expenses"
         totalValue={stats.expenses}
@@ -230,7 +237,7 @@ export function DashboardDetailDialogs({
                 )
               })}
               {expenseCategoryDetails.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-8">No expenses this month</p>
+                <EmptyState icon={PieChart} title="No expenses this month" bare />
               )}
             </div>
           </ScrollArea>

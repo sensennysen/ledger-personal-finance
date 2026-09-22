@@ -44,6 +44,7 @@ import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { InlineLoadError } from '@/components/ui/error-state'
+import { EmptyState } from '@/components/ui/empty-state'
 import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import { OverspendingCard } from '@/components/reports/OverspendingCard'
@@ -406,7 +407,7 @@ export default function ReportsPage() {
     if (accError) void refetchAccounts()
   }
 
-  const { startDay, selectedMonth } = useCycle()
+  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
   const [activeTab, setActiveTab] = useState('overview')
   const { start, end, label: rangeLabel, filenameLabel } = useMemo(
     () => getReportRange(selectedMonth, startDay),
@@ -421,6 +422,12 @@ export default function ReportsPage() {
       return true
     })
   }, [transactions, start, end])
+
+  const goToPreviousPeriod = () => {
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const date = new Date(year, month - 2, 1)
+    setSelectedMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`)
+  }
 
   const categoryById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -759,7 +766,7 @@ export default function ReportsPage() {
               {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
             </div>
           ) : categoryBreakdown.length === 0 ? (
-            <p className="text-[0.8125rem] text-muted-foreground text-center py-4">No expenses in this period</p>
+            <EmptyState icon={TrendingDown} title="No expenses in this period" bare />
           ) : (
             <ScrollArea className="max-h-56">
               <div className="flex flex-col gap-2 pr-3">
@@ -776,7 +783,7 @@ export default function ReportsPage() {
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all duration-500"
+                        className="h-full rounded-full transition-all duration-(--dur-meter)"
                         style={{
                           width: `${(cat.amount / maxCategoryAmount) * 100}%`,
                           background: cat.color,
@@ -816,11 +823,19 @@ export default function ReportsPage() {
               </div>
             ))}
           </div>
+        ) : transactions.length === 0 ? (
+          <EmptyState icon={FileBarChart2} title="Nothing recorded yet" bare />
         ) : sortedTransactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
-            <FileBarChart2 className="w-8 h-8 opacity-30" />
-            <p className="text-[0.8125rem]">No transactions in this period</p>
-          </div>
+          <EmptyState
+            icon={FileBarChart2}
+            title={`No transactions in ${rangeLabel}`}
+            bare
+            action={
+              <Button variant="outline" size="sm" onClick={goToPreviousPeriod}>
+                Try previous period
+              </Button>
+            }
+          />
         ) : (
           <ScrollArea className="max-h-120">
             <table className="w-full text-[0.8125rem]">
@@ -969,7 +984,7 @@ export default function ReportsPage() {
                 {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-8 rounded-lg bg-muted animate-pulse" />)}
               </div>
             ) : merchantBreakdown.length === 0 ? (
-              <p className="text-[0.8125rem] text-muted-foreground text-center py-6">No expense transactions in this period</p>
+              <EmptyState icon={Store} title="No expense transactions in this period" bare />
             ) : (
               <div className="flex flex-col gap-2.5">
                 {merchantBreakdown.map((merchant, i) => (
@@ -986,7 +1001,7 @@ export default function ReportsPage() {
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all duration-500"
+                        className="h-full rounded-full transition-all duration-(--dur-meter)"
                         style={{
                           width: `${(merchant.amount / merchantBreakdown[0].amount) * 100}%`,
                           background: EXPENSE,

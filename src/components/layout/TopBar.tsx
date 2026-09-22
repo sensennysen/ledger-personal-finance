@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   FileBarChart2,
   LayoutDashboard,
+  Lock,
   Moon,
   Search,
   Settings,
@@ -20,6 +21,7 @@ import {
   NAV_TABS,
   SETTINGS_DESTINATION,
   isDestinationActive,
+  isLocked,
   type NavIconKey,
 } from '@/lib/navDestinations'
 
@@ -39,12 +41,14 @@ export function TopBar({
   onSearch,
   mobileTitle,
   mobileStatus,
+  setupComplete = true,
 }: {
   avatar: ReactNode
   onAvatarClick: () => void
   onSearch: () => void
   mobileTitle: string
   mobileStatus: string
+  setupComplete?: boolean
 }) {
   const { pathname } = useLocation()
   const tabStrip = useRef<HTMLDivElement>(null)
@@ -73,7 +77,8 @@ export function TopBar({
       </NavLink>
       <nav aria-label="Main navigation" className="flex items-center gap-1">
         {NAV_TABS.map((tab) => {
-          const Icon = ICONS[tab.icon]
+          const locked = isLocked(tab, setupComplete)
+          const Icon = locked ? Lock : ICONS[tab.icon]
           const active = isDestinationActive(pathname, tab)
           return (
             <NavLink
@@ -81,12 +86,14 @@ export function TopBar({
               to={tab.to}
               end={tab.exact}
               aria-current={active ? 'page' : undefined}
-              title={tab.label}
+              title={locked ? `${tab.label} (finish setup to unlock)` : tab.label}
               className={cn(
                 'flex h-10 items-center gap-2 rounded-full px-3 lg:px-4 text-[0.8125rem] font-medium transition-colors press-scale',
-                active
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-white/4',
+                locked
+                  ? 'text-muted-foreground hover:text-foreground hover:bg-white/4'
+                  : active
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/4',
               )}
             >
               <Icon className="size-4 shrink-0" />
@@ -133,7 +140,7 @@ export function TopBar({
           type="button"
           aria-label="Open account menu"
           onClick={onAvatarClick}
-          className="rounded-full focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-full focus-visible:ring-3 focus-visible:ring-ring"
         >
           {avatar}
         </button>
@@ -167,7 +174,7 @@ export function TopBar({
             type="button"
             aria-label="Open account menu"
             onClick={onAvatarClick}
-            className="rounded-full focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-full focus-visible:ring-3 focus-visible:ring-ring"
           >
             {avatar}
           </button>

@@ -189,7 +189,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
                     <div key={deadline.dueDate} className="border-b pb-2 last:border-0 last:pb-0">
                       <button
                         type="button"
-                        className="flex w-full items-center justify-between gap-3 rounded-md py-1 text-left outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex w-full items-center justify-between gap-3 rounded-md py-1 text-left outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
                         aria-expanded={isExpanded}
                         aria-controls={breakdownId}
                         aria-label={`${isExpanded ? 'Hide' : 'Show'} payment breakdown for ${formatDate(deadline.dueDate)}`}

@@ -259,7 +259,7 @@ function LayoutShell() {
             aria-hidden={fabHidden}
             tabIndex={fabHidden ? -1 : 0}
             className={cn(
-              'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-200',
+              'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-(--dur-base)',
               fabHidden && 'opacity-0 pointer-events-none',
             )}
           >

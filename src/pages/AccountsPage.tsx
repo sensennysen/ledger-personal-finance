@@ -209,12 +209,12 @@ export default function AccountsPage() {
         }}
         ref={flatRearrange ? setAccountCardRef(account.id) : undefined}
         className={cn(
-          'reorder-motion relative overflow-hidden cursor-pointer hover:shadow-md transition-shadow animate-fade-up hover-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'reorder-motion relative overflow-hidden cursor-pointer hover:shadow-md transition-shadow animate-fade-up hover-lift focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
           flatRearrange && 'cursor-grab',
           draggedAccountId === account.id && 'is-dragging',
           dropTargetAccountId === account.id && 'is-drop-target'
         )}
-        style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties}
+        style={{ '--anim-delay': `${Math.min(idx * 60, 240)}ms` } as React.CSSProperties}
         onClick={() => {
           if (!flatRearrange) navigate(`/accounts/${account.id}`)
         }}

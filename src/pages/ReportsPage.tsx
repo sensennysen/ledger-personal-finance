@@ -783,7 +783,7 @@ export default function ReportsPage() {
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all duration-500"
+                        className="h-full rounded-full transition-all duration-(--dur-meter)"
                         style={{
                           width: `${(cat.amount / maxCategoryAmount) * 100}%`,
                           background: cat.color,
@@ -1001,7 +1001,7 @@ export default function ReportsPage() {
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all duration-500"
+                        className="h-full rounded-full transition-all duration-(--dur-meter)"
                         style={{
                           width: `${(merchant.amount / merchantBreakdown[0].amount) * 100}%`,
                           background: EXPENSE,

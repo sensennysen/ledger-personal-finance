@@ -579,7 +579,7 @@ export default function CategoriesPage() {
           draggedCategoryId === cat.id && 'is-dragging',
           dropTargetCategoryId === cat.id && 'is-drop-target'
         )}
-        style={{ '--anim-delay': `${Math.min(idx * 50, 400)}ms` } as React.CSSProperties}
+        style={{ '--anim-delay': `${Math.min(idx * 50, 200)}ms` } as React.CSSProperties}
       >
         <div className="flex items-center justify-between gap-2 p-3 hover:bg-accent/50 transition-colors">
           <button

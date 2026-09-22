@@ -95,7 +95,7 @@ async function discardReceipt(item: QueueItem): Promise<void> {
  * changed are flagged 'conflict'; both are retained for user review and skipped.
  * Returns the number of successfully synced items.
  */
-export async function drainQueue(): Promise<number> {
+export async function drainQueue(onProgress?: (done: number, total: number) => void): Promise<number> {
   const stored = readQueue()
   const queue = markExpired(stored, Date.now())
   if (queue.length === 0) return 0
@@ -114,7 +114,7 @@ export async function drainQueue(): Promise<number> {
   const updatedRows = new Set<string>()
   let synced = 0
 
-  for (const item of fresh) {
+  for (const [index, item] of fresh.entries()) {
     try {
       let skipInsert = false
 
@@ -207,6 +207,8 @@ export async function drainQueue(): Promise<number> {
     } catch {
       // Unexpected error for this item — keep it in the queue for the next retry
       remaining.push(item)
+    } finally {
+      onProgress?.(index + 1, fresh.length)
     }
   }
 

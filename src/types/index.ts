@@ -122,6 +122,8 @@ export interface Transaction {
   to_account?: Account
   category?: Category
   subcategory?: Subcategory
+  /** Client-only: set on optimistic rows queued while offline, cleared on the next successful fetch. */
+  queued?: boolean
 }
 
 export interface BudgetHistoryEntry {

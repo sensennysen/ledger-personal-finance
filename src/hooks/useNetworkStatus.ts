@@ -7,6 +7,8 @@ interface NetworkStatus {
   pendingCount: number
   /** Conflicted or expired items awaiting the user's keep-mine / keep-theirs decision */
   flaggedCount: number
+  /** How many of this drain's items have been attempted so far, and the drain's total. Null when not syncing. */
+  syncProgress: { done: number; total: number } | null
   /** Manually trigger a sync attempt */
   syncNow: () => Promise<void>
   /** Re-read the pending count from storage */
@@ -24,6 +26,7 @@ export function useNetworkStatus(): NetworkStatus {
   const [isSyncing, setIsSyncing] = useState(false)
   const [count, setCount] = useState(() => pendingCount())
   const [flagged, setFlagged] = useState(() => flaggedCount())
+  const [syncProgress, setSyncProgress] = useState<{ done: number; total: number } | null>(null)
 
   const refreshCount = useCallback(() => {
     setCount(pendingCount())
@@ -35,8 +38,9 @@ export function useNetworkStatus(): NetworkStatus {
     const current = pendingCount()
     if (current === 0) return
     setIsSyncing(true)
+    setSyncProgress({ done: 0, total: current })
     try {
-      await drainQueue()
+      await drainQueue((done, total) => setSyncProgress({ done, total }))
       notifySyncListeners()
     } catch {
       // drainQueue itself failed — count will be refreshed in finally
@@ -44,6 +48,7 @@ export function useNetworkStatus(): NetworkStatus {
       // Always refresh the displayed count, even if the drain partially failed
       refreshCount()
       setIsSyncing(false)
+      setSyncProgress(null)
     }
   }, [isSyncing, refreshCount])
 
@@ -77,7 +82,7 @@ export function useNetworkStatus(): NetworkStatus {
     }
   }, [syncNow])
 
-  return { isOnline, isSyncing, pendingCount: count, flaggedCount: flagged, syncNow, refreshCount, resolve }
+  return { isOnline, isSyncing, pendingCount: count, flaggedCount: flagged, syncProgress, syncNow, refreshCount, resolve }
 }
 
 // ---------------------------------------------------------------------------

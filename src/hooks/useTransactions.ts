@@ -136,14 +136,17 @@ export function useTransactions(filters: TransactionFilters = {}) {
       const now = new Date().toISOString()
       const cachedAccounts = readCache<Account[]>(`${user.id}:accounts`) ?? []
       const cachedCategories = readCache<Category[]>(`${user.id}:categories`) ?? []
-      const optimistic = buildOptimisticTransaction({
-        values,
-        userId: user.id,
-        now,
-        id: crypto.randomUUID(),
-        accounts: cachedAccounts,
-        categories: cachedCategories,
-      })
+      const optimistic: Transaction = {
+        ...buildOptimisticTransaction({
+          values,
+          userId: user.id,
+          now,
+          id: crypto.randomUUID(),
+          accounts: cachedAccounts,
+          categories: cachedCategories,
+        }),
+        queued: true,
+      }
 
       if (txMatchesFilters(optimistic, filters)) {
         updateTransactionCache(limitTransactions([optimistic, ...transactions], filters.limit))
@@ -166,7 +169,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (!navigator.onLine) {
       const existing = transactions.find((t) => t.id === id)
       if (existing) {
-        const merged: Transaction = { ...existing, ...values, updated_at: new Date().toISOString() }
+        const merged: Transaction = { ...existing, ...values, updated_at: new Date().toISOString(), queued: true }
         updateTransactionCache(transactions.map((t) => (t.id === id ? merged : t)))
 
         // Reverse old effect, apply new effect
@@ -232,7 +235,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (!navigator.onLine) {
       updateTransactionCache(transactions.map((t) =>
         ids.includes(t.id)
-          ? { ...t, category_id: categoryId, updated_at: new Date().toISOString() }
+          ? { ...t, category_id: categoryId, updated_at: new Date().toISOString(), queued: true }
           : t
       ))
       ids.forEach((id) => {

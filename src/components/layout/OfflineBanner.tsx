@@ -8,7 +8,7 @@ export function OfflineBanner({
   status: ReturnType<typeof useNetworkStatus>
   onReview: () => void
 }) {
-  const { isOnline, isSyncing, pendingCount, flaggedCount } = status
+  const { isOnline, isSyncing, pendingCount, flaggedCount, syncProgress, syncNow } = status
 
   if (isOnline && pendingCount === 0 && flaggedCount === 0) return null
 
@@ -16,7 +16,7 @@ export function OfflineBanner({
     return (
       <div
         role="alert"
-        className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-[0.6875rem] font-medium tracking-wide"
+        className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium"
         style={{ background: 'var(--expense-container)', color: 'var(--expense)' }}
       >
         <AlertTriangle className="size-4 shrink-0" />
@@ -33,7 +33,7 @@ export function OfflineBanner({
     <div
       role="status"
       aria-live="polite"
-      className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-[0.6875rem] font-medium tracking-wide"
+      className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium"
       style={{
         background: isOnline ? 'var(--primary)' : 'var(--expense-container)',
         color: isOnline ? 'var(--primary-foreground)' : 'var(--expense)',
@@ -55,14 +55,17 @@ export function OfflineBanner({
               borderTopColor: 'transparent',
             }}
           />
-          Syncing {pendingCount} pending change{pendingCount !== 1 ? 's' : ''}…
+          Syncing {syncProgress?.done ?? 0} of {syncProgress?.total ?? pendingCount} change
+          {(syncProgress?.total ?? pendingCount) !== 1 ? 's' : ''}…
         </>
       )}
       {isOnline && !isSyncing && pendingCount > 0 && (
         <>
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-current opacity-80" />
-          {pendingCount} change{pendingCount !== 1 ? 's' : ''} queued —
-          reconnecting…
+          {pendingCount} change{pendingCount !== 1 ? 's' : ''} queued
+          <button type="button" onClick={() => void syncNow()} className="underline underline-offset-2 font-semibold">
+            Sync now
+          </button>
         </>
       )}
     </div>

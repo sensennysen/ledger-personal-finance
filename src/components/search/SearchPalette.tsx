@@ -138,7 +138,11 @@ function SearchBody({
 
   const go = (path: string) => {
     close()
-    navigate(path)
+    // On mobile the palette itself is a pushed history entry (see
+    // useBackClosesSearch); replace it with the destination instead of
+    // pushing on top of it, or back from the destination would land on a
+    // phantom search entry before reaching the real previous page.
+    navigate(path, { replace: mobile })
   }
   const runAction = (kind: TransactionKind) => {
     close()
@@ -208,6 +212,7 @@ function SearchBody({
             <button
               type="button"
               aria-label="Clear search"
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => setQuery('')}
               className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
             >

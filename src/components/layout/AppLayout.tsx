@@ -23,6 +23,9 @@ import { InlineLoadError } from '@/components/ui/error-state'
 import { authErrorActionLabel } from '@/lib/authErrors'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useAccounts } from '@/hooks/useAccounts'
+import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
+import { isSetupComplete } from '@/lib/firstRunChecklist'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import {
   Dialog,
@@ -66,7 +69,14 @@ function LayoutShell() {
   const desktop = useMediaQuery('(min-width: 1024px)')
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
-  const { generateDueRecurring, createTransaction } = useTransactions()
+  const { transactions, generateDueRecurring, createTransaction } = useTransactions()
+  const { accounts } = useAccounts()
+  const { cycleConfirmed } = useFirstRunChecklist()
+  const setupComplete = isSetupComplete({
+    hasAccount: accounts.length > 0,
+    hasTransaction: transactions.length > 0,
+    cycleConfirmed,
+  })
   const hasGenerated = useRef(false)
   const [sheet, setSheet] = useState<'add' | 'account' | 'detail' | null>(null)
   const [transactionKind, setTransactionKind] =
@@ -169,6 +179,7 @@ function LayoutShell() {
           avatar={avatar}
           onAvatarClick={() => setSheet('account')}
           onSearch={() => setSearchOpen(true)}
+          setupComplete={setupComplete}
           mobileTitle={
             location.pathname === '/'
               ? 'Good day, ' + (profile?.full_name?.split(' ')[0] ?? 'there')
@@ -251,7 +262,7 @@ function LayoutShell() {
           </aside>
         )}
         </div>
-        <BottomNav />
+        <BottomNav setupComplete={setupComplete} />
         {mobile && !sheet && location.pathname !== '/settings' && (
           <button
             aria-label="Add transaction"

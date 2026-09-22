@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Layers3, MoreVertical, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CloudOff, Layers3, MoreVertical, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react'
 import { LoanPurchaseForm } from '@/components/accounts/LoanPurchaseForm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { FormError } from '@/components/ui/form-error'
 import { resolveLoadState } from '@/lib/loadState'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -15,6 +16,27 @@ import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
 import type { Account, LoanPurchase } from '@/types'
+
+/**
+ * Local, listener-only connectivity flag for UI gating. Deliberately not
+ * useNetworkStatus(): that hook also drives the offline-queue drain on
+ * reconnect and isn't a singleton, so a second instance here would race
+ * AppLayout's and could double-submit queued writes.
+ */
+function useIsOnline() {
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
+  useEffect(() => {
+    const on = () => setIsOnline(true)
+    const off = () => setIsOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+    }
+  }, [])
+  return isOnline
+}
 
 interface LoanPurchaseTrackerProps {
   account: Account
@@ -32,6 +54,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
   const [deadlinePage, setDeadlinePage] = useState(0)
   const [expandedDeadline, setExpandedDeadline] = useState<string | null>(null)
   const { categories } = useCategories()
+  const isOnline = useIsOnline()
   const internalLoanData = useLoanPurchases(account.id, !loanData)
   const { purchases, allocations, deadlines, loading, error, refetch, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
   const loadState = resolveLoadState({ loading, error, hasData: purchases.length > 0 })
@@ -57,12 +80,19 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
           <h2 id="financed-purchases-title" className="text-base font-semibold">Financed Purchases</h2>
           <p className="text-xs text-muted-foreground">Each purchase keeps its own term while shared deadlines are totaled.</p>
         </div>
-        <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
+        <Button size="sm" className="gap-1.5" disabled={!isOnline} onClick={() => setCreateOpen(true)}>
           <Plus className="h-3.5 w-3.5" />Add Purchase
         </Button>
       </div>
 
-      {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
+      {!isOnline && (
+        <div className="flex items-center gap-3 rounded-lg bg-muted px-3.5 py-3 text-xs text-muted-foreground">
+          <CloudOff className="h-4 w-4 shrink-0" />
+          Financed purchases need a connection — they can't be queued.
+        </div>
+      )}
+
+      {formError && <FormError>{formError}</FormError>}
       {loadState === 'stale-error' && (
         <InlineLoadError message="Couldn't refresh your financed purchases. Showing what was last loaded." onRetry={() => void refetch()} />
       )}
@@ -159,7 +189,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
                     <div key={deadline.dueDate} className="border-b pb-2 last:border-0 last:pb-0">
                       <button
                         type="button"
-                        className="flex w-full items-center justify-between gap-3 rounded-md py-1 text-left outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex w-full items-center justify-between gap-3 rounded-md py-1 text-left outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
                         aria-expanded={isExpanded}
                         aria-controls={breakdownId}
                         aria-label={`${isExpanded ? 'Hide' : 'Show'} payment breakdown for ${formatDate(deadline.dueDate)}`}
@@ -245,7 +275,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setFormError(null) }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Add Financed Purchase</DialogTitle></DialogHeader>
-          {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {loadState !== 'error' && purchases.length === 0 && getLoanAmountOwed(account) > 0 && (
             <p className="rounded-lg border border-yellow-400/60 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
               This account already has {formatCurrency(getLoanAmountOwed(account), account.currency)} of unitemized opening debt. A financed purchase will be added on top; set the account’s loan amount to 0 first if this purchase represents that same debt.
@@ -270,7 +300,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
       <Dialog open={Boolean(editPurchase)} onOpenChange={(open) => { if (!open) { setEditPurchase(null); setFormError(null) } }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Edit Financed Purchase</DialogTitle></DialogHeader>
-          {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {editPurchase && (
             <LoanPurchaseForm
               accountId={account.id}
@@ -309,7 +339,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
               “{deleteTarget?.name ?? ''}” will be removed from the schedule and its unpaid balance will be removed from the loan. Existing repayment transactions remain in your expense history.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {formError && <p role="alert" className="text-sm text-destructive">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {

@@ -82,7 +82,7 @@ export default function LoginPage() {
           <button
             onClick={signInWithGoogle}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-5 h-12 rounded-full text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-3 px-5 h-12 rounded-full text-sm font-medium transition-all duration-(--dur-base) disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: 'var(--primary)',
               border: '1px solid var(--primary)',

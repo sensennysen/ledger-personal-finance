@@ -5,6 +5,7 @@ import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { FormError } from '@/components/ui/form-error'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
@@ -193,7 +194,7 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
             </span>
           </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <FormError className="mt-0 px-0">{error}</FormError>}
 
           <div className="flex justify-end gap-2 pt-1 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>

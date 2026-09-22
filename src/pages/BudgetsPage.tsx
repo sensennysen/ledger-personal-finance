@@ -24,7 +24,10 @@ import { BUDGET_WARNING_THRESHOLD, DEFAULT_CURRENCY } from '@/constants/accounts
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { EmptyState } from '@/components/ui/empty-state'
+import { InteractiveRow } from '@/components/ui/interactive-row'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { FormError } from '@/components/ui/form-error'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
@@ -591,9 +594,12 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
   const showRollover = budget.rollover_enabled && canRollover(budget.period)
   if (history.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground text-center py-6">
-        No history yet — data appears after the first complete month.
-      </p>
+      <EmptyState
+        icon={History}
+        title="No history yet"
+        description="Data appears after the first complete month."
+        bare
+      />
     )
   }
 
@@ -893,7 +899,7 @@ function SavingsGoalCard({
       <CardContent className="space-y-2">
         <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-500"
+            className="h-full rounded-full transition-all duration-(--dur-meter)"
             style={{
               width: `${pct}%`,
               backgroundColor: goal.is_completed ? 'var(--income)' : goal.color,
@@ -1095,19 +1101,12 @@ export default function BudgetsPage() {
               const hasRollover = rolloverActive && rollover !== 0
 
               return (
-                <Card
+                <InteractiveRow
+                  as={Card}
                   key={budget.id}
-                  role="button"
-                  tabIndex={0}
-                  className="animate-fade-up cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties}
-                  onClick={() => setSelectedBudget(budget)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setSelectedBudget(budget)
-                    }
-                  }}
+                  className="animate-fade-up cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                  style={{ '--anim-delay': `${Math.min(idx * 60, 240)}ms` } as React.CSSProperties}
+                  onActivate={() => setSelectedBudget(budget)}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
@@ -1225,7 +1224,7 @@ export default function BudgetsPage() {
                       View covered transactions
                     </p>
                   </CardContent>
-                </Card>
+                </InteractiveRow>
               )
             })
           )}
@@ -1348,7 +1347,7 @@ export default function BudgetsPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Budget</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           <BudgetForm
             onSubmit={handleCreateBudget}
             onClose={() => { setCreateOpen(false); setFormError(null) }}
@@ -1360,7 +1359,7 @@ export default function BudgetsPage() {
       <Dialog open={!!editBudget} onOpenChange={(o) => { if (!o) { setEditBudget(null); setFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Budget</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {editBudget && (
             <BudgetForm
               defaultValues={editBudget}
@@ -1375,7 +1374,7 @@ export default function BudgetsPage() {
       <Dialog open={createGoalOpen} onOpenChange={setCreateGoalOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Savings Goal</DialogTitle></DialogHeader>
-          {goalFormError && <p className="text-sm text-destructive px-1 -mt-2">{goalFormError}</p>}
+          {goalFormError && <FormError>{goalFormError}</FormError>}
           <GoalForm
             onSubmit={handleCreateGoal}
             onClose={() => { setCreateGoalOpen(false); setGoalFormError(null) }}
@@ -1387,7 +1386,7 @@ export default function BudgetsPage() {
       <Dialog open={!!editGoal} onOpenChange={(o) => { if (!o) { setEditGoal(null); setGoalFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Goal</DialogTitle></DialogHeader>
-          {goalFormError && <p className="text-sm text-destructive px-1 -mt-2">{goalFormError}</p>}
+          {goalFormError && <FormError>{goalFormError}</FormError>}
           {editGoal && (
             <GoalForm
               defaultValues={editGoal}

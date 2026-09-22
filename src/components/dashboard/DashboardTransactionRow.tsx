@@ -1,3 +1,5 @@
+import { InteractiveRow } from '@/components/ui/interactive-row'
+
 interface DashboardTransactionRowProps {
   onClick?: () => void
   icon: React.ReactNode
@@ -19,8 +21,9 @@ export function DashboardTransactionRow({
   rightDetail,
   className = 'hover:bg-white/3',
 }: DashboardTransactionRowProps) {
-  return (
-    <div role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onClick={onClick} onKeyDown={event=>{if(onClick && (event.key==='Enter'||event.key===' ')){event.preventDefault();onClick()}}} className={`grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 transition-colors ${className}`}>
+  const rowClassName = `grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 transition-colors ${className}`
+  const content = (
+    <>
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center text-sm shrink-0"
         style={{ backgroundColor: iconBackgroundColor }}
@@ -35,6 +38,16 @@ export function DashboardTransactionRow({
         <div className="money whitespace-nowrap text-[0.8125rem] font-semibold">{amount}</div>
         {rightDetail}
       </div>
-    </div>
+    </>
+  )
+
+  if (!onClick) {
+    return <div className={rowClassName}>{content}</div>
+  }
+
+  return (
+    <InteractiveRow as="button" onActivate={onClick} className={rowClassName}>
+      {content}
+    </InteractiveRow>
   )
 }

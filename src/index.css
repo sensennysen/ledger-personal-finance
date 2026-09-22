@@ -242,15 +242,12 @@
   top: auto; bottom: 0; left: 0; width: 100%; max-width: none;
   transform: none; translate: none; border-radius: 28px 28px 0 0;
   background: var(--elevated); padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
-  animation: slide-in-bottom 260ms cubic-bezier(.05,.7,.1,1);
+  animation: slide-in-bottom var(--dur-sheet) cubic-bezier(.05,.7,.1,1);
   grid-template-columns: minmax(0, 1fr);
 }
 .m3-bottom-sheet > * { min-width: 0; }
 @media (max-width: 767px) {
   button, a, input, select { touch-action: manipulation; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .m3-bottom-sheet { animation: none; }
 }
 
 /* ── Utility classes ── */
@@ -272,6 +269,16 @@
    MOTION — Page & element entrance animations
    Mobile-first: short, snappy, GPU-accelerated
    ═══════════════════════════════════════════════════════ */
+
+:root {
+  --dur-instant: 100ms;
+  --dur-fast: 160ms;
+  --dur-base: 200ms;
+  --dur-enter: 280ms;
+  --dur-sheet: 260ms;  /* deliberate, keep */
+  --dur-meter: 500ms;  /* deliberate, keep */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 @keyframes page-in {
   from { opacity: 0; transform: translateY(10px); }
@@ -295,32 +302,32 @@
 
 /* Utility classes */
 .animate-page-in {
-  animation: page-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-in var(--dur-enter) var(--ease-out) both;
 }
 
 .animate-fade-up {
-  animation: fade-up 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fade-up 0.42s var(--ease-out) both;
   animation-delay: var(--anim-delay, 0ms);
 }
 
 .animate-scale-in {
-  animation: scale-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: scale-in var(--dur-enter) var(--ease-out) both;
   animation-delay: var(--anim-delay, 0ms);
 }
 
-/* Stagger delay helpers */
+/* Stagger delay helpers — capped at four steps */
 .anim-delay-1 { --anim-delay: 60ms;  }
 .anim-delay-2 { --anim-delay: 120ms; }
 .anim-delay-3 { --anim-delay: 180ms; }
-.anim-delay-4 { --anim-delay: 240ms; }
-.anim-delay-5 { --anim-delay: 300ms; }
-.anim-delay-6 { --anim-delay: 360ms; }
-.anim-delay-7 { --anim-delay: 420ms; }
-.anim-delay-8 { --anim-delay: 480ms; }
+.anim-delay-4,
+.anim-delay-5,
+.anim-delay-6,
+.anim-delay-7,
+.anim-delay-8 { --anim-delay: 240ms; }
 
 /* Touch press / tap feedback */
 .press-scale {
-  transition: transform 100ms ease, opacity 100ms ease;
+  transition: transform var(--dur-instant) ease, opacity var(--dur-instant) ease;
 }
 .press-scale:active {
   transform: scale(0.95);
@@ -332,11 +339,11 @@
   transform-origin: center;
   will-change: transform;
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 180ms ease,
-    opacity 160ms ease,
-    scale 180ms ease;
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    opacity var(--dur-fast) ease,
+    scale var(--dur-fast) ease;
 }
 
 .reorder-motion.is-dragging {
@@ -355,7 +362,7 @@
 }
 
 .reorder-handle {
-  transition: color 140ms ease, transform 140ms ease, background-color 140ms ease;
+  transition: color var(--dur-fast) ease, transform var(--dur-fast) ease, background-color var(--dur-fast) ease;
 }
 
 .reorder-motion:hover .reorder-handle,
@@ -367,7 +374,7 @@
 /* Card hover lift for pointer devices */
 @media (hover: hover) {
   .hover-lift {
-    transition: transform 200ms ease, box-shadow 200ms ease;
+    transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
   }
   .hover-lift:hover {
     transform: translateY(-2px);
@@ -375,12 +382,25 @@
   }
 }
 
-/* Respect reduced motion */
+/* Respect reduced motion — one block, covering every animated utility in
+   play: the four named entrance classes, tw-animate-css's animate-in/out
+   family (dialog, sheet, dropdown, popover, tooltip, select), the
+   Tailwind animate-pulse/animate-spin utilities, and the ~40 unlabeled
+   transition-colors sites. Durations collapse to near-zero rather than
+   `transition: none` so colour/state changes still take effect, just
+   instantly. */
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
   .animate-page-in,
   .animate-fade-up,
   .animate-scale-in,
-  .reorder-motion {
+  .reorder-motion,
+  .m3-bottom-sheet {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;

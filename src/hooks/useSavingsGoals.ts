@@ -80,6 +80,7 @@ export function useSavingsGoals() {
     values: Omit<SavingsGoal, 'id' | 'user_id' | 'created_at' | 'updated_at'>
   ) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to add a savings goal.' }
     const { error } = await supabase.from('savings_goals').insert({ ...values, user_id: user.id })
     if (!error) await fetch()
     return { error: error?.message ?? null }
@@ -87,6 +88,7 @@ export function useSavingsGoals() {
 
   const updateGoal = async (id: string, values: Partial<SavingsGoal>) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to edit this savings goal.' }
     const { error } = await supabase.from('savings_goals').update(values).eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }
@@ -94,6 +96,7 @@ export function useSavingsGoals() {
 
   const deleteGoal = async (id: string) => {
     if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to remove this savings goal.' }
     const { error } = await supabase.from('savings_goals').delete().eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
     return { error: error?.message ?? null }

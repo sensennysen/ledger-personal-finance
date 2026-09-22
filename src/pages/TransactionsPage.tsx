@@ -18,6 +18,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { FormError } from '@/components/ui/form-error'
+import { InteractiveRow } from '@/components/ui/interactive-row'
 import { resolveLoadState } from '@/lib/loadState'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { UndoToast } from '@/components/ui/undo-toast'
@@ -35,7 +37,7 @@ import type { Transaction } from '@/types'
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
-  const { startDay, selectedMonth } = useCycle()
+  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
   const [createOpen, setCreateOpen] = useState(false)
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
@@ -183,9 +185,18 @@ export default function TransactionsPage() {
 
   // ── Filtered / grouped ─────────────────────────────────────
 
+  const cycleRange = useMemo(
+    () => getCustomMonthRange(selectedMonth, startDay),
+    [selectedMonth, startDay]
+  )
+
+  const cycleOnly = useMemo(
+    () => transactions.filter((t) => t.date >= cycleRange.start && t.date <= cycleRange.end),
+    [transactions, cycleRange]
+  )
+
   const filtered = useMemo(() => {
-    const { start, end } = getCustomMonthRange(selectedMonth, startDay)
-    let result = transactions.filter((t) => t.date >= start && t.date <= end)
+    let result = cycleOnly
     if (filterType !== 'all') result = result.filter((t) => t.type === filterType)
     if (search) {
       const q = search.toLowerCase()
@@ -200,7 +211,28 @@ export default function TransactionsPage() {
       result = result.filter((t) => t.tags?.includes(activeTagFilter))
     }
     return result
-  }, [transactions, filterType, search, selectedMonth, startDay, activeTagFilter])
+  }, [cycleOnly, filterType, search, activeTagFilter])
+
+  const cycleDateLabel = useCallback(
+    (value: string) =>
+      new Date(value + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    []
+  )
+
+  const goToAdjacentCycle = useCallback(
+    (delta: number) => {
+      const [year, month] = selectedMonth.split('-').map(Number)
+      const date = new Date(year, month - 1 + delta, 1)
+      setSelectedMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`)
+    },
+    [selectedMonth, setSelectedMonth]
+  )
+
+  const clearActivityFilters = useCallback(() => {
+    setFilterType('all')
+    setSearch('')
+    setActiveTagFilter(null)
+  }, [])
 
   const allTags = useMemo(
     () => [...new Set(transactions.flatMap((t) => t.tags ?? []))],
@@ -378,7 +410,7 @@ export default function TransactionsPage() {
           <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
             <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
               <DialogHeader><DialogTitle>{TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}</DialogTitle></DialogHeader>
-              {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+              {formError && <FormError>{formError}</FormError>}
               <TransactionForm
                 entryKind={transactionKind}
                 defaultValues={templateDefaults}
@@ -472,19 +504,12 @@ export default function TransactionsPage() {
           </button>
           {templatesOpen && <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
             {templates.map((tmpl) => (
-              <div
+              <InteractiveRow
+                as="div"
                 key={tmpl.id}
-                role="button"
-                tabIndex={0}
                 aria-label={`Use ${tmpl.name} template`}
-                className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={() => handleUseTemplate(tmpl.id)}
-                onKeyDown={(event) => {
-                  if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
-                    event.preventDefault()
-                    handleUseTemplate(tmpl.id)
-                  }
-                }}
+                className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                onActivate={() => handleUseTemplate(tmpl.id)}
               >
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-medium truncate max-w-30">{tmpl.name}</span>
@@ -501,7 +526,7 @@ export default function TransactionsPage() {
                 >
                   <X className="w-2.5 h-2.5" />
                 </button>
-              </div>
+              </InteractiveRow>
             ))}
           </div>}
         </div>
@@ -631,11 +656,51 @@ export default function TransactionsPage() {
         <ErrorState title="Couldn't load your transactions" detail={error} onRetry={() => void refetch()} />
       ) : loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+      ) : transactions.length === 0 ? (
+        <EmptyState
+          icon={ArrowLeftRight}
+          title="Nothing recorded yet"
+          action={
+            <>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
+                <Upload className="w-3.5 h-3.5" />Import CSV
+              </Button>
+              <TransactionKindMenu
+                onSelect={(kind) => {
+                  setTemplateDefaults(undefined)
+                  setFormError(null)
+                  setTransactionKind(kind)
+                  setCreateOpen(true)
+                }}
+                trigger={
+                  <Button size="sm" className="gap-2">
+                    <Plus className="w-3.5 h-3.5" />Add transaction
+                  </Button>
+                }
+              />
+            </>
+          }
+        />
+      ) : cycleOnly.length === 0 ? (
+        <EmptyState
+          icon={ArrowLeftRight}
+          title={`No transactions in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
+          action={
+            <Button variant="outline" size="sm" onClick={() => goToAdjacentCycle(-1)}>
+              Try previous cycle
+            </Button>
+          }
+        />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ArrowLeftRight}
-          title="No transactions found"
-          description={search ? 'Try a different search' : 'Add your first transaction'}
+          title={`No ${filterType === 'all' ? 'transactions' : filterType} in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
+          description={`${cycleOnly.length} transaction${cycleOnly.length === 1 ? '' : 's'} this cycle`}
+          action={
+            <Button variant="outline" size="sm" onClick={clearActivityFilters}>
+              Show all {cycleOnly.length}
+            </Button>
+          }
         />
       ) : prefs.txView === 'flat' ? (
         <div className="space-y-1">
@@ -689,7 +754,7 @@ export default function TransactionsPage() {
       <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {editingTx && (
             <TransactionForm
               isEditing

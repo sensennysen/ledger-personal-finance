@@ -47,6 +47,7 @@ import { ColorPicker } from '@/components/ui/color-picker'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { FormError } from '@/components/ui/form-error'
 import { resolveLoadState } from '@/lib/loadState'
 import type { Category, Subcategory } from '@/types'
 
@@ -381,7 +382,7 @@ function SubcategoryPanel({ category }: { category: Category }) {
                     onKeyDown={(e) => { if (e.key === 'Enter') handleEditSave(); if (e.key === 'Escape') setEditSub(null) }}
                     autoFocus
                   />
-                  {editError && <span className="text-xs text-destructive">{editError}</span>}
+                  {editError && <span role="alert" className="text-xs text-destructive">{editError}</span>}
                   <Button size="sm" className="h-7 text-xs px-2" onClick={handleEditSave}>Save</Button>
                   <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditSub(null)}>Cancel</Button>
                 </>
@@ -459,7 +460,7 @@ function SubcategoryPanel({ category }: { category: Category }) {
           <Plus className="w-3 h-3" />{adding ? 'Adding...' : 'Add'}
         </Button>
       </div>
-      {addError && <p className="text-xs text-destructive pl-1">{addError}</p>}
+      {addError && <FormError className="text-xs px-0 pl-1 mt-0">{addError}</FormError>}
     </div>
   )
 }
@@ -699,7 +700,7 @@ export default function CategoriesPage() {
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle>Add Category</DialogTitle></DialogHeader>
-              {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+              {formError && <FormError>{formError}</FormError>}
               <CategoryForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} />
             </DialogContent>
           </Dialog>
@@ -745,7 +746,7 @@ export default function CategoriesPage() {
       <Dialog open={!!editCategory} onOpenChange={(o) => { if (!o) { setEditCategory(null); setFormError(null) } }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Edit Category</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {editCategory && (
             <CategoryForm
               defaultValues={editCategory as Partial<FormValues>}

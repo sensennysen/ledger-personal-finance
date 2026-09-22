@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { FormError } from '@/components/ui/form-error'
 import { resolveLoadState } from '@/lib/loadState'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
@@ -383,7 +384,7 @@ export default function AccountTransactionsPage() {
                 {account?.type === 'loan' ? `Pay ${account.name}` : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}
               </DialogTitle>
             </DialogHeader>
-            {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+            {formError && <FormError>{formError}</FormError>}
             <TransactionForm
               entryKind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
               onSubmit={handleCreate}
@@ -646,7 +647,7 @@ export default function AccountTransactionsPage() {
       <Dialog open={editAccountOpen} onOpenChange={setEditAccountOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {account && (
             <AccountForm
               account={account}
@@ -749,7 +750,7 @@ export default function AccountTransactionsPage() {
       <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {editingTx && (
             <TransactionForm
               isEditing

@@ -1,5 +1,6 @@
 import { ImagePlus, X } from 'lucide-react'
 import { PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
+import { FormError } from '@/components/ui/form-error'
 
 interface TransactionReceiptFieldProps {
   fileInputRef: React.RefObject<HTMLInputElement | null>
@@ -64,7 +65,7 @@ export function TransactionReceiptField({
           Attach receipt image (JPEG, PNG, WebP - max 5 MB)
         </label>
       )}
-      {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+      {uploadError && <FormError className="text-xs px-0 mt-0">{uploadError}</FormError>}
     </div>
   )
 }

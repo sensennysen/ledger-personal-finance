@@ -24,6 +24,7 @@ import { BUDGET_WARNING_THRESHOLD, DEFAULT_CURRENCY } from '@/constants/accounts
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -591,9 +592,12 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
   const showRollover = budget.rollover_enabled && canRollover(budget.period)
   if (history.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground text-center py-6">
-        No history yet — data appears after the first complete month.
-      </p>
+      <EmptyState
+        icon={History}
+        title="No history yet"
+        description="Data appears after the first complete month."
+        bare
+      />
     )
   }
 

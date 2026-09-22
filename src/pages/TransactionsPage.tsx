@@ -35,7 +35,7 @@ import type { Transaction } from '@/types'
 export default function TransactionsPage() {
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
-  const { startDay, selectedMonth } = useCycle()
+  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
   const [createOpen, setCreateOpen] = useState(false)
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
@@ -183,9 +183,18 @@ export default function TransactionsPage() {
 
   // ── Filtered / grouped ─────────────────────────────────────
 
+  const cycleRange = useMemo(
+    () => getCustomMonthRange(selectedMonth, startDay),
+    [selectedMonth, startDay]
+  )
+
+  const cycleOnly = useMemo(
+    () => transactions.filter((t) => t.date >= cycleRange.start && t.date <= cycleRange.end),
+    [transactions, cycleRange]
+  )
+
   const filtered = useMemo(() => {
-    const { start, end } = getCustomMonthRange(selectedMonth, startDay)
-    let result = transactions.filter((t) => t.date >= start && t.date <= end)
+    let result = cycleOnly
     if (filterType !== 'all') result = result.filter((t) => t.type === filterType)
     if (search) {
       const q = search.toLowerCase()
@@ -200,7 +209,28 @@ export default function TransactionsPage() {
       result = result.filter((t) => t.tags?.includes(activeTagFilter))
     }
     return result
-  }, [transactions, filterType, search, selectedMonth, startDay, activeTagFilter])
+  }, [cycleOnly, filterType, search, activeTagFilter])
+
+  const cycleDateLabel = useCallback(
+    (value: string) =>
+      new Date(value + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    []
+  )
+
+  const goToAdjacentCycle = useCallback(
+    (delta: number) => {
+      const [year, month] = selectedMonth.split('-').map(Number)
+      const date = new Date(year, month - 1 + delta, 1)
+      setSelectedMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`)
+    },
+    [selectedMonth, setSelectedMonth]
+  )
+
+  const clearActivityFilters = useCallback(() => {
+    setFilterType('all')
+    setSearch('')
+    setActiveTagFilter(null)
+  }, [])
 
   const allTags = useMemo(
     () => [...new Set(transactions.flatMap((t) => t.tags ?? []))],
@@ -631,11 +661,51 @@ export default function TransactionsPage() {
         <ErrorState title="Couldn't load your transactions" detail={error} onRetry={() => void refetch()} />
       ) : loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+      ) : transactions.length === 0 ? (
+        <EmptyState
+          icon={ArrowLeftRight}
+          title="Nothing recorded yet"
+          action={
+            <>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
+                <Upload className="w-3.5 h-3.5" />Import CSV
+              </Button>
+              <TransactionKindMenu
+                onSelect={(kind) => {
+                  setTemplateDefaults(undefined)
+                  setFormError(null)
+                  setTransactionKind(kind)
+                  setCreateOpen(true)
+                }}
+                trigger={
+                  <Button size="sm" className="gap-2">
+                    <Plus className="w-3.5 h-3.5" />Add transaction
+                  </Button>
+                }
+              />
+            </>
+          }
+        />
+      ) : cycleOnly.length === 0 ? (
+        <EmptyState
+          icon={ArrowLeftRight}
+          title={`No transactions in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
+          action={
+            <Button variant="outline" size="sm" onClick={() => goToAdjacentCycle(-1)}>
+              Try previous cycle
+            </Button>
+          }
+        />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ArrowLeftRight}
-          title="No transactions found"
-          description={search ? 'Try a different search' : 'Add your first transaction'}
+          title={`No ${filterType === 'all' ? 'transactions' : filterType} in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
+          description={`${cycleOnly.length} transaction${cycleOnly.length === 1 ? '' : 's'} this cycle`}
+          action={
+            <Button variant="outline" size="sm" onClick={clearActivityFilters}>
+              Show all {cycleOnly.length}
+            </Button>
+          }
         />
       ) : prefs.txView === 'flat' ? (
         <div className="space-y-1">

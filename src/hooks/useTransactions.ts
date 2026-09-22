@@ -262,9 +262,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (!user) return { error: 'Not authenticated', imported: 0 }
     if (!navigator.onLine) {
       const now = new Date().toISOString()
-      const optimistics = rows.map((values) =>
-        buildOptimisticTransaction({ values, userId: user.id, now, id: crypto.randomUUID() })
-      )
+      const optimistics = rows.map((values) => ({
+        ...buildOptimisticTransaction({ values, userId: user.id, now, id: crypto.randomUUID() }),
+        queued: true,
+      }))
       const filtered = optimistics.filter((tx) => txMatchesFilters(tx, filters))
       if (filtered.length) {
         updateTransactionCache(limitTransactions([...filtered, ...transactions], filters.limit))

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 interface FirstRunState {
   dismissed: boolean
@@ -45,10 +45,12 @@ export function useFirstRunChecklist() {
     return () => _listeners.delete(fn)
   }, [])
 
-  useState(() => {
+  useEffect(() => {
     const unsub = subscribe(() => forceRender((n) => n + 1))
-    return unsub
-  })
+    return () => {
+      unsub()
+    }
+  }, [subscribe])
 
   const dismiss = useCallback(() => {
     _state = { ..._state, dismissed: true }

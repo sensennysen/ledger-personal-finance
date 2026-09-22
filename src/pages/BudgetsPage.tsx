@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { EmptyState } from '@/components/ui/empty-state'
 import { InteractiveRow } from '@/components/ui/interactive-row'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { FormError } from '@/components/ui/form-error'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
@@ -1346,7 +1347,7 @@ export default function BudgetsPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Budget</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           <BudgetForm
             onSubmit={handleCreateBudget}
             onClose={() => { setCreateOpen(false); setFormError(null) }}
@@ -1358,7 +1359,7 @@ export default function BudgetsPage() {
       <Dialog open={!!editBudget} onOpenChange={(o) => { if (!o) { setEditBudget(null); setFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Budget</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {editBudget && (
             <BudgetForm
               defaultValues={editBudget}
@@ -1373,7 +1374,7 @@ export default function BudgetsPage() {
       <Dialog open={createGoalOpen} onOpenChange={setCreateGoalOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Savings Goal</DialogTitle></DialogHeader>
-          {goalFormError && <p className="text-sm text-destructive px-1 -mt-2">{goalFormError}</p>}
+          {goalFormError && <FormError>{goalFormError}</FormError>}
           <GoalForm
             onSubmit={handleCreateGoal}
             onClose={() => { setCreateGoalOpen(false); setGoalFormError(null) }}
@@ -1385,7 +1386,7 @@ export default function BudgetsPage() {
       <Dialog open={!!editGoal} onOpenChange={(o) => { if (!o) { setEditGoal(null); setGoalFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Goal</DialogTitle></DialogHeader>
-          {goalFormError && <p className="text-sm text-destructive px-1 -mt-2">{goalFormError}</p>}
+          {goalFormError && <FormError>{goalFormError}</FormError>}
           {editGoal && (
             <GoalForm
               defaultValues={editGoal}

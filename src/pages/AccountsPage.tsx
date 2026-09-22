@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { FormError } from '@/components/ui/form-error'
 import { resolveLoadState } from '@/lib/loadState'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
@@ -355,7 +356,7 @@ export default function AccountsPage() {
           </DialogTrigger>
           <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
             <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
-            {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+            {formError && <FormError>{formError}</FormError>}
             <AccountForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} defaultValues={{ currency: defaultCurrency }} />
           </DialogContent>
         </Dialog>
@@ -498,7 +499,7 @@ export default function AccountsPage() {
       <Dialog open={!!editAccount} onOpenChange={(o) => { if (!o) { setEditAccount(null); setFormError(null) } }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {editAccount && (
             <AccountForm
               account={editAccount}

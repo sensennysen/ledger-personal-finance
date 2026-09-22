@@ -17,6 +17,7 @@ import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { FormError } from '@/components/ui/form-error'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -242,7 +243,7 @@ export default function SettingsPage() {
               />
               <div className="flex items-center justify-end gap-2">
                 {form.formState.errors.root && (
-                  <span className="text-sm text-destructive">{form.formState.errors.root.message}</span>
+                  <span role="alert" className="text-sm text-destructive">{form.formState.errors.root.message}</span>
                 )}
                 {saved && <span className="text-sm" style={{ color: INCOME }}>Saved!</span>}
                 <Button type="submit" disabled={form.formState.isSubmitting}>
@@ -554,7 +555,7 @@ export default function SettingsPage() {
               </label>
             ))}
           </fieldset>
-          {deficitError && <p role="alert" className="text-sm text-destructive">{deficitError}</p>}
+          {deficitError && <FormError>{deficitError}</FormError>}
           <p className="text-xs text-muted-foreground">
             Separate from each budget's Rollover unused budget toggle, which decides whether a surplus carries. The two work independently.
           </p>
@@ -645,7 +646,7 @@ export default function SettingsPage() {
                 autoComplete="off"
               />
               {deleteError && (
-                <span className="block text-sm text-destructive">{deleteError}</span>
+                <span role="alert" className="block text-sm text-destructive">{deleteError}</span>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

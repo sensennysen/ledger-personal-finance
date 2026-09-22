@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { FormError } from '@/components/ui/form-error'
 import { InteractiveRow } from '@/components/ui/interactive-row'
 import { resolveLoadState } from '@/lib/loadState'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -409,7 +410,7 @@ export default function TransactionsPage() {
           <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
             <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
               <DialogHeader><DialogTitle>{TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}</DialogTitle></DialogHeader>
-              {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+              {formError && <FormError>{formError}</FormError>}
               <TransactionForm
                 entryKind={transactionKind}
                 defaultValues={templateDefaults}
@@ -753,7 +754,7 @@ export default function TransactionsPage() {
       <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          {formError && <FormError>{formError}</FormError>}
           {editingTx && (
             <TransactionForm
               isEditing

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { CalendarCheck, Info, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react'
+import { CalendarCheck, Info, CheckSquare, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/ui/empty-state'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -282,9 +283,11 @@ export default function ThirteenthMonthPage() {
               ))}
             </div>
           ) : transactions.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-              No income transactions found for {year}.
-            </div>
+            <EmptyState
+              icon={TrendingUp}
+              title={`No income transactions found for ${year}`}
+              bare
+            />
           ) : (
             <div className="divide-y divide-border/50">
               {byMonth.map(([key, txs]) => {

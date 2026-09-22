@@ -73,7 +73,7 @@ function StatCard({
       tabIndex={onClick ? 0 : undefined}
       aria-label={onClick ? `View ${title.toLowerCase()} details` : undefined}
       className={cn(
-        'relative overflow-hidden rounded-[20px] border border-border p-5 transition-colors duration-200 group bg-card press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative overflow-hidden rounded-[20px] border border-border p-5 transition-colors duration-(--dur-base) group bg-card press-scale focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
         onClick && 'cursor-pointer select-none',
         className
       )}

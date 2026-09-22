@@ -897,7 +897,7 @@ function SavingsGoalCard({
       <CardContent className="space-y-2">
         <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-500"
+            className="h-full rounded-full transition-all duration-(--dur-meter)"
             style={{
               width: `${pct}%`,
               backgroundColor: goal.is_completed ? 'var(--income)' : goal.color,
@@ -1103,8 +1103,8 @@ export default function BudgetsPage() {
                   key={budget.id}
                   role="button"
                   tabIndex={0}
-                  className="animate-fade-up cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties}
+                  className="animate-fade-up cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                  style={{ '--anim-delay': `${Math.min(idx * 60, 240)}ms` } as React.CSSProperties}
                   onClick={() => setSelectedBudget(budget)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {

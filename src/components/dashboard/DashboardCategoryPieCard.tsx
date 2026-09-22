@@ -28,7 +28,7 @@ export function DashboardCategoryPieCard({
       role="button"
       tabIndex={0}
       aria-label={`View expenses by category for ${monthLabel}`}
-      className="rounded-[20px] border border-border p-4 md:p-5 bg-card cursor-pointer transition-colors duration-200 hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="rounded-[20px] border border-border p-4 md:p-5 bg-card cursor-pointer transition-colors duration-(--dur-base) hover:bg-elevated focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
       style={style}
       onClick={onClick}
       onKeyDown={(event) => {

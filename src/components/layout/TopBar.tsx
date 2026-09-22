@@ -133,7 +133,7 @@ export function TopBar({
           type="button"
           aria-label="Open account menu"
           onClick={onAvatarClick}
-          className="rounded-full focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-full focus-visible:ring-3 focus-visible:ring-ring"
         >
           {avatar}
         </button>
@@ -167,7 +167,7 @@ export function TopBar({
             type="button"
             aria-label="Open account menu"
             onClick={onAvatarClick}
-            className="rounded-full focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-full focus-visible:ring-3 focus-visible:ring-ring"
           >
             {avatar}
           </button>

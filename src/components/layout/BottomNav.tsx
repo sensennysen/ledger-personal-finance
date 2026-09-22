@@ -34,7 +34,7 @@ export default function BottomNav() {
             >
               <span
                 className={cn(
-                  'flex h-8 w-[60px] items-center justify-center rounded-full transition-colors duration-200',
+                  'flex h-8 w-[60px] items-center justify-center rounded-full transition-colors duration-(--dur-base)',
                   isActive &&
                     'bg-sidebar-accent text-sidebar-accent-foreground',
                 )}

@@ -507,7 +507,7 @@ export default function TransactionsPage() {
                 role="button"
                 tabIndex={0}
                 aria-label={`Use ${tmpl.name} template`}
-                className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
                 onClick={() => handleUseTemplate(tmpl.id)}
                 onKeyDown={(event) => {
                   if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {

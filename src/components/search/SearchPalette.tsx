@@ -366,6 +366,14 @@ function SearchBody({
                 <span className="truncate">{account.name}</span>
               </CommandItem>
             ))}
+            {results.accounts.total > results.accounts.items.length && (
+              <CommandItem value="more:accounts" onSelect={() => go('/accounts')}>
+                <span className="text-muted-foreground">
+                  Show all {results.accounts.total} in Accounts
+                </span>
+                <ArrowRight className="ml-auto size-4 text-muted-foreground" />
+              </CommandItem>
+            )}
           </CommandGroup>
         )}
         {showResults && results.categories.total > 0 && (
@@ -380,6 +388,14 @@ function SearchBody({
                 <span className="truncate">{category.name}</span>
               </CommandItem>
             ))}
+            {results.categories.total > results.categories.items.length && (
+              <CommandItem value="more:categories" onSelect={() => go('/categories')}>
+                <span className="text-muted-foreground">
+                  Show all {results.categories.total} in Categories
+                </span>
+                <ArrowRight className="ml-auto size-4 text-muted-foreground" />
+              </CommandItem>
+            )}
           </CommandGroup>
         )}
         {!isEmptyQuery && actions.length > 0 && (

@@ -150,7 +150,7 @@ export const DESTINATIONS: SearchDestination[] = [
   { id: 'categories', label: 'Categories', path: '/categories' },
   { id: 'reports', label: 'Reports', path: '/reports' },
   { id: 'settings', label: 'Settings', path: '/settings' },
-  { id: 'import-csv', label: 'Import CSV', path: '/transactions' },
+  { id: 'import-csv', label: 'Import CSV', path: '/transactions?import=1' },
 ]
 
 export const DUE_SOON_DAYS = 14

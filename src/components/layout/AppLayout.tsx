@@ -270,6 +270,7 @@ function LayoutShell() {
         <SearchPalette
           open={searchOpen}
           onOpenChange={setSearchOpen}
+          mobile={mobile}
           onAddTransaction={openAddTransactionModal}
         />
         <Dialog

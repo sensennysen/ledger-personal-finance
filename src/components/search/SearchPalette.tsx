@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity,
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
+  ArrowLeft,
   ArrowRight,
   BarChart3,
   CalendarClock,
@@ -15,6 +16,7 @@ import {
   Upload,
   Tag,
   Wallet,
+  X,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -54,30 +56,67 @@ interface SearchPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onAddTransaction: (kind: TransactionKind) => void
+  mobile?: boolean
 }
 
 // The body mounts only while the palette is open, so its data hooks do not
 // run (or refetch) until someone searches.
-export function SearchPalette({ open, onOpenChange, onAddTransaction }: SearchPaletteProps) {
+export function SearchPalette({ open, onOpenChange, onAddTransaction, mobile = false }: SearchPaletteProps) {
+  useBackClosesSearch(open && mobile, () => onOpenChange(false))
   return (
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
       title="Search"
       description="Search transactions, accounts, categories and actions"
-      className="sm:max-w-xl"
+      className={cn(
+        mobile
+          ? 'inset-0 h-dvh max-h-none w-screen max-w-none translate-x-0 rounded-none! pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] ring-0 sm:w-screen sm:max-w-none'
+          : 'sm:max-w-xl',
+      )}
     >
-      {open && <SearchBody close={() => onOpenChange(false)} onAddTransaction={onAddTransaction} />}
+      {open && (
+        <SearchBody
+          mobile={mobile}
+          close={() => onOpenChange(false)}
+          onAddTransaction={onAddTransaction}
+        />
+      )}
     </CommandDialog>
   )
+}
+
+// The full-screen view is "pushed": it takes a history entry so the phone's
+// back gesture closes it instead of leaving the page.
+function useBackClosesSearch(active: boolean, close: () => void) {
+  const closeRef = useRef(close)
+  useEffect(() => {
+    closeRef.current = close
+  })
+  useEffect(() => {
+    if (!active) return
+    let popped = false
+    window.history.pushState({ ledgerSearch: true }, '')
+    const onPop = () => {
+      popped = true
+      closeRef.current()
+    }
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      if (!popped && window.history.state?.ledgerSearch) window.history.back()
+    }
+  }, [active])
 }
 
 function SearchBody({
   close,
   onAddTransaction,
+  mobile,
 }: {
   close: () => void
   onAddTransaction: (kind: TransactionKind) => void
+  mobile: boolean
 }) {
   const navigate = useNavigate()
   const openEntry = useEntryDetail()
@@ -125,6 +164,7 @@ function SearchBody({
 
   return (
     <Command
+      className={cn(mobile && 'rounded-none! p-0')}
       shouldFilter={false}
       value={highlighted}
       onValueChange={setHighlighted}
@@ -144,15 +184,48 @@ function SearchBody({
         runAction(action.kind)
       }}
     >
-      <CommandInput
-        autoFocus
-        value={query}
-        onValueChange={(value) => {
-          setQuery(value)
-          setNavigated(false)
-        }}
-        placeholder="Search transactions, accounts, categories — or type a command"
-      />
+      {mobile ? (
+        <div className="flex h-16 shrink-0 items-center gap-2 border-b px-2">
+          <button
+            type="button"
+            aria-label="Close search"
+            onClick={close}
+            className="flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted"
+          >
+            <ArrowLeft className="size-5" />
+          </button>
+          <CommandInput
+            bare
+            autoFocus
+            value={query}
+            onValueChange={(value) => {
+              setQuery(value)
+              setNavigated(false)
+            }}
+            placeholder="Search…"
+          />
+          {query && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setQuery('')}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
+            >
+              <X className="size-[18px]" />
+            </button>
+          )}
+        </div>
+      ) : (
+        <CommandInput
+          autoFocus
+          value={query}
+          onValueChange={(value) => {
+            setQuery(value)
+            setNavigated(false)
+          }}
+          placeholder="Search transactions, accounts, categories — or type a command"
+        />
+      )}
       {!isEmptyQuery && (
         <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-muted-foreground">
           <span>
@@ -175,7 +248,7 @@ function SearchBody({
           <InlineLoadError message={`Search data failed to load: ${error}`} onRetry={refetch} />
         </div>
       )}
-      <CommandList className="max-h-96">
+      <CommandList className={mobile ? 'max-h-none min-h-0 flex-1' : 'max-h-96'}>
         {loadState === 'loading' && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading…</p>
         )}
@@ -192,7 +265,7 @@ function SearchBody({
                   >
                     <Icon className="size-4 text-muted-foreground" />
                     <span>{action.label}</span>
-                    {action.key && <CommandShortcut>{action.key}</CommandShortcut>}
+                    {action.key && !mobile && <CommandShortcut>{action.key}</CommandShortcut>}
                   </CommandItem>
                 )
               })}
@@ -316,17 +389,26 @@ function SearchBody({
                 >
                   <Icon className="size-4 text-muted-foreground" />
                   <span>{action.label}</span>
-                  {action.key && <CommandShortcut>{action.key}</CommandShortcut>}
+                  {action.key && !mobile && <CommandShortcut>{action.key}</CommandShortcut>}
                 </CommandItem>
               )
             })}
           </CommandGroup>
         )}
       </CommandList>
-      <div className="flex flex-wrap items-center gap-x-3 border-t px-3 py-2 text-xs text-muted-foreground">
-        <span>↑↓ navigate</span>
-        <span>↵ open</span>
-        <span>esc close</span>
+      <div
+        className={cn(
+          'flex flex-wrap items-center gap-x-3 border-t px-3 py-2 text-xs text-muted-foreground',
+          mobile && !isAmountQuery && 'hidden',
+        )}
+      >
+        {!mobile && (
+          <>
+            <span>↑↓ navigate</span>
+            <span>↵ open</span>
+            <span>esc close</span>
+          </>
+        )}
         {isAmountQuery && <span className="basis-full sm:basis-auto">Numbers match amounts within ±5%.</span>}
       </div>
     </Command>

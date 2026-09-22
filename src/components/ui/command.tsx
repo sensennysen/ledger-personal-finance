@@ -68,8 +68,24 @@ function CommandDialog({
 
 function CommandInput({
   className,
+  bare = false,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & {
+  // Bare drops the boxed search field, for a host that supplies its own header.
+  bare?: boolean
+}) {
+  if (bare) {
+    return (
+      <CommandPrimitive.Input
+        data-slot="command-input"
+        className={cn(
+          "min-w-0 flex-1 bg-transparent text-base font-medium outline-hidden placeholder:font-normal placeholder:text-muted-foreground",
+          className
+        )}
+        {...props}
+      />
+    )
+  }
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
       <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">

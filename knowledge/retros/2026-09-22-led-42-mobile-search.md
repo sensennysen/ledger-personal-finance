@@ -8,7 +8,7 @@
 - "Pushed": a `useEffect` pushes a history entry while the mobile view is open and closes on `popstate`, so the phone's back gesture dismisses it like a native screen. Verified in the browser preview — opening search then invoking a browser back navigation closes the view and lands back on the page underneath, not on the previous route.
 - Key-hint footer (↑↓ / ↵ / esc) and `CommandShortcut` (E/I/T) badges are hidden on mobile per design note 7 ("no keyboard hints"). The "Numbers match amounts within ±5%" note is kept since it's information, not a key hint.
 - Skipped design details not in the LED-40/41 acceptance line and also absent from desktop: the filter-chip row (All/Transactions/Actions counts), `<mark>` match highlighting, emoji icon tiles, and moving the scope toggle into the group heading.
-- `SearchBody` remounts when the viewport crosses the 768px breakpoint while search is open (query resets). Accepted as a rare edge case.
+- `SearchBody` is not keyed on `mobile`, so crossing the 768px breakpoint while search is open swaps the header/footer shell in place without remounting — query, scope and highlighted state survive.
 
 ## Acceptance
 - Full-screen view pushed from the header search icon: PASS — verified in the browser preview at 375×812 (back arrow, bare input with clear ✕, no key hints, same Record/Jump-to empty state and same grouped results as desktop).
@@ -20,4 +20,8 @@
 ## Backlog
 - iOS keyboard interaction and safe-area insets on a real device — only checked via `env()` classes and desktop browser emulation, not a real phone.
 - Filter-chip row, `<mark>` highlighting, and emoji tiles from the 16a design frame — intentionally out of scope for this ticket; flag if a follow-up ticket should add them.
-- The history-push/back-gesture handling hasn't been tried against react-router's own navigation (e.g. following a "Show all in Activity" link then pressing back).
+
+## Follow-up fixes (code review)
+- The history-push/back-gesture handling wasn't tried against react-router's own navigation. Confirmed: selecting a navigational result called `navigate(path)`, which pushes a new entry before the pushed `ledgerSearch` entry's cleanup runs, leaving a phantom entry that ate the first back-press. Fixed by having `go()` navigate with `{ replace: mobile }` so the destination replaces the search entry instead of stacking on top of it.
+- The mobile clear (✕) button had no `onMouseDown` guard, so tapping it would blur the input and dismiss the on-screen keyboard. Fixed with `onMouseDown={(e) => e.preventDefault()}` to keep focus (and the keyboard) on the input.
+- Still not verified on a real device — both fixes were checked by reading the code and history/state transitions, not by hand on iOS/Android.

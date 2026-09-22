@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, Search, Plus, CreditCard, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Search, Plus, Upload, CreditCard, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
@@ -147,6 +147,11 @@ export default function AccountTransactionsPage() {
     }
     return result
   }, [accountTransactions, filterType, search])
+
+  const clearAccountFilters = useCallback(() => {
+    setFilterType('all')
+    setSearch('')
+  }, [])
 
   const grouped = useMemo(() => {
     const groups: Record<string, Transaction[]> = {}
@@ -681,11 +686,36 @@ export default function AccountTransactionsPage() {
         <ErrorState title="Couldn't load your transactions" detail={txError} onRetry={() => void refetchTransactions()} />
       ) : loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+      ) : accountTransactions.length === 0 ? (
+        <EmptyState
+          icon={ArrowLeftRight}
+          title="Nothing recorded yet"
+          description="Add your first transaction for this account"
+          action={
+            <>
+              <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/transactions?import=1')}>
+                <Upload className="w-3.5 h-3.5" />Import CSV
+              </Button>
+              <Button
+                size="sm"
+                className="gap-2"
+                onClick={() => { setFormError(null); setTransactionKind('expense'); setCreateOpen(true) }}
+              >
+                <Plus className="w-3.5 h-3.5" />Add transaction
+              </Button>
+            </>
+          }
+        />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={ArrowLeftRight}
-          title="No transactions found"
-          description={search || filterType !== 'all' ? 'Try adjusting your filters' : 'Add your first transaction for this account'}
+          title={`No ${filterType === 'all' ? 'transactions' : filterType} matching your filters`}
+          description={`${accountTransactions.length} transaction${accountTransactions.length === 1 ? '' : 's'} on this account`}
+          action={
+            <Button variant="outline" size="sm" onClick={clearAccountFilters}>
+              Show all {accountTransactions.length}
+            </Button>
+          }
         />
       ) : (
         <div className="space-y-4">

@@ -7,6 +7,7 @@ import { ChevronRight, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
+import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
 import { usePreferences, type DateFormat, type NumberLocale, type Preferences } from '@/hooks/usePreferences'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
@@ -70,6 +71,7 @@ export default function SettingsPage() {
   const { user, profile, signOut, deleteAccount, refreshProfile } = useAuth()
   const { theme, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
+  const { confirmCycle } = useFirstRunChecklist()
   const { prefs, set: setPref } = usePreferences()
   const [saved, setSaved] = useState(false)
   const [deficitSaving, setDeficitSaving] = useState(false)
@@ -484,7 +486,10 @@ export default function SettingsPage() {
             <label className="text-sm font-medium w-28">Starts on day</label>
             <Select
               value={String(startDay)}
-              onValueChange={(v) => setStartDay(Number(v))}
+              onValueChange={(v) => {
+                setStartDay(Number(v))
+                confirmCycle()
+              }}
             >
               <SelectTrigger className="w-24">
                 <SelectValue />

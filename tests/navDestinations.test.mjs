@@ -5,6 +5,7 @@ import {
   BOTTOM_NAV_TABS,
   SETTINGS_DESTINATION,
   isDestinationActive,
+  isLocked,
 } from '../src/lib/navDestinations.ts'
 
 const tab = (label) => NAV_TABS.find((t) => t.label === label)
@@ -50,4 +51,21 @@ test('13th Month is a route, not a tab', () => {
 test('settings is reached from row 1, not the tab list', () => {
   assert.equal(isDestinationActive('/settings', SETTINGS_DESTINATION), true)
   assert.ok(NAV_TABS.every((t) => t.to !== '/settings'))
+})
+
+test('Activity, Budgets, Categories and Reports lock until setup is complete', () => {
+  assert.equal(isLocked(tab('Activity'), false), true)
+  assert.equal(isLocked(tab('Budgets'), false), true)
+  assert.equal(isLocked(tab('Categories'), false), true)
+  assert.equal(isLocked(tab('Reports'), false), true)
+})
+
+test('locked destinations unlock once setup is complete', () => {
+  assert.equal(isLocked(tab('Activity'), true), false)
+  assert.equal(isLocked(tab('Reports'), true), false)
+})
+
+test('Home and Accounts never lock, setup complete or not', () => {
+  assert.equal(isLocked(tab('Home'), false), false)
+  assert.equal(isLocked(tab('Accounts'), false), false)
 })

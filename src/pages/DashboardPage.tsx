@@ -36,6 +36,7 @@ import { DashboardRecentTransactionsCard } from '@/components/dashboard/Dashboar
 import { DashboardBudgetProgressCard } from '@/components/dashboard/DashboardBudgetProgressCard'
 import { DashboardUpcomingBillsCard } from '@/components/dashboard/DashboardUpcomingBillsCard'
 import { DashboardCashFlowForecastCard } from '@/components/dashboard/DashboardCashFlowForecastCard'
+import { DashboardFirstRunChecklist } from '@/components/dashboard/DashboardFirstRunChecklist'
 import { getCreditCardSpending } from '@/lib/creditCards'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
 import { PageActions } from '@/components/layout/PageActions'
@@ -295,6 +296,16 @@ export default function DashboardPage() {
           <InlineLoadError
             message="Some of your data didn't load, so totals below may be incomplete."
             onRetry={retryFailedSources}
+          />
+        </div>
+      )}
+
+      {!loading && !loadFailed && (
+        <div className="lg:col-span-2" style={{ order: 0 }}>
+          <DashboardFirstRunChecklist
+            accounts={accounts}
+            transactions={transactions}
+            onAddTransaction={openAddTransactionModal}
           />
         </div>
       )}

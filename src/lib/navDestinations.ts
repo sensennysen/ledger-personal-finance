@@ -34,6 +34,22 @@ export const BOTTOM_NAV_TABS: NavDestination[] = NAV_TABS.filter((tab) =>
   ['/', '/accounts', '/transactions', '/budgets'].includes(tab.to),
 )
 
+// Destinations that can't do anything useful until first-run setup is done
+// (an account, a transaction, a pay cycle). Advisory only — never blocks.
+export const LOCKED_WHEN_SETUP_INCOMPLETE: string[] = [
+  '/transactions',
+  '/budgets',
+  '/categories',
+  '/reports',
+]
+
+export function isLocked(
+  destination: NavDestination,
+  setupComplete: boolean,
+): boolean {
+  return !setupComplete && LOCKED_WHEN_SETUP_INCOMPLETE.includes(destination.to)
+}
+
 export function isDestinationActive(
   pathname: string,
   destination: NavDestination,

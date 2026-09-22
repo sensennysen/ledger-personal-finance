@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { InteractiveRow } from '@/components/ui/interactive-row'
 import { resolveLoadState } from '@/lib/loadState'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { UndoToast } from '@/components/ui/undo-toast'
@@ -502,19 +503,12 @@ export default function TransactionsPage() {
           </button>
           {templatesOpen && <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
             {templates.map((tmpl) => (
-              <div
+              <InteractiveRow
+                as="div"
                 key={tmpl.id}
-                role="button"
-                tabIndex={0}
                 aria-label={`Use ${tmpl.name} template`}
                 className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
-                onClick={() => handleUseTemplate(tmpl.id)}
-                onKeyDown={(event) => {
-                  if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
-                    event.preventDefault()
-                    handleUseTemplate(tmpl.id)
-                  }
-                }}
+                onActivate={() => handleUseTemplate(tmpl.id)}
               >
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-medium truncate max-w-30">{tmpl.name}</span>
@@ -531,7 +525,7 @@ export default function TransactionsPage() {
                 >
                   <X className="w-2.5 h-2.5" />
                 </button>
-              </div>
+              </InteractiveRow>
             ))}
           </div>}
         </div>

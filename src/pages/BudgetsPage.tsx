@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/ui/empty-state'
+import { InteractiveRow } from '@/components/ui/interactive-row'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -1099,19 +1100,12 @@ export default function BudgetsPage() {
               const hasRollover = rolloverActive && rollover !== 0
 
               return (
-                <Card
+                <InteractiveRow
+                  as={Card}
                   key={budget.id}
-                  role="button"
-                  tabIndex={0}
                   className="animate-fade-up cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
                   style={{ '--anim-delay': `${Math.min(idx * 60, 240)}ms` } as React.CSSProperties}
-                  onClick={() => setSelectedBudget(budget)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setSelectedBudget(budget)
-                    }
-                  }}
+                  onActivate={() => setSelectedBudget(budget)}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
@@ -1229,7 +1223,7 @@ export default function BudgetsPage() {
                       View covered transactions
                     </p>
                   </CardContent>
-                </Card>
+                </InteractiveRow>
               )
             })
           )}

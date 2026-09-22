@@ -3,6 +3,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
 import type { DashboardExpenseCategoryBreakdown } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
+import { InteractiveRow } from '@/components/ui/interactive-row'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DASHBOARD_CHART_TOOLTIP_STYLE } from '@/components/dashboard/chartTooltipStyle'
 
@@ -24,19 +25,12 @@ export function DashboardCategoryPieCard({
   style,
 }: DashboardCategoryPieCardProps) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <InteractiveRow
+      as="button"
       aria-label={`View expenses by category for ${monthLabel}`}
-      className="rounded-[20px] border border-border p-4 md:p-5 bg-card cursor-pointer transition-colors duration-(--dur-base) hover:bg-elevated focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+      className="w-full text-left rounded-[20px] border border-border p-4 md:p-5 bg-card cursor-pointer transition-colors duration-(--dur-base) hover:bg-elevated focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
       style={style}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          onClick()
-        }
-      }}
+      onActivate={onClick}
     >
       <DashboardCardHeader
         title="Expenses by Category"
@@ -87,6 +81,6 @@ export function DashboardCategoryPieCard({
           </div>
         </div>
       )}
-    </div>
+    </InteractiveRow>
   )
 }

@@ -36,11 +36,13 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
 export function TopBar({
   avatar,
   onAvatarClick,
+  onSearch,
   mobileTitle,
   mobileStatus,
 }: {
   avatar: ReactNode
   onAvatarClick: () => void
+  onSearch: () => void
   mobileTitle: string
   mobileStatus: string
 }) {
@@ -96,12 +98,15 @@ export function TopBar({
       <div className="flex-1" />
       <button
         type="button"
-        disabled
-        aria-label="Search (coming soon)"
-        className="flex h-10 w-10 lg:w-60 items-center justify-center lg:justify-start gap-2.5 rounded-full border border-border bg-background lg:px-3.5 text-[0.8125rem] text-muted-foreground disabled:cursor-default"
+        onClick={onSearch}
+        aria-label="Search"
+        className="flex h-10 w-10 lg:w-60 items-center justify-center lg:justify-start gap-2.5 rounded-full border border-border bg-background lg:px-3.5 text-[0.8125rem] text-muted-foreground hover:bg-muted"
       >
         <Search className="size-4" />
         <span className="hidden lg:block flex-1 text-left">Search…</span>
+        <kbd className="hidden lg:block rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold">
+          ⌘K
+        </kbd>
       </button>
       <div className="flex items-center gap-1">
         <Button
@@ -145,8 +150,8 @@ export function TopBar({
           <Button
             variant="ghost"
             size="icon"
-            disabled
-            aria-label="Search (coming soon)"
+            onClick={onSearch}
+            aria-label="Search"
           >
             <Search />
           </Button>

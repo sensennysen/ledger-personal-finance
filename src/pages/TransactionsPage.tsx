@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, ArrowLeftRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCycle } from '@/contexts/cycleState'
@@ -54,7 +55,17 @@ export default function TransactionsPage() {
   const [splittingTx, setSplittingTx] = useState<Transaction | null>(null)
 
   // ── Import CSV ────────────────────────────────────────────
-  const [importOpen, setImportOpen] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [importOpen, setImportOpen] = useState(() => searchParams.get('import') === '1')
+  useEffect(() => {
+    if (searchParams.has('import')) {
+      setSearchParams((params) => {
+        params.delete('import')
+        return params
+      }, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Templates ─────────────────────────────────────────────
   const { templates, addTemplate, removeTemplate } = useTransactionTemplates()

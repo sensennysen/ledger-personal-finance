@@ -74,6 +74,7 @@ import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
 import { buildCategoryBreakdown, rollupBreakdown, type CategorySlice } from '@/lib/categoryBreakdown'
 import { CategoryBreakdownCard } from '@/components/reports/CategoryBreakdownCard'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
 
@@ -330,7 +331,7 @@ function IncomeExpenseCard({
         <div className="flex-1 min-h-52 lg:min-h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis
                 dataKey="month"
                 tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
@@ -381,6 +382,7 @@ const SKELETON_WIDTH: Record<ReportColumn, string> = {
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
+  const ink = useCategoryInk()
   const { profile } = useAuth()
   const deficitBehaviour = useDeficitBehaviour()
   const currency = profile?.default_currency ?? 'USD'
@@ -740,7 +742,7 @@ export default function ReportsPage() {
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div
                       className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: acc.color }}
+                      style={{ background: ink(acc.color) }}
                     />
                     <span className="text-[0.8125rem] font-medium truncate">{acc.name}</span>
                     <Badge variant="outline" className="text-[0.625rem] capitalize shrink-0 px-1.5 py-0">
@@ -872,7 +874,7 @@ export default function ReportsPage() {
                               <span className="flex items-center gap-1.5">
                                 <span
                                   className="w-1.5 h-1.5 rounded-full inline-block shrink-0"
-                                  style={{ background: t.category.color }}
+                                  style={{ background: ink(t.category.color) }}
                                 />
                                 {t.category.name}
                               </span>
@@ -943,7 +945,7 @@ export default function ReportsPage() {
               <div className="h-52 md:h-72 xl:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={netWorthData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis
                       dataKey="month"
                       tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}

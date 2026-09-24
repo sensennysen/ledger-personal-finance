@@ -6,6 +6,7 @@ import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
 import { InteractiveRow } from '@/components/ui/interactive-row'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DASHBOARD_CHART_TOOLTIP_STYLE } from '@/components/dashboard/chartTooltipStyle'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 interface DashboardCategoryPieCardProps {
   expensesByCategory: DashboardExpenseCategoryBreakdown[]
@@ -24,6 +25,7 @@ export function DashboardCategoryPieCard({
   onClick,
   style,
 }: DashboardCategoryPieCardProps) {
+  const ink = useCategoryInk()
   return (
     <InteractiveRow
       as="button"
@@ -59,7 +61,7 @@ export function DashboardCategoryPieCard({
                   stroke="var(--card)"
                 >
                   {expensesByCategory.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
+                    <Cell key={index} fill={ink(entry.color)} />
                   ))}
                 </Pie>
                 <Tooltip
@@ -75,7 +77,7 @@ export function DashboardCategoryPieCard({
               <div key={index} className="flex items-center gap-2 text-sm">
                 <span className="text-base">{category.icon}</span>
                 <span className="truncate flex-1 text-xs text-muted-foreground">{category.name}</span>
-                <span className="money text-xs font-medium shrink-0" style={{ color: category.color }}>
+                <span className="money text-xs font-medium shrink-0" style={{ color: ink(category.color) }}>
                   {formatCurrency(category.amount, currency)}
                 </span>
               </div>

@@ -325,7 +325,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
 
         {importResult ? (
           <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <div className="w-14 h-14 rounded-full bg-[oklch(0.660_0.150_155/0.15)] flex items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-income-container flex items-center justify-center">
               <FileText className="w-7 h-7 text-income" />
             </div>
             <div>
@@ -444,8 +444,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                 )}
 
                 {conversion.kind !== 'same' && (
-                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-yellow-600/30 bg-yellow-500/10 px-3 py-2 text-sm">
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-yellow-600 dark:text-yellow-400" />
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning-container px-3 py-2 text-sm">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-warning" />
                     <span className="flex-1 min-w-48">
                       Statement is in {statementCurrency}; {selectedAccount?.name} is in {accountCurrency}. Amounts
                       convert at the rate you enter.

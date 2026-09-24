@@ -54,6 +54,7 @@ import { ColorPicker } from '@/components/ui/color-picker'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { Budget, SavingsGoal } from '@/types'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 // --- Budget form ---
 
@@ -958,6 +959,7 @@ function SavingsGoalCard({
   onContribute: () => void
   onToggleComplete: () => void
 }) {
+  const ink = useCategoryInk()
   const [expanded, setExpanded] = useState(false)
   const pace = goalPace({ target: goal.target_amount, saved: goal.current_amount, deadline: goal.deadline })
   const { pct, remaining } = pace
@@ -976,7 +978,7 @@ function SavingsGoalCard({
           <div className="flex items-center gap-2.5">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-              style={{ backgroundColor: goal.color + '22', color: goal.color }}
+              style={{ backgroundColor: ink(goal.color) + '22', color: ink(goal.color) }}
             >
               {goal.icon}
             </div>
@@ -1035,7 +1037,7 @@ function SavingsGoalCard({
             className="h-full rounded-full transition-all duration-(--dur-meter)"
             style={{
               width: `${pct}%`,
-              backgroundColor: goal.is_completed ? 'var(--income)' : goal.color,
+              backgroundColor: goal.is_completed ? 'var(--income)' : ink(goal.color),
             }}
           />
         </div>
@@ -1272,7 +1274,7 @@ export default function BudgetsPage() {
                               <Badge variant="secondary" className="text-xs">{budget.category.name}</Badge>
                             )}
                             {rolloverActive && (
-                              <Badge variant="outline" className="text-xs gap-0.5 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                              <Badge variant="outline" className="text-xs gap-0.5 text-transfer border-transfer/40">
                                 <RefreshCw className="w-2.5 h-2.5" />Rollover
                               </Badge>
                             )}
@@ -1280,7 +1282,7 @@ export default function BudgetsPage() {
                               <Badge variant="destructive" className="text-xs">Over budget</Badge>
                             )}
                             {!over && pct >= BUDGET_WARNING_THRESHOLD && (
-                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700">Warning</Badge>
+                              <Badge variant="outline" className="text-xs text-warning border-warning/40">Warning</Badge>
                             )}
                           </div>
                         </div>

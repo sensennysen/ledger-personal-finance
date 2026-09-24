@@ -14,6 +14,7 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 interface AccountComboboxProps {
   accounts: Account[]
@@ -38,6 +39,7 @@ export function AccountCombobox({
   disabled = false,
   className,
 }: AccountComboboxProps) {
+  const ink = useCategoryInk()
   const { profile } = useAuth()
   const [open, setOpen] = useState(false)
   const selectedAccount = accounts.find((account) => account.id === value)
@@ -76,7 +78,7 @@ export function AccountCombobox({
           {SelectedIcon && (
             <span
               className="flex size-6 shrink-0 items-center justify-center rounded-md"
-              style={{ backgroundColor: `${selectedAccount?.color}18`, color: selectedAccount?.color }}
+              style={{ backgroundColor: `${ink(selectedAccount?.color ?? '')}18`, color: ink(selectedAccount?.color ?? '') }}
             >
               <SelectedIcon className="size-3.5" />
             </span>
@@ -110,7 +112,7 @@ export function AccountCombobox({
                     >
                       <span
                         className="flex size-7 shrink-0 items-center justify-center rounded-md"
-                        style={{ backgroundColor: `${account.color}18`, color: account.color }}
+                        style={{ backgroundColor: `${ink(account.color)}18`, color: ink(account.color) }}
                       >
                         <Icon className="size-3.5" />
                       </span>

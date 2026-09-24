@@ -15,7 +15,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
-import { getItemizationGap, labelAllocationInstallments, splitPurchaseProgress } from '@/lib/loanSummary'
+import { getItemizationGap, labelAllocationInstallments, splitPurchaseProgress, type LoanContext } from '@/lib/loanSummary'
 import { daysUntilDate } from '@/lib/accountsOverview'
 import type { LoanDeadline } from '@/lib/loanInstallments'
 import type { Account, LoanPurchase } from '@/types'
@@ -84,6 +84,16 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
   const installmentLabels = labelAllocationInstallments(purchases, allocations)
   const [nextDeadline, ...laterDeadlines] = deadlines
   const hasImportedProgress = purchases.some((purchase) => purchase.opening_paid_amount > 0)
+  // The loan as it stands without `excluded`, so the form can show what saving it does.
+  const loanContextWithout = (excluded: LoanPurchase | null): LoanContext => {
+    const others = purchases.filter((purchase) => purchase.id !== excluded?.id && (purchase.remaining_balance ?? purchase.total_payable) > 0)
+    return {
+      baseOwed: owed - (excluded?.remaining_balance ?? 0),
+      baseMonthly: others.reduce((sum, purchase) => sum + purchase.monthly_installment, 0),
+      baseCount: others.length,
+      allocatedToThis: excluded ? (excluded.paid_amount ?? 0) - excluded.opening_paid_amount : 0,
+    }
+  }
 
   return (
     <section className="space-y-4" aria-labelledby="financed-purchases-title">
@@ -348,7 +358,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
       )}
 
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setFormError(null) }}>
-        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4 lg:max-w-3xl">
           <DialogHeader><DialogTitle>Add Financed Purchase</DialogTitle></DialogHeader>
           <FormError error={formError} />
           {showReconciliation && gap > 0 && (
@@ -360,6 +370,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
             accountId={account.id}
             currency={account.currency}
             categories={expenseCategories}
+            loanContext={loanContextWithout(null)}
             onClose={() => setCreateOpen(false)}
             onSubmit={async (values) => {
               const result = await createPurchase(values)
@@ -373,7 +384,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
       </Dialog>
 
       <Dialog open={Boolean(editPurchase)} onOpenChange={(open) => { if (!open) { setEditPurchase(null); setFormError(null) } }}>
-        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4 lg:max-w-3xl">
           <DialogHeader><DialogTitle>Edit Financed Purchase</DialogTitle></DialogHeader>
           <FormError error={formError} />
           {editPurchase && (
@@ -382,6 +393,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
               currency={account.currency}
               categories={expenseCategories}
               initialValues={editPurchase}
+              loanContext={loanContextWithout(editPurchase)}
               onClose={() => setEditPurchase(null)}
               onSubmit={async (values) => {
                 const result = await updatePurchase(editPurchase.id, {

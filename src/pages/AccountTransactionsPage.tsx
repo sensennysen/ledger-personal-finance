@@ -1,13 +1,14 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowLeftRight, Search, Plus, Upload, CreditCard, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeftRight, ChevronRight, Search, Plus, Upload, CreditCard, Wallet, Pencil } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
+import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCycle } from '@/contexts/cycleState'
 import { ACCOUNT_TYPE_LABELS } from '@/types'
-import { formatCurrency, formatDate, getCurrentCycleMonthKey, getCustomMonthRange, getLocalDateString } from '@/lib/utils'
+import { formatCurrency, formatDate, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange, getLocalDateString } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 import { formatLoanSchedule, getLoanAmountOwed } from '@/lib/loans'
 import { supabase } from '@/lib/supabase'
@@ -36,18 +37,44 @@ import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { dateSpan, groupByDay, sliceGroups, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
 import { buildMonthNets, monthJumpTarget } from '@/lib/monthJump'
+import { cardAmountDue, loanProgress } from '@/lib/accountsOverview'
+import { buildCategoryBreakdown } from '@/lib/categoryBreakdown'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import type { CreditCardPayment, Transaction } from '@/types'
+
+function bandCell(label: string, value: string, sub?: string) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="money mt-1 truncate text-lg font-semibold">{value}</p>
+      {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
+    </div>
+  )
+}
+
+function formatDueIn(days: number | null) {
+  if (days === null) return ''
+  if (days === 0) return 'today'
+  return `in ${days} day${days === 1 ? '' : 's'}`
+}
+
+/** "Sep 16" for a day-of-month countdown. */
+function dayInDaysLabel(days: number | null) {
+  if (days === null) return 'Not set'
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 export default function AccountTransactionsPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
   const { accounts, error: accountsError, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment } = useAccounts()
+  const { categories } = useCategories()
   const { transactions, loading, error: txError, refetch: refetchTransactions, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
   const loadState = resolveLoadState({ loading, error: txError, hasData: transactions.length > 0 })
@@ -138,16 +165,8 @@ export default function AccountTransactionsPage() {
     [account?.currency, paymentSourceAccounts]
   )
 
-  const loanSummary = useMemo(() => {
-    const totalPayable = loanData.purchases.reduce((sum, purchase) => sum + purchase.total_payable, 0)
-    const totalPaid = loanData.purchases.reduce((sum, purchase) => sum + (purchase.paid_amount ?? 0), 0)
-    return {
-      totalPayable,
-      totalPaid,
-      progress: totalPayable > 0 ? Math.min(100, (totalPaid / totalPayable) * 100) : 0,
-      nextDeadline: loanData.deadlines[0] ?? null,
-    }
-  }, [loanData.deadlines, loanData.purchases])
+  const loanRepayment = loanProgress(loanData.purchases, loanData.allocations)
+  const nextLoanDeadline = loanData.deadlines[0] ?? null
 
   const effectivePaymentFromAccountId = useMemo(() => {
     if (!paymentSourceAccounts.length) return null
@@ -191,7 +210,7 @@ export default function AccountTransactionsPage() {
 
   // Month jump (LED-62). The account has no cycle, so a jump scrolls to the
   // month's first day group, growing the window until that group is rendered.
-  const { startDay } = useCycle()
+  const { startDay, selectedMonth } = useCycle()
   const months = useMemo(
     () => buildMonthNets(accountTransactions, { startDay, currentKey: getCurrentCycleMonthKey(startDay), contextAccountId: accountId }),
     [accountTransactions, startDay, accountId]
@@ -252,6 +271,14 @@ export default function AccountTransactionsPage() {
   }, [accountTransactions, accountId])
 
   const currency = account?.currency ?? profile?.default_currency ?? 'USD'
+  // "Where it went" (LED-98): this cycle's spending from this account, by category.
+  const cycleRange = getCustomMonthRange(selectedMonth, startDay)
+  const cycleLabel = `${formatDateShort(cycleRange.start)} – ${formatDateShort(cycleRange.end)}`
+  const categoryById = new Map(categories.map((category) => [category.id, category]))
+  const cycleBreakdown = buildCategoryBreakdown(
+    accountTransactions.filter((t) => t.type === 'expense' && t.account_id === accountId && t.date >= cycleRange.start && t.date <= cycleRange.end),
+    categoryById,
+  )
   const statementDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.statement_day) : null
   const dueDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.due_day) : null
 
@@ -390,12 +417,14 @@ export default function AccountTransactionsPage() {
 
   return (
     <div className="flex justify-center gap-6 lg:pr-6">
-      <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto min-w-0 flex-1">
+      <div className="p-4 md:p-6 space-y-4 max-w-3xl lg:max-w-6xl mx-auto min-w-0 flex-1">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Link to="/accounts" className="rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring">Accounts</Link>
+          <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+          <span aria-current="page" className="truncate text-foreground">{account?.name ?? 'Account'}</span>
+        </nav>
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" aria-label="Back to accounts" onClick={() => navigate('/accounts')} className="shrink-0">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
           {account ? (
             <div className="flex items-center gap-3 flex-1 min-w-0">
               <div
@@ -410,7 +439,12 @@ export default function AccountTransactionsPage() {
               </div>
             </div>
           ) : (
-            <h1 className="text-xl font-bold">Account Transactions</h1>
+            <h1 className="text-xl font-bold flex-1">Account Transactions</h1>
+          )}
+          {account && (
+            <Button variant="outline" className="hidden gap-2 shrink-0 sm:inline-flex" onClick={() => setEditAccountOpen(true)}>
+              <Pencil className="w-4 h-4" />Edit account
+            </Button>
           )}
           {account?.type === 'loan' ? (
             <Button
@@ -517,134 +551,92 @@ export default function AccountTransactionsPage() {
           <InlineLoadError message="Couldn't load this account's details." onRetry={() => void refetchAccounts()} />
         )}
 
-        {/* Account balance card */}
+        {/* Key figures (LED-98): one ruled band instead of stacked cards */}
         {account && (account.type !== 'loan' || loanSection === 'summary') && (
-          <div
-            className="rounded-xl p-4 text-white"
-            style={{ background: `linear-gradient(135deg, ${account.color}dd, ${account.color}99)` }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm font-medium opacity-80">{account.type === 'loan' ? 'Outstanding Loan' : account.type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</p>
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Account actions" className="h-8 w-8 rounded-full text-white hover:bg-black/15 hover:text-white" />}>
-                  <MoreHorizontal className="w-4 h-4" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setEditAccountOpen(true)}>
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Edit account
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="grid grid-cols-2 lg:grid-cols-4 [&>div]:border-border/60 [&>div]:p-4 [&>div:nth-child(odd)]:border-r [&>div:nth-child(-n+2)]:border-b lg:[&>div]:border-b-0 lg:[&>div:not(:last-child)]:border-r">
+              {account.type === 'credit_card' ? (
+                <>
+                  {bandCell('Current balance', formatCurrency(getCreditCardSpending(account), currency), account.balance < 0 ? 'owed' : 'nothing owed')}
+                  {bandCell(
+                    'Credit limit',
+                    account.credit_limit != null ? formatCurrency(account.credit_limit, currency) : 'Not set',
+                    account.credit_limit ? `${getCreditUtilizationPct(account).toFixed(0)}% used` : 'Add one to track utilisation',
+                  )}
+                  {bandCell('Statement closes', account.statement_day ? dayInDaysLabel(statementDays) : 'Not set', account.statement_day ? formatDueIn(statementDays) : 'No countdown')}
+                  {bandCell('Payment due', account.due_day ? dayInDaysLabel(dueDays) : 'Not set', account.due_day ? formatDueIn(dueDays) : 'No countdown')}
+                </>
+              ) : account.type === 'loan' ? (
+                <>
+                  {bandCell('Outstanding', formatCurrency(getLoanAmountOwed(account), currency), 'owed')}
+                  {bandCell(
+                    'Repaid',
+                    formatCurrency(loanRepayment?.totalPaid ?? 0, currency),
+                    loanRepayment ? `${loanRepayment.paidInstallments} of ${loanRepayment.totalInstallments} installments` : 'No financed purchases',
+                  )}
+                  {bandCell(
+                    'Next payment',
+                    nextLoanDeadline ? formatCurrency(nextLoanDeadline.total, currency) : 'None due',
+                    nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : undefined,
+                  )}
+                  {bandCell('Schedule', formatLoanSchedule(account) ?? 'Per purchase', 'Subtracted from net worth')}
+                </>
+              ) : (
+                <>
+                  {bandCell('Current balance', formatCurrency(account.balance, currency))}
+                  {bandCell('Income', `+${formatCurrency(stats.income, currency)}`)}
+                  {bandCell('Expenses', `−${formatCurrency(stats.expenses, currency)}`)}
+                  {bandCell('Transfers', `−${formatCurrency(stats.transfersSent, currency)}`, `+${formatCurrency(stats.transfersReceived, currency)} received`)}
+                </>
+              )}
             </div>
-            <p className="money text-3xl font-bold mt-1">
-              {formatCurrency(account.type === 'credit_card' ? getCreditCardSpending(account) : account.type === 'loan' ? getLoanAmountOwed(account) : account.balance, account.currency)}
-            </p>
-            {account.type === 'loan' ? (
-              <div className="mt-4 space-y-3">
-                <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-                  <div>
-                    <p className="text-xs opacity-70">Next payment</p>
-                    <p className="font-semibold">
-                      {loanSummary.nextDeadline
-                        ? formatCurrency(loanSummary.nextDeadline.total, currency)
-                        : 'No payment due'}
-                    </p>
-                    {loanSummary.nextDeadline && <p className="text-[0.6875rem] opacity-70">{formatDate(loanSummary.nextDeadline.dueDate)}</p>}
-                  </div>
-                  <div>
-                    <p className="text-xs opacity-70">Repaid</p>
-                    <p className="font-semibold">{formatCurrency(loanSummary.totalPaid, currency)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs opacity-70">Financed purchases</p>
-                    <p className="font-semibold">{loanData.purchases.length}</p>
-                  </div>
+            {account.type === 'credit_card' && account.credit_limit ? (
+              <div className="space-y-1.5 border-t border-border/60 px-4 py-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Utilisation</span>
+                  <span className="money">
+                    {formatCurrency(getCreditCardSpending(account), currency)} of {formatCurrency(account.credit_limit, currency)} · target {account.utilization_target_pct ?? 30}%
+                  </span>
                 </div>
-                <div>
-                  <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="opacity-70">Repayment progress</span>
-                    <span className="font-semibold">{loanSummary.progress.toFixed(0)}%</span>
-                  </div>
-                  <Progress value={loanSummary.progress} className="bg-white/20 [&>div]:bg-white" />
-                </div>
+                <Progress
+                  value={Math.min(getCreditUtilizationPct(account), 100)}
+                  aria-label="Credit utilisation"
+                  className={getCreditUtilizationPct(account) >= (account.utilization_target_pct ?? 30) ? '[&_[data-slot=progress-indicator]]:bg-expense' : '[&_[data-slot=progress-indicator]]:bg-income'}
+                />
               </div>
-            ) : account.type !== 'credit_card' ? (
-              <div className="flex gap-4 mt-3 text-sm opacity-90">
-                <div>
-                  <p className="text-xs opacity-70">Income</p>
-                  <p className="font-semibold">+{formatCurrency(stats.income, currency)}</p>
+            ) : account.type === 'loan' && loanRepayment ? (
+              <div className="space-y-1.5 border-t border-border/60 px-4 py-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Repayment progress</span>
+                  <span className="font-semibold">{loanRepayment.pct.toFixed(0)}%</span>
                 </div>
-                <div>
-                  <p className="text-xs opacity-70">Expenses</p>
-                  <p className="font-semibold">-{formatCurrency(stats.expenses, currency)}</p>
-                </div>
-                <div>
-                  <p className="text-xs opacity-70">Sent</p>
-                  <p className="font-semibold">-{formatCurrency(stats.transfersSent, currency)}</p>
-                </div>
-                <div>
-                  <p className="text-xs opacity-70">Received</p>
-                  <p className="font-semibold">+{formatCurrency(stats.transfersReceived, currency)}</p>
-                </div>
+                <Progress value={loanRepayment.pct} aria-label="Repayment progress" />
               </div>
             ) : null}
+          </div>
+        )}
+
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {account && (
+          <aside className="space-y-4 lg:col-start-2 lg:row-start-1" aria-label="Account summary">
             {account.type === 'credit_card' && (
-              <div className="mt-4 rounded-lg bg-black/15 border border-white/20 p-3 space-y-2.5">
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <p className="opacity-70">Credit Limit</p>
-                    <p className="font-semibold">{formatCurrency(account.credit_limit ?? 0, currency)}</p>
-                  </div>
-                  <div>
-                    <p className="opacity-70">Current Spending</p>
-                    <p className="font-semibold">{formatCurrency(getCreditCardSpending(account), currency)}</p>
-                  </div>
-                  <div>
-                    <p className="opacity-70">Statement Balance</p>
-                    <p className="font-semibold">{formatCurrency(account.statement_balance ?? 0, currency)}</p>
-                  </div>
-                  <div>
-                    <p className="opacity-70">Remaining to Pay</p>
-                    <p className="font-semibold">
-                      {formatCurrency(Math.max((account.statement_balance ?? 0) - (account.statement_paid_amount ?? 0), 0), currency)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="opacity-70">Statement Date</p>
-                    <p className="font-semibold">
-                      {account.statement_day
-                        ? `Day ${account.statement_day}${statementDays !== null ? ` (${statementDays === 0 ? 'today' : `in ${statementDays} ${statementDays === 1 ? 'day' : 'days'}`})` : ''}`
-                        : 'Not set'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="opacity-70">Due Date</p>
-                    <p className="font-semibold">
-                      {account.due_day
-                        ? `Day ${account.due_day}${dueDays !== null ? ` (${dueDays === 0 ? 'today' : `in ${dueDays} ${dueDays === 1 ? 'day' : 'days'}`})` : ''}`
-                        : 'Not set'}
-                    </p>
-                  </div>
+              <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+                <h2 className="text-sm font-semibold">Pay this card</h2>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-muted-foreground">Amount to pay</span>
+                  <span className="money text-lg font-bold">{formatCurrency(cardAmountDue(account), currency)}</span>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <p className="opacity-70">Utilization</p>
-                    <p className="font-semibold">
-                      {getCreditUtilizationPct(account).toFixed(1)}% / target {(account.utilization_target_pct ?? 30)}%
-                    </p>
-                  </div>
-                  <Progress
-                    value={Math.min(getCreditUtilizationPct(account), 100)}
-                    className={getCreditUtilizationPct(account) >= (account.utilization_target_pct ?? 30) ? '[&>div]:bg-expense' : '[&>div]:bg-income'}
-                  />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_1fr_1fr_auto] gap-2">
+                {account.statement_balance != null && (
+                  <p className="text-xs text-muted-foreground">
+                    Statement {formatCurrency(account.statement_balance, currency)}, paid {formatCurrency(account.statement_paid_amount ?? 0, currency)}
+                  </p>
+                )}
+                <div className="grid gap-2">
                   <Select
                     value={effectivePaymentFromAccountId ?? ''}
                     onValueChange={(value) => setPaymentFromAccountId(value)}
                   >
-                    <SelectTrigger className="bg-white/95 text-black">
+                    <SelectTrigger aria-label="Pay from account">
                       <SelectValue>
                         {(value) => {
                           const account = paymentSourceAccounts.find(a => a.id === value);
@@ -658,68 +650,112 @@ export default function AccountTransactionsPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Payment amount"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="bg-white/95 text-black"
-                  />
-                  <Input
-                    type="date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                    className="bg-white/95 text-black"
-                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Amount"
+                      aria-label="Payment amount"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                    />
+                    <Input
+                      type="date"
+                      aria-label="Payment date"
+                      value={paymentDate}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                    />
+                  </div>
                   <Button
                     type="button"
-                    variant="secondary"
                     onClick={handleLogPayment}
                     disabled={!effectivePaymentFromAccountId}
                   >
-                    Log Payment
+                    Record payment
                   </Button>
                 </div>
                 {paymentSourceAccounts.length === 0 && (
-                  <p className="text-[0.6875rem] opacity-80">
+                  <p className="text-xs text-muted-foreground">
                     Add a cash, bank, or wallet account to record credit card payments correctly.
                   </p>
                 )}
                 {account.last_payment_date && account.last_payment_amount != null && (
-                  <p className="text-[0.6875rem] opacity-80">
+                  <p className="text-xs text-muted-foreground">
                     Last payment: {formatCurrency(account.last_payment_amount, currency)} on {account.last_payment_date}
                   </p>
                 )}
-                <div className="pt-1 border-t border-white/20">
-                  <p className="text-[0.6875rem] uppercase tracking-wide opacity-70 mb-1.5">Payment History</p>
+                <div className="border-t border-border/60 pt-2">
+                  <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground mb-1.5">Payment history</p>
                   {paymentsLoading ? (
-                    <p className="text-[0.6875rem] opacity-70">Loading payment history...</p>
+                    <p className="text-xs text-muted-foreground">Loading payment history...</p>
                   ) : paymentHistory.length === 0 ? (
-                    <p className="text-[0.6875rem] opacity-70">No logged payments yet.</p>
+                    <p className="text-xs text-muted-foreground">No logged payments yet.</p>
                   ) : (
                     <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                       {paymentHistory.map((p) => (
-                        <div key={p.id} className="flex items-center justify-between text-[0.75rem]">
-                          <span className="opacity-80">{p.payment_date}</span>
-                          <span className="font-semibold">{formatCurrency(p.amount, currency)}</span>
+                        <div key={p.id} className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">{p.payment_date}</span>
+                          <span className="money font-semibold">{formatCurrency(p.amount, currency)}</span>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-              </div>
+              </section>
             )}
-            {account.type === 'loan' && formatLoanSchedule(account) && (
-              <div className="mt-4 rounded-lg bg-black/15 border border-white/20 p-3">
-                <p className="text-xs opacity-70">Repayment schedule</p>
-                <p className="text-sm font-semibold mt-0.5">{formatLoanSchedule(account)}</p>
-                <p className="text-xs opacity-70 mt-1">Loan debt is subtracted from net worth.</p>
-              </div>
+            {account.type === 'loan' && (
+              <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+                <h2 className="text-sm font-semibold">Next payment</h2>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs text-muted-foreground">{nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : 'Nothing scheduled'}</span>
+                  <span className="money text-lg font-bold">{formatCurrency(nextLoanDeadline?.total ?? 0, currency)}</span>
+                </div>
+                <Button className="w-full" onClick={() => { setTransactionKind('loan-repayment'); setCreateOpen(true) }}>
+                  Make payment
+                </Button>
+              </section>
             )}
-          </div>
+            {account.type !== 'loan' && (
+              <section className="space-y-2 rounded-xl border border-border bg-card p-4">
+                <h2 className="text-sm font-semibold">Where it went</h2>
+                <p className="text-xs text-muted-foreground">Spending from this account in {cycleLabel}</p>
+                {cycleBreakdown.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No spending this cycle.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {cycleBreakdown.slice(0, 4).map((slice) => (
+                      <li key={slice.key} className="flex items-center gap-2 text-sm">
+                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
+                        <span className="min-w-0 flex-1 truncate">{slice.name}</span>
+                        <span className="money shrink-0 font-medium">{formatCurrency(slice.amount, currency)}</span>
+                      </li>
+                    ))}
+                    {cycleBreakdown.length > 4 && (
+                      <li className="text-xs text-muted-foreground">+{cycleBreakdown.length - 4} more categories</li>
+                    )}
+                  </ul>
+                )}
+              </section>
+            )}
+            <section className="rounded-xl border border-border bg-card p-4">
+              <h2 className="mb-2 text-sm font-semibold">Account</h2>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+                <dt className="text-muted-foreground">Type</dt><dd className="text-right">{ACCOUNT_TYPE_LABELS[account.type]}</dd>
+                {account.type === 'credit_card' && (
+                  <>
+                    <dt className="text-muted-foreground">Statement day</dt><dd className="text-right">{account.statement_day ?? 'Not set'}</dd>
+                    <dt className="text-muted-foreground">Due day</dt><dd className="text-right">{account.due_day ?? 'Not set'}</dd>
+                  </>
+                )}
+                <dt className="text-muted-foreground">Currency</dt><dd className="text-right">{account.currency}</dd>
+              </dl>
+              <Button variant="ghost" size="sm" className="mt-2 w-full gap-2 sm:hidden" onClick={() => setEditAccountOpen(true)}>
+                <Pencil className="w-3.5 h-3.5" />Edit account
+              </Button>
+            </section>
+          </aside>
         )}
-
+        <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
         {account?.type === 'loan' && loanSection === 'purchases' && (
           <LoanPurchaseTracker account={account} onAccountChanged={refetchAccounts} loanData={loanData} />
         )}
@@ -832,6 +868,8 @@ export default function AccountTransactionsPage() {
             <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
           </ResultBarLayout>
         ))}
+        </div>
+        </div>
 
         {/* Edit dialog */}
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>

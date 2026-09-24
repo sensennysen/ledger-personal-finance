@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, ArrowLeftRight, Search, Plus, Upload, CreditCard, Wallet, Pencil, MoreHorizontal } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -21,6 +21,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
 import { resolveLoadState } from '@/lib/loadState'
+import { searchMatcher } from '@/lib/globalSearch'
 import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { defaultCardPaymentDescription } from '@/lib/cardPayment'
@@ -52,6 +53,25 @@ export default function AccountTransactionsPage() {
   const loadState = resolveLoadState({ loading, error: txError, hasData: transactions.length > 0 })
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  // Search handoff (LED-64): "See all" from the palette arrives as ?q=. Take it
+  // while rendering, clear filters that would hide matches, then drop the param.
+  const handoffQuery = searchParams.get('q')
+  const [takenQuery, setTakenQuery] = useState<string | null>(null)
+  if (handoffQuery !== takenQuery) {
+    setTakenQuery(handoffQuery)
+    if (handoffQuery !== null) {
+      setSearch(handoffQuery)
+      setFilterType('all')
+    }
+  }
+  useEffect(() => {
+    if (handoffQuery === null) return
+    setSearchParams((params) => {
+      params.delete('q')
+      return params
+    }, { replace: true })
+  }, [handoffQuery, setSearchParams])
   const [createOpen, setCreateOpen] = useState(false)
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editAccountOpen, setEditAccountOpen] = useState(false)
@@ -147,14 +167,8 @@ export default function AccountTransactionsPage() {
   const filtered = useMemo(() => {
     let result = accountTransactions
     if (filterType !== 'all') result = result.filter((t) => t.type === filterType)
-    if (search) {
-      const q = search.toLowerCase()
-      result = result.filter(
-        (t) =>
-          t.description.toLowerCase().includes(q) ||
-          t.category?.name.toLowerCase().includes(q)
-      )
-    }
+    // Same rule as the search palette, so its "See all" count matches (LED-64).
+    if (search) result = result.filter(searchMatcher(search))
     return result
   }, [accountTransactions, filterType, search])
 

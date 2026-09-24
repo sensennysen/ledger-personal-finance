@@ -57,11 +57,19 @@ interface SearchPaletteProps {
   onOpenChange: (open: boolean) => void
   onAddTransaction: (kind: TransactionKind) => void
   mobile?: boolean
+  /** The account page the palette opened over, if any; ⌘F scopes to it. */
+  currentAccount?: { id: string; name: string } | null
 }
 
 // The body mounts only while the palette is open, so its data hooks do not
 // run (or refetch) until someone searches.
-export function SearchPalette({ open, onOpenChange, onAddTransaction, mobile = false }: SearchPaletteProps) {
+export function SearchPalette({
+  open,
+  onOpenChange,
+  onAddTransaction,
+  mobile = false,
+  currentAccount = null,
+}: SearchPaletteProps) {
   useBackClosesSearch(open && mobile, () => onOpenChange(false))
   return (
     <CommandDialog
@@ -78,6 +86,7 @@ export function SearchPalette({ open, onOpenChange, onAddTransaction, mobile = f
       {open && (
         <SearchBody
           mobile={mobile}
+          currentAccount={currentAccount}
           close={() => onOpenChange(false)}
           onAddTransaction={onAddTransaction}
         />
@@ -113,15 +122,19 @@ function SearchBody({
   close,
   onAddTransaction,
   mobile,
+  currentAccount,
 }: {
   close: () => void
   onAddTransaction: (kind: TransactionKind) => void
   mobile: boolean
+  currentAccount: { id: string; name: string } | null
 }) {
   const navigate = useNavigate()
   const openEntry = useEntryDetail()
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<SearchScope>('cycle')
+  const [accountScoped, setAccountScoped] = useState(false)
+  const scopedAccount = accountScoped ? currentAccount : null
   const [highlighted, setHighlighted] = useState('')
   // E / I / T only fire after the user arrows onto an action, so typing a
   // search that starts with one of those letters is never hijacked.
@@ -131,6 +144,7 @@ function SearchBody({
     query,
     scope,
     ACTIONS,
+    scopedAccount,
   )
   const actions = results.actions as typeof ACTIONS
   const trimmed = query.trim()
@@ -161,10 +175,15 @@ function SearchBody({
       ]
     : [{ id: 'text', heading: 'Transactions', group: results.text }]
 
-  const transactionTotal = results.exact.total + results.nearby.total + results.text.total
-  const anyResult =
-    transactionTotal + results.accounts.total + results.categories.total + actions.length > 0
+  const transactionTotal = results.transactionTotal
+  const overallTotal = transactionTotal + results.accounts.total + results.categories.total
+  const anyResult = overallTotal + actions.length > 0
   const showResults = loadState !== 'loading' && !(loadState === 'error')
+  const { handoff } = results
+  // An all-time search can match nothing in the cycle Activity shows; then there
+  // is nowhere honest to send "See all".
+  const canHandOff = showResults && trimmed !== '' && handoff.count > 0
+  const firstTransactionGroup = transactionGroups.find(({ group }) => group.total > 0)?.id
 
   return (
     <Command
@@ -173,6 +192,18 @@ function SearchBody({
       value={highlighted}
       onValueChange={setHighlighted}
       onKeyDown={(event) => {
+        const mod = (event.metaKey || event.ctrlKey) && !event.altKey
+        if (mod && event.key === 'Enter' && canHandOff) {
+          event.preventDefault()
+          go(handoff.path)
+          return
+        }
+        // Only claimed on an account page; elsewhere the browser's find still works.
+        if (mod && event.key.toLowerCase() === 'f' && currentAccount) {
+          event.preventDefault()
+          setAccountScoped((current) => !current)
+          return
+        }
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
           setNavigated(true)
           return
@@ -233,10 +264,28 @@ function SearchBody({
       )}
       {!isEmptyQuery && (
         <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-          <span>
-            {scope === 'cycle'
-              ? `This cycle · ${formatDateShort(range.start)} – ${formatDateShort(range.end)}`
-              : 'Searching all time'}
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            {showResults && (
+              <span className="font-medium text-foreground tabular-nums">
+                {overallTotal} {overallTotal === 1 ? 'match' : 'matches'}
+              </span>
+            )}
+            <span>
+              {scope === 'cycle'
+                ? `This cycle · ${formatDateShort(range.start)} – ${formatDateShort(range.end)}`
+                : 'Searching all time'}
+            </span>
+            {scopedAccount && (
+              <button
+                type="button"
+                aria-label={`Stop filtering to ${scopedAccount.name}`}
+                onClick={() => setAccountScoped(false)}
+                className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground hover:bg-muted/70"
+              >
+                {scopedAccount.name} only
+                <X className="size-3" />
+              </button>
+            )}
           </span>
           <button
             type="button"
@@ -327,13 +376,33 @@ function SearchBody({
         )}
         {showResults && trimmed && !anyResult && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No results for “{trimmed}”{scope === 'cycle' ? ' in this cycle' : ''}.
+            No results for “{trimmed}”{scopedAccount ? ` in ${scopedAccount.name}` : ''}
+            {scope === 'cycle' ? ' in this cycle' : ''}.
           </p>
         )}
         {showResults &&
           transactionGroups.map(({ id, heading, group }) =>
             group.total === 0 ? null : (
-              <CommandGroup key={id} heading={`${heading} · ${group.total}`}>
+              <CommandGroup
+                key={id}
+                heading={
+                  <span className="flex items-center justify-between gap-2">
+                    <span>
+                      {heading} · {group.total}
+                    </span>
+                    {id === firstTransactionGroup && canHandOff && (
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => go(handoff.path)}
+                        className="font-medium text-foreground hover:underline"
+                      >
+                        {handoff.label} →
+                      </button>
+                    )}
+                  </span>
+                }
+              >
                 {group.items.map((transaction) => (
                   <CommandItem
                     key={transaction.id}
@@ -343,14 +412,21 @@ function SearchBody({
                     <TransactionRow transaction={transaction as Transaction} />
                   </CommandItem>
                 ))}
-                {group.total > group.items.length && (
-                  <CommandItem value={`more:${id}`} onSelect={() => go('/transactions')}>
-                    <span className="text-muted-foreground">
-                      Show all {group.total} in Activity
-                    </span>
-                    <ArrowRight className="ml-auto size-4 text-muted-foreground" />
-                  </CommandItem>
-                )}
+                {group.total > group.items.length &&
+                  (canHandOff ? (
+                    <CommandItem value={`more:${id}`} onSelect={() => go(handoff.path)}>
+                      <span className="text-muted-foreground">
+                        {handoff.complete
+                          ? `${group.total - group.items.length} more ${id === 'text' ? 'transactions' : 'amounts'}`
+                          : handoff.label}
+                      </span>
+                      <ArrowRight className="ml-auto size-4 text-muted-foreground" />
+                    </CommandItem>
+                  ) : (
+                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                      {group.total - group.items.length} more, all outside this cycle
+                    </p>
+                  ))}
               </CommandGroup>
             ),
           )}
@@ -384,8 +460,23 @@ function SearchBody({
                 value={`category:${category.id}`}
                 onSelect={() => go('/categories')}
               >
-                <Tag className="size-4 text-muted-foreground" />
-                <span className="truncate">{category.name}</span>
+                <Tag className="size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">{category.name}</p>
+                  {category.matchCount > 0 && (
+                    <p className="truncate text-xs text-muted-foreground">
+                      contains {category.matchCount} “{trimmed}”{' '}
+                      {category.matchCount === 1 ? 'match' : 'matches'}
+                    </p>
+                  )}
+                </div>
+                {category.matchCount > 0 && (
+                  <span className="shrink-0 tabular-nums">
+                    {Object.entries(category.matchSum)
+                      .map(([currency, sum]) => formatCurrency(sum, currency))
+                      .join(' · ')}
+                  </span>
+                )}
               </CommandItem>
             ))}
             {results.categories.total > results.categories.items.length && (
@@ -425,8 +516,12 @@ function SearchBody({
       >
         {!mobile && (
           <>
-            <span>↑↓ navigate</span>
+            <span>↑↓ move</span>
             <span>↵ open</span>
+            {canHandOff && <span>⌘↵ open in {scopedAccount ? scopedAccount.name : 'Activity'}</span>}
+            {currentAccount && (
+              <span>⌘F {accountScoped ? 'search everything' : 'filter this account only'}</span>
+            )}
             <span>esc close</span>
           </>
         )}

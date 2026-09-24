@@ -17,6 +17,7 @@ import {
 } from '@/lib/overspending'
 import type { DeficitBehaviour } from '@/lib/budgetRollover'
 import type { Category } from '@/types'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 interface OverspendingCardProps {
   categories: Category[]
@@ -31,6 +32,7 @@ interface OverspendingCardProps {
  * setting. Follows the global cycle chosen in the top-bar stepper (LED-21).
  */
 export function OverspendingCard({ categories, startDay, month, deficitBehaviour }: OverspendingCardProps) {
+  const ink = useCategoryInk()
   const behaviour: DeficitBehaviour = deficitBehaviour ?? 'carry'
   const range = monthCycleRange(month, startDay)
   const { budgets, txs, loading, error, refetch } = useOverspending(range.end)
@@ -56,9 +58,9 @@ export function OverspendingCard({ categories, startDay, month, deficitBehaviour
   const uncarried = result.totals.filter((t) => t.uncarried > 0)
 
   return (
-    <Card className={cn('p-5 gap-3', result.rows.length > 0 && 'border-amber-600/50')}>
+    <Card className={cn('p-5 gap-3', result.rows.length > 0 && 'border-warning/50')}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <span className="flex items-center gap-2 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-amber-700 dark:text-amber-500">
+        <span className="flex items-center gap-2 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-warning">
           <TriangleAlert className="w-4 h-4" />
           Overspending
         </span>
@@ -108,7 +110,7 @@ export function OverspendingCard({ categories, startDay, month, deficitBehaviour
                 <span className="flex items-center gap-3 min-w-0">
                   <span
                     className="w-8 h-8 shrink-0 rounded-[10px] flex items-center justify-center text-sm"
-                    style={{ backgroundColor: category ? `${category.color}22` : undefined }}
+                    style={{ backgroundColor: category ? `${ink(category.color)}22` : undefined }}
                   >
                     {category?.icon}
                   </span>
@@ -120,7 +122,7 @@ export function OverspendingCard({ categories, startDay, month, deficitBehaviour
                     </span>
                   </span>
                 </span>
-                <span className="text-sm font-bold tabular-nums text-amber-700 dark:text-amber-500 text-right">
+                <span className="text-sm font-bold tabular-nums text-warning text-right">
                   {formatCurrency(row.over, row.currency)}
                 </span>
                 <span
@@ -136,7 +138,7 @@ export function OverspendingCard({ categories, startDay, month, deficitBehaviour
           })}
           <div className="flex items-baseline justify-between border-t pt-3 mt-1">
             <span className="text-sm font-medium">Total over</span>
-            <span className="text-base font-bold tabular-nums text-amber-700 dark:text-amber-500">
+            <span className="text-base font-bold tabular-nums text-warning">
               {result.totals.map((t) => formatCurrency(t.over, t.currency)).join(' + ')}
             </span>
           </div>

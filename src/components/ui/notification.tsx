@@ -54,7 +54,7 @@ export function NotificationSurface({ notification, onDismiss }: NotificationSur
                 onDismiss(id)
                 action.run()
               }}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-foreground bg-white/15 hover:bg-white/25 transition-colors px-2.5 py-1 rounded-md shrink-0"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-foreground bg-primary-foreground/15 hover:bg-primary-foreground/25 transition-colors px-2.5 py-1 rounded-md shrink-0"
             >
               {action.label === 'Undo' && <Undo2 className="w-3.5 h-3.5" />}
               {action.label}

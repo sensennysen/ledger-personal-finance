@@ -15,7 +15,9 @@ const FONT_SIZE_MAP: Record<FontSize, string> = {
   xl: '20px',
 }
 
-const DEFAULT_ACCENT = '#c79144' // approximate hex for oklch(0.700 0.115 72) — app gold
+const DEFAULT_ACCENT = '#55659a' // app indigo, the light --primary in index.css
+// The previous default. A stored copy is a preference for "default", not for gold.
+const LEGACY_DEFAULT_ACCENT = '#c79144'
 
 interface ThemeContextValue {
   theme: Theme
@@ -62,7 +64,10 @@ function getInitialFontSize(): FontSize {
 
 function getInitialAccent(): string {
   try {
-    return localStorage.getItem(ACCENT_KEY) ?? DEFAULT_ACCENT
+    const stored = localStorage.getItem(ACCENT_KEY)
+    if (!stored || stored.toLowerCase() === LEGACY_DEFAULT_ACCENT)
+      return DEFAULT_ACCENT
+    return stored
   } catch {
     return DEFAULT_ACCENT
   }
@@ -82,7 +87,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#15130B' : '#EFE7DA')
+      ?.setAttribute('content', theme === 'dark' ? '#131218' : '#DEDDE3')
     try {
       localStorage.setItem(STORAGE_KEY, theme)
     } catch {

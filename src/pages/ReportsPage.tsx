@@ -898,7 +898,7 @@ export default function ReportsPage() {
             }
           />
         ) : (
-          <ScrollArea className="max-h-120">
+          <ScrollArea className="max-h-120" horizontal>
             <table className="w-full min-w-max text-[0.8125rem]">
               {tableHead}
               <tbody>

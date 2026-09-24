@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   TransactionForm,
@@ -67,6 +68,9 @@ function LayoutShell() {
   const { user, profile, signOut, refreshProfile, authError } = useAuth()
   const mobile = useMediaQuery('(max-width: 767px)')
   const desktop = useMediaQuery('(min-width: 1024px)')
+  // At 1920 the capped page leaves room for a docked detail column; below it
+  // the column would squeeze the list, so detail overlays instead (LED-99).
+  const wide = useMediaQuery('(min-width: 1920px)')
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
   const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
@@ -101,13 +105,13 @@ function LayoutShell() {
   }
   const [formError, setFormError] = useState<string | null>(null)
   useEffect(() => {
-    if (sheet !== 'detail' || !desktop) return
+    if (sheet !== 'detail' || !wide) return
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setSheet(null)
     }
     window.addEventListener('keydown', close)
     return () => window.removeEventListener('keydown', close)
-  }, [sheet, desktop])
+  }, [sheet, wide])
   // Re-check when the page changes or its content grows (async loads).
   useEffect(() => {
     const main = mainRef.current
@@ -235,10 +239,10 @@ function LayoutShell() {
           id="dashboard-detail-pane"
           className={cn(
             'hidden lg:flex shrink-0 empty:hidden',
-            sheet === 'detail' && 'lg:hidden',
+            wide && sheet === 'detail' && 'lg:hidden',
           )}
         />
-        {desktop && sheet === 'detail' && entry && (
+        {wide && sheet === 'detail' && entry && (
           <aside
             aria-label="Entry detail"
             className="relative w-[340px] shrink-0 border-l border-border bg-sidebar p-5 overflow-y-auto animate-page-in"
@@ -292,6 +296,33 @@ function LayoutShell() {
           onAddTransaction={openAddTransactionModal}
           currentAccount={currentAccount}
         />
+        <Sheet
+          open={desktop && !wide && sheet === 'detail' && !!entry}
+          onOpenChange={(open) => {
+            if (!open) setSheet(null)
+          }}
+        >
+          <SheetContent side="right" className="w-[380px] sm:max-w-[380px] overflow-y-auto">
+            <SheetHeader className="pb-0">
+              <SheetTitle>Entry detail</SheetTitle>
+            </SheetHeader>
+            {entry && (
+              <div className="px-4 pb-4">
+                <EntryDetail
+                  transaction={entry.transaction}
+                  onEdit={
+                    entry.onEdit
+                      ? () => {
+                          setSheet(null)
+                          entry.onEdit?.()
+                        }
+                      : undefined
+                  }
+                />
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
         <Dialog
           open={sheet !== null && !(desktop && sheet === 'detail')}
           onOpenChange={(open) => {

@@ -26,3 +26,18 @@ test('FAB, toast and install banner clear the bottom nav', () => {
   assert.ok(toastBottom > fab + 64, 'toast sits above the 64px FAB')
   assert.ok(bannerBottom > fab + 64)
 })
+
+test('entry-detail pane docks only where it fits beside the full-width Activity list', () => {
+  const activity = read('pages/TransactionsPage.tsx')
+  // Tailwind max-w-3xl = 48rem = 768px, plus md:p-6 on both sides.
+  assert.match(activity, /p-4 md:p-6 space-y-4 max-w-3xl mx-auto/)
+  const list = 768 + 2 * 24
+  const pane = px(layout, /aria-label="Entry detail"\s+className="relative w-\[(\d+)px\]/)
+  const dock = px(layout, /const wide = useMediaQuery\('\(min-width: (\d+)px\)'\)/)
+  assert.equal(dock, 1920)
+  assert.ok(dock - pane >= list, 'docked at 1920 the list keeps its capped width')
+  assert.ok(1024 - pane < list, 'at lg a docked column would squeeze the list')
+  // Below the dock width the pane is an overlay sheet, never a column.
+  assert.match(layout, /\{wide && sheet === 'detail' && entry && \(\s*<aside/)
+  assert.match(layout, /open=\{desktop && !wide && sheet === 'detail'/)
+})

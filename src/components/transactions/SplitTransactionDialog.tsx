@@ -226,7 +226,7 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
 
           <p className="text-xs text-muted-foreground">
             The original transaction is deleted and replaced by {lines.length} entries. This can't be undone.
-            {carriesExtras && ' Its receipt and tags won’t carry over.'}
+            {carriesExtras && " Its receipt and tags won't carry over."}
           </p>
 
           {error && <FormError className="mt-0 px-0">{error}</FormError>}

@@ -46,11 +46,11 @@ import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import type { CreditCardPayment, Transaction } from '@/types'
 
-function bandCell(label: string, value: string, sub?: string) {
+function bandCell(label: string, value: string, sub?: string, money = true) {
   return (
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="money mt-1 truncate text-lg font-semibold">{value}</p>
+      <p className={`${money ? 'money ' : ''}mt-1 truncate text-lg font-semibold`}>{value}</p>
       {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
     </div>
   )
@@ -425,9 +425,9 @@ export default function AccountTransactionsPage() {
           <span aria-current="page" className="truncate text-foreground">{account?.name ?? 'Account'}</span>
         </nav>
         {/* Header */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {account ? (
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-1 min-w-0 max-sm:basis-full">
               <div
                 className="p-2.5 rounded-xl shrink-0"
                 style={{ backgroundColor: account.color + '20', color: account.color }}
@@ -443,8 +443,8 @@ export default function AccountTransactionsPage() {
             <h1 className="text-xl font-bold flex-1">Account Transactions</h1>
           )}
           {account && (
-            <Button variant="outline" className="hidden gap-2 shrink-0 sm:inline-flex" onClick={() => setEditAccountOpen(true)}>
-              <Pencil className="w-4 h-4" />Edit account
+            <Button variant="outline" className="gap-2 shrink-0 max-sm:size-9 max-sm:px-0" aria-label="Edit account" onClick={() => setEditAccountOpen(true)}>
+              <Pencil className="w-4 h-4" /><span className="max-sm:hidden">Edit account</span>
             </Button>
           )}
           {account?.type === 'loan' ? (
@@ -564,8 +564,8 @@ export default function AccountTransactionsPage() {
                     account.credit_limit != null ? formatCurrency(account.credit_limit, currency) : 'Not set',
                     account.credit_limit ? `${getCreditUtilizationPct(account).toFixed(0)}% used` : 'Add one to track utilisation',
                   )}
-                  {bandCell('Statement closes', account.statement_day ? dayInDaysLabel(statementDays) : 'Not set', account.statement_day ? formatDueIn(statementDays) : 'No countdown')}
-                  {bandCell('Payment due', account.due_day ? dayInDaysLabel(dueDays) : 'Not set', account.due_day ? formatDueIn(dueDays) : 'No countdown')}
+                  {bandCell('Statement closes', account.statement_day ? dayInDaysLabel(statementDays) : 'Not set', account.statement_day ? formatDueIn(statementDays) : 'No countdown', false)}
+                  {bandCell('Payment due', account.due_day ? dayInDaysLabel(dueDays) : 'Not set', account.due_day ? formatDueIn(dueDays) : 'No countdown', false)}
                 </>
               ) : account.type === 'loan' ? (
                 <>
@@ -580,7 +580,7 @@ export default function AccountTransactionsPage() {
                     nextLoanDeadline ? formatCurrency(nextLoanDeadline.total, currency) : 'None due',
                     nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : undefined,
                   )}
-                  {bandCell('Schedule', formatLoanSchedule(account) ?? 'Per purchase', 'Subtracted from net worth')}
+                  {bandCell('Schedule', formatLoanSchedule(account) ?? 'Per purchase', 'Subtracted from net worth', false)}
                 </>
               ) : (
                 <>
@@ -620,7 +620,12 @@ export default function AccountTransactionsPage() {
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {account && (
-          <aside className="space-y-4 lg:col-start-2 lg:row-start-1" aria-label="Account summary">
+          <aside
+            className={account.type === 'loan' && loanSection === 'summary'
+              ? 'space-y-4 lg:col-span-full lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0'
+              : 'space-y-4 lg:col-start-2 lg:row-start-1'}
+            aria-label="Account summary"
+          >
             {account.type === 'credit_card' && (
               <section className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <h2 className="text-sm font-semibold">Pay this card</h2>
@@ -718,7 +723,7 @@ export default function AccountTransactionsPage() {
               </section>
             )}
             {account.type !== 'loan' && (
-              <section className="space-y-2 rounded-xl border border-border bg-card p-4">
+              <section className="hidden space-y-2 rounded-xl border border-border bg-card p-4 lg:block">
                 <h2 className="text-sm font-semibold">Where it went</h2>
                 <p className="text-xs text-muted-foreground">Spending from this account in {cycleLabel}</p>
                 {cycleBreakdown.length === 0 ? (
@@ -739,7 +744,7 @@ export default function AccountTransactionsPage() {
                 )}
               </section>
             )}
-            <section className="rounded-xl border border-border bg-card p-4">
+            <section className="hidden rounded-xl border border-border bg-card p-4 lg:block">
               <h2 className="mb-2 text-sm font-semibold">Account</h2>
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
                 <dt className="text-muted-foreground">Type</dt><dd className="text-right">{ACCOUNT_TYPE_LABELS[account.type]}</dd>
@@ -751,9 +756,6 @@ export default function AccountTransactionsPage() {
                 )}
                 <dt className="text-muted-foreground">Currency</dt><dd className="text-right">{account.currency}</dd>
               </dl>
-              <Button variant="ghost" size="sm" className="mt-2 w-full gap-2 sm:hidden" onClick={() => setEditAccountOpen(true)}>
-                <Pencil className="w-3.5 h-3.5" />Edit account
-              </Button>
             </section>
           </aside>
         )}

@@ -1,6 +1,8 @@
-import { useState, useCallback, useRef } from 'react'
-import { Upload, X, AlertCircle, Loader2, FileText } from 'lucide-react'
+import { useState, useCallback, useRef, useMemo } from 'react'
+import { Upload, X, AlertCircle, Loader2, FileText, Copy } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
+import { useImportDuplicates } from '@/hooks/useImportDuplicates'
+import { duplicateSpan, matchDuplicates } from '@/lib/importDuplicates'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -254,14 +256,38 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ imported: number; account: string } | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [includedDupes, setIncludedDupes] = useState<Set<number>>(new Set())
 
   const selectedAccount = accounts.find((account) => account.id === accountId)
+
+  const candidates = useMemo(
+    () => (parsed?.rows ?? []).map((row, index) => ({ ...row, line: index + 1 })),
+    [parsed],
+  )
+  const span = useMemo(() => duplicateSpan(candidates), [candidates])
+  const dupeCheck = useImportDuplicates(accountId, span)
+  const duplicates = useMemo(
+    () => matchDuplicates(candidates, dupeCheck.existing),
+    [candidates, dupeCheck.existing],
+  )
+  const toImport = candidates.filter((row) => !duplicates.has(row.line) || includedDupes.has(row.line))
+  const duplicateRows = candidates.filter((row) => duplicates.has(row.line))
+
+  const toggleDupe = (line: number) => {
+    setIncludedDupes((current) => {
+      const next = new Set(current)
+      if (next.has(line)) next.delete(line)
+      else next.add(line)
+      return next
+    })
+  }
 
   const reset = () => {
     setParsed(null)
     setParseError(null)
     setAccountId('')
     setImportResult(null)
+    setIncludedDupes(new Set())
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -292,6 +318,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
 
         setParsed(result)
         setParseError(null)
+        setIncludedDupes(new Set())
         if (!accountId && accounts.length > 0) {
           setAccountId(accounts[0].id)
         }
@@ -314,10 +341,13 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   }
 
   const handleImport = async () => {
-    if (!parsed || !accountId || !selectedAccount) return
+    if (!parsed || !accountId || !selectedAccount || dupeCheck.loading || dupeCheck.error) return
     setImporting(true)
-    const txs: ImportTx[] = parsed.rows.map((row) => ({
-      ...row,
+    const txs: ImportTx[] = toImport.map((row) => ({
+      date: row.date,
+      description: row.description,
+      amount: row.amount,
+      type: row.type,
       account_id: accountId,
       currency: selectedAccount.currency,
       category_id: null,
@@ -489,6 +519,49 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                   )}
                 </div>
 
+                {dupeCheck.error && (
+                  <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span className="flex-1">Couldn't check for duplicates: {dupeCheck.error}</span>
+                    <Button variant="outline" size="sm" className="h-7" onClick={dupeCheck.retry}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                {duplicateRows.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      {duplicateRows.length} likely duplicate{duplicateRows.length !== 1 ? 's' : ''} - skipped unless ticked
+                    </p>
+                    <div className="rounded-lg border divide-y">
+                      {duplicateRows.map((row) => {
+                        const match = duplicates.get(row.line)!
+                        return (
+                          <label key={row.line} className="flex items-start gap-2.5 px-3 py-2 text-sm cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={includedDupes.has(row.line)}
+                              onChange={() => toggleDupe(row.line)}
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-1.5">
+                                <Copy className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                <span className="truncate">{row.description}</span>
+                              </span>
+                              <span className="block text-xs text-muted-foreground truncate">
+                                Already in Ledger: {match.date} · {match.description || 'No description'} ·{' '}
+                                {formatCurrency(Number(match.amount), selectedAccount?.currency ?? 'PHP')}
+                              </span>
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
                   Transactions will be imported uncategorized. Use bulk re-categorize after import to assign categories quickly.
                 </p>
@@ -506,14 +579,22 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                 Cancel
               </Button>
               {parsed && (
-                <Button onClick={handleImport} disabled={!accountId || importing}>
+                <Button
+                  onClick={handleImport}
+                  disabled={!accountId || importing || dupeCheck.loading || Boolean(dupeCheck.error) || toImport.length === 0}
+                >
                   {importing ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                       Importing...
                     </>
+                  ) : dupeCheck.loading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      Checking for duplicates...
+                    </>
                   ) : (
-                    `Import ${parsed.rows.length} transaction${parsed.rows.length !== 1 ? 's' : ''}`
+                    `Import ${toImport.length} transaction${toImport.length !== 1 ? 's' : ''}`
                   )}
                 </Button>
               )}

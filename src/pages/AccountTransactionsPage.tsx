@@ -27,9 +27,11 @@ import { TransactionKindMenu } from '@/components/transactions/TransactionKindMe
 import { TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
+import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
+import { usePreferences } from '@/hooks/usePreferences'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { groupByDay, sliceGroups, WINDOW_STEP } from '@/lib/transactionWindow'
+import { dateSpan, groupByDay, sliceGroups, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -158,14 +160,28 @@ export default function AccountTransactionsPage() {
     setSearch('')
   }, [])
 
-  const grouped = useMemo(() => groupByDay(filtered, accountId), [filtered, accountId])
+  const { prefs, set: setPref } = usePreferences()
+  const [sort, setSort] = useState<TxSort>('newest')
+  const grouped = useMemo(() => groupByDay(filtered, accountId, sort), [filtered, accountId, sort])
 
   // Window the list (LED-60); nets in the day headers are relative to this account.
   const compactList = useMediaQuery('(max-width: 767px)')
   const { rendered, sentinelRef } = useRenderWindow(filtered.length, {
     step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
-    resetKey: JSON.stringify([accountId, filterType, search]),
+    resetKey: JSON.stringify([accountId, filterType, search, sort]),
   })
+
+  // Result bar (LED-61): the sum is relative to this account, the range spans its history.
+  const matchSum = useMemo(() => sumByCurrency(filtered, accountId), [filtered, accountId])
+  const historyRange = useMemo(() => {
+    const span = dateSpan(accountTransactions)
+    if (!span) return null
+    const month = (value: string) =>
+      new Date(value + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+    const start = month(span.start)
+    const end = month(span.end)
+    return start === end ? start : `${start} – ${end}`
+  }, [accountTransactions])
 
   // Summary stats for this account's transactions
   const stats = useMemo(() => {
@@ -723,7 +739,22 @@ export default function AccountTransactionsPage() {
           }
         />
       ) : (
-        <div>
+        <ResultBarLayout
+          bar={
+            <ResultBar
+              matchCount={filtered.length}
+              total={accountTransactions.length}
+              totalLabel="on this account"
+              rangeLabel={historyRange}
+              sum={matchSum}
+              sort={sort}
+              onSortChange={setSort}
+              density={prefs.txDensity}
+              onDensityChange={(density) => setPref('txDensity', density)}
+              compact={compactList}
+            />
+          }
+        >
           <TransactionDayList
             groups={sliceGroups(grouped, rendered)}
             compact={compactList}
@@ -734,11 +765,12 @@ export default function AccountTransactionsPage() {
                 onEdit={setEditingTx}
                 onDelete={handleDelete}
                 contextAccountId={accountId}
+                dense={prefs.txDensity === 'compact'}
               />
             )}
           />
           <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
-        </div>
+        </ResultBarLayout>
       ))}
 
       {/* Edit dialog */}

@@ -1,12 +1,7 @@
 import type { ReactNode, Ref } from 'react'
-import { formatCurrency, formatDate, formatDateShort, getLocalDateString } from '@/lib/utils'
+import { formatDate, formatDateShort, getLocalDateString } from '@/lib/utils'
+import { formatNet } from '@/lib/formatNet'
 import { dayLabel, type DayGroup } from '@/lib/transactionWindow'
-
-function formatNet(net: Record<string, number>): string {
-  return Object.entries(net)
-    .map(([currency, amount]) => `${amount > 0 ? '+' : amount < 0 ? '-' : ''}${formatCurrency(Math.abs(amount), currency)}`)
-    .join(' · ')
-}
 
 /** Footer and scroll sentinel under a windowed list; renders nothing once every row is shown. */
 export function WindowFooter({
@@ -31,7 +26,7 @@ export function WindowFooter({
 
 /**
  * Day-grouped transaction list. Headers stick below `--tx-list-sticky-top`
- * (0 today; the LED-61 result bar will sit above them) and always carry the
+ * (the height of the LED-61 result bar, set by ResultBarLayout) and always carry the
  * whole day's count and net, even when the window cuts the day short.
  */
 export function TransactionDayList<T extends { id: string }>({

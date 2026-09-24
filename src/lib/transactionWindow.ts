@@ -38,8 +38,45 @@ export function signedAmount(tx: WindowedTx, contextAccountId?: string): number 
   return 0
 }
 
-/** Groups by day, newest first, keeping the incoming order within a day. */
-export function groupByDay<T extends WindowedTx>(txs: T[], contextAccountId?: string): DayGroup<T>[] {
+/** Result-bar sort (spec §7 V2). Date only, so day groups stay intact either way. */
+export type TxSort = 'newest' | 'oldest'
+
+function compareDates(a: string, b: string, sort: TxSort): number {
+  return sort === 'newest' ? b.localeCompare(a) : a.localeCompare(b)
+}
+
+/** Sorted copy by date; rows on the same day keep their incoming order. */
+export function sortByDate<T extends { date: string }>(txs: T[], sort: TxSort): T[] {
+  return [...txs].sort((a, b) => compareDates(a.date, b.date, sort))
+}
+
+/** Sum of the signed amounts per currency, as the rows and day headers sign them. */
+export function sumByCurrency(txs: WindowedTx[], contextAccountId?: string): Record<string, number> {
+  const sum: Record<string, number> = {}
+  for (const tx of txs) {
+    sum[tx.currency] = (sum[tx.currency] ?? 0) + signedAmount(tx, contextAccountId)
+  }
+  return sum
+}
+
+/** Earliest and latest date in the list, or null when it is empty. */
+export function dateSpan(txs: { date: string }[]): { start: string; end: string } | null {
+  if (txs.length === 0) return null
+  let start = txs[0].date
+  let end = txs[0].date
+  for (const tx of txs) {
+    if (tx.date < start) start = tx.date
+    if (tx.date > end) end = tx.date
+  }
+  return { start, end }
+}
+
+/** Groups by day in `sort` order, keeping the incoming order within a day. */
+export function groupByDay<T extends WindowedTx>(
+  txs: T[],
+  contextAccountId?: string,
+  sort: TxSort = 'newest',
+): DayGroup<T>[] {
   const byDate = new Map<string, DayGroup<T>>()
   for (const tx of txs) {
     let group = byDate.get(tx.date)
@@ -52,7 +89,7 @@ export function groupByDay<T extends WindowedTx>(txs: T[], contextAccountId?: st
     // Keyed by tx.currency, the currency TransactionRow labels the amount with.
     group.net[tx.currency] = (group.net[tx.currency] ?? 0) + signedAmount(tx, contextAccountId)
   }
-  return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date))
+  return [...byDate.values()].sort((a, b) => compareDates(a.date, b.date, sort))
 }
 
 /** Cuts groups so exactly `rowCount` rows render; partial days keep their full count and net. */

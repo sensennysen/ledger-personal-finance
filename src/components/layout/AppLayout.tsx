@@ -18,8 +18,10 @@ import { PWAInstallBanner } from './PWAInstallBanner'
 import { resolveHeaderMeta } from '@/lib/pageChrome'
 import { CycleProvider } from '@/contexts/CycleContext'
 import { EntryContext, type EntryActions } from '@/contexts/EntryContext'
+import { NotificationProvider } from '@/contexts/NotificationContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { InlineLoadError } from '@/components/ui/error-state'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { authErrorActionLabel } from '@/lib/authErrors'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -59,7 +61,9 @@ export type AppLayoutContext = {
 export default function AppLayout() {
   return (
     <CycleProvider>
-      <LayoutShell />
+      <NotificationProvider>
+        <LayoutShell />
+      </NotificationProvider>
     </CycleProvider>
   )
 }
@@ -215,12 +219,14 @@ function LayoutShell() {
         }
       : undefined
   const entryDetail = entry && (
-    <EntryDetail
-      transaction={entry.transaction}
-      onEdit={closeThen(entry.actions?.onEdit)}
-      onDelete={closeThen(entry.actions?.onDelete)}
-      onSplit={closeThen(entry.actions?.onSplit)}
-    />
+    <ErrorBoundary key={entry.transaction.id}>
+      <EntryDetail
+        transaction={entry.transaction}
+        onEdit={closeThen(entry.actions?.onEdit)}
+        onDelete={closeThen(entry.actions?.onDelete)}
+        onSplit={closeThen(entry.actions?.onSplit)}
+      />
+    </ErrorBoundary>
   )
   const title =
     sheet === 'account'
@@ -297,7 +303,9 @@ function LayoutShell() {
               key={location.pathname}
               className="animate-page-in min-h-full min-w-0 w-full max-w-full"
             >
-              <Outlet context={{ openAddTransactionModal }} />
+              <ErrorBoundary>
+                <Outlet context={{ openAddTransactionModal }} />
+              </ErrorBoundary>
             </div>
           </main>
         </div>

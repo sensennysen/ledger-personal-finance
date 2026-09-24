@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 const read = (f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')
 const layout = read('components/layout/AppLayout.tsx')
 const bottomNav = read('components/layout/BottomNav.tsx')
-const toast = read('components/ui/undo-toast.tsx')
+const toast = read('components/ui/notification.tsx')
 const banner = read('components/layout/PWAInstallBanner.tsx')
 
 const px = (src, re) => Number(src.match(re)?.[1])

@@ -654,7 +654,7 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
                     <div className="w-14 hidden sm:block">
                       <Progress
                         value={pct}
-                        className={`h-1.5 ${over ? '[&>div]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-yellow-500' : '[&>div]:bg-emerald-500'}`}
+                        className={`h-1.5 ${over ? '[&>div]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-primary' : '[&>div]:bg-income'}`}
                       />
                     </div>
                     {over
@@ -1203,10 +1203,10 @@ export default function BudgetsPage() {
                     )}
                     <Progress
                       value={pct}
-                      className={over ? '[&>div]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-yellow-500' : ''}
+                      className={over ? '[&>div]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&>div]:bg-primary' : ''}
                     />
                     {budget.currency !== defaultCurrency && (
-                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                      <p className="text-xs text-primary">
                         Budget is in {budget.currency} — transactions in other currencies are converted using their exchange rate.
                       </p>
                     )}

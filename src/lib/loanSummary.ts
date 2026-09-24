@@ -1,5 +1,5 @@
 import type { LoanPaymentAllocation, LoanPurchase } from '@/types'
-import { roundMoney } from './loanInstallments.ts'
+import { addMonthsClamped, roundMoney } from './loanInstallments.ts'
 
 export interface ItemizationGap {
   /** What the financed purchases still account for. */
@@ -81,4 +81,64 @@ export function labelAllocationInstallments(
     }
   }
   return labels
+}
+
+export interface PurchaseCostInput {
+  principal: number
+  installment: number
+  termMonths: number
+  firstDueDate: string
+  installmentsPaid: number
+}
+
+export interface PurchaseCostPreview {
+  totalPayable: number
+  /** Total payable minus the sticker price: the cost of borrowing. */
+  interest: number
+  /** Interest as a percent of the purchase amount. */
+  interestPct: number
+  firstDate: string
+  finalDate: string
+  /** A balancing figure, as the schedule and the database compute it; it can differ from the rest. */
+  finalInstallment: number
+  openingPaidAmount: number
+}
+
+/** What a financed purchase will cost, using the same arithmetic the save path and the schedule use. */
+export function getPurchaseCostPreview(input: PurchaseCostInput): PurchaseCostPreview | null {
+  const { principal, installment, termMonths, firstDueDate, installmentsPaid } = input
+  if (!(principal > 0) || !(installment > 0) || !Number.isInteger(termMonths) || termMonths < 1 || !firstDueDate) return null
+  const totalPayable = roundMoney(installment * termMonths)
+  const interest = roundMoney(totalPayable - principal)
+  return {
+    totalPayable,
+    interest,
+    interestPct: (interest / principal) * 100,
+    firstDate: firstDueDate,
+    finalDate: addMonthsClamped(firstDueDate, termMonths - 1),
+    finalInstallment: roundMoney(totalPayable - installment * (termMonths - 1)),
+    openingPaidAmount: roundMoney(Math.min(totalPayable, installment * Math.max(0, installmentsPaid || 0))),
+  }
+}
+
+export interface LoanContext {
+  /** What the loan owes without this purchase. */
+  baseOwed: number
+  /** Monthly installments of the loan's other active purchases. */
+  baseMonthly: number
+  /** How many other purchases are still being paid. */
+  baseCount: number
+  /** Repayments already applied to this purchase (edits only). */
+  allocatedToThis: number
+}
+
+/** The loan after saving: the purchase trigger adds whatever is left to pay on it. */
+export function getLoanEffect(context: LoanContext, preview: PurchaseCostPreview, installment: number) {
+  const left = Math.max(0, preview.totalPayable - preview.openingPaidAmount - context.allocatedToThis)
+  const active = left > 0
+  return {
+    owedAfter: roundMoney(context.baseOwed + left),
+    monthlyAfter: roundMoney(context.baseMonthly + (active ? installment : 0)),
+    countAfter: context.baseCount + (active ? 1 : 0),
+  }
 }

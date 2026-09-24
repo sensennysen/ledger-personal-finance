@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { getItemizationGap, labelAllocationInstallments, splitPurchaseProgress } from '../src/lib/loanSummary.ts'
+import { getItemizationGap, getLoanEffect, getPurchaseCostPreview, labelAllocationInstallments, splitPurchaseProgress } from '../src/lib/loanSummary.ts'
 
 test('purchases that cover the loan leave no gap', () => {
   const r = getItemizationGap(8540, [{ total_payable: 23040, remaining_balance: 6720 }, { total_payable: 3120, remaining_balance: 1820 }])
@@ -69,4 +69,54 @@ test('a partial payment names the installment it went toward', () => {
 test('the balancing final installment is numbered correctly', () => {
   const odd = { id: 'o', term_months: 3, monthly_installment: 33.33, total_payable: 100, opening_paid_amount: 66.66 }
   assert.equal(labelAllocationInstallments([odd], [allocation('a', 33.34, '2026-01-01', 'o')]).get('a'), 'Installment 3')
+})
+
+const warrantyCost = { principal: 2400, installment: 130, termMonths: 24, firstDueDate: '2026-10-15', installmentsPaid: 10 }
+
+test('the cost of borrowing is named: $720 on $2,400 at 1.25% flat over 24 months', () => {
+  const r = getPurchaseCostPreview(warrantyCost)
+  assert.equal(r.totalPayable, 3120)
+  assert.equal(r.interest, 720)
+  assert.equal(r.interestPct, 30)
+  assert.equal(r.openingPaidAmount, 1300)
+})
+
+test('the schedule preview runs from the first due date to the last', () => {
+  const r = getPurchaseCostPreview(warrantyCost)
+  assert.equal(r.firstDate, '2026-10-15')
+  assert.equal(r.finalDate, '2028-09-15')
+  assert.equal(r.finalInstallment, 130)
+})
+
+test('a month-end first due date is clamped in the final date', () => {
+  assert.equal(getPurchaseCostPreview({ ...warrantyCost, firstDueDate: '2026-01-31', termMonths: 2 }).finalDate, '2026-02-28')
+})
+
+test('nothing to preview until amount, installment and term are usable', () => {
+  assert.equal(getPurchaseCostPreview({ ...warrantyCost, principal: 0 }), null)
+  assert.equal(getPurchaseCostPreview({ ...warrantyCost, installment: NaN }), null)
+  assert.equal(getPurchaseCostPreview({ ...warrantyCost, termMonths: 0 }), null)
+  assert.equal(getPurchaseCostPreview({ ...warrantyCost, termMonths: 2.5 }), null)
+})
+
+test('opening progress never exceeds the total payable', () => {
+  assert.equal(getPurchaseCostPreview({ ...warrantyCost, installmentsPaid: 30 }).openingPaidAmount, 3120)
+})
+
+test('adding a purchase raises what the loan owes and the monthly obligation', () => {
+  const preview = getPurchaseCostPreview(warrantyCost)
+  const r = getLoanEffect({ baseOwed: 8940, baseMonthly: 620, baseCount: 1, allocatedToThis: 0 }, preview, 130)
+  assert.deepEqual(r, { owedAfter: 10760, monthlyAfter: 750, countAfter: 2 })
+})
+
+test('editing counts repayments already applied to the purchase', () => {
+  const preview = getPurchaseCostPreview({ ...warrantyCost, installmentsPaid: 0 })
+  const r = getLoanEffect({ baseOwed: 6720, baseMonthly: 480, baseCount: 1, allocatedToThis: 520 }, preview, 130)
+  assert.equal(r.owedAfter, 9320)
+})
+
+test('a fully paid purchase adds nothing to the monthly obligation', () => {
+  const preview = getPurchaseCostPreview({ ...warrantyCost, installmentsPaid: 24 })
+  const r = getLoanEffect({ baseOwed: 1000, baseMonthly: 480, baseCount: 1, allocatedToThis: 0 }, preview, 130)
+  assert.deepEqual(r, { owedAfter: 1000, monthlyAfter: 480, countAfter: 1 })
 })

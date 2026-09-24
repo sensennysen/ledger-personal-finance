@@ -11,3 +11,4 @@ Earlier retros left layout unverified because sign-in is Google-only. It doesn't
    - Navigate, `Runtime.evaluate` measurements (`main.scrollHeight` vs `clientHeight`), then `Page.captureScreenshot`.
 5. Wrap evaluated code in `(async () => { … })()`, since top-level await is rejected. For React inputs, set the value with the native setter, then dispatch `input` and `focusout`.
 6. Keep the script and screenshots in the session scratchpad, not the repo. Delete the test user when done.
+7. Simulate failures with CDP `Network.setBlockedURLs` (e.g. `*rest/v1/credit_card_payments*`); fetch then throws "Failed to fetch". Blocked **reads** take ~8 s to surface because supabase-js retries GETs, so wait before asserting; writes fail at once. Match buttons by exact `aria-label`: "Dismiss" also matches the PWA banner's "Dismiss install banner".

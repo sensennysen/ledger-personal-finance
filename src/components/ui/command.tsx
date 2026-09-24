@@ -59,8 +59,14 @@ function CommandDialog({
           className
         )}
         showCloseButton={showCloseButton}
-        // Search opens on its input: typing is the point (LED-91).
-        initialFocus
+        // Search opens on its input: typing is the point (LED-91). An
+        // autoFocus input would take focus before the dialog records the
+        // trigger, and closing would drop focus on <body>.
+        initialFocus={() =>
+          document.querySelector<HTMLElement>(
+            '[data-slot="dialog-content"] [data-slot="command-input"]'
+          ) ?? true
+        }
       >
         {children}
       </DialogContent>

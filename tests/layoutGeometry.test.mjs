@@ -39,5 +39,12 @@ test('entry-detail pane docks only where it fits beside the full-width Activity 
   assert.ok(1024 - pane < list, 'at lg a docked column would squeeze the list')
   // Below the dock width the pane is an overlay sheet, never a column.
   assert.match(layout, /\{wide && sheet === 'detail' && entry && \(\s*<aside/)
-  assert.match(layout, /open=\{desktop && !wide && sheet === 'detail'/)
+  assert.match(layout, /open=\{!wide && sheet === 'detail'/)
+})
+
+test('entry detail below lg is its own sheet, not the add/edit modal', () => {
+  assert.match(layout, /side=\{mobile \? 'bottom' : 'right'\}/)
+  assert.match(layout, /<Dialog\s+open=\{sheet === 'add' \|\| sheet === 'account'\}/)
+  const dialog = layout.slice(layout.indexOf("open={sheet === 'add' || sheet === 'account'}"))
+  assert.doesNotMatch(dialog, /<EntryDetail/)
 })

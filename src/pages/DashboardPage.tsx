@@ -76,7 +76,7 @@ function StatCard({
       tabIndex={onClick ? 0 : undefined}
       aria-label={onClick ? `View ${title.toLowerCase()} details` : undefined}
       className={cn(
-        'relative overflow-hidden rounded-[20px] border border-border p-5 transition-colors duration-(--dur-base) group bg-card press-scale focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
+        'relative overflow-hidden rounded-[20px] border border-border p-5 2xl:px-4 2xl:py-3 transition-colors duration-(--dur-base) group bg-card press-scale focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
         onClick && 'cursor-pointer select-none',
         className
       )}
@@ -91,7 +91,7 @@ function StatCard({
     >
 
 
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-4 2xl:mb-2">
         <p className="text-[0.6875rem] font-medium text-muted-foreground uppercase tracking-widest">{title}</p>
         <div className="flex items-center gap-1.5">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{background: variant==='income'?'var(--income-container)':variant==='expense'?'var(--expense-container)':'var(--accent)'}}>
@@ -251,11 +251,11 @@ export default function DashboardPage() {
     <WidgetDragContext.Provider value={{start:setDraggedWidget,drop:key=>{if(draggedWidget)reorderWidget(draggedWidget,key);setDraggedWidget(null)},end:()=>setDraggedWidget(null)}}>
     <div className="grid w-full min-w-0 gap-4 overflow-x-hidden p-4 md:p-6 lg:grid-cols-2 2xl:grid-cols-3">
       <div className="hidden md:flex items-start justify-between gap-3 flex-wrap col-span-full">
-        <div className="min-w-0">
+        <div className="min-w-0 2xl:flex 2xl:items-baseline 2xl:gap-3">
           <h1 className="text-2xl font-bold leading-tight truncate">
             {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Dashboard'}
           </h1>
-          <p className="text-muted-foreground text-[0.8125rem] mt-0.5">
+          <p className="text-muted-foreground text-[0.8125rem] mt-0.5 2xl:mt-0">
             {new Date().toLocaleDateString('en-US', {
               weekday: 'long',
               month: 'long',
@@ -280,7 +280,7 @@ export default function DashboardPage() {
       </div>
 
       <div
-        className="hidden md:block h-px col-span-full"
+        className="hidden md:block 2xl:hidden h-px col-span-full"
         style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }}
       />
 
@@ -306,7 +306,7 @@ export default function DashboardPage() {
       )}
 
       {!loading && !loadFailed && (
-        <div className="col-span-full" style={{ order: 0 }}>
+        <div className="col-span-full empty:hidden" style={{ order: 0 }}>
           <DashboardFirstRunChecklist
             accounts={accounts}
             transactions={transactions}

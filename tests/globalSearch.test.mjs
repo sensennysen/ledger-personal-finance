@@ -7,6 +7,11 @@ import {
   matchActions,
   capGroup,
   inScope,
+  GROUP_CAP,
+  searchMatcher,
+  categoryMatches,
+  mergeCategoryResults,
+  buildHandoff,
   DESTINATIONS,
   buildDueSoon,
   summarizeLoans,
@@ -136,6 +141,91 @@ test('capGroup limits drawn rows but keeps the true total', () => {
   const group = capGroup([1, 2, 3, 4, 5], 3)
   assert.deepEqual(group.items, [1, 2, 3])
   assert.equal(group.total, 5)
+})
+
+test('the default cap is three (design 29a)', () => {
+  assert.equal(GROUP_CAP, 3)
+  assert.deepEqual(capGroup(['a', 'b', 'c', 'd']).items, ['a', 'b', 'c'])
+})
+
+test('searchMatcher agrees with searchTransactions on text and amounts', () => {
+  const rows = [
+    tx('exact', 86.4),
+    tx('near', 88),
+    tx('far', 120),
+    tx('text', 5, { description: 'Bought 86.40 worth' }),
+    tx('note', 5, { notes: 'grab home' }),
+  ]
+  for (const query of ['86.40', 'grab', 'misc', 'nothing']) {
+    const found = searchTransactions(rows, query, 'all', range)
+    const expected = ids([...found.exact, ...found.nearby, ...found.text]).sort()
+    assert.deepEqual(ids(rows.filter(searchMatcher(query))).sort(), expected, query)
+  }
+  assert.equal(rows.filter(searchMatcher('  ')).length, rows.length)
+})
+
+test('account scope keeps rows leaving or entering the account', () => {
+  const rows = [
+    tx('out', 1, { account_id: 'a' }),
+    tx('in', 1, { account_id: 'b', to_account_id: 'a' }),
+    tx('other', 1, { account_id: 'b' }),
+    tx('old', 1, { account_id: 'a', date: '2025-01-01' }),
+  ]
+  assert.deepEqual(ids(inScope(rows, 'all', range, 'a')), ['out', 'in', 'old'])
+  assert.deepEqual(ids(inScope(rows, 'cycle', range, 'a')), ['out', 'in'])
+  assert.deepEqual(ids(searchTransactions(rows, 'misc', 'cycle', range, 'a').text), ['out', 'in'])
+})
+
+test('categoryMatches buckets matched rows by category id', () => {
+  const byCategory = categoryMatches([
+    tx('1', 1, { category_id: 't' }),
+    tx('2', 1, { category_id: 'd' }),
+    tx('3', 1, { category_id: 't' }),
+    tx('4', 1, { category_id: null }),
+  ])
+  assert.deepEqual(ids(byCategory.get('t')), ['1', '3'])
+  assert.deepEqual(ids(byCategory.get('d')), ['2'])
+  assert.equal(byCategory.size, 2)
+})
+
+test('mergeCategoryResults puts name matches first, then containing categories by count', () => {
+  const categories = [
+    { id: 'd', name: 'Dining' },
+    { id: 't', name: 'Transport' },
+    { id: 'g', name: 'Grab rewards' },
+    { id: 'x', name: 'Rent' },
+  ]
+  const counts = new Map([['d', 3], ['t', 211], ['g', 1]])
+  assert.deepEqual(ids(mergeCategoryResults(categories, 'grab', counts)), ['g', 't', 'd'])
+  assert.deepEqual(mergeCategoryResults(categories, '', counts), [])
+})
+
+test('buildHandoff sends cycle searches to Activity with the query encoded', () => {
+  const handoff = buildHandoff({ query: ' grab & go ', scope: 'cycle', paletteTotal: 12, cycleCount: 12 })
+  assert.equal(handoff.path, '/transactions?q=grab%20%26%20go')
+  assert.equal(handoff.count, 12)
+  assert.equal(handoff.complete, true)
+  assert.equal(handoff.label, 'See all in Activity')
+})
+
+test('buildHandoff states the cycle count when an all-time search exceeds it', () => {
+  const handoff = buildHandoff({ query: 'grab', scope: 'all', paletteTotal: 397, cycleCount: 41 })
+  assert.equal(handoff.count, 41)
+  assert.equal(handoff.complete, false)
+  assert.equal(handoff.label, 'See 41 this cycle in Activity')
+  const same = buildHandoff({ query: 'grab', scope: 'all', paletteTotal: 5, cycleCount: 5 })
+  assert.equal(same.complete, true)
+})
+
+test('buildHandoff sends an account scope to that account', () => {
+  const account = { id: 'acc-1', name: 'Everyday' }
+  const handoff = buildHandoff({
+    query: 'grab', scope: 'cycle', paletteTotal: 9, cycleCount: 40, account, accountCount: 30,
+  })
+  assert.equal(handoff.path, '/accounts/acc-1?q=grab')
+  assert.equal(handoff.count, 30)
+  assert.equal(handoff.complete, false)
+  assert.equal(handoff.label, 'See all in Everyday')
 })
 
 const deadline = (dueDate, ...items) => ({

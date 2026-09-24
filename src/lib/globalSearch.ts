@@ -12,6 +12,9 @@ export interface SearchRange {
 export interface SearchableTransaction {
   id: string
   date: string
+  account_id?: string
+  to_account_id?: string | null
+  category_id?: string | null
   amount: number
   description: string
   notes?: string | null
@@ -40,7 +43,8 @@ export interface TransactionMatches<T> {
 
 // Fraction either side of an exact amount that still counts as "nearby".
 export const AMOUNT_BAND = 0.05
-export const GROUP_CAP = 8
+// Design 29a: each group draws three rows and states its true count.
+export const GROUP_CAP = 3
 
 const toCents = (value: number) => Math.round(Math.abs(value) * 100)
 
@@ -55,16 +59,48 @@ export function parseAmountQuery(query: string): number | null {
 const includes = (haystack: string | null | undefined, needle: string) =>
   !!haystack && haystack.toLowerCase().includes(needle)
 
-export function inScope<T extends { date: string }>(
+// `accountId` narrows to rows that leave or enter that account (⌘F in the palette).
+export function inScope<T extends { date: string; account_id?: string; to_account_id?: string | null }>(
   rows: T[],
   scope: SearchScope,
   range: SearchRange,
+  accountId?: string,
 ): T[] {
-  if (scope === 'all') return rows
   return rows.filter((row) => {
+    if (accountId && row.account_id !== accountId && row.to_account_id !== accountId) return false
+    if (scope === 'all') return true
     const day = row.date.slice(0, 10)
     return day >= range.start && day <= range.end
   })
+}
+
+const matchesText = (row: SearchableTransaction, needle: string) =>
+  includes(row.description, needle) ||
+  includes(row.notes, needle) ||
+  includes(row.account?.name, needle) ||
+  includes(row.to_account?.name, needle) ||
+  includes(row.category?.name, needle)
+
+// Cents away from the target, or null when outside the ±AMOUNT_BAND band.
+function amountDistance(amount: number, targetCents: number): number | null {
+  const distance = Math.abs(toCents(amount) - targetCents)
+  if (distance === 0) return 0
+  return targetCents > 0 && distance <= targetCents * AMOUNT_BAND ? distance : null
+}
+
+/**
+ * One row-level predicate for the palette and the Activity / Account search
+ * boxes, so "See all in Activity" lands on exactly the rows the palette counted.
+ * An empty query matches everything.
+ */
+export function searchMatcher(query: string): (row: SearchableTransaction) => boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return () => true
+  const target = parseAmountQuery(needle)
+  const targetCents = target === null ? null : toCents(target)
+  return (row) =>
+    (targetCents !== null && amountDistance(row.amount, targetCents) !== null) ||
+    matchesText(row, needle)
 }
 
 export function searchTransactions<T extends SearchableTransaction>(
@@ -72,12 +108,13 @@ export function searchTransactions<T extends SearchableTransaction>(
   query: string,
   scope: SearchScope,
   range: SearchRange,
+  accountId?: string,
 ): TransactionMatches<T> {
   const needle = query.trim().toLowerCase()
   const empty = { exact: [], nearby: [], text: [] }
   if (!needle) return empty
 
-  const scoped = inScope(rows, scope, range)
+  const scoped = inScope(rows, scope, range, accountId)
   const target = parseAmountQuery(needle)
   const exact: T[] = []
   const nearby: T[] = []
@@ -85,28 +122,101 @@ export function searchTransactions<T extends SearchableTransaction>(
 
   if (target !== null) {
     const targetCents = toCents(target)
-    const bandCents = targetCents * AMOUNT_BAND
     const banded: { row: T; distance: number }[] = []
     for (const row of scoped) {
-      const distance = Math.abs(toCents(row.amount) - targetCents)
+      const distance = amountDistance(row.amount, targetCents)
       if (distance === 0) exact.push(row)
-      else if (targetCents > 0 && distance <= bandCents) banded.push({ row, distance })
+      else if (distance !== null) banded.push({ row, distance })
     }
     banded.sort((a, b) => a.distance - b.distance)
     for (const { row } of banded) nearby.push(row)
     for (const row of [...exact, ...nearby]) claimed.add(row.id)
   }
 
-  const text = scoped.filter(
-    (row) =>
-      !claimed.has(row.id) &&
-      (includes(row.description, needle) ||
-        includes(row.notes, needle) ||
-        includes(row.account?.name, needle) ||
-        includes(row.to_account?.name, needle) ||
-        includes(row.category?.name, needle)),
-  )
+  const text = scoped.filter((row) => !claimed.has(row.id) && matchesText(row, needle))
   return { exact, nearby, text }
+}
+
+// Matched transactions per category id, in match order.
+export function categoryMatches<T extends SearchableTransaction>(matches: T[]): Map<string, T[]> {
+  const byCategory = new Map<string, T[]>()
+  for (const row of matches) {
+    if (!row.category_id) continue
+    const rows = byCategory.get(row.category_id)
+    if (rows) rows.push(row)
+    else byCategory.set(row.category_id, [row])
+  }
+  return byCategory
+}
+
+/**
+ * Design 29a: a category shows up when its name matches or when matched
+ * transactions sit inside it ("Transport · contains 211 matches"). Name matches
+ * lead in their incoming order; the rest follow by match count, most first.
+ */
+export function mergeCategoryResults<T extends SearchableNamed>(
+  categories: T[],
+  query: string,
+  matchCounts: Map<string, number>,
+): T[] {
+  if (!query.trim()) return []
+  const named = searchNamed(categories, query)
+  const seen = new Set(named.map((category) => category.id))
+  const containing = categories
+    .filter((category) => !seen.has(category.id) && (matchCounts.get(category.id) ?? 0) > 0)
+    .sort((a, b) => (matchCounts.get(b.id) ?? 0) - (matchCounts.get(a.id) ?? 0))
+  return [...named, ...containing]
+}
+
+export interface SearchHandoff {
+  path: string
+  /** Rows the destination will show for this query. */
+  count: number
+  /** True when the destination shows every transaction the palette counted. */
+  complete: boolean
+  label: string
+}
+
+/**
+ * Where "See all" lands. An account scope opens that account's full history;
+ * otherwise Activity, which is bound to the selected cycle. For an all-time
+ * search the label states the cycle count instead of promising rows Activity
+ * cannot show.
+ */
+export function buildHandoff({
+  query,
+  scope,
+  paletteTotal,
+  cycleCount,
+  account,
+  accountCount,
+}: {
+  query: string
+  scope: SearchScope
+  paletteTotal: number
+  cycleCount: number
+  account?: { id: string; name: string } | null
+  accountCount?: number
+}): SearchHandoff {
+  const q = `?q=${encodeURIComponent(query.trim())}`
+  if (account) {
+    const count = accountCount ?? 0
+    return {
+      path: `/accounts/${account.id}${q}`,
+      count,
+      complete: count === paletteTotal,
+      label: `See all in ${account.name}`,
+    }
+  }
+  if (scope === 'all' && cycleCount !== paletteTotal) {
+    return {
+      path: `/transactions${q}`,
+      count: cycleCount,
+      complete: false,
+      label: `See ${cycleCount} this cycle in Activity`,
+    }
+  }
+  return { path: `/transactions${q}`, count: cycleCount, complete: true, label: 'See all in Activity' }
 }
 
 export function searchNamed<T extends SearchableNamed>(rows: T[], query: string): T[] {

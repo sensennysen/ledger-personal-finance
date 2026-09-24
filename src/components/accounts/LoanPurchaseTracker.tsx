@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CloudOff, Layers3, MoreVertical, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CloudOff, Layers3, MoreVertical, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react'
 import { LoanPurchaseForm } from '@/components/accounts/LoanPurchaseForm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
-import { withDetail, type FormErrorValue } from '@/lib/dataErrors'
+import { withDetail, type FormErrorValue, type MutationResult } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -16,6 +16,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
+import { getItemizationGap } from '@/lib/loanSummary'
 import type { Account, LoanPurchase } from '@/types'
 
 /**
@@ -43,22 +44,29 @@ interface LoanPurchaseTrackerProps {
   account: Account
   onAccountChanged: () => void
   loanData?: ReturnType<typeof useLoanPurchases>
+  /** Sets what the loan owes; the page routes it through the balance-adjustment path. */
+  onSetLoanAmount?: (owed: number) => Promise<MutationResult>
 }
 
 const DEADLINES_PAGE_SIZE = 4
 
-export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: LoanPurchaseTrackerProps) {
+export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSetLoanAmount }: LoanPurchaseTrackerProps) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editPurchase, setEditPurchase] = useState<LoanPurchase | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<LoanPurchase | null>(null)
   const [formError, setFormError] = useState<FormErrorValue>(null)
   const [deadlinePage, setDeadlinePage] = useState(0)
   const [expandedDeadline, setExpandedDeadline] = useState<string | null>(null)
+  const [reconciling, setReconciling] = useState(false)
   const { categories } = useCategories()
   const isOnline = useIsOnline()
   const internalLoanData = useLoanPurchases(account.id, !loanData)
   const { purchases, allocations, deadlines, loading, error, errorDetail, refetch, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
   const loadState = resolveLoadState({ loading, error, hasData: purchases.length > 0 })
+  const owed = getLoanAmountOwed(account)
+  const { itemized, gap } = getItemizationGap(owed, purchases)
+  // Only a settled read can be reconciled: a stale or in-flight list would report a gap that isn't there.
+  const showReconciliation = !loading && (loadState === 'ready' || loadState === 'empty') && gap !== 0
   const expenseCategories = categories.filter((category) => category.type === 'expense' || category.type === 'both')
   const purchaseById = useMemo(() => new Map(purchases.map((purchase) => [purchase.id, purchase])), [purchases])
   const recentAllocations = useMemo(
@@ -96,6 +104,47 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
       <FormError error={formError} />
       {loadState === 'stale-error' && (
         <InlineLoadError message="Couldn't refresh your financed purchases. Showing what was last loaded." onRetry={() => void refetch()} />
+      )}
+
+      {showReconciliation && (
+        <div role="status" className="flex items-start gap-2.5 rounded-lg border border-yellow-400/60 bg-yellow-50 px-3.5 py-3 text-xs text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <div className="min-w-0 space-y-2">
+            {gap > 0 ? (
+              <>
+                <p className="font-semibold">{purchases.length === 0 ? "None of this loan is itemized" : "Some of this loan isn't itemized"}</p>
+                <p>
+                  The account carries {formatCurrency(owed, account.currency)} owed
+                  {purchases.length > 0 && <>, but the purchases below account for {formatCurrency(itemized, account.currency)} of it</>}.
+                  {' '}The remaining {formatCurrency(gap, account.currency)} has no schedule, so it never appears in a deadline.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold">The purchases add up to more than this loan owes</p>
+                <p>
+                  The purchases below have {formatCurrency(itemized, account.currency)} left to pay, but the account carries only {formatCurrency(owed, account.currency)} owed. The {formatCurrency(-gap, account.currency)} difference is scheduled but not counted in the loan's balance.
+                </p>
+              </>
+            )}
+            {purchases.length > 0 && onSetLoanAmount && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-yellow-400/60 bg-transparent text-xs"
+                disabled={!isOnline || reconciling}
+                onClick={async () => {
+                  setReconciling(true)
+                  const result = await onSetLoanAmount(itemized)
+                  setReconciling(false)
+                  setFormError(withDetail(result))
+                }}
+              >
+                {reconciling ? 'Saving...' : `Set the loan amount to ${formatCurrency(itemized, account.currency)}`}
+              </Button>
+            )}
+          </div>
+        </div>
       )}
 
       {loadState === 'error' ? (
@@ -277,9 +326,9 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Add Financed Purchase</DialogTitle></DialogHeader>
           <FormError error={formError} />
-          {loadState !== 'error' && purchases.length === 0 && getLoanAmountOwed(account) > 0 && (
+          {showReconciliation && gap > 0 && (
             <p className="rounded-lg border border-yellow-400/60 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
-              This account already has {formatCurrency(getLoanAmountOwed(account), account.currency)} of unitemized opening debt. A financed purchase will be added on top; set the account’s loan amount to 0 first if this purchase represents that same debt.
+              This account already has {formatCurrency(gap, account.currency)} of unitemized debt. A financed purchase will be added on top; lower the account’s loan amount by {formatCurrency(gap, account.currency)} first if this purchase represents that same debt.
             </p>
           )}
           <LoanPurchaseForm

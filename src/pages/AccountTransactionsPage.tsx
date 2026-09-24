@@ -389,6 +389,14 @@ export default function AccountTransactionsPage() {
     if (retrying) notify({ severity: 'success', title: `Statement updated for ${card.name}` })
   }
 
+  // Same path as editing the balance in the account form, so the change leaves an adjustment in history.
+  const handleSetLoanAmount = async (owed: number) => {
+    if (!account) return { error: 'Account not found' }
+    const result = await updateAccountWithAdjustment(account.id, { balance: -owed }, account.balance)
+    if (!result.error) refetchAccounts()
+    return result
+  }
+
   const handleAccountEdit = async (values: AccountFormValues) => {
     if (!account) return
     const { error, errorDetail } = await updateAccountWithAdjustment(account.id, normalizeCreditCardBalanceForStorage(values), account.balance)
@@ -751,7 +759,12 @@ export default function AccountTransactionsPage() {
         )}
         <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
         {account?.type === 'loan' && loanSection === 'purchases' && (
-          <LoanPurchaseTracker account={account} onAccountChanged={refetchAccounts} loanData={loanData} />
+          <LoanPurchaseTracker
+            account={account}
+            onAccountChanged={refetchAccounts}
+            loanData={loanData}
+            onSetLoanAmount={handleSetLoanAmount}
+          />
         )}
 
         <Dialog open={editAccountOpen} onOpenChange={setEditAccountOpen}>

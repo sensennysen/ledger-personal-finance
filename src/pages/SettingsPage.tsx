@@ -321,7 +321,7 @@ export default function SettingsPage() {
             <ColorPicker
                 value={accentColor}
                 onChange={setAccentColor}
-                palette={['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#06b6d4']}
+                palette={['#55659a','#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#06b6d4']}
               />
             <p className="text-xs text-muted-foreground mt-2">Customizes the primary action color throughout the app.</p>
           </div>
@@ -395,7 +395,7 @@ export default function SettingsPage() {
 
           <div className="space-y-1.5">
             <Label htmlFor="preferences-large-transaction-threshold">
-              <AlertTriangle className="w-4 h-4 text-amber-500" /> Large Transaction Alert Threshold
+              <AlertTriangle className="w-4 h-4 text-warning" /> Large Transaction Alert Threshold
             </Label>
             <div className="flex items-center gap-2">
               <Input

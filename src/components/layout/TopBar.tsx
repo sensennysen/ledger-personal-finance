@@ -116,10 +116,10 @@ export function TopBar({
               className={cn(
                 'flex h-10 items-center gap-2 rounded-full px-3 lg:px-4 text-[0.8125rem] font-medium transition-colors press-scale',
                 locked
-                  ? 'text-muted-foreground hover:text-foreground hover:bg-white/4'
+                  ? 'text-muted-foreground hover:text-foreground hover:bg-foreground/4'
                   : active
                     ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/4',
+                    : 'text-muted-foreground hover:text-foreground hover:bg-foreground/4',
               )}
             >
               <Icon className="size-4 shrink-0" />
@@ -156,7 +156,7 @@ export function TopBar({
           aria-label={SETTINGS_DESTINATION.label}
           className={({ isActive }) =>
             cn(
-              'flex size-9 items-center justify-center rounded-full transition-colors hover:bg-white/4',
+              'flex size-9 items-center justify-center rounded-full transition-colors hover:bg-foreground/4',
               isActive ? 'text-foreground' : 'text-muted-foreground',
             )
           }

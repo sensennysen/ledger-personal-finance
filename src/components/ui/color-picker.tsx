@@ -27,7 +27,7 @@ export function ColorPicker({ value, onChange, palette, className }: ColorPicker
           className="w-7 h-7 rounded-full border-2 transition-all hover:scale-110"
           style={{
             backgroundColor: c,
-            borderColor: value === c ? 'white' : 'transparent',
+            borderColor: value === c ? 'var(--card)' : 'transparent',
             outline: value === c ? `2px solid ${c}` : 'none',
             outlineOffset: '2px',
           }}
@@ -42,7 +42,7 @@ export function ColorPicker({ value, onChange, palette, className }: ColorPicker
         className="w-7 h-7 rounded-full border-2 transition-all hover:scale-110 flex items-center justify-center overflow-hidden relative"
         style={{
           backgroundColor: isCustom ? value : 'transparent',
-          borderColor: isCustom ? 'white' : 'hsl(var(--border))',
+          borderColor: isCustom ? 'var(--card)' : 'var(--border)',
           outline: isCustom ? `2px solid ${value}` : 'none',
           outlineOffset: '2px',
         }}

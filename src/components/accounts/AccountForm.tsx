@@ -192,7 +192,7 @@ export function AccountForm({
               <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
               <FormMessage />
               {balanceChanged && (
-                <div className="flex items-start gap-2 rounded-md border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-950/30 p-2.5 text-sm text-yellow-800 dark:text-yellow-300">
+                <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning-container p-2.5 text-sm text-warning">
                   <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
                   <span>
                     Changing the balance will create a <strong>Balance Adjustment</strong> transaction for the difference ({normalizedWatchedBalance > originalBalance! ? '+' : ''}{formatCurrency(normalizedWatchedBalance - originalBalance!, account?.currency ?? 'USD')}). This keeps your transaction history accurate.

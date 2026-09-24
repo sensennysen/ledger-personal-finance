@@ -29,6 +29,7 @@ import { formatLoanSchedule } from '@/lib/loans'
 import { buildAccountsOverview, formatShare, isLiability, type AssetRow, type LiabilityRow } from '@/lib/accountsOverview'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
 import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 function formatDueIn(days: number) {
   if (days < 0) return `${-days}d overdue`
@@ -37,6 +38,7 @@ function formatDueIn(days: number) {
 }
 
 export default function AccountsPage() {
+  const ink = useCategoryInk()
   const { user, profile, refreshProfile } = useAuth()
   const { accounts, loading, error, errorDetail, refetch, createAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder } = useAccounts()
   const loadState = resolveLoadState({ loading, error, hasData: accounts.length > 0 })
@@ -277,7 +279,7 @@ export default function AccountsPage() {
     return (
       <span
         className="flex size-8 shrink-0 items-center justify-center rounded-lg"
-        style={{ backgroundColor: account.color + '20', color: account.color }}
+        style={{ backgroundColor: ink(account.color) + '20', color: ink(account.color) }}
       >
         <Icon className="w-4 h-4" />
       </span>
@@ -349,7 +351,7 @@ export default function AccountsPage() {
         )}
         style={{ '--anim-delay': `${Math.min(idx * 60, 240)}ms` } as React.CSSProperties}
       >
-        <div className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: account.color }} />
+        <div className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: ink(account.color) }} />
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             {rearrangeControls(account, flatRearrange, columnIds)}

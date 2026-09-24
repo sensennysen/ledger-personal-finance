@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { EmptyState } from '@/components/ui/empty-state'
 import { DashboardSummaryValueRow } from '@/components/dashboard/DashboardSummaryValueRow'
 import { DashboardTransactionRow } from '@/components/dashboard/DashboardTransactionRow'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 export type DashboardDetailView = 'balance' | 'income' | 'expenses' | 'categories' | null
 
@@ -109,6 +110,7 @@ export function DashboardDetailDialogs({
   stats,
   currency,
 }: DashboardDetailDialogsProps) {
+  const ink = useCategoryInk()
   return (
     <>
       <Dialog open={detailView === 'balance'} onOpenChange={(open) => !open && setDetailView(null)}>
@@ -126,9 +128,9 @@ export function DashboardDetailDialogs({
                   <div key={account.id} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 bg-muted/30">
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 border border-border/50"
-                      style={{ backgroundColor: account.color + '22' }}
+                      style={{ backgroundColor: ink(account.color) + '22' }}
                     >
-                      <AccountIcon className="w-4 h-4" style={{ color: account.color }} />
+                      <AccountIcon className="w-4 h-4" style={{ color: ink(account.color) }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[0.8125rem] font-medium truncate">{account.name}</p>
@@ -208,14 +210,14 @@ export function DashboardDetailDialogs({
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{categoryBreakdown.icon}</span>
                       <span className="flex-1 text-[0.8125rem] font-medium">{categoryBreakdown.name}</span>
-                      <span className="money text-[0.8125rem] font-semibold shrink-0" style={{ color: categoryBreakdown.color }}>
+                      <span className="money text-[0.8125rem] font-semibold shrink-0" style={{ color: ink(categoryBreakdown.color) }}>
                         {formatCurrency(categoryBreakdown.amount, currency)}
                       </span>
                     </div>
                     <div className="h-1.5 rounded-full bg-border overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
-                        style={{ width: `${categoryBreakdown.percentage}%`, backgroundColor: categoryBreakdown.color }}
+                        style={{ width: `${categoryBreakdown.percentage}%`, backgroundColor: ink(categoryBreakdown.color) }}
                       />
                     </div>
                     <p className="text-[0.6875rem] text-muted-foreground">

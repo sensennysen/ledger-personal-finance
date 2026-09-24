@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react'
 import { LegalPage } from '@/components/legal/LegalPage'
+import { ExportDataCard } from '@/components/legal/ExportDataCard'
 import { cn } from '@/lib/utils'
 
 const LAST_UPDATED = 'May 2, 2026'
@@ -55,6 +56,7 @@ export default function DataDeletionPage() {
         </p>
       }
       toc={TOC}
+      aside={<ExportDataCard />}
     >
       <div className="space-y-10">
         {/* ── What we store ── */}

@@ -47,6 +47,7 @@ import {
   type Lookback,
 } from '@/lib/reportLookback'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
 import { abbreviateTick } from '@/lib/chartTicks'
 import { REPORT_COLUMNS, defaultColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
 import { Button } from '@/components/ui/button'
@@ -81,70 +82,6 @@ function localDateStr(date: Date) {
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
-}
-
-// ─── csv export ───────────────────────────────────────────────────────────────
-
-function escapeCsvCell(value: string | number | null | undefined): string {
-  let str = String(value ?? '')
-  // Neutralize spreadsheet formulas when the CSV is opened in Excel/Sheets.
-  if (/^[=+\-@]/.test(str)) {
-    str = `'${str}`
-  }
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`
-  }
-  return str
-}
-
-function exportToCsv(
-  transactions: Transaction[],
-  filename: string,
-  balanceMap: Map<string, number>,
-) {
-  const headers = [
-    'Date',
-    'Type',
-    'Description',
-    'Category',
-    'Account',
-    'To Account',
-    'Amount',
-    'Currency',
-    'Exchange Rate',
-    'Transfer Fee',
-    'Standing Balance',
-    'Notes',
-  ]
-
-  const rows = transactions.map((t) => [
-    t.date,
-    t.type,
-    t.description,
-    t.category?.name ?? '',
-    t.account?.name ?? t.account_id,
-    t.to_account?.name ?? t.to_account_id ?? '',
-    t.amount,
-    t.currency,
-    t.exchange_rate,
-    t.transfer_fee ?? '',
-    balanceMap.get(t.id) ?? '',
-    t.notes ?? '',
-  ])
-
-  const csvContent = [headers, ...rows]
-    .map((row) => row.map(escapeCsvCell).join(','))
-    .join('\n')
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.setAttribute('download', filename)
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
 }
 
 // ─── pdf export ──────────────────────────────────────────────────────────────
@@ -523,7 +460,7 @@ export default function ReportsPage() {
   )
 
   const handleExport = () => {
-    exportToCsv(sortedTransactions, `ledger-report_${filenameLabel}.csv`, txBalanceMap)
+    downloadCsv(buildTransactionsCsv(sortedTransactions, txBalanceMap), `ledger-report_${filenameLabel}.csv`)
   }
 
   const handleExportPdf = () => {

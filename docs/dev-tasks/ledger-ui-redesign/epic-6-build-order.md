@@ -86,6 +86,7 @@ so Activity goes first.
 | 27 | LED-96 | Login page says what the product is | 2 | |
 | 28 | LED-88 | One `<LegalPage>` layout for three documents | 5 | |
 | 29 | LED-89 | CSV export on the data-deletion page | 2 | Goes on LED-88's page and reuses the Reports exporter. |
+| 30 | LED-103 | Mobile add transaction uses the full form | 2 | Added 2026-09-24 from add-transaction-spec §4, which no ticket covered. Independent, so it can be pulled forward. |
 
 ## Things to watch
 

@@ -9,6 +9,7 @@ import {
   Store,
   ArrowUpRight,
   ChevronDown,
+  Columns3,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -38,6 +39,8 @@ import {
   type Lookback,
 } from '@/lib/reportLookback'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { abbreviateTick } from '@/lib/chartTicks'
+import { REPORT_COLUMNS, defaultColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -46,14 +49,16 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { PageActions } from '@/components/layout/PageActions'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { EmptyState } from '@/components/ui/empty-state'
-import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
+import { INCOME, EXPENSE, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import { OverspendingCard } from '@/components/reports/OverspendingCard'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
@@ -345,10 +350,10 @@ function IncomeExpenseCard({
   currency: string
 }) {
   return (
-    <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
+    <div className="h-full rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
+          <FileBarChart2 className="w-3.5 h-3.5 text-muted-foreground" />
           <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
             Income vs. Expenses — {getLookbackSubtitle(lookback, new Date())}
           </p>
@@ -365,9 +370,9 @@ function IncomeExpenseCard({
         </select>
       </div>
   {loading ? (
-        <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
+        <div className="flex-1 min-h-52 lg:min-h-72"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
       ) : (
-        <div className="h-52">
+        <div className="flex-1 min-h-52 lg:min-h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
@@ -381,8 +386,8 @@ function IncomeExpenseCard({
                 tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v: number) => formatCurrency(v, currency)}
-                width={72}
+                tickFormatter={abbreviateTick}
+                width={40}
               />
               <Tooltip
                 formatter={(v, name) => [formatCurrency(v as number, currency), name as string]}
@@ -404,6 +409,8 @@ function IncomeExpenseCard({
     </div>
   )
 }
+
+const RIGHT_ALIGNED = new Set<ReportColumn>(['amount', 'balance'])
 
 // ─── main page ────────────────────────────────────────────────────────────────
 
@@ -560,6 +567,11 @@ export default function ReportsPage() {
   })()
 
   const activeAccounts = accounts.filter((a) => a.is_active)
+
+  // Transaction table columns: all seven when there is room, session-only.
+  const wide = useMediaQuery('(min-width: 768px)')
+  const [visibleColumns, setVisibleColumns] = useState(() => defaultColumns(wide))
+  const columns = REPORT_COLUMNS.filter((c) => visibleColumns.has(c.key))
   const balanceSummary = getBalanceSummary(activeAccounts)
   const totalBalance = balanceSummary.netWorth
 
@@ -731,7 +743,7 @@ export default function ReportsPage() {
               <Separator className="my-1" />
               <div className="flex items-center justify-between px-3 py-1.5">
                 <span className="text-xs font-medium text-muted-foreground">Net</span>
-                <span className="text-[0.8125rem] font-bold tabular-nums" style={{ color: GOLD }}>
+                <span className="text-[0.8125rem] font-bold tabular-nums" style={{ color: 'var(--foreground)' }}>
                   {formatCurrency(totalBalance, currency)}
                 </span>
               </div>
@@ -749,9 +761,32 @@ export default function ReportsPage() {
           <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
             Transactions
           </p>
-          <span className="text-[0.6875rem] text-muted-foreground tabular-nums">
-            {filtered.length} record{filtered.length !== 1 ? 's' : ''}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[0.6875rem] text-muted-foreground tabular-nums">
+              {filtered.length} record{filtered.length !== 1 ? 's' : ''}
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+                    <Columns3 className="w-3.5 h-3.5" />
+                    Columns
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="w-40">
+                {REPORT_COLUMNS.filter((c) => !c.required).map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c.key}
+                    checked={visibleColumns.has(c.key)}
+                    onCheckedChange={() => setVisibleColumns((prev) => toggleColumn(prev, c.key))}
+                  >
+                    {c.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {loading ? (
@@ -782,15 +817,20 @@ export default function ReportsPage() {
           />
         ) : (
           <ScrollArea className="max-h-120">
-            <table className="w-full text-[0.8125rem]">
+            <table className="w-full min-w-max text-[0.8125rem]">
               <thead className="sticky top-0 bg-card z-10">
                 <tr className="border-b border-border/40">
-                  <th className="text-left px-4 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Date</th>
-                  <th className="text-left px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Description</th>
-                  <th className="hidden sm:table-cell text-left px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Category</th>
-                  <th className="hidden md:table-cell text-left px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Account</th>
-                  <th className="text-right px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Amount</th>
-                  <th className="hidden lg:table-cell text-right px-4 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Balance</th>
+                  {columns.map((c) => (
+                    <th
+                      key={c.key}
+                      className={cn(
+                        'px-2 py-2.5 first:pl-4 last:pr-4 text-[0.6875rem] font-medium text-muted-foreground tracking-wide',
+                        RIGHT_ALIGNED.has(c.key) ? 'text-right' : 'text-left',
+                      )}
+                    >
+                      {c.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -799,6 +839,72 @@ export default function ReportsPage() {
                   const isTransfer = t.type === 'transfer'
                   const amountColor = isIncome ? INCOME : isTransfer ? TRANSFER : EXPENSE
                   const sign = isIncome ? '+' : isTransfer ? '↔' : '−'
+                  const cell = (key: ReportColumn) => {
+                    switch (key) {
+                      case 'date':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-muted-foreground whitespace-nowrap">
+                            {formatDate(t.date)}
+                          </td>
+                        )
+                      case 'description':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 max-w-40">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-medium truncate">{t.description}</span>
+                              {!visibleColumns.has('category') && (
+                                <span className="text-[0.6875rem] text-muted-foreground">
+                                  {t.category?.name ?? '—'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )
+                      case 'category':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-muted-foreground">
+                            {t.category ? (
+                              <span className="flex items-center gap-1.5">
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full inline-block shrink-0"
+                                  style={{ background: t.category.color }}
+                                />
+                                {t.category.name}
+                              </span>
+                            ) : '—'}
+                          </td>
+                        )
+                      case 'account':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-muted-foreground">
+                            {t.account?.name ?? '—'}
+                            {t.type === 'transfer' && t.to_account && (
+                              <span className="text-[0.6875rem]"> → {t.to_account.name}</span>
+                            )}
+                          </td>
+                        )
+                      case 'type':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 capitalize" style={{ color: amountColor }}>
+                            {t.type}
+                          </td>
+                        )
+                      case 'amount':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-right font-semibold tabular-nums whitespace-nowrap" style={{ color: amountColor }}>
+                            {sign} {formatCurrency(t.amount, t.currency)}
+                          </td>
+                        )
+                      case 'balance':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-right tabular-nums whitespace-nowrap text-muted-foreground">
+                            {txBalanceMap.has(t.id)
+                              ? formatCurrency(txBalanceMap.get(t.id)!, t.account?.currency ?? t.currency)
+                              : '—'}
+                          </td>
+                        )
+                    }
+                  }
                   return (
                     <tr
                       key={t.id}
@@ -807,42 +913,7 @@ export default function ReportsPage() {
                         i % 2 === 0 ? '' : 'bg-muted/10'
                       )}
                     >
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                        {formatDate(t.date)}
-                      </td>
-                      <td className="px-2 py-3 max-w-40">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-medium truncate">{t.description}</span>
-                          <span className="text-[0.6875rem] text-muted-foreground sm:hidden">
-                            {t.category?.name ?? '—'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="hidden sm:table-cell px-2 py-3 text-muted-foreground">
-                        {t.category ? (
-                          <span className="flex items-center gap-1.5">
-                            <span
-                              className="w-1.5 h-1.5 rounded-full inline-block shrink-0"
-                              style={{ background: t.category.color }}
-                            />
-                            {t.category.name}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td className="hidden md:table-cell px-2 py-3 text-muted-foreground">
-                        {t.account?.name ?? '—'}
-                        {t.type === 'transfer' && t.to_account && (
-                          <span className="text-[0.6875rem]"> → {t.to_account.name}</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-3 text-right font-semibold tabular-nums whitespace-nowrap" style={{ color: amountColor }}>
-                        {sign} {formatCurrency(t.amount, t.currency)}
-                      </td>
-                      <td className="hidden lg:table-cell px-4 py-3 text-right tabular-nums whitespace-nowrap text-muted-foreground">
-                        {txBalanceMap.has(t.id)
-                          ? formatCurrency(txBalanceMap.get(t.id)!, t.account?.currency ?? t.currency)
-                          : '—'}
-                      </td>
+                      {columns.map((c) => cell(c.key))}
                     </tr>
                   )
                 })}
@@ -862,9 +933,9 @@ export default function ReportsPage() {
               <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time — Last 13 months · monthly</p>
             </div>
             {loading ? (
-              <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
+              <div className="h-52 md:h-72 xl:h-80"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
             ) : (
-              <div className="h-52">
+              <div className="h-52 md:h-72 xl:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={netWorthData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
@@ -878,8 +949,8 @@ export default function ReportsPage() {
                       tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: number) => formatCurrency(v, currency)}
-                      width={72}
+                      tickFormatter={abbreviateTick}
+                      width={40}
                     />
                     <Tooltip
                       formatter={(v) => [formatCurrency(v as number, currency), 'Net Worth']}

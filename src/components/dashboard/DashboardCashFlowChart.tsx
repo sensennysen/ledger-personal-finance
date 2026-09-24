@@ -58,9 +58,10 @@ export function DashboardCashFlowChart({
       </div>
       <div className="px-2 pb-4">
         {loading ? (
-          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-60 w-full 2xl:h-48" />
         ) : (
-          <ResponsiveContainer width="100%" height={240}>
+          <div className="h-60 2xl:h-48">
+          <ResponsiveContainer width="100%" height="100%">
             <BarChart data={cashFlowData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis
@@ -86,6 +87,7 @@ export function DashboardCashFlowChart({
               <Bar dataKey="expenses" fill={EXPENSE} radius={[4,4,0,0]} name="Expenses" />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         )}
       </div>
     </div>

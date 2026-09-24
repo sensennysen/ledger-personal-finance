@@ -32,6 +32,14 @@ test('setup is not complete until all three are done', () => {
   )
 })
 
+test('nav is not locked on a first frame whose reads have not answered yet', () => {
+  assert.equal(isSetupComplete({ ...base, cycleConfirmed: true }, { loading: true }), true)
+})
+
+test('a locally unconfirmed cycle still locks while reads load', () => {
+  assert.equal(isSetupComplete(base, { loading: true }), false)
+})
+
 test('cycle completion does not fall back to reading startDay === 1', () => {
   // month_start_day defaults to 1 in the DB, which is indistinguishable from a
   // deliberate choice — isSetupComplete must only trust the explicit flag.

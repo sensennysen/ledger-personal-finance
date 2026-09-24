@@ -8,6 +8,7 @@ import {
   FileBarChart2,
   Store,
   ArrowUpRight,
+  ChevronDown,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -43,6 +44,13 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { PageActions } from '@/components/layout/PageActions'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { EmptyState } from '@/components/ui/empty-state'
 import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
@@ -597,13 +605,9 @@ export default function ReportsPage() {
         />
       )}
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold md:hidden">Reports</h1>
-            <p className="text-xs text-muted-foreground">{rangeLabel}</p>
-          </div>
-
-          <div className="flex flex-col items-end gap-2">
+        <h1 className="sr-only md:hidden">Reports</h1>
+        <PageActions>
+          <div className="flex w-full items-center justify-between gap-2 md:w-auto">
             <TabsList className="h-8">
               <TabsTrigger value="overview" className="text-xs h-7 px-3">Overview</TabsTrigger>
               <TabsTrigger value="analytics" className="text-xs h-7 px-3">Analytics</TabsTrigger>
@@ -616,37 +620,25 @@ export default function ReportsPage() {
                 13th Month Pay
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
-              <Button
-                onClick={handleExport}
-                disabled={loading || filtered.length === 0}
-                size="sm"
-                className="gap-2 shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 15%, transparent), color-mix(in srgb, var(--primary) 8%, transparent))',
-                  border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
-                  color: 'var(--primary)',
-                }}
-              >
-                <Download className="w-3.5 h-3.5" />
-                CSV
-              </Button>
-              <Button
-                onClick={handleExportPdf}
-                disabled={loading || filtered.length === 0}
-                size="sm"
-                className="gap-2 shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, oklch(0.620 0.160 18 / 0.15), oklch(0.620 0.160 18 / 0.08))',
-                  border: '1px solid oklch(0.620 0.160 18 / 0.30)',
-                  color: EXPENSE,
-                }}
-              >
-                <Download className="w-3.5 h-3.5" />
-                PDF
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  disabled={loading || filtered.length === 0}
+                  render={
+                    <Button variant="outline" size="sm" className="gap-2 shrink-0">
+                      <Download className="w-3.5 h-3.5" />
+                      Export
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent align="end" className="w-36">
+                  <DropdownMenuItem onClick={handleExport}>CSV</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportPdf}>PDF</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-        </div>
+        </PageActions>
 
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
           <OverspendingCard

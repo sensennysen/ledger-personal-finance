@@ -67,7 +67,6 @@ function LayoutShell() {
   const navigate = useNavigate()
   const { user, profile, signOut, refreshProfile, authError } = useAuth()
   const mobile = useMediaQuery('(max-width: 767px)')
-  const desktop = useMediaQuery('(min-width: 1024px)')
   // At 1920 the capped page leaves room for a docked detail column; below it
   // the column would squeeze the list, so detail overlays instead (LED-99).
   const wide = useMediaQuery('(min-width: 1920px)')
@@ -175,9 +174,7 @@ function LayoutShell() {
   const title =
     sheet === 'account'
       ? 'Your account'
-      : sheet === 'detail'
-        ? 'Entry detail'
-        : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]
+      : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]
   return (
     <EntryContext.Provider
       value={(transaction, onEdit) => {
@@ -297,12 +294,22 @@ function LayoutShell() {
           currentAccount={currentAccount}
         />
         <Sheet
-          open={desktop && !wide && sheet === 'detail' && !!entry}
+          open={!wide && sheet === 'detail' && !!entry}
           onOpenChange={(open) => {
             if (!open) setSheet(null)
           }}
         >
-          <SheetContent side="right" className="w-[380px] sm:max-w-[380px] overflow-y-auto">
+          {/* Detail is its own surface at every width, never the add/edit
+              modal (LED-79): bottom sheet on phones, side sheet above. */}
+          <SheetContent
+            side={mobile ? 'bottom' : 'right'}
+            className={cn(
+              'overflow-y-auto',
+              mobile
+                ? 'max-h-[85dvh] rounded-t-[28px] pb-[env(safe-area-inset-bottom)]'
+                : 'w-[380px] sm:max-w-[380px]',
+            )}
+          >
             <SheetHeader className="pb-0">
               <SheetTitle>Entry detail</SheetTitle>
             </SheetHeader>
@@ -324,7 +331,7 @@ function LayoutShell() {
           </SheetContent>
         </Sheet>
         <Dialog
-          open={sheet !== null && !(desktop && sheet === 'detail')}
+          open={sheet === 'add' || sheet === 'account'}
           onOpenChange={(open) => {
             if (!open) {
               setSheet(null)
@@ -426,19 +433,6 @@ function LayoutShell() {
                   Sign out
                 </Button>
               </div>
-            )}
-            {sheet === 'detail' && entry && (
-              <EntryDetail
-                transaction={entry.transaction}
-                onEdit={
-                  entry.onEdit
-                    ? () => {
-                        setSheet(null)
-                        entry.onEdit?.()
-                      }
-                    : undefined
-                }
-              />
             )}
           </DialogContent>
         </Dialog>

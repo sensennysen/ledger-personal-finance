@@ -50,6 +50,8 @@ import type { Transaction } from '@/types'
 import { OverspendingCard } from '@/components/reports/OverspendingCard'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
+import { buildCategoryBreakdown, rollupBreakdown, type CategorySlice } from '@/lib/categoryBreakdown'
+import { CategoryBreakdownCard } from '@/components/reports/CategoryBreakdownCard'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
 
@@ -126,6 +128,12 @@ function exportToCsv(
 
 // ─── pdf export ──────────────────────────────────────────────────────────────
 
+/** Same rollup as the on-screen card, so the PDF's shares add up to the whole. */
+function pdfCategoryRows(categoryBreakdown: CategorySlice[]) {
+  const { top, other } = rollupBreakdown(categoryBreakdown)
+  return other ? [...top, { name: `Other - ${other.count} categories`, amount: other.amount }] : top
+}
+
 function exportToPdf(
   transactions: Transaction[],
   totalIncome: number,
@@ -133,7 +141,7 @@ function exportToPdf(
   netChange: number,
   currency: string,
   dateRangeLabel: string,
-  categoryBreakdown: { name: string; color: string; amount: number }[],
+  categoryBreakdown: CategorySlice[],
   merchantBreakdown: { displayName: string; amount: number; count: number }[],
   filenameLabel: string,
 ) {
@@ -195,7 +203,7 @@ function exportToPdf(
     autoTable(doc, {
       startY: currentY,
       head: [['Category', 'Amount', '% of Total']],
-      body: categoryBreakdown.slice(0, 8).map((cat) => [
+      body: pdfCategoryRows(categoryBreakdown).map((cat) => [
         cat.name,
         pdfFmt(cat.amount, currency),
         totalExpenses > 0 ? `${((cat.amount / totalExpenses) * 100).toFixed(1)}%` : '-',
@@ -451,27 +459,10 @@ export default function ReportsPage() {
   }, [filtered])
 
   // Category breakdown (expenses only)
-  const categoryBreakdown = useMemo(() => {
-    const map = new Map<string, { name: string; color: string; amount: number }>()
-    for (const t of filtered) {
-      if (t.type !== 'expense') continue
-      const key = t.category_id ?? '__none__'
-      const cat = t.category_id ? categoryById.get(t.category_id) : undefined
-      const existing = map.get(key)
-      if (existing) {
-        existing.amount += t.amount * (t.exchange_rate ?? 1)
-      } else {
-        map.set(key, {
-          name: cat?.name ?? 'Uncategorized',
-          color: cat?.color ?? '#888',
-          amount: t.amount * (t.exchange_rate ?? 1),
-        })
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => b.amount - a.amount)
-  }, [filtered, categoryById])
-
-  const maxCategoryAmount = categoryBreakdown[0]?.amount ?? 1
+  const categoryBreakdown = useMemo(
+    () => buildCategoryBreakdown(filtered, categoryById),
+    [filtered, categoryById]
+  )
 
   const handleExport = () => {
     exportToCsv(sortedTransactions, `ledger-report_${filenameLabel}.csv`, txBalanceMap)
@@ -757,46 +748,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Category breakdown */}
-        <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
-          <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
-            Expenses by Category
-          </p>
-          {loading ? (
-            <div className="flex flex-col gap-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
-            </div>
-          ) : categoryBreakdown.length === 0 ? (
-            <EmptyState icon={TrendingDown} title="No expenses in this period" bare />
-          ) : (
-            <ScrollArea className="max-h-56">
-              <div className="flex flex-col gap-2 pr-3">
-                {categoryBreakdown.map((cat) => (
-                  <div key={cat.name} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: cat.color }} />
-                        <span className="text-xs font-medium truncate">{cat.name}</span>
-                      </div>
-                      <span className="text-xs tabular-nums text-muted-foreground shrink-0">
-                        {formatCurrency(cat.amount, currency)}
-                      </span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-(--dur-meter)"
-                        style={{
-                          width: `${(cat.amount / maxCategoryAmount) * 100}%`,
-                          background: cat.color,
-                          opacity: 0.8,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
-        </div>
+        <CategoryBreakdownCard rows={categoryBreakdown} loading={loading} currency={currency} />
       </div>
 
       {/* Transactions table */}

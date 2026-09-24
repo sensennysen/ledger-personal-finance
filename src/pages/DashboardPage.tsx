@@ -27,6 +27,8 @@ import { INCOME, EXPENSE, GOLD } from '@/constants/colors'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { InlineLoadError } from '@/components/ui/error-state'
+import { RefreshingRegion } from '@/components/ui/refreshing-region'
+import type { Budget } from '@/types'
 import { DashboardDetailDialogs, type DashboardDetailView } from '@/components/dashboard/DashboardDetailDialogs'
 import { DashboardWidgetSettingsSheet } from '@/components/dashboard/DashboardWidgetSettingsSheet'
 import { DashboardCreditCardMonitor } from '@/components/dashboard/DashboardCreditCardMonitor'
@@ -135,6 +137,8 @@ function formatMonthLabel(key: string) {
   return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 }
 
+const NO_BUDGETS: Budget[] = []
+
 export default function DashboardPage() {
   const { openAddTransactionModal } = useOutletContext<AppLayoutContext>()
   const { profile } = useAuth()
@@ -145,7 +149,7 @@ export default function DashboardPage() {
   const { categories } = useCategories()
   const { purchases: loanPurchases, allocations: loanAllocations, loading: loansLoading, error: loansError, refetch: refetchLoans } = useLoanPurchases()
   const { startDay, selectedMonth } = useCycle()
-  const { budgets } = useBudgets({ selectedMonth, startDay })
+  const { budgets, refreshing: budgetsRefreshing } = useBudgets({ selectedMonth, startDay })
   const [chartPeriod, setChartPeriod] = useState<DashboardChartPeriod>('month')
   const [detailView, setDetailView] = useState<DashboardDetailView>(null)
 
@@ -184,7 +188,8 @@ export default function DashboardPage() {
   }
   const { widgets, widgetOrder, toggle, moveWidget, reorderWidget } = useDashboardPrefs()
   const { prefs } = usePreferences()
-  const alerts = useSpendingAlerts(budgets, transactions, prefs.largeTransactionThreshold)
+  // While a new cycle loads the budgets on screen belong to the previous one; don't alert on them.
+  const alerts = useSpendingAlerts(budgetsRefreshing ? NO_BUDGETS : budgets, transactions, prefs.largeTransactionThreshold)
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
   const [draggedWidget, setDraggedWidget] = useState<DashboardWidgetKey | null>(null)
   const [dropTargetWidget, setDropTargetWidget] = useState<DashboardWidgetKey | null>(null)
@@ -440,11 +445,13 @@ export default function DashboardPage() {
 
       <div className="contents">
         {widgets.budgets && budgets.length > 0 && (
-          <DashboardBudgetProgressCard
-            budgets={budgets}
-            monthLabel={monthLabel}
+          <RefreshingRegion
+            refreshing={budgetsRefreshing}
+            label={`Loading ${monthLabel}…`}
             style={widgetGridStyle('budgets')}
-          />
+          >
+            <DashboardBudgetProgressCard budgets={budgets} monthLabel={monthLabel} />
+          </RefreshingRegion>
         )}
       </div>
 

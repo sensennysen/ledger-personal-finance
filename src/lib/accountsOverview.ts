@@ -73,7 +73,7 @@ export function loanProgress(purchases: LoanPurchase[], allocations: LoanPayment
   }
 }
 
-function daysUntilDate(date: string, today: Date): number {
+export function daysUntilDate(date: string, today: Date): number {
   const [year, month, day] = date.split('-').map(Number)
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   return Math.round((new Date(year, month - 1, day).getTime() - start.getTime()) / 86400000)

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CloudOff, Layers3, MoreVertical, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ChevronDown, CloudOff, Layers3, MoreVertical, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react'
 import { LoanPurchaseForm } from '@/components/accounts/LoanPurchaseForm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,13 +10,14 @@ import { resolveLoadState } from '@/lib/loadState'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCategories } from '@/hooks/useCategories'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
-import { getItemizationGap } from '@/lib/loanSummary'
+import { getItemizationGap, labelAllocationInstallments, splitPurchaseProgress } from '@/lib/loanSummary'
+import { daysUntilDate } from '@/lib/accountsOverview'
+import type { LoanDeadline } from '@/lib/loanInstallments'
 import type { Account, LoanPurchase } from '@/types'
 
 /**
@@ -46,16 +47,21 @@ interface LoanPurchaseTrackerProps {
   loanData?: ReturnType<typeof useLoanPurchases>
   /** Sets what the loan owes; the page routes it through the balance-adjustment path. */
   onSetLoanAmount?: (owed: number) => Promise<MutationResult>
+  /** Opens the loan-repayment form prefilled for this deadline. */
+  onRecordPayment?: (deadline: LoanDeadline) => void
 }
 
-const DEADLINES_PAGE_SIZE = 4
+function formatDueIn(days: number) {
+  if (days < 0) return `${-days} day${days === -1 ? '' : 's'} overdue`
+  if (days === 0) return 'due today'
+  return `in ${days} day${days === 1 ? '' : 's'}`
+}
 
-export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSetLoanAmount }: LoanPurchaseTrackerProps) {
+export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSetLoanAmount, onRecordPayment }: LoanPurchaseTrackerProps) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editPurchase, setEditPurchase] = useState<LoanPurchase | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<LoanPurchase | null>(null)
   const [formError, setFormError] = useState<FormErrorValue>(null)
-  const [deadlinePage, setDeadlinePage] = useState(0)
   const [expandedDeadline, setExpandedDeadline] = useState<string | null>(null)
   const [reconciling, setReconciling] = useState(false)
   const { categories } = useCategories()
@@ -75,12 +81,9 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
       .slice(0, 8),
     [allocations],
   )
-  const deadlinePageCount = Math.max(1, Math.ceil(deadlines.length / DEADLINES_PAGE_SIZE))
-  const activeDeadlinePage = Math.min(deadlinePage, deadlinePageCount - 1)
-  const visibleDeadlines = useMemo(
-    () => deadlines.slice(activeDeadlinePage * DEADLINES_PAGE_SIZE, (activeDeadlinePage + 1) * DEADLINES_PAGE_SIZE),
-    [activeDeadlinePage, deadlines],
-  )
+  const installmentLabels = labelAllocationInstallments(purchases, allocations)
+  const [nextDeadline, ...laterDeadlines] = deadlines
+  const hasImportedProgress = purchases.some((purchase) => purchase.opening_paid_amount > 0)
 
   return (
     <section className="space-y-4" aria-labelledby="financed-purchases-title">
@@ -165,7 +168,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
             {purchases.map((purchase) => {
               const paid = purchase.paid_amount ?? 0
               const remaining = purchase.remaining_balance ?? purchase.total_payable
-              const progress = purchase.total_payable > 0 ? Math.min(100, (paid / purchase.total_payable) * 100) : 0
+              const split = splitPurchaseProgress(purchase)
               return (
                 <article key={purchase.id} className="rounded-xl border bg-card p-3.5">
                   <div className="flex items-start justify-between gap-3">
@@ -212,7 +215,14 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
                       </div>
                     </div>
                   </div>
-                  <Progress value={progress} className="mt-3 h-1.5" />
+                  <div
+                    role="img"
+                    aria-label={`${formatCurrency(split.repaidAmount, account.currency)} paid through Ledger, ${formatCurrency(split.importedAmount, account.currency)} imported as already paid, of ${formatCurrency(purchase.total_payable, account.currency)}`}
+                    className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-muted"
+                  >
+                    <div className="h-full bg-primary/40" style={{ width: `${split.importedPct}%` }} />
+                    <div className="h-full bg-primary" style={{ width: `${split.repaidPct}%` }} />
+                  </div>
                   <div className="mt-2 flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Paid {formatCurrency(paid, account.currency)}</span>
                     <span className="font-medium">{formatCurrency(remaining, account.currency)} remaining</span>
@@ -220,80 +230,92 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
                 </article>
               )
             })}
+            {hasImportedProgress && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[0.6875rem] text-muted-foreground" aria-hidden>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary" />Paid through Ledger</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary/40" />Imported as already paid</span>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border bg-card p-3.5">
-              <div className="mb-3 flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold">Payment Deadlines</h3>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Payment schedule</h3>
+                </div>
+                {deadlines.length > 0 && <span className="text-xs text-muted-foreground">{deadlines.length} remaining</span>}
               </div>
-              {visibleDeadlines.length === 0 ? (
+              {!nextDeadline ? (
                 <p className="text-xs text-muted-foreground">No upcoming payment deadlines.</p>
               ) : (
-                <div className="space-y-3">
-                {visibleDeadlines.map((deadline) => {
-                  const isExpanded = expandedDeadline === deadline.dueDate
-                  const breakdownId = `deadline-breakdown-${deadline.dueDate}`
-                  return (
-                    <div key={deadline.dueDate} className="border-b pb-2 last:border-0 last:pb-0">
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between gap-3 rounded-md py-1 text-left outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
-                        aria-expanded={isExpanded}
-                        aria-controls={breakdownId}
-                        aria-label={`${isExpanded ? 'Hide' : 'Show'} payment breakdown for ${formatDate(deadline.dueDate)}`}
-                        onClick={() => setExpandedDeadline(isExpanded ? null : deadline.dueDate)}
-                      >
-                        <span className="text-xs font-medium">{formatDate(deadline.dueDate)}</span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="money text-sm font-semibold">{formatCurrency(deadline.total, account.currency)}</span>
-                          <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} aria-hidden />
-                        </span>
-                      </button>
-                      {isExpanded && (
-                        <div id={breakdownId} className="mt-1 space-y-0.5 pl-2">
-                          {deadline.items.map((item) => (
-                            <div key={`${item.purchaseId}-${item.installmentNumber}`} className="flex justify-between gap-3 text-[0.6875rem] text-muted-foreground">
-                              <span className="truncate">{item.purchaseName} · {item.installmentNumber}</span>
-                              <span>{formatCurrency(item.remainingAmount, account.currency)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                <>
+                  <div className="rounded-lg border bg-muted/40 p-3" aria-labelledby="next-loan-payment">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p id="next-loan-payment" className="text-xs font-medium text-muted-foreground">Next payment</p>
+                        <p className="text-sm font-semibold">
+                          {formatDate(nextDeadline.dueDate)}
+                          <span className="font-normal text-muted-foreground"> · {formatDueIn(daysUntilDate(nextDeadline.dueDate, new Date()))}</span>
+                        </p>
+                      </div>
+                      <span className="money shrink-0 text-base font-bold">{formatCurrency(nextDeadline.total, account.currency)}</span>
                     </div>
-                  )
-                })}
-                </div>
-              )}
-              {deadlinePageCount > 1 && (
-                <nav className="mt-3 flex items-center justify-between gap-3 border-t pt-2.5" aria-label="Payment deadline pages">
-                  <p className="text-xs text-muted-foreground" aria-live="polite">
-                    Page {activeDeadlinePage + 1} of {deadlinePageCount}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      disabled={activeDeadlinePage === 0}
-                      aria-label="Previous payment deadlines"
-                      onClick={() => setDeadlinePage(Math.max(0, activeDeadlinePage - 1))}
-                    >
-                      <ChevronLeft />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      disabled={activeDeadlinePage >= deadlinePageCount - 1}
-                      aria-label="Next payment deadlines"
-                      onClick={() => setDeadlinePage(Math.min(deadlinePageCount - 1, activeDeadlinePage + 1))}
-                    >
-                      <ChevronRight />
-                    </Button>
+                    <div className="mt-2 space-y-0.5">
+                      {nextDeadline.items.map((item) => (
+                        <div key={`${item.purchaseId}-${item.installmentNumber}`} className="flex justify-between gap-3 text-[0.6875rem] text-muted-foreground">
+                          <span className="truncate">{item.purchaseName} · installment {item.installmentNumber}</span>
+                          <span className="money">{formatCurrency(item.remainingAmount, account.currency)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {onRecordPayment && (
+                      <Button size="sm" className="mt-3 w-full" onClick={() => onRecordPayment(nextDeadline)}>
+                        Record this payment
+                      </Button>
+                    )}
                   </div>
-                </nav>
+                  {laterDeadlines.length > 0 && (
+                    <div className="mt-3 max-h-72 space-y-1 overflow-y-auto pr-1" role="region" aria-label="Later payments" tabIndex={0}>
+                      {laterDeadlines.map((deadline) => {
+                        const isExpanded = expandedDeadline === deadline.dueDate
+                        const breakdownId = `deadline-breakdown-${deadline.dueDate}`
+                        return (
+                          <div key={deadline.dueDate} className="border-b pb-1 last:border-0 last:pb-0">
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between gap-3 rounded-md py-1 text-left outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
+                              aria-expanded={isExpanded}
+                              aria-controls={breakdownId}
+                              aria-label={`${isExpanded ? 'Hide' : 'Show'} payment breakdown for ${formatDate(deadline.dueDate)}`}
+                              onClick={() => setExpandedDeadline(isExpanded ? null : deadline.dueDate)}
+                            >
+                              <span className="text-xs">
+                                <span className="font-medium">{formatDate(deadline.dueDate)}</span>
+                                <span className="text-muted-foreground"> · {deadline.items.length} purchase{deadline.items.length === 1 ? '' : 's'}</span>
+                              </span>
+                              <span className="flex items-center gap-1.5">
+                                <span className="money text-sm font-semibold">{formatCurrency(deadline.total, account.currency)}</span>
+                                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} aria-hidden />
+                              </span>
+                            </button>
+                            {isExpanded && (
+                              <div id={breakdownId} className="mt-1 space-y-0.5 pl-2">
+                                {deadline.items.map((item) => (
+                                  <div key={`${item.purchaseId}-${item.installmentNumber}`} className="flex justify-between gap-3 text-[0.6875rem] text-muted-foreground">
+                                    <span className="truncate">{item.purchaseName} · installment {item.installmentNumber}</span>
+                                    <span>{formatCurrency(item.remainingAmount, account.currency)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -310,7 +332,10 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
                     <div key={allocation.id} className="flex items-start justify-between gap-3 text-xs">
                       <div className="min-w-0">
                         <p className="truncate font-medium">{purchaseById.get(allocation.loan_purchase_id)?.name ?? 'Purchase'}</p>
-                        <p className="text-[0.6875rem] text-muted-foreground">{allocation.transaction?.date ? formatDate(allocation.transaction.date) : 'Payment'}</p>
+                        <p className="text-[0.6875rem] text-muted-foreground">
+                          {installmentLabels.get(allocation.id) ?? 'Payment'}
+                          {allocation.transaction?.date && <> · {formatDate(allocation.transaction.date)}</>}
+                        </p>
                       </div>
                       <span className="money shrink-0 font-semibold">{formatCurrency(allocation.amount, account.currency)}</span>
                     </div>

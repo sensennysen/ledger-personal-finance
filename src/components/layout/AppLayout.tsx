@@ -22,6 +22,8 @@ import { NotificationProvider } from '@/contexts/NotificationContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
+import { FormError } from '@/components/ui/form-error'
+import type { FormErrorValue } from '@/lib/dataErrors'
 import { authErrorActionLabel } from '@/lib/authErrors'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -127,7 +129,7 @@ function LayoutShell() {
   const syncFab = () => {
     if (mainRef.current) setFabHidden(isNearScrollEnd(mainRef.current))
   }
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   useEffect(() => {
     if (sheet !== 'detail' || !wide) return
     const close = (event: KeyboardEvent) => {
@@ -185,11 +187,11 @@ function LayoutShell() {
     }
   }, [generateDueRecurring])
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error } = await createTransaction(
+    const { error, errorDetail } = await createTransaction(
       values as Parameters<typeof createTransaction>[0],
     )
     if (error) {
-      setFormError(error)
+      setFormError({ message: error, detail: errorDetail ?? null })
       return
     }
     setFormError(null)
@@ -430,11 +432,7 @@ function LayoutShell() {
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
             </DialogHeader>
-            {formError && (
-              <p role="alert" className="text-sm text-expense">
-                {formError}
-              </p>
-            )}
+            <FormError error={formError} className="px-0 mt-0" />
             {sheet === 'add' &&
               (mobile ? (
                 <QuickEntry

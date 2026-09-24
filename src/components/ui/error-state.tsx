@@ -1,33 +1,30 @@
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { TechnicalDetail } from '@/components/ui/technical-detail'
 
 interface ErrorStateProps {
   title: string
-  description?: string
+  description?: string | null
   detail?: string | null
   onRetry: () => void
 }
 
 const DEFAULT_DESCRIPTION = "Check your connection and try again. Nothing was changed."
 
-export function ErrorState({ title, description = DEFAULT_DESCRIPTION, detail, onRetry }: ErrorStateProps) {
+/** `description` is the hook's plain sentence; `detail` its raw text, kept collapsed. */
+export function ErrorState({ title, description, detail, onRetry }: ErrorStateProps) {
   return (
     <Card className="text-center py-16" role="alert">
       <CardContent>
         <AlertTriangle className="w-12 h-12 mx-auto text-destructive mb-4" />
         <p className="font-medium">{title}</p>
-        <p className="text-sm text-muted-foreground mb-4">{description}</p>
+        <p className="text-sm text-muted-foreground mb-4">{description || DEFAULT_DESCRIPTION}</p>
         <Button variant="outline" onClick={onRetry}>
           <RefreshCw className="w-4 h-4 mr-2" />
           Try again
         </Button>
-        {detail && (
-          <details className="mt-4 text-xs text-muted-foreground">
-            <summary className="cursor-pointer">Details</summary>
-            <p className="mt-1 break-words">{detail}</p>
-          </details>
-        )}
+        {detail && <TechnicalDetail detail={detail} className="mt-4 max-w-md mx-auto text-left" />}
       </CardContent>
     </Card>
   )

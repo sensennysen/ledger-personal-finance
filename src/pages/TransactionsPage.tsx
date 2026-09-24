@@ -20,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
+import type { FormErrorValue } from '@/lib/dataErrors'
 import { InteractiveRow } from '@/components/ui/interactive-row'
 import { resolveLoadState } from '@/lib/loadState'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -49,7 +50,7 @@ export default function TransactionsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   const { prefs, set: setPref } = usePreferences()
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
   const [sort, setSort] = useState<TxSort>('newest')
@@ -111,6 +112,7 @@ export default function TransactionsPage() {
     transactions,
     loading,
     error,
+    errorDetail,
     refetch,
     createTransaction,
     updateTransaction,
@@ -254,16 +256,16 @@ export default function TransactionsPage() {
   // ── Handlers ───────────────────────────────────────────────
 
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error } = await createTransaction(values as Parameters<typeof createTransaction>[0])
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await createTransaction(values as Parameters<typeof createTransaction>[0])
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setCreateOpen(false)
   }
 
   const handleEdit = async (values: TransactionFormValues) => {
     if (!editingTx) return
-    const { error } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setEditingTx(null)
   }
@@ -453,7 +455,7 @@ export default function TransactionsPage() {
             <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
               <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
                 <DialogHeader><DialogTitle>{TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}</DialogTitle></DialogHeader>
-                {formError && <FormError>{formError}</FormError>}
+                <FormError error={formError} />
                 <TransactionForm
                   entryKind={transactionKind}
                   defaultValues={templateDefaults}
@@ -696,7 +698,7 @@ export default function TransactionsPage() {
           <InlineLoadError message="Couldn't refresh your transactions. Showing what was last loaded." onRetry={() => void refetch()} />
         )}
         {loadState === 'error' ? (
-          <ErrorState title="Couldn't load your transactions" detail={error} onRetry={() => void refetch()} />
+          <ErrorState title="Couldn't load your transactions" description={error} detail={errorDetail} onRetry={() => void refetch()} />
         ) : loadState === 'loading' ? (
           <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
         ) : transactions.length === 0 ? (
@@ -761,7 +763,7 @@ export default function TransactionsPage() {
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
           <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
             <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
-            {formError && <FormError>{formError}</FormError>}
+            <FormError error={formError} />
             {editingTx && (
               <TransactionForm
                 isEditing

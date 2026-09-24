@@ -6,12 +6,13 @@ import { readCache, writeCache } from '@/lib/dataCache'
 import { registerAccountsListener } from '@/lib/cacheEvents'
 import { getLocalDateString } from '@/lib/utils'
 import type { Account } from '@/types'
+import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 export function useAccounts() {
   const { user } = useAuth()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
 
   const fetch = useCallback(async () => {
     if (!user) {
@@ -35,9 +36,9 @@ export function useAccounts() {
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
     if (error) {
-      setError(error.message)
+      setLoadFailure(describeDataError(error, { action: 'load' }))
     } else {
-      setError(null)
+      setLoadFailure(null)
       setAccounts(data as Account[])
       writeCache(cacheKey, data)
     }
@@ -59,7 +60,7 @@ export function useAccounts() {
 
   useEffect(() => registerAccountsListener(reloadFromCache), [reloadFromCache])
 
-  const createAccount = async (values: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const createAccount = async (values: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add an account.' }
     const { error } = await supabase.from('accounts').insert({
@@ -68,18 +69,18 @@ export function useAccounts() {
       user_id: user.id,
     })
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'account' })
   }
 
-  const updateAccount = async (id: string, values: Partial<Account>) => {
+  const updateAccount = async (id: string, values: Partial<Account>): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this account.' }
     const { error } = await supabase.from('accounts').update(values).eq('id', id).eq('user_id', user.id)
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'account' })
   }
 
-  const updateAccountWithAdjustment = async (id: string, values: Partial<Account>, oldBalance: number) => {
+  const updateAccountWithAdjustment = async (id: string, values: Partial<Account>, oldBalance: number): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this account.' }
     const newBalance = values.balance ?? oldBalance
@@ -91,7 +92,7 @@ export function useAccounts() {
     }
 
     const { error: updateError } = await supabase.from('accounts').update(updatePayload).eq('id', id).eq('user_id', user.id)
-    if (updateError) return { error: updateError.message }
+    if (updateError) return toResult(updateError, { action: 'save', entity: 'account' })
 
     if (newBalance !== oldBalance) {
       const diff = newBalance - oldBalance
@@ -106,14 +107,14 @@ export function useAccounts() {
         description: BALANCE_ADJUSTMENT_DESCRIPTION,
         date: getLocalDateString(),
       })
-      if (txError) return { error: txError.message }
+      if (txError) return toResult(txError, { action: 'save', entity: 'balance adjustment' })
     }
 
     await fetch()
     return { error: null }
   }
 
-  const deleteAccount = async (id: string) => {
+  const deleteAccount = async (id: string): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to remove this account.' }
     const targetAccount = accounts.find((account) => account.id === id)
@@ -126,7 +127,7 @@ export function useAccounts() {
         .select('id', { count: 'exact', head: true })
         .or(`account_id.eq.${id},to_account_id.eq.${id}`)
         .eq('user_id', user.id)
-      if (countError) return { error: countError.message }
+      if (countError) return toResult(countError, { action: 'delete', entity: 'account' })
       if (count && count > 0) {
         return {
           error: `This account has ${count} transaction(s). Move or delete them before removing the account.`,
@@ -140,10 +141,10 @@ export function useAccounts() {
       .eq('id', id)
       .eq('user_id', user.id)
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'delete', entity: 'account' })
   }
 
-  const updateAccountOrder = async (orderedIds: string[]) => {
+  const updateAccountOrder = async (orderedIds: string[]): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
 
     const orderMap = new Map(orderedIds.map((id, index) => [id, index]))
@@ -164,10 +165,12 @@ export function useAccounts() {
     const failed = results.find((result) => result.error)
     if (failed?.error) {
       await fetch()
-      return { error: failed.error.message }
+      return toResult(failed.error, { action: 'save' })
     }
     return { error: null }
   }
 
-  return { accounts, loading, error, refetch: fetch, createAccount, updateAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder }
+  const error = loadFailure?.message ?? null
+  const errorDetail = loadFailure?.detail ?? null
+  return { accounts, loading, error, errorDetail, refetch: fetch, createAccount, updateAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder }
 }

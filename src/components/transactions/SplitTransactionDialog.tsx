@@ -229,7 +229,7 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
             {carriesExtras && " Its receipt and tags won't carry over."}
           </p>
 
-          {error && <FormError className="mt-0 px-0">{error}</FormError>}
+          <FormError error={error} className="mt-0 px-0" />
 
           <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t">
             {!valid && split.blockers.length > 0 && (

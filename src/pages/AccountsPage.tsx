@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
+import type { FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
@@ -37,14 +38,14 @@ function formatDueIn(days: number) {
 
 export default function AccountsPage() {
   const { user, profile, refreshProfile } = useAuth()
-  const { accounts, loading, error, refetch, createAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder } = useAccounts()
+  const { accounts, loading, error, errorDetail, refetch, createAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder } = useAccounts()
   const loadState = resolveLoadState({ loading, error, hasData: accounts.length > 0 })
   const { prefs, set: setPref } = usePreferences()
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   const [draggedAccountId, setDraggedAccountId] = useState<string | null>(null)
   const [dropTargetAccountId, setDropTargetAccountId] = useState<string | null>(null)
   const [draggedGroupType, setDraggedGroupType] = useState<AccountType | null>(null)
@@ -158,16 +159,16 @@ export default function AccountsPage() {
   }
 
   const handleCreate = async (values: AccountFormValues) => {
-    const { error } = await createAccount({ ...normalizeCreditCardBalanceForStorage(values), is_active: true, icon: null })
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await createAccount({ ...normalizeCreditCardBalanceForStorage(values), is_active: true, icon: null })
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setCreateOpen(false)
   }
 
   const handleEdit = async (values: AccountFormValues) => {
     if (!editAccount) return
-    const { error } = await updateAccountWithAdjustment(editAccount.id, normalizeCreditCardBalanceForStorage(values), editAccount.balance)
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await updateAccountWithAdjustment(editAccount.id, normalizeCreditCardBalanceForStorage(values), editAccount.balance)
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setEditAccount(null)
   }
@@ -571,7 +572,7 @@ export default function AccountsPage() {
             </DialogTrigger>
             <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
               <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
-              {formError && <FormError>{formError}</FormError>}
+              <FormError error={formError} />
               <AccountForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} defaultValues={{ currency: defaultCurrency }} />
             </DialogContent>
           </Dialog>
@@ -582,7 +583,7 @@ export default function AccountsPage() {
         <InlineLoadError message="Couldn't refresh your accounts. Showing what was last loaded." onRetry={() => void refetch()} />
       )}
       {loadState === 'error' ? (
-        <ErrorState title="Couldn't load your accounts" detail={error} onRetry={() => void refetch()} />
+        <ErrorState title="Couldn't load your accounts" description={error} detail={errorDetail} onRetry={() => void refetch()} />
       ) : loading ? (
         <div className="space-y-6">
           <Skeleton className="h-24 rounded-xl" />
@@ -681,7 +682,7 @@ export default function AccountsPage() {
       <Dialog open={!!editAccount} onOpenChange={(o) => { if (!o) { setEditAccount(null); setFormError(null) } }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
-          {formError && <FormError>{formError}</FormError>}
+          <FormError error={formError} />
           {editAccount && (
             <AccountForm
               account={editAccount}

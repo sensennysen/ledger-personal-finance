@@ -4,6 +4,7 @@ import { registerLoanPurchasesListener } from '@/lib/cacheEvents'
 import { enrichLoanPurchase, getLoanDeadlines, roundMoney } from '@/lib/loanInstallments'
 import { supabase } from '@/lib/supabase'
 import type { LoanPaymentAllocation, LoanPurchase } from '@/types'
+import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 export interface CreateLoanPurchaseValues {
   account_id: string
@@ -27,7 +28,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
   const [purchases, setPurchases] = useState<LoanPurchase[]>([])
   const [allocations, setAllocations] = useState<LoanPaymentAllocation[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
 
   const fetch = useCallback(async () => {
     if (!userId || !enabled) {
@@ -50,7 +51,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
       .order('created_at', { ascending: true })
 
     if (purchaseError) {
-      setError(purchaseError.message)
+      setLoadFailure(describeDataError(purchaseError, { action: 'load' }))
       setLoading(false)
       return
     }
@@ -68,7 +69,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
         .order('created_at', { ascending: true })
 
       if (allocationError) {
-        setError(allocationError.message)
+        setLoadFailure(describeDataError(allocationError, { action: 'load' }))
         setLoading(false)
         return
       }
@@ -77,7 +78,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
 
     setPurchases(nextPurchases)
     setAllocations(nextAllocations)
-    setError(null)
+    setLoadFailure(null)
     setLoading(false)
   }, [accountId, enabled, userId])
 
@@ -87,7 +88,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
 
   useEffect(() => registerLoanPurchasesListener(() => { void fetch() }), [fetch])
 
-  const createPurchase = async (values: CreateLoanPurchaseValues) => {
+  const createPurchase = async (values: CreateLoanPurchaseValues): Promise<MutationResult> => {
     if (!userId) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add a financed purchase.' }
 
@@ -97,13 +98,13 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
       total_payable: totalPayable,
       user_id: userId,
     })
-    if (insertError) return { error: insertError.message }
+    if (insertError) return toResult(insertError, { action: 'save', entity: 'purchase' })
 
     await fetch()
     return { error: null }
   }
 
-  const updatePurchase = async (id: string, values: UpdateLoanPurchaseValues) => {
+  const updatePurchase = async (id: string, values: UpdateLoanPurchaseValues): Promise<MutationResult> => {
     if (!userId) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit a financed purchase.' }
 
@@ -122,13 +123,13 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
       .update({ ...values, total_payable: totalPayable })
       .eq('id', id)
       .eq('user_id', userId)
-    if (updateError) return { error: updateError.message }
+    if (updateError) return toResult(updateError, { action: 'save', entity: 'purchase' })
 
     await fetch()
     return { error: null }
   }
 
-  const deletePurchase = async (id: string) => {
+  const deletePurchase = async (id: string): Promise<MutationResult> => {
     if (!userId) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to remove a financed purchase.' }
     const { error: deleteError } = await supabase
@@ -136,7 +137,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
       .delete()
       .eq('id', id)
       .eq('user_id', userId)
-    if (deleteError) return { error: deleteError.message }
+    if (deleteError) return toResult(deleteError, { action: 'delete', entity: 'purchase' })
 
     await fetch()
     return { error: null }
@@ -151,12 +152,15 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
     [allocations, purchases],
   )
 
+  const error = loadFailure?.message ?? null
+  const errorDetail = loadFailure?.detail ?? null
   return {
     purchases: enrichedPurchases,
     allocations,
     deadlines,
     loading,
     error,
+    errorDetail,
     refetch: fetch,
     createPurchase,
     updatePurchase,

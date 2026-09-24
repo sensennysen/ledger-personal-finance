@@ -28,6 +28,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { InteractiveRow } from '@/components/ui/interactive-row'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { FormError } from '@/components/ui/form-error'
+import type { FormErrorValue } from '@/lib/dataErrors'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
@@ -681,6 +682,7 @@ function BudgetTransactionsDialog({
   transactions,
   loading,
   error,
+  errorDetail,
   onRetry,
   periodRange,
 }: {
@@ -688,6 +690,7 @@ function BudgetTransactionsDialog({
   transactions: ReturnType<typeof useTransactions>['transactions']
   loading: boolean
   error: string | null
+  errorDetail: string | null
   onRetry: () => void
   periodRange: { start: string; end: string }
 }) {
@@ -703,7 +706,7 @@ function BudgetTransactionsDialog({
 
   // Spent/Left are derived from these rows, so a failed read must not show them as zero.
   if (loadState === 'error') {
-    return <ErrorState title="Couldn't load these transactions" detail={error} onRetry={onRetry} />
+    return <ErrorState title="Couldn't load these transactions" description={error} detail={errorDetail} onRetry={onRetry} />
   }
 
   return (
@@ -973,19 +976,19 @@ function SavingsGoalCard({
 export default function BudgetsPage() {
   const { profile } = useAuth()
   const { selectedMonth, startDay } = useCycle()
-  const { budgets, loading, refreshing: budgetsRefreshing, error: budgetError, refetch: refetchBudgets, createBudget, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
+  const { budgets, loading, refreshing: budgetsRefreshing, error: budgetError, errorDetail: budgetErrorDetail, refetch: refetchBudgets, createBudget, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
   const budgetsLoadState = resolveLoadState({ loading, error: budgetError, hasData: budgets.length > 0 })
   const budgetsRefreshLabel = `Loading ${new Date(`${selectedMonth}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}…`
-  const { goals, loading: goalsLoading, error: goalsError, refetch: refetchGoals, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
+  const { goals, loading: goalsLoading, error: goalsError, errorDetail: goalsErrorDetail, refetch: refetchGoals, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
   const goalsLoadState = resolveLoadState({ loading: goalsLoading, error: goalsError, hasData: goals.length > 0 })
 
   const [activeTab, setActiveTab] = useState('budgets')
   const [createOpen, setCreateOpen] = useState(false)
   const [editBudget, setEditBudget] = useState<Budget | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   const [createGoalOpen, setCreateGoalOpen] = useState(false)
   const [editGoal, setEditGoal] = useState<GoalWithContributions | null>(null)
-  const [goalFormError, setGoalFormError] = useState<string | null>(null)
+  const [goalFormError, setGoalFormError] = useState<FormErrorValue>(null)
   const [contributionGoal, setContributionGoal] = useState<GoalWithContributions | null>(null)
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null)
 
@@ -998,6 +1001,7 @@ export default function BudgetsPage() {
     transactions: selectedBudgetTransactions,
     loading: selectedBudgetTransactionsLoading,
     error: selectedBudgetTransactionsError,
+    errorDetail: selectedBudgetTransactionsErrorDetail,
     refetch: refetchSelectedBudgetTransactions,
   } = useTransactions({
     categoryId: selectedBudget?.category_id ?? '__no_budget_selected__',
@@ -1007,31 +1011,31 @@ export default function BudgetsPage() {
   })
 
   const handleCreateBudget = async (values: BudgetFormValues) => {
-    const { error } = await createBudget({ ...values, is_active: true })
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await createBudget({ ...values, is_active: true })
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setCreateOpen(false)
   }
 
   const handleEditBudget = async (values: BudgetFormValues) => {
     if (!editBudget) return
-    const { error } = await updateBudget(editBudget.id, values)
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await updateBudget(editBudget.id, values)
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setEditBudget(null)
   }
 
   const handleCreateGoal = async (values: GoalFormValues) => {
-    const { error } = await createGoal(values)
-    if (error) { setGoalFormError(error); return }
+    const { error, errorDetail } = await createGoal(values)
+    if (error) { setGoalFormError({ message: error, detail: errorDetail ?? null }); return }
     setGoalFormError(null)
     setCreateGoalOpen(false)
   }
 
   const handleEditGoal = async (values: GoalFormValues) => {
     if (!editGoal) return
-    const { error } = await updateGoal(editGoal.id, values)
-    if (error) { setGoalFormError(error); return }
+    const { error, errorDetail } = await updateGoal(editGoal.id, values)
+    if (error) { setGoalFormError({ message: error, detail: errorDetail ?? null }); return }
     setGoalFormError(null)
     setEditGoal(null)
   }
@@ -1084,7 +1088,7 @@ export default function BudgetsPage() {
         {/* Budgets tab */}
         <TabsContent value="budgets" className="mt-4 space-y-4">
           {budgetsLoadState === 'error' ? (
-            <ErrorState title="Couldn't load your budgets" detail={budgetError} onRetry={() => void refetchBudgets()} />
+            <ErrorState title="Couldn't load your budgets" description={budgetError} detail={budgetErrorDetail} onRetry={() => void refetchBudgets()} />
           ) : budgetsLoadState === 'loading' ? (
             <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36" />)}</div>
           ) : budgets.length === 0 ? (
@@ -1243,7 +1247,7 @@ export default function BudgetsPage() {
         {/* History tab */}
         <TabsContent value="history" className="mt-4 space-y-4">
           {budgetsLoadState === 'error' ? (
-            <ErrorState title="Couldn't load your budget history" detail={budgetError} onRetry={() => void refetchBudgets()} />
+            <ErrorState title="Couldn't load your budget history" description={budgetError} detail={budgetErrorDetail} onRetry={() => void refetchBudgets()} />
           ) : budgetsLoadState === 'loading' ? (
             <div className="space-y-4">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-48" />)}</div>
           ) : monthlyBudgets.length === 0 ? (
@@ -1294,7 +1298,7 @@ export default function BudgetsPage() {
             <InlineLoadError message="Couldn't refresh your savings goals. Showing what was last loaded." onRetry={() => void refetchGoals()} />
           )}
           {goalsLoadState === 'error' ? (
-            <ErrorState title="Couldn't load your savings goals" detail={goalsError} onRetry={() => void refetchGoals()} />
+            <ErrorState title="Couldn't load your savings goals" description={goalsError} detail={goalsErrorDetail} onRetry={() => void refetchGoals()} />
           ) : goalsLoading ? (
             <div className="space-y-4">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-40" />)}</div>
           ) : goals.length === 0 ? (
@@ -1353,6 +1357,7 @@ export default function BudgetsPage() {
               transactions={selectedBudgetTransactions}
               loading={selectedBudgetTransactionsLoading}
               error={selectedBudgetTransactionsError}
+              errorDetail={selectedBudgetTransactionsErrorDetail}
               onRetry={() => void refetchSelectedBudgetTransactions()}
               periodRange={selectedBudgetRange}
             />
@@ -1363,7 +1368,7 @@ export default function BudgetsPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Budget</DialogTitle></DialogHeader>
-          {formError && <FormError>{formError}</FormError>}
+          <FormError error={formError} />
           <BudgetForm
             onSubmit={handleCreateBudget}
             onClose={() => { setCreateOpen(false); setFormError(null) }}
@@ -1375,7 +1380,7 @@ export default function BudgetsPage() {
       <Dialog open={!!editBudget} onOpenChange={(o) => { if (!o) { setEditBudget(null); setFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Budget</DialogTitle></DialogHeader>
-          {formError && <FormError>{formError}</FormError>}
+          <FormError error={formError} />
           {editBudget && (
             <BudgetForm
               defaultValues={editBudget}
@@ -1390,7 +1395,7 @@ export default function BudgetsPage() {
       <Dialog open={createGoalOpen} onOpenChange={setCreateGoalOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Savings Goal</DialogTitle></DialogHeader>
-          {goalFormError && <FormError>{goalFormError}</FormError>}
+          <FormError error={goalFormError} />
           <GoalForm
             onSubmit={handleCreateGoal}
             onClose={() => { setCreateGoalOpen(false); setGoalFormError(null) }}
@@ -1402,7 +1407,7 @@ export default function BudgetsPage() {
       <Dialog open={!!editGoal} onOpenChange={(o) => { if (!o) { setEditGoal(null); setGoalFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Goal</DialogTitle></DialogHeader>
-          {goalFormError && <FormError>{goalFormError}</FormError>}
+          <FormError error={goalFormError} />
           {editGoal && (
             <GoalForm
               defaultValues={editGoal}

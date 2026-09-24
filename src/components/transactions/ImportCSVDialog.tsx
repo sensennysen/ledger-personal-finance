@@ -50,6 +50,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { TechnicalDetail } from '@/components/ui/technical-detail'
 
 export interface ImportTx {
   date: string
@@ -468,10 +469,13 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                 {categoryMemory.error && (
                   <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                    <span className="flex-1">
-                      Couldn't load category suggestions: {categoryMemory.error}. Rows import uncategorized unless you
-                      choose one.
-                    </span>
+                    <div className="flex-1">
+                      <p>
+                        Couldn't load category suggestions. {categoryMemory.error} Rows import uncategorized unless you
+                        choose one.
+                      </p>
+                      {categoryMemory.errorDetail && <TechnicalDetail detail={categoryMemory.errorDetail} className="mt-1" />}
+                    </div>
                     <Button variant="outline" size="sm" className="h-7" onClick={categoryMemory.retry}>
                       Retry
                     </Button>
@@ -481,7 +485,10 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                 {dupeCheck.error && (
                   <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                    <span className="flex-1">Couldn't check for duplicates: {dupeCheck.error}</span>
+                    <div className="flex-1">
+                      <p>Couldn't check for duplicates. {dupeCheck.error}</p>
+                      {dupeCheck.errorDetail && <TechnicalDetail detail={dupeCheck.errorDetail} className="mt-1" />}
+                    </div>
                     <Button variant="outline" size="sm" className="h-7" onClick={dupeCheck.retry}>
                       Retry
                     </Button>

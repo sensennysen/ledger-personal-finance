@@ -202,6 +202,18 @@ function LayoutShell() {
       }}
     >
       <div className="flex h-dvh w-full max-w-full flex-col bg-background overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
+        {/* First tab stop: jumps past the bar and row 2 (LED-90). Focus is
+            moved by hand so the URL keeps no #main. */}
+        <a
+          href="#main"
+          onClick={(event) => {
+            event.preventDefault()
+            mainRef.current?.focus()
+          }}
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-60 focus:flex focus:h-10 focus:items-center focus:rounded-full focus:bg-popover focus:px-4 focus:text-sm focus:font-medium focus:text-popover-foreground focus:shadow-lg focus-visible:ring-3 focus-visible:ring-ring"
+        >
+          Skip to content
+        </a>
         <TopBar
           avatar={avatar}
           onAvatarClick={() => setSheet('account')}
@@ -239,9 +251,11 @@ function LayoutShell() {
             </div>
           )}
           <main
+            id="main"
             ref={mainRef}
+            tabIndex={-1}
             onScroll={syncFab}
-            className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0"
+            className="outline-none flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0"
           >
             <div
               key={location.pathname}
@@ -279,7 +293,8 @@ function LayoutShell() {
           </aside>
         )}
         </div>
-        <BottomNav setupComplete={setupComplete} />
+        {/* The FAB comes before the nav in the DOM, so Tab reaches the page's
+            primary action before Home (27a). */}
         {mobile && !sheet && location.pathname !== '/settings' && (
           <button
             aria-label="Add transaction"
@@ -294,6 +309,7 @@ function LayoutShell() {
             <Plus className="size-7" />
           </button>
         )}
+        <BottomNav setupComplete={setupComplete} />
         <PWAInstallBanner hidden={sheet !== null} />
         <SearchPalette
           open={searchOpen}

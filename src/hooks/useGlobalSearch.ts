@@ -6,11 +6,17 @@ import { useCategories } from '@/hooks/useCategories'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { getCustomMonthRange } from '@/lib/utils'
 import { resolveLoadState } from '@/lib/loadState'
+import { sumByCurrency } from '@/lib/transactionWindow'
 import {
   buildDueSoon,
+  buildHandoff,
   capGroup,
+  categoryMatches,
+  inScope,
   matchActions,
+  mergeCategoryResults,
   parseAmountQuery,
+  searchMatcher,
   searchNamed,
   searchTransactions,
   summarizeLoans,
@@ -22,8 +28,14 @@ import {
  * Search over transactions, accounts, categories and actions. The cycle is
  * never applied implicitly: `scope` says whether to search the shell's selected
  * cycle or all time, and `range` is returned so the UI can state which.
+ * `account` (⌘F) narrows transactions to one account and sends "See all" there.
  */
-export function useGlobalSearch(query: string, scope: SearchScope, actions: SearchAction[]) {
+export function useGlobalSearch(
+  query: string,
+  scope: SearchScope,
+  actions: SearchAction[],
+  account?: { id: string; name: string } | null,
+) {
   const { startDay, selectedMonth } = useCycle()
   const transactions = useTransactions()
   const accounts = useAccounts()
@@ -37,17 +49,47 @@ export function useGlobalSearch(query: string, scope: SearchScope, actions: Sear
     [selectedMonth, startDay],
   )
 
+  const accountId = account?.id
+  const accountName = account?.name
   const results = useMemo(() => {
-    const matches = searchTransactions(transactions.transactions, query, scope, range)
+    const rows = transactions.transactions
+    const matches = searchTransactions(rows, query, scope, range, accountId)
+    const matched = [...matches.exact, ...matches.nearby, ...matches.text]
+
+    // What the destination of "See all" will show for the same query.
+    const matcher = searchMatcher(query)
+    const cycleCount =
+      scope === 'cycle' && !accountId
+        ? matched.length
+        : inScope(rows, 'cycle', range).filter(matcher).length
+    const accountCount = accountId ? inScope(rows, 'all', range, accountId).filter(matcher).length : 0
+    const handoff = buildHandoff({
+      query,
+      scope,
+      paletteTotal: matched.length,
+      cycleCount,
+      account: accountId && accountName ? { id: accountId, name: accountName } : null,
+      accountCount,
+    })
+
+    const byCategory = categoryMatches(matched)
+    const matchCounts = new Map([...byCategory].map(([id, inCategory]) => [id, inCategory.length]))
+    const categoryRows = mergeCategoryResults(categories.categories, query, matchCounts).map((category) => {
+      const inCategory = byCategory.get(category.id) ?? []
+      return { ...category, matchCount: inCategory.length, matchSum: sumByCurrency(inCategory) }
+    })
+
     return {
       exact: capGroup(matches.exact),
       nearby: capGroup(matches.nearby),
       text: capGroup(matches.text),
+      transactionTotal: matched.length,
+      handoff,
       accounts: capGroup(searchNamed(accounts.accounts, query)),
-      categories: capGroup(searchNamed(categories.categories, query)),
+      categories: capGroup(categoryRows),
       actions: matchActions(actions, query),
     }
-  }, [transactions.transactions, accounts.accounts, categories.categories, query, scope, range, actions])
+  }, [transactions.transactions, accounts.accounts, categories.categories, query, scope, range, actions, accountId, accountName])
 
   const deadlines = loans.deadlines
   const dueSoon = useMemo(() => {

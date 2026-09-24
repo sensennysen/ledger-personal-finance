@@ -35,6 +35,7 @@ import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
 import { buildMonthNets } from '@/lib/monthJump'
+import { searchMatcher } from '@/lib/globalSearch'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
 import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
@@ -76,6 +77,26 @@ export default function TransactionsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Search handoff (LED-64): "See all" from the palette arrives as ?q=. Take it
+  // while rendering, clear filters that would hide matches, then drop the param.
+  const handoffQuery = searchParams.get('q')
+  const [takenQuery, setTakenQuery] = useState<string | null>(null)
+  if (handoffQuery !== takenQuery) {
+    setTakenQuery(handoffQuery)
+    if (handoffQuery !== null) {
+      setSearch(handoffQuery)
+      setFilterType('all')
+      setActiveTagFilter(null)
+    }
+  }
+  useEffect(() => {
+    if (handoffQuery === null) return
+    setSearchParams((params) => {
+      params.delete('q')
+      return params
+    }, { replace: true })
+  }, [handoffQuery, setSearchParams])
 
   // ── Templates ─────────────────────────────────────────────
   const { templates, addTemplate, removeTemplate } = useTransactionTemplates()
@@ -206,15 +227,8 @@ export default function TransactionsPage() {
   const filtered = useMemo(() => {
     let result = cycleOnly
     if (filterType !== 'all') result = result.filter((t) => t.type === filterType)
-    if (search) {
-      const q = search.toLowerCase()
-      result = result.filter(
-        (t) =>
-          t.description.toLowerCase().includes(q) ||
-          t.category?.name.toLowerCase().includes(q) ||
-          t.account?.name.toLowerCase().includes(q)
-      )
-    }
+    // Same rule as the search palette, so its "See all" count matches (LED-64).
+    if (search) result = result.filter(searchMatcher(search))
     if (activeTagFilter) {
       result = result.filter((t) => t.tags?.includes(activeTagFilter))
     }

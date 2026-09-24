@@ -33,3 +33,36 @@ export function deficitOutcome(
 ): number {
   return budgetAmount + nextRollover(0, budgetAmount - spent, budgetAmount, behaviour)
 }
+
+export interface BudgetAllowance {
+  base: number
+  /** What rollover brings into this cycle; 0 when rollover is off. */
+  carriedIn: number
+  /** The limit this cycle actually runs on, never below zero. */
+  effective: number
+}
+
+/** Base limit -> carried in -> effective, as useBudgets computes the effective limit. */
+export function budgetAllowance(
+  base: number,
+  carriedIn: number,
+  rolloverActive: boolean,
+): BudgetAllowance {
+  const carried = rolloverActive ? carriedIn : 0
+  return { base, carriedIn: carried, effective: Math.max(0, base + carried) }
+}
+
+/**
+ * The limit the next cycle opens at once this one closes with `spent`. Without
+ * rollover nothing carries, so it opens at the base whatever the deficit setting.
+ */
+export function nextCycleOpensAt(
+  base: number,
+  carriedIn: number,
+  spent: number,
+  rolloverActive: boolean,
+  behaviour: DeficitBehaviour,
+): number {
+  if (!rolloverActive) return base
+  return budgetAllowance(base, nextRollover(carriedIn, base - spent, base, behaviour), true).effective
+}

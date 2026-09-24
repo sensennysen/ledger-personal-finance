@@ -42,7 +42,12 @@ export function TransactionDayList<T extends { id: string }>({
   return (
     <div className="space-y-4">
       {groups.map((group) => (
-        <section key={group.date} aria-label={formatDate(group.date)}>
+        <section
+          key={group.date}
+          aria-label={formatDate(group.date)}
+          data-day={group.date}
+          className="scroll-mt-[var(--tx-list-sticky-top,0px)]"
+        >
           <div className="sticky top-[var(--tx-list-sticky-top,0px)] z-10 -mx-1 mb-2 flex items-center justify-between gap-3 bg-background/95 px-1 py-1.5 backdrop-blur-sm">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               {dayLabel(group.date, today, { short: formatDateShort, full: formatDate })}

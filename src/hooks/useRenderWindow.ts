@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { nextRowCount } from '@/lib/transactionWindow'
 
 /**
@@ -36,5 +36,16 @@ export function useRenderWindow(total: number, { step, resetKey }: { step: numbe
     return () => observer.disconnect()
   }, [sentinel, hasMore, rendered, step, total])
 
-  return { rendered, hasMore, sentinelRef }
+  // Month jump (LED-62): render at least `min` rows so a target further down
+  // exists. Pass `key` when the same update changes the reset key (a jump that
+  // clears filters), so the reset does not throw the new count away.
+  const ensure = useCallback((min: number, key?: string) => {
+    setState((current) => {
+      const nextKey = key ?? current.key
+      if (nextKey === current.key) return current.count >= min ? current : { ...current, count: min }
+      return { key: nextKey, count: min }
+    })
+  }, [])
+
+  return { rendered, hasMore, sentinelRef, ensure }
 }

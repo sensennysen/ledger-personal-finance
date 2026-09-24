@@ -1,11 +1,12 @@
 // CSV import parsing and problem grouping (LED-65, spec §7 V6). Rows that
 // can't be imported are kept and flagged instead of silently dropped, then
 // grouped by cause so fixing one cause (a date order, say) clears every row
-// under it. Errors block the import; warnings import anyway.
+// under it. Errors block the import; warnings import anyway. Rows with no
+// category match (LED-74) are a warning: they import uncategorized.
 
 export type BankFormat = 'BDO' | 'BPI' | 'Metrobank' | 'Generic'
 export type DateOrder = 'MDY' | 'DMY'
-export type CauseId = 'bad-date' | 'bad-amount' | 'empty-description' | 'duplicate'
+export type CauseId = 'bad-date' | 'bad-amount' | 'empty-description' | 'no-category' | 'duplicate'
 export type Severity = 'error' | 'warning' | 'duplicate'
 
 export const MAX_IMPORT_ROWS = 5000
@@ -15,10 +16,11 @@ export const CAUSES: Record<CauseId, { label: string; severity: Severity }> = {
   'bad-date': { label: 'Unparseable date', severity: 'error' },
   'bad-amount': { label: 'Amount not a number', severity: 'error' },
   'empty-description': { label: 'Description empty', severity: 'warning' },
+  'no-category': { label: 'No category match', severity: 'warning' },
   duplicate: { label: 'Matches existing row', severity: 'duplicate' },
 }
 
-const CAUSE_ORDER: CauseId[] = ['bad-date', 'bad-amount', 'empty-description', 'duplicate']
+const CAUSE_ORDER: CauseId[] = ['bad-date', 'bad-amount', 'empty-description', 'no-category', 'duplicate']
 
 export interface ImportRow {
   /** 1-based data row number, counted from the row after the header. */
@@ -29,7 +31,7 @@ export interface ImportRow {
   description: string
   amount: number | null
   type: 'income' | 'expense' | null
-  /** Parse problems; duplicates are added later, once the check has run. */
+  /** Parse problems; duplicates and category misses are added later. */
   issues: CauseId[]
 }
 
@@ -310,6 +312,12 @@ export function processFile(text: string): ParsedFile | { error: string } {
   }
 
   return { format, raw, headerIdx, dateOrder }
+}
+
+/** The rows with `no-category` added to those in `uncategorised`. */
+export function withCategoryIssues(rows: ImportRow[], uncategorised: ReadonlySet<number>): ImportRow[] {
+  if (uncategorised.size === 0) return rows
+  return rows.map((row) => (uncategorised.has(row.line) ? { ...row, issues: [...row.issues, 'no-category'] } : row))
 }
 
 /** A row's parse issues plus `duplicate` when the check matched it. */

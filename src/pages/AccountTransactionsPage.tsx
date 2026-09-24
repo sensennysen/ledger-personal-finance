@@ -23,7 +23,8 @@ import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
 import { resolveLoadState } from '@/lib/loadState'
 import { searchMatcher } from '@/lib/globalSearch'
-import { UndoToast } from '@/components/ui/undo-toast'
+import { useUndoDelete } from '@/hooks/useUndoDelete'
+import { useNotify } from '@/contexts/notificationState'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { defaultCardPaymentDescription } from '@/lib/cardPayment'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
@@ -44,7 +45,7 @@ import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
-import type { CreditCardPayment, Transaction } from '@/types'
+import type { Account, CreditCardPayment, Transaction } from '@/types'
 
 function bandCell(label: string, value: string, sub?: string, money = true) {
   return (
@@ -112,46 +113,8 @@ export default function AccountTransactionsPage() {
   const [paymentsLoading, setPaymentsLoading] = useState(false)
   const [loanSection, setLoanSection] = useState<'summary' | 'purchases' | 'activity'>('summary')
 
-  // Undo delete
-  type UndoState = { snapshots: Transaction[]; message: string }
-  const [undoState, setUndoState] = useState<UndoState | null>(null)
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const showUndo = useCallback((snapshots: Transaction[], message: string) => {
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    setUndoState({ snapshots, message })
-    undoTimerRef.current = setTimeout(() => {
-      setUndoState(null)
-      undoTimerRef.current = null
-    }, 5000)
-  }, [])
-
-  const handleUndoDelete = useCallback(async () => {
-    if (!undoState) return
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    setUndoState(null)
-    for (const tx of undoState.snapshots) {
-      await createTransaction({
-        type: tx.type,
-        account_id: tx.account_id,
-        to_account_id: tx.to_account_id,
-        category_id: tx.category_id,
-        subcategory_id: tx.subcategory_id,
-        amount: tx.amount,
-        currency: tx.currency,
-        exchange_rate: tx.exchange_rate,
-        description: tx.description,
-        notes: tx.notes,
-        date: tx.date,
-        transfer_fee: tx.transfer_fee,
-        is_recurring: tx.is_recurring,
-        recurrence_interval: tx.recurrence_interval,
-        recurrence_end_date: tx.recurrence_end_date,
-        receipt_url: tx.receipt_url,
-      })
-    }
-    refetchAccounts()
-  }, [undoState, createTransaction, refetchAccounts])
+  const notify = useNotify()
+  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createTransaction, refetchAccounts)
 
   const account = accounts.find((a) => a.id === accountId)
   const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet
@@ -303,9 +266,12 @@ export default function AccountTransactionsPage() {
   const handleDelete = async (id: string) => {
     const snapshot = transactions.find((t) => t.id === id)
     const { error } = await deleteTransaction(id)
-    if (error) { console.error('Failed to delete transaction:', error); return }
+    if (error) {
+      announceDeleteFailed("Couldn't delete that transaction", () => void handleDelete(id))
+      return
+    }
     refetchAccounts()
-    if (snapshot) showUndo([snapshot], `"${snapshot.description}" deleted`)
+    if (snapshot) announceDeleted([snapshot], `"${snapshot.description}" deleted`)
   }
 
   useEffect(() => {
@@ -365,38 +331,61 @@ export default function AccountTransactionsPage() {
       return
     }
 
-    const amountToPay = account.statement_balance ?? 0
-    const currentPaid = account.statement_paid_amount ?? 0
-    const nextPaid = Math.min(currentPaid + amount, amountToPay)
+    // The transfer is saved: clear the form so a retry can never pay twice.
+    setFormError(null)
+    setPaymentAmount('')
+    await recordStatementPayment(account, amount, paymentDate, null)
+  }
 
-    const { data: insertedPayment, error: insertError } = await supabase
-      .from('credit_card_payments')
-      .insert({
-        user_id: user.id,
-        account_id: account.id,
-        amount,
-        payment_date: paymentDate,
+  /**
+   * Statement tracking after the transfer has saved. If a step fails the payment is
+   * half-recorded, so Fix reruns only the steps that did not complete.
+   */
+  const recordStatementPayment = async (
+    card: Account,
+    amount: number,
+    paymentDate: string,
+    recorded: CreditCardPayment | null,
+    retrying = false,
+  ): Promise<void> => {
+    if (!user) return
+    const fix = (payment: CreditCardPayment | null) => {
+      refetchAccounts()
+      notify({
+        severity: 'partial',
+        title: 'Payment recorded, statement not updated',
+        body: `The transfer saved, but statement tracking for ${card.name} may be out of date.`,
+        action: { label: 'Fix', run: () => void recordStatementPayment(card, amount, paymentDate, payment, true) },
       })
-      .select('*')
-      .single()
-    if (insertError) {
-      setFormError(insertError.message)
-      return
     }
 
-    const { error } = await updateAccount(account.id, {
+    let payment = recorded
+    if (!payment) {
+      const { data, error } = await supabase
+        .from('credit_card_payments')
+        .insert({
+          user_id: user.id,
+          account_id: card.id,
+          amount,
+          payment_date: paymentDate,
+        })
+        .select('*')
+        .single()
+      if (error) return fix(null)
+      const inserted = data as CreditCardPayment
+      payment = inserted
+      setPaymentHistory((prev) => [inserted, ...prev])
+    }
+
+    const nextPaid = Math.min((card.statement_paid_amount ?? 0) + amount, card.statement_balance ?? 0)
+    const { error } = await updateAccount(card.id, {
       statement_paid_amount: nextPaid,
       last_payment_amount: amount,
       last_payment_date: paymentDate,
     })
-    if (error) {
-      setFormError(error)
-      return
-    }
-    setFormError(null)
-    setPaymentAmount('')
-    setPaymentHistory((prev) => [insertedPayment as CreditCardPayment, ...prev])
+    if (error) return fix(payment)
     refetchAccounts()
+    if (retrying) notify({ severity: 'success', title: `Statement updated for ${card.name}` })
   }
 
   const handleAccountEdit = async (values: AccountFormValues) => {
@@ -907,17 +896,6 @@ export default function AccountTransactionsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Undo delete toast */}
-        {undoState && (
-          <UndoToast
-            message={undoState.message}
-            onUndo={handleUndoDelete}
-            onDismiss={() => {
-              if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-              setUndoState(null)
-            }}
-          />
-        )}
 
         {showMonthJump && <MonthJumpBar months={months} activeKey={null} onPick={jumpToMonth} />}
       </div>

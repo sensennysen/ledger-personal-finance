@@ -19,7 +19,7 @@ export function DashboardTransactionRow({
   subtitle,
   amount,
   rightDetail,
-  className = 'hover:bg-white/3',
+  className = 'hover:bg-foreground/3',
 }: DashboardTransactionRowProps) {
   const rowClassName = `grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors 2xl:py-1 ${className}`
   const content = (

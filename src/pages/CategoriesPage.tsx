@@ -51,6 +51,7 @@ import { FormError } from '@/components/ui/form-error'
 import type { FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
 import type { Category, Subcategory } from '@/types'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 const CATEGORY_COLORS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
@@ -467,6 +468,7 @@ function SubcategoryPanel({ category }: { category: Category }) {
 }
 
 export default function CategoriesPage() {
+  const ink = useCategoryInk()
   const { categories, loading, error, errorDetail, refetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder } = useCategories()
   const loadState = resolveLoadState({ loading, error, hasData: categories.length > 0 })
   const [createOpen, setCreateOpen] = useState(false)
@@ -604,7 +606,7 @@ export default function CategoriesPage() {
             }
             <div
               className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-lg"
-              style={{ backgroundColor: cat.color + '20' }}
+              style={{ backgroundColor: ink(cat.color) + '20' }}
             >
               {cat.icon}
             </div>

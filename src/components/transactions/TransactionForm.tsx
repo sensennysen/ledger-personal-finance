@@ -633,7 +633,7 @@ export function TransactionForm({
             {cardSummary.overpayment > 0 && (
               <div
                 role="status"
-                className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-snug"
+                className="rounded-lg border border-warning/40 bg-warning-container p-3 text-xs leading-snug"
               >
                 This is {formatCurrency(cardSummary.overpayment, cardCurrency)} more than the card owes. The extra
                 becomes a statement credit and the card&apos;s balance goes positive, which is allowed but shows as an

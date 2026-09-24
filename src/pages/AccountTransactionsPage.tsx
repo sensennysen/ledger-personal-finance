@@ -48,6 +48,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import type { Account, CreditCardPayment, Transaction } from '@/types'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 function bandCell(label: string, value: string, sub?: string, money = true) {
   return (
@@ -74,6 +75,7 @@ function dayInDaysLabel(days: number | null) {
 }
 
 export default function AccountTransactionsPage() {
+  const ink = useCategoryInk()
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
@@ -440,7 +442,7 @@ export default function AccountTransactionsPage() {
             <div className="flex items-center gap-3 flex-1 min-w-0 max-sm:basis-full">
               <div
                 className="p-2.5 rounded-xl shrink-0"
-                style={{ backgroundColor: account.color + '20', color: account.color }}
+                style={{ backgroundColor: ink(account.color) + '20', color: ink(account.color) }}
               >
                 <Icon className="w-5 h-5" />
               </div>
@@ -743,7 +745,7 @@ export default function AccountTransactionsPage() {
                   <ul className="space-y-1.5">
                     {cycleBreakdown.slice(0, 4).map((slice) => (
                       <li key={slice.key} className="flex items-center gap-2 text-sm">
-                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: slice.color }} aria-hidden />
+                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: ink(slice.color) }} aria-hidden />
                         <span className="min-w-0 flex-1 truncate">{slice.name}</span>
                         <span className="money shrink-0 font-medium">{formatCurrency(slice.amount, currency)}</span>
                       </li>

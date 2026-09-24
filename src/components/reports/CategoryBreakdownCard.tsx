@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DASHBOARD_CHART_TOOLTIP_STYLE } from '@/components/dashboard/chartTooltipStyle'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 type View = 'ranked' | 'grouped' | 'treemap'
 
@@ -234,7 +235,7 @@ function CategoryPie({ rows, currency }: { rows: CategorySlice[]; currency: stri
 }
 
 export function CategoryBreakdownCard({
-  rows,
+  rows: storedRows,
   loading,
   currency,
 }: {
@@ -243,6 +244,8 @@ export function CategoryBreakdownCard({
   currency: string
 }) {
   const [view, setView] = useState<View>('ranked')
+  const ink = useCategoryInk()
+  const rows = storedRows.map((r) => ({ ...r, color: ink(r.color) }))
   const { mode, total, top, other } = rollupBreakdown(rows)
 
   return (

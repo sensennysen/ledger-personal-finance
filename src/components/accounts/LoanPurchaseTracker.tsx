@@ -120,7 +120,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
       )}
 
       {showReconciliation && (
-        <div role="status" className="flex items-start gap-2.5 rounded-lg border border-yellow-400/60 bg-yellow-50 px-3.5 py-3 text-xs text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
+        <div role="status" className="flex items-start gap-2.5 rounded-lg border border-warning/40 bg-warning-container px-3.5 py-3 text-xs text-warning">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           <div className="min-w-0 space-y-2">
             {gap > 0 ? (
@@ -144,7 +144,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 border-yellow-400/60 bg-transparent text-xs"
+                className="h-7 border-warning/40 bg-transparent text-xs"
                 disabled={!isOnline || reconciling}
                 onClick={async () => {
                   setReconciling(true)
@@ -362,7 +362,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
           <DialogHeader><DialogTitle>Add Financed Purchase</DialogTitle></DialogHeader>
           <FormError error={formError} />
           {showReconciliation && gap > 0 && (
-            <p className="rounded-lg border border-yellow-400/60 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
+            <p className="rounded-lg border border-warning/40 bg-warning-container px-3 py-2 text-xs text-warning">
               This account already has {formatCurrency(gap, account.currency)} of unitemized debt. A financed purchase will be added on top; lower the account’s loan amount by {formatCurrency(gap, account.currency)} first if this purchase represents that same debt.
             </p>
           )}

@@ -29,9 +29,10 @@ import { TransactionKindMenu } from '@/components/transactions/TransactionKindMe
 import { inferTransactionKind, TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
+import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { groupByDay, sliceGroups, WINDOW_STEP } from '@/lib/transactionWindow'
+import { groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
 import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
@@ -48,6 +49,7 @@ export default function TransactionsPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const { prefs, set: setPref } = usePreferences()
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
+  const [sort, setSort] = useState<TxSort>('newest')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
 
@@ -243,15 +245,16 @@ export default function TransactionsPage() {
     [transactions]
   )
 
-  const grouped = useMemo(() => groupByDay(filtered), [filtered])
-  const flatSorted = useMemo(() => [...filtered].sort((a, b) => b.date.localeCompare(a.date)), [filtered])
+  const grouped = useMemo(() => groupByDay(filtered, undefined, sort), [filtered, sort])
+  const flatSorted = useMemo(() => sortByDate(filtered, sort), [filtered, sort])
+  const matchSum = useMemo(() => sumByCurrency(filtered), [filtered])
 
   // Window the list (LED-60). The cycle is left out of the reset key so
   // stepping it keeps the window and the scroll position.
   const compactList = useMediaQuery('(max-width: 767px)')
   const { rendered, sentinelRef } = useRenderWindow(filtered.length, {
     step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
-    resetKey: JSON.stringify([filterType, search, activeTagFilter, prefs.txView]),
+    resetKey: JSON.stringify([filterType, search, activeTagFilter, prefs.txView, sort]),
   })
 
   // ── Handlers ───────────────────────────────────────────────
@@ -388,6 +391,22 @@ export default function TransactionsPage() {
       selectable={selectMode}
       selected={selectedIds.has(tx.id)}
       onSelect={toggleSelect}
+      dense={prefs.txDensity === 'compact'}
+    />
+  )
+
+  const resultBar = (
+    <ResultBar
+      matchCount={filtered.length}
+      total={cycleOnly.length}
+      totalLabel="this cycle"
+      rangeLabel={`${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
+      sum={matchSum}
+      sort={sort}
+      onSortChange={setSort}
+      density={prefs.txDensity}
+      onDensityChange={(density) => setPref('txDensity', density)}
+      compact={compactList}
     />
   )
 
@@ -723,15 +742,15 @@ export default function TransactionsPage() {
           }
         />
       ) : prefs.txView === 'flat' ? (
-        <div>
+        <ResultBarLayout bar={resultBar}>
           <div className="space-y-1">{flatSorted.slice(0, rendered).map(renderRow)}</div>
           <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
-        </div>
+        </ResultBarLayout>
       ) : (
-        <div>
+        <ResultBarLayout bar={resultBar}>
           <TransactionDayList groups={sliceGroups(grouped, rendered)} renderRow={renderRow} compact={compactList} />
           <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
-        </div>
+        </ResultBarLayout>
       )}
 
       {/* Edit dialog */}

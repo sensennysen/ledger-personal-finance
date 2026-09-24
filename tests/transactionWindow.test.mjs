@@ -7,6 +7,9 @@ import {
   sliceGroups,
   nextRowCount,
   dayLabel,
+  sortByDate,
+  sumByCurrency,
+  dateSpan,
 } from '../src/lib/transactionWindow.ts'
 
 const tx = (overrides) => ({
@@ -86,4 +89,46 @@ test('day labels name today and yesterday, across a month boundary', () => {
   assert.equal(dayLabel('2026-09-16', '2026-09-17', format), 'Yesterday · short:2026-09-16')
   assert.equal(dayLabel('2026-08-31', '2026-09-01', format), 'Yesterday · short:2026-08-31')
   assert.equal(dayLabel('2026-09-10', '2026-09-17', format), 'full:2026-09-10')
+})
+
+test('sorts by date either way and keeps the incoming order within a day', () => {
+  const rows = [
+    tx({ date: '2026-09-16', id: 'a' }),
+    tx({ date: '2026-09-17', id: 'b' }),
+    tx({ date: '2026-09-16', id: 'c' }),
+  ]
+  assert.deepEqual(sortByDate(rows, 'newest').map((t) => t.id), ['b', 'a', 'c'])
+  assert.deepEqual(sortByDate(rows, 'oldest').map((t) => t.id), ['a', 'c', 'b'])
+  assert.deepEqual(rows.map((t) => t.id), ['a', 'b', 'c'])
+})
+
+test('oldest-first groups put the earliest day first', () => {
+  const rows = [tx({ date: '2026-09-17' }), tx({ date: '2026-09-15' }), tx({ date: '2026-09-16' })]
+  assert.deepEqual(groupByDay(rows, undefined, 'oldest').map((g) => g.date), ['2026-09-15', '2026-09-16', '2026-09-17'])
+})
+
+test('the match sum is per currency and signed like the rows', () => {
+  const rows = [
+    tx({ amount: 86.4 }),
+    tx({ type: 'income', amount: 200, currency: 'PHP' }),
+    tx({ type: 'transfer', amount: 500, to_account_id: 'b' }),
+    tx({ amount: 13.6 }),
+  ]
+  assert.deepEqual(sumByCurrency(rows), { USD: -100, PHP: 200 })
+  assert.deepEqual(sumByCurrency([]), {})
+})
+
+test('inside an account the match sum counts transfers in and out', () => {
+  const rows = [
+    tx({ type: 'transfer', amount: 100, to_account_id: 'acc', exchange_rate: 2 }),
+    tx({ type: 'transfer', amount: 50, to_account_id: 'other' }),
+    tx({ amount: 30 }),
+  ]
+  assert.deepEqual(sumByCurrency(rows, 'acc'), { USD: 120 })
+})
+
+test('the date span covers the earliest and latest rows, or is null when empty', () => {
+  const rows = [tx({ date: '2026-03-02' }), tx({ date: '2025-09-14' }), tx({ date: '2026-09-17' })]
+  assert.deepEqual(dateSpan(rows), { start: '2025-09-14', end: '2026-09-17' })
+  assert.equal(dateSpan([]), null)
 })

@@ -10,8 +10,8 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
-import { INCOME, GOLD } from '@/constants/colors'
+import { INCOME } from '@/constants/colors'
+import { excludedByCategory, groupByMonth, monthKey, salaryOnlySelection } from '@/lib/thirteenthMonth'
 import type { Transaction } from '@/types'
 
 // --- constants ---
@@ -45,39 +45,8 @@ function persistSelection(userId: string, year: number, ids: Set<string>) {
 
 // --- helpers ---
 
-function monthKey(date: string) {
-  return date.slice(0, 7)
-}
-
 function txAmt(tx: Transaction) {
   return tx.amount * (tx.exchange_rate ?? 1)
-}
-
-// --- SummaryCard ---
-
-function SummaryCard({
-  label, value, sub, color, loading,
-}: {
-  label: string
-  value: string
-  sub?: string
-  color: string
-  loading?: boolean
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-border/60 p-5 bg-card">
-      <div
-        className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-10 pointer-events-none"
-        style={{ background: color, filter: 'blur(28px)', transform: 'translate(30%, -30%)' }}
-      />
-      <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground mb-1">{label}</p>
-      {loading
-        ? <Skeleton className="h-7 w-28 mt-1" />
-        : <p className="text-2xl font-bold tracking-tight" style={{ color }}>{value}</p>
-      }
-      {sub && !loading && <p className="text-[0.6875rem] text-muted-foreground mt-1">{sub}</p>}
-    </div>
-  )
 }
 
 // --- page ---
@@ -89,7 +58,8 @@ export default function ThirteenthMonthPage() {
 
   const [year, setYear] = useState(CURRENT_YEAR)
   const [included, setIncluded] = useState<Set<string> | null>(() => loadSelection(userId, CURRENT_YEAR))
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // Months start open (LED-97): the include checkbox shouldn't sit on a closed row.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const startDate = `${year}-01-01`
   const endDate = `${year}-12-31`
@@ -114,18 +84,7 @@ export default function ThirteenthMonthPage() {
     persistSelection(userId, year, next)
   }
 
-  // Group by month, sorted asc
-  const byMonth = useMemo(() => {
-    const map = new Map<string, Transaction[]>()
-    for (const tx of transactions) {
-      const key = monthKey(tx.date)
-      const arr = map.get(key)
-      if (arr) arr.push(tx)
-      else map.set(key, [tx])
-    }
-    for (const arr of map.values()) arr.sort((a, b) => b.date.localeCompare(a.date))
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
-  }, [transactions])
+  const byMonth = useMemo(() => groupByMonth(transactions), [transactions])
 
   const { totalIncluded, monthsWithIncome } = useMemo(() => {
     let totalIncluded = 0
@@ -166,8 +125,8 @@ export default function ThirteenthMonthPage() {
     updateIncluded(next)
   }
 
-  const toggleExpand = (key: string) => {
-    setExpanded((prev) => {
+  const toggleCollapsed = (key: string) => {
+    setCollapsed((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
@@ -175,7 +134,11 @@ export default function ThirteenthMonthPage() {
     })
   }
 
-  const allChecked = transactions.length > 0 && transactions.every((t) => effectiveIncluded.has(t.id))
+  const includedCount = transactions.filter((t) => effectiveIncluded.has(t.id)).length
+  const excluded = useMemo(
+    () => excludedByCategory(transactions, effectiveIncluded),
+    [transactions, effectiveIncluded]
+  )
 
   return (
     <div className="p-4 md:p-6 lg:px-8 space-y-6">
@@ -211,38 +174,27 @@ export default function ThirteenthMonthPage() {
 
       <div className="space-y-6 xl:grid xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start xl:gap-6 xl:space-y-0">
       <div className="space-y-6 xl:order-2 xl:sticky xl:top-6">
-      <section className="rounded-3xl bg-accent text-accent-foreground p-6"><p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p><p className="money text-[40px] leading-tight mt-3">{loading ? '…' : formatCurrency(thirteenthMonthPay,currency)}</p><p className="text-sm mt-3">{formatCurrency(totalIncluded,currency)} basic salary ÷ 12</p></section>
-      <div className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3">
-        <SummaryCard
-          label="Total Basic Salary"
-          value={formatCurrency(totalIncluded, currency)}
-          sub={`${monthsWithIncome} of ${monthsElapsed} month${monthsElapsed !== 1 ? 's' : ''} covered`}
-          color={INCOME}
-          loading={loading}
-        />
-        <SummaryCard
-          label="Estimated 13th Month Pay"
-          value={formatCurrency(thirteenthMonthPay, currency)}
-          sub="Total / 12 (PD 851)"
-          color={GOLD}
-          loading={loading}
-        />
-        <SummaryCard
-          label="Records Included"
-          value={loading ? '-' : `${effectiveIncluded.size} / ${transactions.length}`}
-          sub="Tap rows below to toggle"
-          color="var(--muted-foreground)"
-          loading={loading}
-        />
-      </div>
+      <section className="rounded-3xl bg-accent text-accent-foreground p-6">
+        <p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p>
+        {loading
+          ? <Skeleton className="h-10 w-40 mt-3" />
+          : <p className="money text-[40px] leading-tight mt-3">{formatCurrency(thirteenthMonthPay, currency)}</p>
+        }
+        <p className="text-sm mt-3">{formatCurrency(totalIncluded, currency)} basic salary ÷ 12</p>
+        {!loading && (
+          <p className="text-xs mt-1 opacity-80">
+            Across {monthsWithIncome} of {monthsElapsed} month{monthsElapsed !== 1 ? 's' : ''} {isCurrentYear ? 'so far this year' : `of ${year}`}
+          </p>
+        )}
+      </section>
 
       <div className="flex items-start gap-2.5 rounded-xl bg-transfer-container p-4 text-sm text-transfer">
         <Info className="w-4 h-4 mt-0.5 shrink-0" />
         <p className="max-w-prose">
           All income transactions for the year are shown below. Check only the records that qualify
           as <strong className="text-foreground">basic salary</strong> under PD 851 – exclude bonuses,
-          allowances, overtime, and non-covered sources. Your selection is saved locally and never
-          affects your account balances.
+          allowances, overtime, and non-covered sources. Your selection is saved on this device only
+          and never affects your account balances.
         </p>
       </div>
       </div>
@@ -255,21 +207,44 @@ export default function ThirteenthMonthPage() {
                 <CalendarCheck className="w-4 h-4" style={{ color: INCOME }} />
                 Income Records – {year}
               </CardTitle>
-              <CardDescription>Select the records that count as basic salary</CardDescription>
+              <CardDescription>
+                {loading || transactions.length === 0
+                  ? 'Select the records that count as basic salary'
+                  : `${includedCount} of ${transactions.length} counted as basic salary`}
+              </CardDescription>
             </div>
-            {!loading && transactions.length > 0 && (
-              <button
-                type="button"
-                onClick={() => allChecked
-                  ? updateIncluded(new Set())
-                  : updateIncluded(new Set(transactions.map((t) => t.id)))
-                }
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 shrink-0"
-              >
-                {allChecked ? 'Deselect all' : 'Select all'}
-              </button>
-            )}
           </div>
+          {!loading && transactions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateIncluded(salaryOnlySelection(transactions))}
+              >
+                Auto-select salary only
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => updateIncluded(new Set(transactions.map((t) => t.id)))}
+              >
+                Select all
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => updateIncluded(new Set())}>
+                Clear
+              </Button>
+            </div>
+          )}
+          {!loading && excluded.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+              <span>Excluded by category:</span>
+              {excluded.map(({ name, count }) => (
+                <Badge key={name} variant="outline" className="font-normal">
+                  {name} · {count}
+                </Badge>
+              ))}
+            </div>
+          )}
         </CardHeader>
 
         <CardContent className="p-0">
@@ -308,13 +283,13 @@ export default function ThirteenthMonthPage() {
                 const someOn = monthSomeChecked(txs)
                 const inclTotal = monthIncludedTotal(txs)
                 const total = txs.reduce((s, t) => s + txAmt(t), 0)
-                const isOpen = expanded.has(key)
+                const isOpen = !collapsed.has(key)
 
                 return (
                   <div key={key}>
                     <div
                       className="flex items-center gap-3 px-5 py-3 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors select-none"
-                      onClick={() => toggleExpand(key)}
+                      onClick={() => toggleCollapsed(key)}
                     >
                       {isOpen
                         ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
@@ -404,22 +379,6 @@ export default function ThirteenthMonthPage() {
             </div>
           )}
 
-          {!loading && transactions.length > 0 && (
-            <>
-              <Separator />
-              <div className="flex items-center justify-between px-5 py-4 bg-muted/30">
-                <div>
-                  <p className="text-sm font-semibold">Estimated 13th Month Pay</p>
-                  <p className="text-[0.6875rem] text-muted-foreground">
-                    {formatCurrency(totalIncluded, currency)} total / 12
-                  </p>
-                </div>
-                <span className="text-xl font-bold tabular-nums" style={{ color: GOLD }}>
-                  {formatCurrency(thirteenthMonthPay, currency)}
-                </span>
-              </div>
-            </>
-          )}
         </CardContent>
       </Card>
       </div>

@@ -20,13 +20,19 @@ const TITLES: Record<string, string> = {
   '/settings': 'Settings',
 }
 
-export function resolveHeaderMeta(pathname: string): HeaderMeta {
+// Budgets' Goals view is not per-cycle, so the stepper would move nothing on screen.
+function followsCycle(pathname: string, search: string): boolean {
+  if (!STEPPER_PATHS.includes(pathname)) return false
+  return !(pathname === '/budgets' && new URLSearchParams(search).get('view') === 'goals')
+}
+
+export function resolveHeaderMeta(pathname: string, search = ''): HeaderMeta {
   if (/^\/accounts\/[^/]+$/.test(pathname)) {
     return { title: 'Account', showStepper: false, titleIsHeading: false }
   }
   return {
     title: TITLES[pathname] ?? 'Ledger',
-    showStepper: STEPPER_PATHS.includes(pathname),
+    showStepper: followsCycle(pathname, search),
     titleIsHeading: true,
   }
 }

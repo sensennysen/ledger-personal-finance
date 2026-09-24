@@ -39,3 +39,10 @@ test('account detail leaves the visible heading to the page', () => {
   assert.equal(resolveHeaderMeta('/accounts/abc').titleIsHeading, false)
   assert.equal(resolveHeaderMeta('/accounts').titleIsHeading, true)
 })
+
+test('the Budgets goals view hides the stepper; the budgets view keeps it', () => {
+  assert.equal(resolveHeaderMeta('/budgets', '?view=goals').showStepper, false)
+  assert.equal(resolveHeaderMeta('/budgets', '?view=budgets').showStepper, true)
+  assert.equal(resolveHeaderMeta('/budgets', '').showStepper, true)
+  assert.equal(resolveHeaderMeta('/transactions', '?view=goals').showStepper, true)
+})

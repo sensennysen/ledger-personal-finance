@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -12,6 +13,8 @@ import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { useBudgets } from '@/hooks/useBudgets'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { canRollover } from '@/lib/budgetRollover'
+import { budgetUsage } from '@/lib/budgetUsage'
+import { goalPace } from '@/lib/goalPace'
 import { useCycle } from '@/contexts/cycleState'
 import { PageActions } from '@/components/layout/PageActions'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -74,6 +77,9 @@ const BUDGET_PERIOD_LABELS: Record<BudgetFormValues['period'], string> = {
 }
 
 const getCurrencyLabel = (value: string | null | undefined) => value ?? 'Select currency'
+const formatCycleDay = (date: string) =>
+  new Date(date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+
 const DEFAULT_GOAL_ICON = '\u{1F3AF}'
 const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
 
@@ -106,6 +112,8 @@ function BudgetForm({
 
   const period = useWatch({ control: form.control, name: 'period' })
   const rolloverAllowed = canRollover(period)
+  const { selectedMonth, startDay } = useCycle()
+  const cycle = getBudgetCycleRange(period, selectedMonth, startDay)
   const initialPeriod = defaultValues?.period ?? 'monthly'
 
   // Only clear the flag when the user moves a budget off monthly in this edit;
@@ -222,6 +230,11 @@ function BudgetForm({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Runs <span className="font-medium text-foreground">{formatCycleDay(cycle.start)} – {formatCycleDay(cycle.end)}</span>
+                {period === 'monthly' && startDay !== 1 && ', following your pay cycle — not the calendar month'}
+                .
+              </p>
             </FormItem>
           )}
         />
@@ -293,6 +306,10 @@ function BudgetForm({
 
 // --- Savings goal form ---
 
+const formatTargetMonth = (deadline: string) =>
+  new Date(deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+
+
 const goalSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   target_amount: z.coerce.number().positive('Target must be positive'),
@@ -334,6 +351,14 @@ function GoalForm({
       ...defaultValues,
     },
   })
+
+  const [watchedTarget, watchedSaved, watchedDeadline, watchedCurrency] = useWatch({
+    control: form.control,
+    name: ['target_amount', 'current_amount', 'deadline', 'currency'],
+  })
+  const target = Number(watchedTarget) || 0
+  const saved = Number(watchedSaved) || 0
+  const pace = goalPace({ target, saved, deadline: watchedDeadline ?? null })
 
   React.useEffect(() => {
     const currentIcon = form.getValues('icon')
@@ -428,7 +453,7 @@ function GoalForm({
             name="current_amount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Current Savings</FormLabel>
+                <FormLabel>Saved so far</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -472,7 +497,7 @@ function GoalForm({
             name="deadline"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Deadline (optional)</FormLabel>
+                <FormLabel>Target date (optional)</FormLabel>
                 <FormControl>
                   <Input
                     type="date"
@@ -484,6 +509,40 @@ function GoalForm({
             )}
           />
         </div>
+        {target > 0 && (
+          <div className="rounded-lg border bg-muted/40 p-3 space-y-2 text-sm">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">What it takes</span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {formatCurrency(saved, watchedCurrency)} of {formatCurrency(target, watchedCurrency)} · {Math.round(pace.pct)}%
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Still needed</p>
+                <p className="font-medium tabular-nums">{formatCurrency(pace.remaining, watchedCurrency)}</p>
+              </div>
+              <div>
+                {pace.status === 'on-pace' && watchedDeadline ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">Per month to hit {formatTargetMonth(watchedDeadline)}</p>
+                    <p className="font-medium tabular-nums">{formatCurrency(pace.perMonth ?? 0, watchedCurrency)}</p>
+                    <p className="text-xs text-muted-foreground">{pace.monthsLeft} month{pace.monthsLeft !== 1 ? 's' : ''} left</p>
+                  </>
+                ) : pace.status === 'overdue' ? (
+                  <p className="text-xs text-destructive">The target date has passed. Pick a new one to see a monthly figure.</p>
+                ) : pace.status === 'no-date' ? (
+                  <p className="text-xs text-muted-foreground">Add a target date to see what to save each month.</p>
+                ) : (
+                  <p className="text-xs text-income">Target reached.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Goals aren't linked to an account — <span className="font-medium text-foreground">Saved so far</span> is a number you maintain. Transfers to a savings account won't update it automatically.
+        </p>
         <FormField
           control={form.control}
           name="color"
@@ -624,8 +683,7 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
         <tbody>
           {history.map((entry) => {
             const effective = entry.budget_amount + entry.rollover_in
-            const over = entry.spent_amount > effective
-            const pct = Math.min((entry.spent_amount / (effective || 1)) * 100, 100)
+            const { over, barPct: pct } = budgetUsage(entry.spent_amount, effective)
             const month = new Date(entry.period_start + 'T00:00:00').toLocaleDateString(undefined, {
               month: 'short',
               year: 'numeric',
@@ -824,19 +882,14 @@ function SavingsGoalCard({
   onToggleComplete: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const pct = Math.min((goal.current_amount / goal.target_amount) * 100, 100)
-  const remaining = goal.target_amount - goal.current_amount
+  const pace = goalPace({ target: goal.target_amount, saved: goal.current_amount, deadline: goal.deadline })
+  const { pct, remaining } = pace
 
   const deadlineInfo = (() => {
-    if (!goal.deadline) return null
-    const deadline = new Date(goal.deadline + 'T00:00:00')
-    const now = new Date()
-    const diffDays = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-    if (diffDays < 0) return { label: 'Overdue', urgent: true }
-    if (diffDays === 0) return { label: 'Due today', urgent: true }
-    if (diffDays <= 30) return { label: `${diffDays}d left`, urgent: true }
-    const months = Math.round(diffDays / 30)
-    return { label: `${months}mo left`, urgent: false }
+    if (goal.is_completed) return null
+    if (pace.status === 'overdue') return { label: 'Past target date', urgent: true }
+    if (pace.status !== 'on-pace' || pace.monthsLeft === null) return null
+    return { label: `${pace.monthsLeft}mo left`, urgent: pace.monthsLeft <= 1 }
   })()
 
   return (
@@ -859,7 +912,7 @@ function SavingsGoalCard({
                 {goal.deadline && (
                   <Badge variant="outline" className="text-xs gap-1">
                     <CalendarDays className="w-3 h-3" />
-                    {new Date(goal.deadline + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+                    {formatTargetMonth(goal.deadline)}
                   </Badge>
                 )}
                 {deadlineInfo && (
@@ -923,6 +976,9 @@ function SavingsGoalCard({
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
             {Math.round(pct)}% of {formatCurrency(goal.target_amount, goal.currency)}
+            {!goal.is_completed && pace.status === 'on-pace' && goal.deadline && (
+              <> · <span className="font-medium text-foreground">{formatCurrency(pace.perMonth ?? 0, goal.currency)}/mo</span> to hit {formatTargetMonth(goal.deadline)}</>
+            )}
           </p>
           <Button
             variant="ghost"
@@ -953,6 +1009,7 @@ function SavingsGoalCard({
             </button>
             {expanded && (
               <div className="mt-2 space-y-1">
+                <p className="text-xs text-muted-foreground">Shown for reference — they don't change Saved so far.</p>
                 {goal.linkedTransactions!.slice(0, 10).map((tx) => (
                   <div key={tx.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/40">
                     <span className="text-muted-foreground">{tx.date}</span>
@@ -982,7 +1039,17 @@ export default function BudgetsPage() {
   const { goals, loading: goalsLoading, error: goalsError, errorDetail: goalsErrorDetail, refetch: refetchGoals, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
   const goalsLoadState = resolveLoadState({ loading: goalsLoading, error: goalsError, hasData: goals.length > 0 })
 
-  const [activeTab, setActiveTab] = useState('budgets')
+  // The view lives in the URL so the header can hide the cycle stepper on Goals.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const activeTab = searchParams.get('view') === 'goals' ? 'goals' : 'budgets'
+  const setActiveTab = (view: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (view === 'goals') next.set('view', 'goals')
+      else next.delete('view')
+      return next
+    }, { replace: true })
+  }
   const [createOpen, setCreateOpen] = useState(false)
   const [editBudget, setEditBudget] = useState<Budget | null>(null)
   const [formError, setFormError] = useState<FormErrorValue>(null)
@@ -1069,24 +1136,21 @@ export default function BudgetsPage() {
         </PageActions>
       </div>
 
-      {budgetsLoadState === 'stale-error' && (
-        <InlineLoadError message="Couldn't refresh your budgets. Showing what was last loaded." onRetry={() => void refetchBudgets()} />
-      )}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full max-w-xs grid-cols-2">
           <TabsTrigger value="budgets" className="gap-1.5">
             <Target className="w-3.5 h-3.5" />Budgets
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-1.5">
-            <History className="w-3.5 h-3.5" />Budget history
-          </TabsTrigger>
           <TabsTrigger value="goals" className="gap-1.5">
-            <PiggyBank className="w-3.5 h-3.5" />Savings Goals
+            <PiggyBank className="w-3.5 h-3.5" />Goals
           </TabsTrigger>
         </TabsList>
 
-        {/* Budgets tab */}
+        {/* Budgets view */}
         <TabsContent value="budgets" className="mt-4 space-y-4">
+          {budgetsLoadState === 'stale-error' && (
+            <InlineLoadError message="Couldn't refresh your budgets. Showing what was last loaded." onRetry={() => void refetchBudgets()} />
+          )}
           {budgetsLoadState === 'error' ? (
             <ErrorState title="Couldn't load your budgets" description={budgetError} detail={budgetErrorDetail} onRetry={() => void refetchBudgets()} />
           ) : budgetsLoadState === 'loading' ? (
@@ -1105,8 +1169,7 @@ export default function BudgetsPage() {
             {budgets.map((budget, idx) => {
               const spent = budget.spent ?? 0
               const effective = budget.effective_amount ?? budget.amount
-              const pct = Math.min((spent / (effective || 1)) * 100, 100)
-              const over = spent > effective
+              const { usedPct, barPct: pct, over } = budgetUsage(spent, effective)
               const remaining = effective - spent
               const rollover = budget.rollover_amount ?? 0
               const rolloverActive = budget.rollover_enabled && canRollover(budget.period)
@@ -1139,7 +1202,7 @@ export default function BudgetsPage() {
                             {over && (
                               <Badge variant="destructive" className="text-xs">Over budget</Badge>
                             )}
-                            {!over && pct >= BUDGET_WARNING_THRESHOLD * 100 && (
+                            {!over && pct >= BUDGET_WARNING_THRESHOLD && (
                               <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700">Warning</Badge>
                             )}
                           </div>
@@ -1205,10 +1268,15 @@ export default function BudgetsPage() {
                         </div>
                       </div>
                     )}
-                    <Progress
-                      value={pct}
-                      className={over ? '[&_[data-slot=progress-indicator]]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&_[data-slot=progress-indicator]]:bg-primary' : ''}
-                    />
+                    <div className="flex items-center gap-3">
+                      <Progress
+                        value={pct}
+                        className={`flex-1 ${over ? '[&_[data-slot=progress-indicator]]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&_[data-slot=progress-indicator]]:bg-primary' : ''}`}
+                      />
+                      <span className={`shrink-0 text-sm font-medium tabular-nums ${over ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        {usedPct === null ? 'Over' : `${usedPct}%`}
+                      </span>
+                    </div>
                     {budget.currency !== defaultCurrency && (
                       <p className="text-xs text-primary">
                         Budget is in {budget.currency} — transactions in other currencies are converted using their exchange rate.
@@ -1242,24 +1310,17 @@ export default function BudgetsPage() {
             </div>
             </RefreshingRegion>
           )}
-        </TabsContent>
 
-        {/* History tab */}
-        <TabsContent value="history" className="mt-4 space-y-4">
-          {budgetsLoadState === 'error' ? (
-            <ErrorState title="Couldn't load your budget history" description={budgetError} detail={budgetErrorDetail} onRetry={() => void refetchBudgets()} />
-          ) : budgetsLoadState === 'loading' ? (
-            <div className="space-y-4">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-48" />)}</div>
-          ) : monthlyBudgets.length === 0 ? (
-            <Card className="text-center py-16">
-              <CardContent>
-                <History className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="font-medium">No monthly budget history</p>
-                <p className="text-sm text-muted-foreground">
-                  Budget history is tracked for monthly budgets. Create one to get started.
-                </p>
-              </CardContent>
-            </Card>
+          {/* Budget history: shown once budgets are on screen; the list above owns the error and loading states */}
+          {budgets.length > 0 && (
+          <section className="space-y-4 pt-4" aria-labelledby="budget-history-heading">
+          <h2 id="budget-history-heading" className="flex items-center gap-1.5 text-base font-semibold">
+            <History className="w-4 h-4" />Budget history
+          </h2>
+          {monthlyBudgets.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Budget history is tracked for monthly budgets. Create one to get started.
+            </p>
           ) : (
             <RefreshingRegion refreshing={budgetsRefreshing} label={budgetsRefreshLabel}>
             <div className="space-y-4">
@@ -1290,10 +1351,15 @@ export default function BudgetsPage() {
               History tracking is available for monthly budgets only.
             </p>
           )}
+          </section>
+          )}
         </TabsContent>
 
-        {/* Savings Goals tab */}
+        {/* Goals view */}
         <TabsContent value="goals" className="mt-4 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Goals are tracked by hand. They aren't linked to an account, so update Saved so far or add a contribution when you move money.
+          </p>
           {goalsLoadState === 'stale-error' && (
             <InlineLoadError message="Couldn't refresh your savings goals. Showing what was last loaded." onRetry={() => void refetchGoals()} />
           )}

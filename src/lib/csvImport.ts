@@ -325,7 +325,7 @@ export function rowIssues(row: ImportRow, duplicates: ReadonlySet<number> | Read
   return duplicates.has(row.line) ? [...row.issues, 'duplicate'] : row.issues
 }
 
-function hasError(issues: CauseId[]): boolean {
+export function hasError(issues: CauseId[]): boolean {
   return issues.some((id) => CAUSES[id].severity === 'error')
 }
 

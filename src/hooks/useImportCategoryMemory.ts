@@ -20,15 +20,16 @@ const EMPTY_MEMORY: PayeeMemory = new Map()
 /**
  * What the import needs to suggest categories (LED-74): the user's rules and
  * a payee → category memory built from every categorised transaction. Read
- * only while the dialog has a file. A failed read is reported; the import can
- * still go ahead, with every row left for the user to categorise.
+ * afresh for each file (`fileKey`), so a second import in the same session
+ * learns from the first; null while there's no file. A failed read is
+ * reported; the import can still go ahead, with rows left for the user.
  */
-export function useImportCategoryMemory(enabled: boolean) {
+export function useImportCategoryMemory(fileKey: number | null) {
   const { user } = useAuth()
   const [attempt, setAttempt] = useState(0)
   const [result, setResult] = useState<MemoryResult | null>(null)
 
-  const key = enabled && user ? `${user.id}|${attempt}` : ''
+  const key = fileKey !== null && user ? `${user.id}|${fileKey}|${attempt}` : ''
 
   useEffect(() => {
     if (!key || !user) return

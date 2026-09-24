@@ -11,6 +11,7 @@ import {
   EMPTY_DESCRIPTION,
   fixableByOtherOrder,
   groupProblems,
+  hasError,
   importableRows,
   isProblem,
   isSelectable,
@@ -120,7 +121,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const [onlyProblems, setOnlyProblems] = useState(false)
 
   const { categories } = useCategories()
-  const categoryMemory = useImportCategoryMemory(Boolean(file))
+  const categoryMemory = useImportCategoryMemory(file ? fileKey : null)
   const categoryById = new Map(categories.map((category) => [category.id, category]))
   const selectedAccount = accounts.find((account) => account.id === accountId)
   const accountCurrency = selectedAccount?.currency ?? ''
@@ -134,26 +135,28 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     [file, dateOrder],
   )
   const span = useMemo(() => duplicateSpan(built.rows), [built.rows])
+  const dupeCheck = useImportDuplicates(accountId, span)
+  // Compare in the account's currency: that's what the existing rows are in.
+  const duplicates = matchDuplicates(
+    built.rows.map((row) => (row.amount === null ? row : { ...row, amount: convertAmount(row.amount, rate) })),
+    dupeCheck.existing,
+    accountId,
+  )
   const suggestions = new Map<number, Suggestion>()
   const uncategorised = new Set<number>()
   for (const row of built.rows) {
     if (row.type === null || transfers.has(row.line)) continue
+    // Rows that stay out anyway (an error, or already in Ledger) aren't flagged.
+    const leftOut = hasError(row.issues) || (duplicates.has(row.line) && !toggled.has(row.line))
     const suggestion = suggestCategory(row, categoryMemory.rules, categoryMemory.memory, categoryById)
     if (suggestion) suggestions.set(row.line, suggestion)
-    else if (!picks.has(row.line) && !categoryMemory.loading) uncategorised.add(row.line)
+    else if (!leftOut && !picks.has(row.line) && !categoryMemory.loading) uncategorised.add(row.line)
   }
   const rows = withCategoryIssues(built.rows, uncategorised)
   const categoryOf = (line: number): string | null => {
     const pick = picks.get(line)
     return pick !== undefined ? pick || null : (suggestions.get(line)?.categoryId ?? null)
   }
-  const dupeCheck = useImportDuplicates(accountId, span)
-  // Compare in the account's currency: that's what the existing rows are in.
-  const duplicates = matchDuplicates(
-    rows.map((row) => (row.amount === null ? row : { ...row, amount: convertAmount(row.amount, rate) })),
-    dupeCheck.existing,
-    accountId,
-  )
 
   const selection = { duplicates, skipped, toggled }
   const summary = summarise(rows, selection)

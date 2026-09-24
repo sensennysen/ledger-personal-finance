@@ -43,6 +43,17 @@ export function getStepStatus(progress: FirstRunProgress): FirstRunStepStatus[] 
   return FIRST_RUN_STEPS.map((step) => ({ ...step, done: done[step.id] }))
 }
 
-export function isSetupComplete(progress: FirstRunProgress): boolean {
-  return progress.hasAccount && progress.hasTransaction && progress.cycleConfirmed
+/**
+ * `loading` means accounts/transactions are still being read. The shell must
+ * not lock nav on a query that hasn't answered yet (LED-95), so an unknown
+ * answer counts as complete — unless the locally stored cycle flag already
+ * says setup isn't done.
+ */
+export function isSetupComplete(
+  progress: FirstRunProgress,
+  { loading = false }: { loading?: boolean } = {},
+): boolean {
+  if (!progress.cycleConfirmed) return false
+  if (loading) return true
+  return progress.hasAccount && progress.hasTransaction
 }

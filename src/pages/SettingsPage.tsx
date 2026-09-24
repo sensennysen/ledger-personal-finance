@@ -18,6 +18,7 @@ import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { FormError } from '@/components/ui/form-error'
+import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -76,11 +77,12 @@ export default function SettingsPage() {
   const { prefs, set: setPref } = usePreferences()
   const [saved, setSaved] = useState(false)
   const [deficitSaving, setDeficitSaving] = useState(false)
-  const [deficitError, setDeficitError] = useState<string | null>(null)
+  const [deficitError, setDeficitError] = useState<FormErrorValue>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<FormErrorValue>(null)
+  const [profileError, setProfileError] = useState<FormErrorValue>(null)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
       return 'unsupported'
@@ -112,7 +114,7 @@ export default function SettingsPage() {
     try {
       await deleteAccount()
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Deletion failed. Please try again.')
+      setDeleteError(err instanceof Error ? describeDataError(err, { action: 'delete', entity: 'account' }) : 'Deletion failed. Please try again.')
       setDeleting(false)
     }
   }
@@ -134,9 +136,10 @@ export default function SettingsPage() {
 
   const onSave = async (values: ProfileValues) => {
     if (!user) return
+    setProfileError(null)
     const { error } = await supabase.from('profiles').update(values).eq('id', user.id)
     if (error) {
-      form.setError('root', { message: error.message })
+      setProfileError(describeDataError(error, { action: 'save', entity: 'profile' }))
       return
     }
     await refreshProfile()
@@ -153,7 +156,7 @@ export default function SettingsPage() {
     setDeficitError(null)
     const { error } = await supabase.from('profiles').update({ budget_deficit_behaviour: next }).eq('id', user.id)
     if (error) {
-      setDeficitError(`Couldn't save this setting: ${error.message}`)
+      setDeficitError(describeDataError(error, { action: 'save', entity: 'setting' }))
     } else {
       await refreshProfile()
     }
@@ -242,9 +245,7 @@ export default function SettingsPage() {
                 )}
               />
               <div className="flex items-center justify-end gap-2">
-                {form.formState.errors.root && (
-                  <span role="alert" className="text-sm text-destructive">{form.formState.errors.root.message}</span>
-                )}
+                <FormError error={profileError} className="px-0 mt-0" />
                 {saved && <span className="text-sm" style={{ color: INCOME }}>Saved!</span>}
                 <Button type="submit" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
@@ -555,7 +556,7 @@ export default function SettingsPage() {
               </label>
             ))}
           </fieldset>
-          {deficitError && <FormError>{deficitError}</FormError>}
+          <FormError error={deficitError} />
           <p className="text-xs text-muted-foreground">
             Separate from each budget's Rollover unused budget toggle, which decides whether a surplus carries. The two work independently.
           </p>
@@ -645,9 +646,7 @@ export default function SettingsPage() {
                 disabled={deleting}
                 autoComplete="off"
               />
-              {deleteError && (
-                <span role="alert" className="block text-sm text-destructive">{deleteError}</span>
-              )}
+              <FormError error={deleteError} className="px-0 mt-0" />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

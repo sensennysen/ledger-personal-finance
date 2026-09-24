@@ -129,7 +129,11 @@ export function TransactionRow({
       <div className="flex-1 min-w-0 space-y-0.5">
         {/* Row 1: description | amount */}
         <div className="flex items-baseline justify-between gap-2">
-          <button type="button" className="text-sm font-medium truncate text-left py-1" onClick={()=>openDetail ? openDetail(tx,()=>onEdit(tx)) : onEdit(tx)}>{tx.description}</button>
+          <button type="button" className="text-sm font-medium truncate text-left py-1" onClick={()=>openDetail ? openDetail(tx,{
+            onEdit: ()=>onEdit(tx),
+            onDelete: ()=>void onDelete(tx.id),
+            onSplit: onSplit && tx.type !== 'transfer' ? ()=>onSplit(tx) : undefined,
+          }) : onEdit(tx)}>{tx.description}</button>
           <p className={`money text-sm font-semibold shrink-0 ${amountColorClass}`}>
             {amountPrefix}{formatCurrency(displayAmount, tx.currency)}
           </p>

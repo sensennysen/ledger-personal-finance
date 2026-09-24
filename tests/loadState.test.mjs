@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveLoadState } from '../src/lib/loadState.ts'
+import { resolveLoadState, resolveRefresh } from '../src/lib/loadState.ts'
 
 const s = (loading, error, hasData) => resolveLoadState({ loading, error, hasData })
 
@@ -27,4 +27,23 @@ test('loaded with no rows is empty', () => {
 test('refetch with cached data stays ready', () => {
   assert.equal(s(true, null, true), 'ready')
   assert.equal(s(false, null, true), 'ready')
+})
+
+const r = (loading, hasData, dataKey, requestedKey) =>
+  resolveRefresh({ loading, hasData, dataKey, requestedKey })
+
+test('loading a new key with the old key on screen is a refresh, named by the new key', () => {
+  assert.deepEqual(r(true, true, '2026-09', '2026-10'), { refreshing: true, pendingKey: '2026-10' })
+})
+
+test('refetching the key already on screen is not a refresh', () => {
+  assert.deepEqual(r(true, true, '2026-10', '2026-10'), { refreshing: false, pendingKey: null })
+})
+
+test('first load with nothing on screen is not a refresh', () => {
+  assert.deepEqual(r(true, false, null, '2026-10'), { refreshing: false, pendingKey: null })
+})
+
+test('once the new key has loaded the refresh ends', () => {
+  assert.deepEqual(r(false, true, '2026-10', '2026-10'), { refreshing: false, pendingKey: null })
 })

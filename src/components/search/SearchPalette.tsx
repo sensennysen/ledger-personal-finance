@@ -231,7 +231,6 @@ function SearchBody({
           </button>
           <CommandInput
             bare
-            autoFocus
             value={query}
             onValueChange={(value) => {
               setQuery(value)
@@ -253,7 +252,6 @@ function SearchBody({
         </div>
       ) : (
         <CommandInput
-          autoFocus
           value={query}
           onValueChange={(value) => {
             setQuery(value)
@@ -299,7 +297,7 @@ function SearchBody({
       )}
       {error && loadState !== 'loading' && (
         <div className="px-1 pb-1">
-          <InlineLoadError message={`Search data failed to load: ${error}`} onRetry={refetch} />
+          <InlineLoadError message={`Search data failed to load. ${error}`} onRetry={refetch} />
         </div>
       )}
       <CommandList className={mobile ? 'max-h-none min-h-0 flex-1' : 'max-h-96'}>

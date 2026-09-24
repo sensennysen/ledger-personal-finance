@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CloudOff, Layers3, MoreVertical, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react'
+import { AlertTriangle, CalendarDays, ChevronDown, CloudOff, Layers3, MoreVertical, Pencil, Plus, ReceiptText, Trash2 } from 'lucide-react'
 import { LoanPurchaseForm } from '@/components/accounts/LoanPurchaseForm'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
+import { withDetail, type FormErrorValue, type MutationResult } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCategories } from '@/hooks/useCategories'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
+import { getItemizationGap, labelAllocationInstallments, splitPurchaseProgress, type LoanContext } from '@/lib/loanSummary'
+import { daysUntilDate } from '@/lib/accountsOverview'
+import type { LoanDeadline } from '@/lib/loanInstallments'
 import type { Account, LoanPurchase } from '@/types'
 
 /**
@@ -42,22 +45,34 @@ interface LoanPurchaseTrackerProps {
   account: Account
   onAccountChanged: () => void
   loanData?: ReturnType<typeof useLoanPurchases>
+  /** Sets what the loan owes; the page routes it through the balance-adjustment path. */
+  onSetLoanAmount?: (owed: number) => Promise<MutationResult>
+  /** Opens the loan-repayment form prefilled for this deadline. */
+  onRecordPayment?: (deadline: LoanDeadline) => void
 }
 
-const DEADLINES_PAGE_SIZE = 4
+function formatDueIn(days: number) {
+  if (days < 0) return `${-days} day${days === -1 ? '' : 's'} overdue`
+  if (days === 0) return 'due today'
+  return `in ${days} day${days === 1 ? '' : 's'}`
+}
 
-export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: LoanPurchaseTrackerProps) {
+export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSetLoanAmount, onRecordPayment }: LoanPurchaseTrackerProps) {
   const [createOpen, setCreateOpen] = useState(false)
   const [editPurchase, setEditPurchase] = useState<LoanPurchase | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<LoanPurchase | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [deadlinePage, setDeadlinePage] = useState(0)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   const [expandedDeadline, setExpandedDeadline] = useState<string | null>(null)
+  const [reconciling, setReconciling] = useState(false)
   const { categories } = useCategories()
   const isOnline = useIsOnline()
   const internalLoanData = useLoanPurchases(account.id, !loanData)
-  const { purchases, allocations, deadlines, loading, error, refetch, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
+  const { purchases, allocations, deadlines, loading, error, errorDetail, refetch, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
   const loadState = resolveLoadState({ loading, error, hasData: purchases.length > 0 })
+  const owed = getLoanAmountOwed(account)
+  const { itemized, gap } = getItemizationGap(owed, purchases)
+  // Only a settled read can be reconciled: a stale or in-flight list would report a gap that isn't there.
+  const showReconciliation = !loading && (loadState === 'ready' || loadState === 'empty') && gap !== 0
   const expenseCategories = categories.filter((category) => category.type === 'expense' || category.type === 'both')
   const purchaseById = useMemo(() => new Map(purchases.map((purchase) => [purchase.id, purchase])), [purchases])
   const recentAllocations = useMemo(
@@ -66,12 +81,19 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
       .slice(0, 8),
     [allocations],
   )
-  const deadlinePageCount = Math.max(1, Math.ceil(deadlines.length / DEADLINES_PAGE_SIZE))
-  const activeDeadlinePage = Math.min(deadlinePage, deadlinePageCount - 1)
-  const visibleDeadlines = useMemo(
-    () => deadlines.slice(activeDeadlinePage * DEADLINES_PAGE_SIZE, (activeDeadlinePage + 1) * DEADLINES_PAGE_SIZE),
-    [activeDeadlinePage, deadlines],
-  )
+  const installmentLabels = labelAllocationInstallments(purchases, allocations)
+  const [nextDeadline, ...laterDeadlines] = deadlines
+  const hasImportedProgress = purchases.some((purchase) => purchase.opening_paid_amount > 0)
+  // The loan as it stands without `excluded`, so the form can show what saving it does.
+  const loanContextWithout = (excluded: LoanPurchase | null): LoanContext => {
+    const others = purchases.filter((purchase) => purchase.id !== excluded?.id && (purchase.remaining_balance ?? purchase.total_payable) > 0)
+    return {
+      baseOwed: owed - (excluded?.remaining_balance ?? 0),
+      baseMonthly: others.reduce((sum, purchase) => sum + purchase.monthly_installment, 0),
+      baseCount: others.length,
+      allocatedToThis: excluded ? (excluded.paid_amount ?? 0) - excluded.opening_paid_amount : 0,
+    }
+  }
 
   return (
     <section className="space-y-4" aria-labelledby="financed-purchases-title">
@@ -92,13 +114,54 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
         </div>
       )}
 
-      {formError && <FormError>{formError}</FormError>}
+      <FormError error={formError} />
       {loadState === 'stale-error' && (
         <InlineLoadError message="Couldn't refresh your financed purchases. Showing what was last loaded." onRetry={() => void refetch()} />
       )}
 
+      {showReconciliation && (
+        <div role="status" className="flex items-start gap-2.5 rounded-lg border border-yellow-400/60 bg-yellow-50 px-3.5 py-3 text-xs text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <div className="min-w-0 space-y-2">
+            {gap > 0 ? (
+              <>
+                <p className="font-semibold">{purchases.length === 0 ? "None of this loan is itemized" : "Some of this loan isn't itemized"}</p>
+                <p>
+                  The account carries {formatCurrency(owed, account.currency)} owed
+                  {purchases.length > 0 && <>, but the purchases below account for {formatCurrency(itemized, account.currency)} of it</>}.
+                  {' '}The remaining {formatCurrency(gap, account.currency)} has no schedule, so it never appears in a deadline.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold">The purchases add up to more than this loan owes</p>
+                <p>
+                  The purchases below have {formatCurrency(itemized, account.currency)} left to pay, but the account carries only {formatCurrency(owed, account.currency)} owed. The {formatCurrency(-gap, account.currency)} difference is scheduled but not counted in the loan's balance.
+                </p>
+              </>
+            )}
+            {purchases.length > 0 && onSetLoanAmount && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-yellow-400/60 bg-transparent text-xs"
+                disabled={!isOnline || reconciling}
+                onClick={async () => {
+                  setReconciling(true)
+                  const result = await onSetLoanAmount(itemized)
+                  setReconciling(false)
+                  setFormError(withDetail(result))
+                }}
+              >
+                {reconciling ? 'Saving...' : `Set the loan amount to ${formatCurrency(itemized, account.currency)}`}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {loadState === 'error' ? (
-        <ErrorState title="Couldn't load your financed purchases" detail={error} onRetry={() => void refetch()} />
+        <ErrorState title="Couldn't load your financed purchases" description={error} detail={errorDetail} onRetry={() => void refetch()} />
       ) : loading ? (
         <div className="space-y-2" aria-busy="true" aria-label="Loading financed purchases">
           {[0, 1].map((item) => <Skeleton key={item} className="h-24 rounded-xl" />)}
@@ -115,7 +178,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
             {purchases.map((purchase) => {
               const paid = purchase.paid_amount ?? 0
               const remaining = purchase.remaining_balance ?? purchase.total_payable
-              const progress = purchase.total_payable > 0 ? Math.min(100, (paid / purchase.total_payable) * 100) : 0
+              const split = splitPurchaseProgress(purchase)
               return (
                 <article key={purchase.id} className="rounded-xl border bg-card p-3.5">
                   <div className="flex items-start justify-between gap-3">
@@ -162,7 +225,14 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
                       </div>
                     </div>
                   </div>
-                  <Progress value={progress} className="mt-3 h-1.5" />
+                  <div
+                    role="img"
+                    aria-label={`${formatCurrency(split.repaidAmount, account.currency)} paid through Ledger, ${formatCurrency(split.importedAmount, account.currency)} imported as already paid, of ${formatCurrency(purchase.total_payable, account.currency)}`}
+                    className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-muted"
+                  >
+                    <div className="h-full bg-primary/40" style={{ width: `${split.importedPct}%` }} />
+                    <div className="h-full bg-primary" style={{ width: `${split.repaidPct}%` }} />
+                  </div>
                   <div className="mt-2 flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Paid {formatCurrency(paid, account.currency)}</span>
                     <span className="font-medium">{formatCurrency(remaining, account.currency)} remaining</span>
@@ -170,80 +240,92 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
                 </article>
               )
             })}
+            {hasImportedProgress && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[0.6875rem] text-muted-foreground" aria-hidden>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary" />Paid through Ledger</span>
+                <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary/40" />Imported as already paid</span>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="rounded-xl border bg-card p-3.5">
-              <div className="mb-3 flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold">Payment Deadlines</h3>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Payment schedule</h3>
+                </div>
+                {deadlines.length > 0 && <span className="text-xs text-muted-foreground">{deadlines.length} remaining</span>}
               </div>
-              {visibleDeadlines.length === 0 ? (
+              {!nextDeadline ? (
                 <p className="text-xs text-muted-foreground">No upcoming payment deadlines.</p>
               ) : (
-                <div className="space-y-3">
-                {visibleDeadlines.map((deadline) => {
-                  const isExpanded = expandedDeadline === deadline.dueDate
-                  const breakdownId = `deadline-breakdown-${deadline.dueDate}`
-                  return (
-                    <div key={deadline.dueDate} className="border-b pb-2 last:border-0 last:pb-0">
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between gap-3 rounded-md py-1 text-left outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
-                        aria-expanded={isExpanded}
-                        aria-controls={breakdownId}
-                        aria-label={`${isExpanded ? 'Hide' : 'Show'} payment breakdown for ${formatDate(deadline.dueDate)}`}
-                        onClick={() => setExpandedDeadline(isExpanded ? null : deadline.dueDate)}
-                      >
-                        <span className="text-xs font-medium">{formatDate(deadline.dueDate)}</span>
-                        <span className="flex items-center gap-1.5">
-                          <span className="money text-sm font-semibold">{formatCurrency(deadline.total, account.currency)}</span>
-                          <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} aria-hidden />
-                        </span>
-                      </button>
-                      {isExpanded && (
-                        <div id={breakdownId} className="mt-1 space-y-0.5 pl-2">
-                          {deadline.items.map((item) => (
-                            <div key={`${item.purchaseId}-${item.installmentNumber}`} className="flex justify-between gap-3 text-[0.6875rem] text-muted-foreground">
-                              <span className="truncate">{item.purchaseName} · {item.installmentNumber}</span>
-                              <span>{formatCurrency(item.remainingAmount, account.currency)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                <>
+                  <div className="rounded-lg border bg-muted/40 p-3" aria-labelledby="next-loan-payment">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p id="next-loan-payment" className="text-xs font-medium text-muted-foreground">Next payment</p>
+                        <p className="text-sm font-semibold">
+                          {formatDate(nextDeadline.dueDate)}
+                          <span className="font-normal text-muted-foreground"> · {formatDueIn(daysUntilDate(nextDeadline.dueDate, new Date()))}</span>
+                        </p>
+                      </div>
+                      <span className="money shrink-0 text-base font-bold">{formatCurrency(nextDeadline.total, account.currency)}</span>
                     </div>
-                  )
-                })}
-                </div>
-              )}
-              {deadlinePageCount > 1 && (
-                <nav className="mt-3 flex items-center justify-between gap-3 border-t pt-2.5" aria-label="Payment deadline pages">
-                  <p className="text-xs text-muted-foreground" aria-live="polite">
-                    Page {activeDeadlinePage + 1} of {deadlinePageCount}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      disabled={activeDeadlinePage === 0}
-                      aria-label="Previous payment deadlines"
-                      onClick={() => setDeadlinePage(Math.max(0, activeDeadlinePage - 1))}
-                    >
-                      <ChevronLeft />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      disabled={activeDeadlinePage >= deadlinePageCount - 1}
-                      aria-label="Next payment deadlines"
-                      onClick={() => setDeadlinePage(Math.min(deadlinePageCount - 1, activeDeadlinePage + 1))}
-                    >
-                      <ChevronRight />
-                    </Button>
+                    <div className="mt-2 space-y-0.5">
+                      {nextDeadline.items.map((item) => (
+                        <div key={`${item.purchaseId}-${item.installmentNumber}`} className="flex justify-between gap-3 text-[0.6875rem] text-muted-foreground">
+                          <span className="truncate">{item.purchaseName} · installment {item.installmentNumber}</span>
+                          <span className="money">{formatCurrency(item.remainingAmount, account.currency)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {onRecordPayment && (
+                      <Button size="sm" className="mt-3 w-full" onClick={() => onRecordPayment(nextDeadline)}>
+                        Record this payment
+                      </Button>
+                    )}
                   </div>
-                </nav>
+                  {laterDeadlines.length > 0 && (
+                    <div className="mt-3 max-h-72 space-y-1 overflow-y-auto pr-1" role="region" aria-label="Later payments" tabIndex={0}>
+                      {laterDeadlines.map((deadline) => {
+                        const isExpanded = expandedDeadline === deadline.dueDate
+                        const breakdownId = `deadline-breakdown-${deadline.dueDate}`
+                        return (
+                          <div key={deadline.dueDate} className="border-b pb-1 last:border-0 last:pb-0">
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between gap-3 rounded-md py-1 text-left outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
+                              aria-expanded={isExpanded}
+                              aria-controls={breakdownId}
+                              aria-label={`${isExpanded ? 'Hide' : 'Show'} payment breakdown for ${formatDate(deadline.dueDate)}`}
+                              onClick={() => setExpandedDeadline(isExpanded ? null : deadline.dueDate)}
+                            >
+                              <span className="text-xs">
+                                <span className="font-medium">{formatDate(deadline.dueDate)}</span>
+                                <span className="text-muted-foreground"> · {deadline.items.length} purchase{deadline.items.length === 1 ? '' : 's'}</span>
+                              </span>
+                              <span className="flex items-center gap-1.5">
+                                <span className="money text-sm font-semibold">{formatCurrency(deadline.total, account.currency)}</span>
+                                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} aria-hidden />
+                              </span>
+                            </button>
+                            {isExpanded && (
+                              <div id={breakdownId} className="mt-1 space-y-0.5 pl-2">
+                                {deadline.items.map((item) => (
+                                  <div key={`${item.purchaseId}-${item.installmentNumber}`} className="flex justify-between gap-3 text-[0.6875rem] text-muted-foreground">
+                                    <span className="truncate">{item.purchaseName} · installment {item.installmentNumber}</span>
+                                    <span>{formatCurrency(item.remainingAmount, account.currency)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -260,7 +342,10 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
                     <div key={allocation.id} className="flex items-start justify-between gap-3 text-xs">
                       <div className="min-w-0">
                         <p className="truncate font-medium">{purchaseById.get(allocation.loan_purchase_id)?.name ?? 'Purchase'}</p>
-                        <p className="text-[0.6875rem] text-muted-foreground">{allocation.transaction?.date ? formatDate(allocation.transaction.date) : 'Payment'}</p>
+                        <p className="text-[0.6875rem] text-muted-foreground">
+                          {installmentLabels.get(allocation.id) ?? 'Payment'}
+                          {allocation.transaction?.date && <> · {formatDate(allocation.transaction.date)}</>}
+                        </p>
                       </div>
                       <span className="money shrink-0 font-semibold">{formatCurrency(allocation.amount, account.currency)}</span>
                     </div>
@@ -273,22 +358,23 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
       )}
 
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setFormError(null) }}>
-        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4 lg:max-w-3xl">
           <DialogHeader><DialogTitle>Add Financed Purchase</DialogTitle></DialogHeader>
-          {formError && <FormError>{formError}</FormError>}
-          {loadState !== 'error' && purchases.length === 0 && getLoanAmountOwed(account) > 0 && (
+          <FormError error={formError} />
+          {showReconciliation && gap > 0 && (
             <p className="rounded-lg border border-yellow-400/60 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
-              This account already has {formatCurrency(getLoanAmountOwed(account), account.currency)} of unitemized opening debt. A financed purchase will be added on top; set the account’s loan amount to 0 first if this purchase represents that same debt.
+              This account already has {formatCurrency(gap, account.currency)} of unitemized debt. A financed purchase will be added on top; lower the account’s loan amount by {formatCurrency(gap, account.currency)} first if this purchase represents that same debt.
             </p>
           )}
           <LoanPurchaseForm
             accountId={account.id}
             currency={account.currency}
             categories={expenseCategories}
+            loanContext={loanContextWithout(null)}
             onClose={() => setCreateOpen(false)}
             onSubmit={async (values) => {
               const result = await createPurchase(values)
-              if (result.error) { setFormError(result.error); return }
+              if (result.error) { setFormError(withDetail(result)); return }
               setFormError(null)
               setCreateOpen(false)
               onAccountChanged()
@@ -298,15 +384,16 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
       </Dialog>
 
       <Dialog open={Boolean(editPurchase)} onOpenChange={(open) => { if (!open) { setEditPurchase(null); setFormError(null) } }}>
-        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4 lg:max-w-3xl">
           <DialogHeader><DialogTitle>Edit Financed Purchase</DialogTitle></DialogHeader>
-          {formError && <FormError>{formError}</FormError>}
+          <FormError error={formError} />
           {editPurchase && (
             <LoanPurchaseForm
               accountId={account.id}
               currency={account.currency}
               categories={expenseCategories}
               initialValues={editPurchase}
+              loanContext={loanContextWithout(editPurchase)}
               onClose={() => setEditPurchase(null)}
               onSubmit={async (values) => {
                 const result = await updatePurchase(editPurchase.id, {
@@ -321,7 +408,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
                   first_due_date: values.first_due_date,
                   notes: values.notes,
                 })
-                if (result.error) { setFormError(result.error); return }
+                if (result.error) { setFormError(withDetail(result)); return }
                 setFormError(null)
                 setEditPurchase(null)
                 onAccountChanged()
@@ -339,13 +426,13 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
               “{deleteTarget?.name ?? ''}” will be removed from the schedule and its unpaid balance will be removed from the loan. Existing repayment transactions remain in your expense history.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {formError && <FormError>{formError}</FormError>}
+          <FormError error={formError} />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {
               if (!deleteTarget) return
               const result = await deletePurchase(deleteTarget.id)
-              if (result.error) { setFormError(result.error); return }
+              if (result.error) { setFormError(withDetail(result)); return }
               setDeleteTarget(null)
               onAccountChanged()
             }}>Remove</AlertDialogAction>

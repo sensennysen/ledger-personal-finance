@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { storePendingReceipt, PENDING_RECEIPT_PREFIX } from '@/lib/receiptStore'
+import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import {
   buildReceiptObjectPath,
   isPendingReceiptReference,
@@ -28,7 +29,7 @@ export function useReceiptAttachment({ initialReceiptUrl, userId }: UseReceiptAt
   const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null)
   const [resolvedPreviewUrl, setResolvedPreviewUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<FormErrorValue>(null)
   const previewUrl =
     pendingPreviewUrl ??
     (initialReceiptUrl && !isPendingReceiptReference(initialReceiptUrl) ? resolvedPreviewUrl : null)
@@ -119,7 +120,10 @@ export function useReceiptAttachment({ initialReceiptUrl, userId }: UseReceiptAt
         return path
       }
 
-      setUploadError(`Receipt upload failed (${error.message}). Saving a local pending copy instead.`)
+      setUploadError({
+        message: 'Receipt upload failed. Saving a local pending copy instead.',
+        detail: describeDataError(error, { action: 'save' })?.detail ?? null,
+      })
 
       try {
         return await saveReceiptForLater(normalizedFile)

@@ -188,7 +188,7 @@ function ProtectedRoutes() {
   }
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary variant="app">
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />

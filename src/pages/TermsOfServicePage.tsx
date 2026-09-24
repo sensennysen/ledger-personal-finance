@@ -1,15 +1,9 @@
-import { Link } from 'react-router-dom'
-import { ArrowLeft, ScrollText } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
+import { LegalPage, LegalSections } from '@/components/legal/LegalPage'
+import { legalToc, type LegalSection } from '@/lib/legalSections'
 
 const LAST_UPDATED = 'May 2, 2026'
 
-interface Section {
-  title: string
-  content: string | string[]
-}
-
-const sections: Section[] = [
+const sections: LegalSection[] = [
   {
     title: '1. Acceptance of Terms',
     content:
@@ -86,125 +80,19 @@ const sections: Section[] = [
 
 export default function TermsOfServicePage() {
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-
-      {/* ── Atmospheric background (mirrors LoginPage) ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-175 h-125 rounded-full"
-          style={{ background: 'radial-gradient(ellipse, color-mix(in srgb, var(--primary) 4%, transparent) 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, var(--foreground) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
-        <div className="absolute -top-40 -left-40 w-120 h-120 rounded-full border border-primary/5" />
-        <div className="absolute -bottom-48 -right-48 w-125 h-125 rounded-full border border-primary/5" />
-      </div>
-
-      <div className="relative z-10 max-w-3xl mx-auto px-4 py-12 md:py-16">
-
-        {/* ── Back link ── */}
-        <Link
-          to="/login"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-10 group"
-        >
-          <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-          Back
-        </Link>
-
-        {/* ── Header ── */}
-        <div className="mb-10">
-          <div className="flex items-center gap-3 mb-4">
-            <div
-              className="flex items-center justify-center w-10 h-10 rounded-xl"
-              style={{ background: 'color-mix(in srgb, var(--primary) 12%, transparent)' }}
-            >
-              <ScrollText className="w-5 h-5" style={{ color: 'var(--primary)' }} />
-            </div>
-            <div>
-              <h1
-                className="text-3xl md:text-4xl font-bold tracking-tight"
-                style={{ fontFamily: "Roboto, system-ui, sans-serif" }}
-              >
-                Terms of Service
-              </h1>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Last updated: <span className="font-medium text-foreground">{LAST_UPDATED}</span>
-          </p>
-          <p className="mt-4 text-muted-foreground leading-relaxed max-w-2xl">
-            Please read these Terms of Service carefully before using Ledger. They govern your access
-            to and use of the application and constitute a binding legal agreement between you and Ledger.
-          </p>
-        </div>
-
-        <Separator className="mb-10 opacity-50" />
-
-        {/* ── Sections ── */}
-        <div className="space-y-8">
-          {sections.map((section) => (
-            <section key={section.title}>
-              <h2
-                className="text-base font-semibold mb-3"
-                style={{ color: 'var(--primary)' }}
-              >
-                {section.title}
-              </h2>
-              {Array.isArray(section.content) ? (
-                <ul className="space-y-2">
-                  {section.content.map((item, i) => (
-                    <li key={i} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
-                      <span
-                        className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full"
-                        style={{ background: 'color-mix(in srgb, var(--primary) 60%, transparent)' }}
-                      />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground leading-relaxed">{section.content}</p>
-              )}
-            </section>
-          ))}
-        </div>
-
-        <Separator className="my-10 opacity-50" />
-
-        {/* ── Privacy Policy link ── */}
-        <div
-          className="rounded-xl border p-5 mb-10 flex gap-4"
-          style={{
-            borderColor: 'color-mix(in srgb, var(--primary) 25%, transparent)',
-            background: 'color-mix(in srgb, var(--primary) 4%, transparent)',
-          }}
-        >
-          <ScrollText
-            className="mt-0.5 shrink-0 w-5 h-5"
-            style={{ color: 'var(--primary)' }}
-          />
-          <div>
-            <p className="text-sm font-semibold text-foreground mb-1">Also see our Privacy Policy</p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              For information on how we collect, use, and protect your personal data, visit our{' '}
-              <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground transition-colors">
-                Privacy Policy
-              </Link>{' '}
-              page.
-            </p>
-          </div>
-        </div>
-
-        {/* ── Footer ── */}
-        <p className="text-center text-[0.6875rem] text-muted-foreground/50">
-          © {new Date().getFullYear()} Ledger. All rights reserved.
+    <LegalPage
+      current="terms"
+      title="Terms of Service"
+      lastUpdated={LAST_UPDATED}
+      intro={
+        <p>
+          Please read these Terms of Service carefully before using Ledger. They govern your access to
+          and use of the application and constitute a binding legal agreement between you and Ledger.
         </p>
-      </div>
-    </div>
+      }
+      toc={legalToc(sections)}
+    >
+      <LegalSections sections={sections} />
+    </LegalPage>
   )
 }

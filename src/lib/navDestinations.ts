@@ -59,3 +59,29 @@ export function isDestinationActive(
     pathname === destination.to || pathname.startsWith(destination.to + '/')
   )
 }
+
+// The tab rows are one tab stop (LED-90): the active tab is 0, the rest -1.
+// With no tab active (Settings, 13th Month) the first tab takes the stop.
+export function rovingTabStop(
+  tabs: NavDestination[],
+  pathname: string,
+): number {
+  return Math.max(
+    0,
+    tabs.findIndex((tab) => isDestinationActive(pathname, tab)),
+  )
+}
+
+// Arrow keys move focus within a tab row and wrap; Home and End jump to the
+// ends. Returns null for any other key so the browser keeps its behaviour.
+export function nextTabIndex(
+  current: number,
+  key: string,
+  count: number,
+): number | null {
+  if (key === 'ArrowRight') return (current + 1) % count
+  if (key === 'ArrowLeft') return (current - 1 + count) % count
+  if (key === 'Home') return 0
+  if (key === 'End') return count - 1
+  return null
+}

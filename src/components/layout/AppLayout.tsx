@@ -17,9 +17,13 @@ import { QueueReviewSheet } from './QueueReviewSheet'
 import { PWAInstallBanner } from './PWAInstallBanner'
 import { resolveHeaderMeta } from '@/lib/pageChrome'
 import { CycleProvider } from '@/contexts/CycleContext'
-import { EntryContext } from '@/contexts/EntryContext'
+import { EntryContext, type EntryActions } from '@/contexts/EntryContext'
+import { NotificationProvider } from '@/contexts/NotificationContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { InlineLoadError } from '@/components/ui/error-state'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
+import { FormError } from '@/components/ui/form-error'
+import type { FormErrorValue } from '@/lib/dataErrors'
 import { authErrorActionLabel } from '@/lib/authErrors'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -34,12 +38,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   TransactionForm,
   type TransactionFormValues,
 } from '@/components/transactions/TransactionForm'
-import { QuickEntry } from '@/components/transactions/QuickEntry'
 import {
   TRANSACTION_KIND_DIALOG_TITLES,
   type TransactionKind,
@@ -52,12 +56,15 @@ import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
 import type { Transaction } from '@/types'
 
 export type AppLayoutContext = {
-  openAddTransactionModal: (kind: TransactionKind) => void
+  /** `targetAccountId` locks the card or loan for card-payment and loan-repayment. */
+  openAddTransactionModal: (kind: TransactionKind, options?: { targetAccountId?: string }) => void
 }
 export default function AppLayout() {
   return (
     <CycleProvider>
-      <LayoutShell />
+      <NotificationProvider>
+        <LayoutShell />
+      </NotificationProvider>
     </CycleProvider>
   )
 }
@@ -66,45 +73,82 @@ function LayoutShell() {
   const navigate = useNavigate()
   const { user, profile, signOut, refreshProfile, authError } = useAuth()
   const mobile = useMediaQuery('(max-width: 767px)')
-  const desktop = useMediaQuery('(min-width: 1024px)')
+  // At 1920 the capped page leaves room for a docked detail column; below it
+  // the column would squeeze the list, so detail overlays instead (LED-99).
+  const wide = useMediaQuery('(min-width: 1920px)')
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
-  const { transactions, generateDueRecurring, createTransaction } = useTransactions()
-  const { accounts } = useAccounts()
+  const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
+  const { accounts, loading: accountsLoading } = useAccounts()
   // ⌘F in search scopes to the account page it opened over.
   const accountRouteId = useMatch('/accounts/:accountId')?.params.accountId
   const routeAccount = accounts.find((account) => account.id === accountRouteId)
   const currentAccount = routeAccount ? { id: routeAccount.id, name: routeAccount.name } : null
   const { cycleConfirmed } = useFirstRunChecklist()
-  const setupComplete = isSetupComplete({
-    hasAccount: accounts.length > 0,
-    hasTransaction: transactions.length > 0,
-    cycleConfirmed,
-  })
+  const setupComplete = isSetupComplete(
+    {
+      hasAccount: accounts.length > 0,
+      hasTransaction: transactions.length > 0,
+      cycleConfirmed,
+    },
+    { loading: accountsLoading || transactionsLoading },
+  )
   const hasGenerated = useRef(false)
   const [sheet, setSheet] = useState<'add' | 'account' | 'detail' | null>(null)
   const [transactionKind, setTransactionKind] =
     useState<TransactionKind>('expense')
+  const [targetAccountId, setTargetAccountId] = useState<string | undefined>()
   const [entry, setEntry] = useState<{
     transaction: Transaction
-    onEdit?: () => void
+    actions?: EntryActions
   } | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [fabHidden, setFabHidden] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
+  // Where focus returns when the add/account dialog or entry detail closes
+  // (LED-91). The FAB unmounts while a sheet is open, so it is remembered by
+  // name and found again through its ref.
+  const fabRef = useRef<HTMLButtonElement>(null)
+  const trigger = useRef<HTMLElement | 'fab' | null>(null)
+  const rememberTrigger = () => {
+    const active = document.activeElement
+    trigger.current =
+      active === fabRef.current
+        ? 'fab'
+        : active instanceof HTMLElement && active !== document.body
+          ? active
+          : null
+  }
+  const triggerFocus = () => {
+    const target = trigger.current
+    if (target === 'fab') return fabRef.current ?? true
+    return target?.isConnected ? target : true
+  }
   const syncFab = () => {
     if (mainRef.current) setFabHidden(isNearScrollEnd(mainRef.current))
   }
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   useEffect(() => {
-    if (sheet !== 'detail' || !desktop) return
+    if (sheet !== 'detail' || !wide) return
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setSheet(null)
     }
     window.addEventListener('keydown', close)
     return () => window.removeEventListener('keydown', close)
-  }, [sheet, desktop])
+  }, [sheet, wide])
+  // The desktop detail pane is not a dialog, so it moves focus by hand:
+  // heading on open, back to the row that opened it on close (LED-91).
+  const detailPane = wide && sheet === 'detail' && !!entry
+  const detailHeading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (!detailPane) return
+    detailHeading.current?.focus()
+    return () => {
+      const target = triggerFocus()
+      if (target !== true) target.focus()
+    }
+  }, [detailPane])
   // Re-check when the page changes or its content grows (async loads).
   useEffect(() => {
     const main = mainRef.current
@@ -117,9 +161,11 @@ function LayoutShell() {
     return () => observer.disconnect()
   }, [location.pathname])
   const touchStart = useRef<number | null>(null)
-  const openAddTransactionModal = (kind: TransactionKind) => {
+  const openAddTransactionModal = (kind: TransactionKind, options?: { targetAccountId?: string }) => {
+    rememberTrigger()
     setFormError(null)
     setTransactionKind(kind)
+    setTargetAccountId(options?.targetAccountId)
     setSheet('add')
   }
   useEffect(() => {
@@ -140,11 +186,11 @@ function LayoutShell() {
     }
   }, [generateDueRecurring])
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error } = await createTransaction(
+    const { error, errorDetail } = await createTransaction(
       values as Parameters<typeof createTransaction>[0],
     )
     if (error) {
-      setFormError(error)
+      setFormError({ message: error, detail: errorDetail ?? null })
       return
     }
     setFormError(null)
@@ -165,23 +211,55 @@ function LayoutShell() {
       </AvatarFallback>
     </Avatar>
   )
+  // Every action closes detail first, then hands off to the page that owns it.
+  const closeThen = (action?: () => void) =>
+    action
+      ? () => {
+          setSheet(null)
+          action()
+        }
+      : undefined
+  const entryDetail = entry && (
+    <ErrorBoundary key={entry.transaction.id}>
+      <EntryDetail
+        transaction={entry.transaction}
+        onEdit={closeThen(entry.actions?.onEdit)}
+        onDelete={closeThen(entry.actions?.onDelete)}
+        onSplit={closeThen(entry.actions?.onSplit)}
+      />
+    </ErrorBoundary>
+  )
   const title =
     sheet === 'account'
       ? 'Your account'
-      : sheet === 'detail'
-        ? 'Entry detail'
-        : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]
+      : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]
   return (
     <EntryContext.Provider
-      value={(transaction, onEdit) => {
-        setEntry({ transaction, onEdit })
+      value={(transaction, actions) => {
+        rememberTrigger()
+        setEntry({ transaction, actions })
         setSheet('detail')
       }}
     >
       <div className="flex h-dvh w-full max-w-full flex-col bg-background overflow-hidden pt-[env(safe-area-inset-top)] md:pt-0">
+        {/* First tab stop: jumps past the bar and row 2 (LED-90). Focus is
+            moved by hand so the URL keeps no #main. */}
+        <a
+          href="#main"
+          onClick={(event) => {
+            event.preventDefault()
+            mainRef.current?.focus()
+          }}
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-60 focus:flex focus:h-10 focus:items-center focus:rounded-full focus:bg-popover focus:px-4 focus:text-sm focus:font-medium focus:text-popover-foreground focus:shadow-lg focus-visible:ring-3 focus-visible:ring-ring"
+        >
+          Skip to content
+        </a>
         <TopBar
           avatar={avatar}
-          onAvatarClick={() => setSheet('account')}
+          onAvatarClick={() => {
+            rememberTrigger()
+            setSheet('account')
+          }}
           onSearch={() => setSearchOpen(true)}
           setupComplete={setupComplete}
           mobileTitle={
@@ -216,15 +294,19 @@ function LayoutShell() {
             </div>
           )}
           <main
+            id="main"
             ref={mainRef}
+            tabIndex={-1}
             onScroll={syncFab}
-            className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0"
+            className="outline-none flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0"
           >
             <div
               key={location.pathname}
               className="animate-page-in min-h-full min-w-0 w-full max-w-full"
             >
-              <Outlet context={{ openAddTransactionModal }} />
+              <ErrorBoundary>
+                <Outlet context={{ openAddTransactionModal }} />
+              </ErrorBoundary>
             </div>
           </main>
         </div>
@@ -232,18 +314,19 @@ function LayoutShell() {
           id="dashboard-detail-pane"
           className={cn(
             'hidden lg:flex shrink-0 empty:hidden',
-            sheet === 'detail' && 'lg:hidden',
+            wide && sheet === 'detail' && 'lg:hidden',
           )}
         />
-        {desktop && sheet === 'detail' && entry && (
+        {wide && sheet === 'detail' && entry && (
           <aside
             aria-label="Entry detail"
             className="relative w-[340px] shrink-0 border-l border-border bg-sidebar p-5 overflow-y-auto animate-page-in"
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-medium">Entry detail</h2>
+              <h2 ref={detailHeading} tabIndex={-1} className="font-medium outline-none">
+                Entry detail
+              </h2>
               <Button
-                autoFocus
                 variant="ghost"
                 size="icon"
                 aria-label="Close entry details"
@@ -252,23 +335,15 @@ function LayoutShell() {
                 <X />
               </Button>
             </div>
-            <EntryDetail
-              transaction={entry.transaction}
-              onEdit={
-                entry.onEdit
-                  ? () => {
-                      setSheet(null)
-                      entry.onEdit?.()
-                    }
-                  : undefined
-              }
-            />
+            {entryDetail}
           </aside>
         )}
         </div>
-        <BottomNav setupComplete={setupComplete} />
+        {/* The FAB comes before the nav in the DOM, so Tab reaches the page's
+            primary action before Home (27a). */}
         {mobile && !sheet && location.pathname !== '/settings' && (
           <button
+            ref={fabRef}
             aria-label="Add transaction"
             onClick={() => openAddTransactionModal('expense')}
             aria-hidden={fabHidden}
@@ -281,6 +356,7 @@ function LayoutShell() {
             <Plus className="size-7" />
           </button>
         )}
+        <BottomNav setupComplete={setupComplete} />
         <PWAInstallBanner hidden={sheet !== null} />
         <SearchPalette
           open={searchOpen}
@@ -289,8 +365,36 @@ function LayoutShell() {
           onAddTransaction={openAddTransactionModal}
           currentAccount={currentAccount}
         />
+        <Sheet
+          open={!wide && sheet === 'detail' && !!entry}
+          onOpenChange={(open) => {
+            if (!open) setSheet(null)
+          }}
+        >
+          {/* Detail is its own surface at every width, never the add/edit
+              modal (LED-79): bottom sheet on phones, side sheet above. */}
+          <SheetContent
+            finalFocus={triggerFocus}
+            side={mobile ? 'bottom' : 'right'}
+            className={cn(
+              'overflow-y-auto',
+              mobile
+                ? 'max-h-[85dvh] rounded-t-[28px] pb-[env(safe-area-inset-bottom)]'
+                : 'w-[380px] sm:max-w-[380px]',
+            )}
+          >
+            <SheetHeader className="pb-0">
+              <SheetTitle>Entry detail</SheetTitle>
+            </SheetHeader>
+            {entry && (
+              <div className="px-4 pb-4">
+                {entryDetail}
+              </div>
+            )}
+          </SheetContent>
+        </Sheet>
         <Dialog
-          open={sheet !== null && !(desktop && sheet === 'detail')}
+          open={sheet === 'add' || sheet === 'account'}
           onOpenChange={(open) => {
             if (!open) {
               setSheet(null)
@@ -299,6 +403,7 @@ function LayoutShell() {
           }}
         >
           <DialogContent
+            finalFocus={triggerFocus}
             className={cn(
               'max-w-md max-h-[90dvh] overflow-y-auto',
               mobile && 'm3-bottom-sheet',
@@ -326,25 +431,16 @@ function LayoutShell() {
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
             </DialogHeader>
-            {formError && (
-              <p role="alert" className="text-sm text-expense">
-                {formError}
-              </p>
+            <FormError error={formError} className="px-0 mt-0" />
+            {sheet === 'add' && (
+              <TransactionForm
+                entryKind={transactionKind}
+                lockedCardAccountId={transactionKind === 'card-payment' ? targetAccountId : undefined}
+                lockedLoanAccountId={transactionKind === 'loan-repayment' ? targetAccountId : undefined}
+                onSubmit={handleCreate}
+                onClose={() => setSheet(null)}
+              />
             )}
-            {sheet === 'add' &&
-              (mobile ? (
-                <QuickEntry
-                  initialKind={transactionKind}
-                  onSubmit={handleCreate}
-                  onClose={() => setSheet(null)}
-                />
-              ) : (
-                <TransactionForm
-                  entryKind={transactionKind}
-                  onSubmit={handleCreate}
-                  onClose={() => setSheet(null)}
-                />
-              ))}
             {sheet === 'account' && (
               <div className="space-y-5">
                 <div className="flex items-center gap-3">
@@ -392,19 +488,6 @@ function LayoutShell() {
                   Sign out
                 </Button>
               </div>
-            )}
-            {sheet === 'detail' && entry && (
-              <EntryDetail
-                transaction={entry.transaction}
-                onEdit={
-                  entry.onEdit
-                    ? () => {
-                        setSheet(null)
-                        entry.onEdit?.()
-                      }
-                    : undefined
-                }
-              />
             )}
           </DialogContent>
         </Dialog>

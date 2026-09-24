@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readAllPages } from '@/lib/pagedRead'
+import { describeDataError, type DescribedError } from '@/lib/dataErrors'
 import { buildPayeeMemory, type CategoryRule, type HistoryTx, type PayeeMemory } from '@/lib/importCategories'
 import type { TransferRule } from '@/lib/importTransfer'
 
@@ -12,7 +13,7 @@ interface MemoryResult {
   key: string
   memory: PayeeMemory
   rules: ImportRule[]
-  error: string | null
+  error: DescribedError | null
 }
 
 const EMPTY_MEMORY: PayeeMemory = new Map()
@@ -50,7 +51,7 @@ export function useImportCategoryMemory(fileKey: number | null) {
         supabase.from('transaction_rules').select('keyword, category_id, type_hint, priority').eq('user_id', user.id),
       ])
       if (cancelled) return
-      const error = history.error ?? rules.error?.message ?? null
+      const error = describeDataError(history.error ?? rules.error, { action: 'load' })
       setResult({
         key,
         memory: error ? EMPTY_MEMORY : buildPayeeMemory(history.rows),
@@ -61,7 +62,7 @@ export function useImportCategoryMemory(fileKey: number | null) {
 
     run().catch((error: unknown) => {
       if (!cancelled) {
-        setResult({ key, memory: EMPTY_MEMORY, rules: [], error: error instanceof Error ? error.message : 'Network error' })
+        setResult({ key, memory: EMPTY_MEMORY, rules: [], error: describeDataError(error instanceof Error ? error : String(error), { action: 'load' }) })
       }
     })
     return () => {
@@ -74,7 +75,8 @@ export function useImportCategoryMemory(fileKey: number | null) {
     memory: current?.memory ?? EMPTY_MEMORY,
     rules: current?.rules ?? [],
     loading: Boolean(key) && !current,
-    error: current?.error ?? null,
+    error: current?.error?.message ?? null,
+    errorDetail: current?.error?.detail ?? null,
     retry: () => setAttempt((value) => value + 1),
   }
 }

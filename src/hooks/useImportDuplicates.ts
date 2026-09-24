@@ -3,11 +3,12 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import type { ExistingTx } from '@/lib/importDuplicates'
 import { readAllPages } from '@/lib/pagedRead'
+import { describeDataError, type DescribedError } from '@/lib/dataErrors'
 
 interface CheckResult {
   key: string
   existing: ExistingTx[]
-  error: string | null
+  error: DescribedError | null
 }
 
 /**
@@ -42,12 +43,12 @@ export function useImportDuplicates(accountId: string, span: { start: string; en
           .range(from, to),
       )
       if (cancelled) return
-      setResult({ key, existing: error ? [] : rows, error })
+      setResult({ key, existing: error ? [] : rows, error: describeDataError(error, { action: 'load' }) })
     }
 
     run().catch((error: unknown) => {
       if (!cancelled) {
-        setResult({ key, existing: [], error: error instanceof Error ? error.message : 'Network error' })
+        setResult({ key, existing: [], error: describeDataError(error instanceof Error ? error : String(error), { action: 'load' }) })
       }
     })
     return () => {
@@ -61,7 +62,8 @@ export function useImportDuplicates(accountId: string, span: { start: string; en
   return {
     existing: current?.existing ?? [],
     loading: enabled && !current,
-    error: current?.error ?? null,
+    error: current?.error?.message ?? null,
+    errorDetail: current?.error?.detail ?? null,
     retry: () => setAttempt((value) => value + 1),
   }
 }

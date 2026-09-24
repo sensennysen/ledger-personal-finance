@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
+import { withDetail, type FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -50,13 +51,13 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
   const [createOpen, setCreateOpen] = useState(false)
   const [editPurchase, setEditPurchase] = useState<LoanPurchase | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<LoanPurchase | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   const [deadlinePage, setDeadlinePage] = useState(0)
   const [expandedDeadline, setExpandedDeadline] = useState<string | null>(null)
   const { categories } = useCategories()
   const isOnline = useIsOnline()
   const internalLoanData = useLoanPurchases(account.id, !loanData)
-  const { purchases, allocations, deadlines, loading, error, refetch, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
+  const { purchases, allocations, deadlines, loading, error, errorDetail, refetch, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
   const loadState = resolveLoadState({ loading, error, hasData: purchases.length > 0 })
   const expenseCategories = categories.filter((category) => category.type === 'expense' || category.type === 'both')
   const purchaseById = useMemo(() => new Map(purchases.map((purchase) => [purchase.id, purchase])), [purchases])
@@ -92,13 +93,13 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
         </div>
       )}
 
-      {formError && <FormError>{formError}</FormError>}
+      <FormError error={formError} />
       {loadState === 'stale-error' && (
         <InlineLoadError message="Couldn't refresh your financed purchases. Showing what was last loaded." onRetry={() => void refetch()} />
       )}
 
       {loadState === 'error' ? (
-        <ErrorState title="Couldn't load your financed purchases" detail={error} onRetry={() => void refetch()} />
+        <ErrorState title="Couldn't load your financed purchases" description={error} detail={errorDetail} onRetry={() => void refetch()} />
       ) : loading ? (
         <div className="space-y-2" aria-busy="true" aria-label="Loading financed purchases">
           {[0, 1].map((item) => <Skeleton key={item} className="h-24 rounded-xl" />)}
@@ -275,7 +276,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setFormError(null) }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Add Financed Purchase</DialogTitle></DialogHeader>
-          {formError && <FormError>{formError}</FormError>}
+          <FormError error={formError} />
           {loadState !== 'error' && purchases.length === 0 && getLoanAmountOwed(account) > 0 && (
             <p className="rounded-lg border border-yellow-400/60 bg-yellow-50 px-3 py-2 text-xs text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-300">
               This account already has {formatCurrency(getLoanAmountOwed(account), account.currency)} of unitemized opening debt. A financed purchase will be added on top; set the account’s loan amount to 0 first if this purchase represents that same debt.
@@ -288,7 +289,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
             onClose={() => setCreateOpen(false)}
             onSubmit={async (values) => {
               const result = await createPurchase(values)
-              if (result.error) { setFormError(result.error); return }
+              if (result.error) { setFormError(withDetail(result)); return }
               setFormError(null)
               setCreateOpen(false)
               onAccountChanged()
@@ -300,7 +301,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
       <Dialog open={Boolean(editPurchase)} onOpenChange={(open) => { if (!open) { setEditPurchase(null); setFormError(null) } }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
           <DialogHeader><DialogTitle>Edit Financed Purchase</DialogTitle></DialogHeader>
-          {formError && <FormError>{formError}</FormError>}
+          <FormError error={formError} />
           {editPurchase && (
             <LoanPurchaseForm
               accountId={account.id}
@@ -321,7 +322,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
                   first_due_date: values.first_due_date,
                   notes: values.notes,
                 })
-                if (result.error) { setFormError(result.error); return }
+                if (result.error) { setFormError(withDetail(result)); return }
                 setFormError(null)
                 setEditPurchase(null)
                 onAccountChanged()
@@ -339,13 +340,13 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData }: Loa
               “{deleteTarget?.name ?? ''}” will be removed from the schedule and its unpaid balance will be removed from the loan. Existing repayment transactions remain in your expense history.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {formError && <FormError>{formError}</FormError>}
+          <FormError error={formError} />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {
               if (!deleteTarget) return
               const result = await deletePurchase(deleteTarget.id)
-              if (result.error) { setFormError(result.error); return }
+              if (result.error) { setFormError(withDetail(result)); return }
               setDeleteTarget(null)
               onAccountChanged()
             }}>Remove</AlertDialogAction>

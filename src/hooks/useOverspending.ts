@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import type { OverspendingBudget } from '@/lib/overspending'
 import type { BudgetSpendTx } from '@/lib/budgetSpend'
+import { describeDataError, type DescribedError } from '@/lib/dataErrors'
 
 const PAGE = 1000
 
@@ -17,7 +18,7 @@ export function useOverspending(until: string) {
   const [budgets, setBudgets] = useState<OverspendingBudget[]>([])
   const [txs, setTxs] = useState<BudgetSpendTx[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
   // The cycle end the loaded data covers; data for an earlier cycle must not be shown for a later one.
   const [loadedUntil, setLoadedUntil] = useState<string | null>(null)
   const requestId = useRef(0)
@@ -29,7 +30,7 @@ export function useOverspending(until: string) {
     }
     const request = ++requestId.current
     setLoading(true)
-    setError(null)
+    setLoadFailure(null)
 
     const { data: budgetData, error: budgetError } = await supabase
       .from('budgets')
@@ -38,7 +39,7 @@ export function useOverspending(until: string) {
       .eq('is_active', true)
     if (request !== requestId.current) return
     if (budgetError) {
-      setError(budgetError.message)
+      setLoadFailure(describeDataError(budgetError, { action: 'load' }))
       setLoading(false)
       return
     }
@@ -60,7 +61,7 @@ export function useOverspending(until: string) {
           .range(from, from + PAGE - 1)
         if (request !== requestId.current) return
         if (txError) {
-          setError(txError.message)
+          setLoadFailure(describeDataError(txError, { action: 'load' }))
           setLoading(false)
           return
         }
@@ -83,11 +84,14 @@ export function useOverspending(until: string) {
 
   // Until data for this cycle arrives, expose nothing so the card shows its loading or error state.
   const fresh = loadedUntil === until
+  const error = loadFailure?.message ?? null
+  const errorDetail = loadFailure?.detail ?? null
   return {
     budgets: fresh ? budgets : [],
     txs: fresh ? txs : [],
     loading,
     error,
+    errorDetail,
     refetch: load,
   }
 }

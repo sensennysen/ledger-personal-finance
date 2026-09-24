@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
+import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
 import { searchMatcher } from '@/lib/globalSearch'
 import { useUndoDelete } from '@/hooks/useUndoDelete'
@@ -77,7 +78,7 @@ export default function AccountTransactionsPage() {
   const { profile, user } = useAuth()
   const { accounts, error: accountsError, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment } = useAccounts()
   const { categories } = useCategories()
-  const { transactions, loading, error: txError, refetch: refetchTransactions, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
+  const { transactions, loading, error: txError, errorDetail: txErrorDetail, refetch: refetchTransactions, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
   const loadState = resolveLoadState({ loading, error: txError, hasData: transactions.length > 0 })
   const [filterType, setFilterType] = useState<string>('all')
@@ -105,7 +106,7 @@ export default function AccountTransactionsPage() {
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editAccountOpen, setEditAccountOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentDate, setPaymentDate] = useState(getLocalDateString)
   const [paymentFromAccountId, setPaymentFromAccountId] = useState<string | null>(null)
@@ -247,8 +248,8 @@ export default function AccountTransactionsPage() {
   const dueDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.due_day) : null
 
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error } = await createTransaction(values as Parameters<typeof createTransaction>[0])
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await createTransaction(values as Parameters<typeof createTransaction>[0])
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     refetchAccounts()
     setCreateOpen(false)
@@ -256,8 +257,8 @@ export default function AccountTransactionsPage() {
 
   const handleEdit = async (values: TransactionFormValues) => {
     if (!editingTx) return
-    const { error } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     refetchAccounts()
     setEditingTx(null)
@@ -291,7 +292,7 @@ export default function AccountTransactionsPage() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        setFormError(error.message)
+        setFormError(describeDataError(error, { action: 'load' }))
       } else {
         setPaymentHistory((data as CreditCardPayment[]) ?? [])
       }
@@ -306,7 +307,7 @@ export default function AccountTransactionsPage() {
     const amount = Number(paymentAmount)
     if (!amount || amount <= 0 || !effectivePaymentFromAccountId) return
 
-    const { error: transferError } = await createTransaction({
+    const { error: transferError, errorDetail: transferErrorDetail } = await createTransaction({
       type: 'transfer',
       account_id: effectivePaymentFromAccountId,
       to_account_id: account.id,
@@ -327,7 +328,7 @@ export default function AccountTransactionsPage() {
       goal_id: null,
     })
     if (transferError) {
-      setFormError(transferError)
+      setFormError({ message: transferError, detail: transferErrorDetail ?? null })
       return
     }
 
@@ -390,9 +391,9 @@ export default function AccountTransactionsPage() {
 
   const handleAccountEdit = async (values: AccountFormValues) => {
     if (!account) return
-    const { error } = await updateAccountWithAdjustment(account.id, normalizeCreditCardBalanceForStorage(values), account.balance)
+    const { error, errorDetail } = await updateAccountWithAdjustment(account.id, normalizeCreditCardBalanceForStorage(values), account.balance)
     if (error) {
-      setFormError(error)
+      setFormError({ message: error, detail: errorDetail ?? null })
       return
     }
     setFormError(null)
@@ -488,7 +489,7 @@ export default function AccountTransactionsPage() {
                   {account?.type === 'loan' ? `Pay ${account.name}` : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}
                 </DialogTitle>
               </DialogHeader>
-              {formError && <FormError>{formError}</FormError>}
+              <FormError error={formError} />
               <TransactionForm
                 entryKind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
                 onSubmit={handleCreate}
@@ -756,7 +757,7 @@ export default function AccountTransactionsPage() {
         <Dialog open={editAccountOpen} onOpenChange={setEditAccountOpen}>
           <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
-            {formError && <FormError>{formError}</FormError>}
+            <FormError error={formError} />
             {account && (
               <AccountForm
                 account={account}
@@ -793,7 +794,7 @@ export default function AccountTransactionsPage() {
           <InlineLoadError message="Couldn't refresh your transactions. Showing what was last loaded." onRetry={() => void refetchTransactions()} />
         )}
         {(account?.type !== 'loan' || loanSection === 'activity') && (loadState === 'error' ? (
-          <ErrorState title="Couldn't load your transactions" detail={txError} onRetry={() => void refetchTransactions()} />
+          <ErrorState title="Couldn't load your transactions" description={txError} detail={txErrorDetail} onRetry={() => void refetchTransactions()} />
         ) : loadState === 'loading' ? (
           <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
         ) : accountTransactions.length === 0 ? (
@@ -868,7 +869,7 @@ export default function AccountTransactionsPage() {
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
           <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
             <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
-            {formError && <FormError>{formError}</FormError>}
+            <FormError error={formError} />
             {editingTx && (
               <TransactionForm
                 isEditing

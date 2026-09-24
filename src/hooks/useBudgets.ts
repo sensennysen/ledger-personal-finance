@@ -10,6 +10,7 @@ import { readAllPages } from '@/lib/pagedRead'
 import { canRollover, nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { resolveRefresh } from '@/lib/loadState'
+import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 function localDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -30,7 +31,7 @@ export function useBudgets(
   const startDay = cycle?.startDay ?? 1
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
   // Cycle key the budgets on screen were read for; differs from the requested
   // key while a new cycle loads with the previous one still showing.
   const [dataKey, setDataKey] = useState<string | null>(null)
@@ -46,7 +47,7 @@ export function useBudgets(
 
   const fetch = useCallback(async () => {
     const request = ++requestId.current
-    setError(null)
+    setLoadFailure(null)
     if (!user) {
       setLoading(false)
       return
@@ -66,13 +67,13 @@ export function useBudgets(
       setLoading(true)
     }
     // A failed read for a new cycle must not leave the old cycle posing as it.
-    const failNewCycle = (message: string) => {
+    const failNewCycle = (failure: DescribedError | null) => {
       if (dataKeyRef.current !== key) showBudgets([], null)
-      setError(message)
+      setLoadFailure(failure)
       setLoading(false)
     }
     if (!navigator.onLine) {
-      if (!cached) failNewCycle('Budgets for this cycle are not cached. Reconnect to load them.')
+      if (!cached) failNewCycle({ message: 'Budgets for this cycle are not cached. Reconnect to load them.', detail: null })
       else setLoading(false)
       return
     }
@@ -86,7 +87,7 @@ export function useBudgets(
 
     if (request !== requestId.current) return
     if (budgetError) {
-      failNewCycle(budgetError.message)
+      failNewCycle(describeDataError(budgetError, { action: 'load' }))
       return
     }
 
@@ -120,7 +121,7 @@ export function useBudgets(
 
     if (request !== requestId.current) return
     if (spentError) {
-      failNewCycle(spentError)
+      failNewCycle(describeDataError(spentError, { action: 'load' }))
       return
     }
 
@@ -227,17 +228,17 @@ export function useBudgets(
       | 'effective_amount'
       | 'history'
     >,
-  ) => {
+  ): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add a budget.' }
     const { error } = await supabase
       .from('budgets')
       .insert({ ...values, user_id: user.id })
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'budget' })
   }
 
-  const updateBudget = async (id: string, values: Partial<Budget>) => {
+  const updateBudget = async (id: string, values: Partial<Budget>): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this budget.' }
     const { error } = await supabase
@@ -246,10 +247,10 @@ export function useBudgets(
       .eq('id', id)
       .eq('user_id', user.id)
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'budget' })
   }
 
-  const deleteBudget = async (id: string) => {
+  const deleteBudget = async (id: string): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to remove this budget.' }
     const { error } = await supabase
@@ -258,7 +259,7 @@ export function useBudgets(
       .eq('id', id)
       .eq('user_id', user.id)
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'delete', entity: 'budget' })
   }
 
   const { refreshing } = resolveRefresh({
@@ -268,12 +269,15 @@ export function useBudgets(
     requestedKey,
   })
 
+  const error = loadFailure?.message ?? null
+  const errorDetail = loadFailure?.detail ?? null
   return {
     budgets,
     loading,
     /** Previous cycle's budgets are on screen while the selected one loads. */
     refreshing,
     error,
+    errorDetail,
     refetch: fetch,
     createBudget,
     updateBudget,

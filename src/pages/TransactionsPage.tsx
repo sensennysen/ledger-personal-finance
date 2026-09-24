@@ -8,7 +8,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { usePreferences } from '@/hooks/usePreferences'
-import { formatDate, formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
+import { formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -28,6 +28,10 @@ import { PageActions } from '@/components/layout/PageActions'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { inferTransactionKind, TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
+import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
+import { useRenderWindow } from '@/hooks/useRenderWindow'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { groupByDay, sliceGroups, WINDOW_STEP } from '@/lib/transactionWindow'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
 import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
@@ -239,14 +243,16 @@ export default function TransactionsPage() {
     [transactions]
   )
 
-  const grouped = useMemo(() => {
-    const groups: Record<string, Transaction[]> = {}
-    for (const tx of filtered) {
-      if (!groups[tx.date]) groups[tx.date] = []
-      groups[tx.date].push(tx)
-    }
-    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
-  }, [filtered])
+  const grouped = useMemo(() => groupByDay(filtered), [filtered])
+  const flatSorted = useMemo(() => [...filtered].sort((a, b) => b.date.localeCompare(a.date)), [filtered])
+
+  // Window the list (LED-60). The cycle is left out of the reset key so
+  // stepping it keeps the window and the scroll position.
+  const compactList = useMediaQuery('(max-width: 767px)')
+  const { rendered, sentinelRef } = useRenderWindow(filtered.length, {
+    step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
+    resetKey: JSON.stringify([filterType, search, activeTagFilter, prefs.txView]),
+  })
 
   // ── Handlers ───────────────────────────────────────────────
 
@@ -370,6 +376,20 @@ export default function TransactionsPage() {
     (selectedMonth !== getCurrentCycleMonthKey(startDay) ? 1 : 0)
 
   // ── Render ─────────────────────────────────────────────────
+
+  const renderRow = (tx: Transaction) => (
+    <TransactionRow
+      key={tx.id}
+      tx={tx}
+      onEdit={setEditingTx}
+      onDelete={handleDelete}
+      onSplit={setSplittingTx}
+      onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
+      selectable={selectMode}
+      selected={selectedIds.has(tx.id)}
+      onSelect={toggleSelect}
+    />
+  )
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">
@@ -703,50 +723,14 @@ export default function TransactionsPage() {
           }
         />
       ) : prefs.txView === 'flat' ? (
-        <div className="space-y-1">
-          {[...filtered].sort((a, b) => b.date.localeCompare(a.date)).map((tx) => (
-            <TransactionRow
-              key={tx.id}
-              tx={tx}
-              onEdit={setEditingTx}
-              onDelete={handleDelete}
-              onSplit={setSplittingTx}
-              onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
-              selectable={selectMode}
-              selected={selectedIds.has(tx.id)}
-              onSelect={toggleSelect}
-            />
-          ))}
+        <div>
+          <div className="space-y-1">{flatSorted.slice(0, rendered).map(renderRow)}</div>
+          <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
         </div>
       ) : (
-        <div className="space-y-4">
-          {grouped.map(([date, txs]) => (
-            <div key={date}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  {formatDate(date)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {txs.length} transaction{txs.length > 1 ? 's' : ''}
-                </p>
-              </div>
-              <div className="space-y-1">
-                {txs.map((tx) => (
-                  <TransactionRow
-                    key={tx.id}
-                    tx={tx}
-                    onEdit={setEditingTx}
-                    onDelete={handleDelete}
-                    onSplit={setSplittingTx}
-                    onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
-                    selectable={selectMode}
-                    selected={selectedIds.has(tx.id)}
-                    onSelect={toggleSelect}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+        <div>
+          <TransactionDayList groups={sliceGroups(grouped, rendered)} renderRow={renderRow} compact={compactList} />
+          <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
         </div>
       )}
 

@@ -26,6 +26,10 @@ import { defaultCardPaymentDescription } from '@/lib/cardPayment'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
+import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
+import { useRenderWindow } from '@/hooks/useRenderWindow'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { groupByDay, sliceGroups, WINDOW_STEP } from '@/lib/transactionWindow'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -154,14 +158,14 @@ export default function AccountTransactionsPage() {
     setSearch('')
   }, [])
 
-  const grouped = useMemo(() => {
-    const groups: Record<string, Transaction[]> = {}
-    for (const tx of filtered) {
-      if (!groups[tx.date]) groups[tx.date] = []
-      groups[tx.date].push(tx)
-    }
-    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
-  }, [filtered])
+  const grouped = useMemo(() => groupByDay(filtered, accountId), [filtered, accountId])
+
+  // Window the list (LED-60); nets in the day headers are relative to this account.
+  const compactList = useMediaQuery('(max-width: 767px)')
+  const { rendered, sentinelRef } = useRenderWindow(filtered.length, {
+    step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
+    resetKey: JSON.stringify([accountId, filterType, search]),
+  })
 
   // Summary stats for this account's transactions
   const stats = useMemo(() => {
@@ -719,30 +723,21 @@ export default function AccountTransactionsPage() {
           }
         />
       ) : (
-        <div className="space-y-4">
-          {grouped.map(([date, txs]) => (
-            <div key={date}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  {formatDate(date)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {txs.length} transaction{txs.length > 1 ? 's' : ''}
-                </p>
-              </div>
-              <div className="space-y-1">
-                {txs.map((tx) => (
-                  <TransactionRow
-                    key={tx.id}
-                    tx={tx}
-                    onEdit={setEditingTx}
-                    onDelete={handleDelete}
-                    contextAccountId={accountId}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+        <div>
+          <TransactionDayList
+            groups={sliceGroups(grouped, rendered)}
+            compact={compactList}
+            renderRow={(tx) => (
+              <TransactionRow
+                key={tx.id}
+                tx={tx}
+                onEdit={setEditingTx}
+                onDelete={handleDelete}
+                contextAccountId={accountId}
+              />
+            )}
+          />
+          <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
         </div>
       ))}
 

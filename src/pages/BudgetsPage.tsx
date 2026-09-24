@@ -565,7 +565,6 @@ function ContributionDialog({
                 <Input
                   type="number"
                   step="0.01"
-                  autoFocus
                   name={field.name}
                   ref={field.ref}
                   onBlur={field.onBlur}

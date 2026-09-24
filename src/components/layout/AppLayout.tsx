@@ -101,6 +101,25 @@ function LayoutShell() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [fabHidden, setFabHidden] = useState(false)
   const mainRef = useRef<HTMLElement>(null)
+  // Where focus returns when the add/account dialog or entry detail closes
+  // (LED-91). The FAB unmounts while a sheet is open, so it is remembered by
+  // name and found again through its ref.
+  const fabRef = useRef<HTMLButtonElement>(null)
+  const trigger = useRef<HTMLElement | 'fab' | null>(null)
+  const rememberTrigger = () => {
+    const active = document.activeElement
+    trigger.current =
+      active === fabRef.current
+        ? 'fab'
+        : active instanceof HTMLElement && active !== document.body
+          ? active
+          : null
+  }
+  const triggerFocus = () => {
+    const target = trigger.current
+    if (target === 'fab') return fabRef.current ?? true
+    return target?.isConnected ? target : true
+  }
   const syncFab = () => {
     if (mainRef.current) setFabHidden(isNearScrollEnd(mainRef.current))
   }
@@ -113,6 +132,18 @@ function LayoutShell() {
     window.addEventListener('keydown', close)
     return () => window.removeEventListener('keydown', close)
   }, [sheet, wide])
+  // The desktop detail pane is not a dialog, so it moves focus by hand:
+  // heading on open, back to the row that opened it on close (LED-91).
+  const detailPane = wide && sheet === 'detail' && !!entry
+  const detailHeading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (!detailPane) return
+    detailHeading.current?.focus()
+    return () => {
+      const target = triggerFocus()
+      if (target !== true) target.focus()
+    }
+  }, [detailPane])
   // Re-check when the page changes or its content grows (async loads).
   useEffect(() => {
     const main = mainRef.current
@@ -126,6 +157,7 @@ function LayoutShell() {
   }, [location.pathname])
   const touchStart = useRef<number | null>(null)
   const openAddTransactionModal = (kind: TransactionKind, options?: { targetAccountId?: string }) => {
+    rememberTrigger()
     setFormError(null)
     setTransactionKind(kind)
     setTargetAccountId(options?.targetAccountId)
@@ -197,6 +229,7 @@ function LayoutShell() {
   return (
     <EntryContext.Provider
       value={(transaction, actions) => {
+        rememberTrigger()
         setEntry({ transaction, actions })
         setSheet('detail')
       }}
@@ -216,7 +249,10 @@ function LayoutShell() {
         </a>
         <TopBar
           avatar={avatar}
-          onAvatarClick={() => setSheet('account')}
+          onAvatarClick={() => {
+            rememberTrigger()
+            setSheet('account')
+          }}
           onSearch={() => setSearchOpen(true)}
           setupComplete={setupComplete}
           mobileTitle={
@@ -278,9 +314,10 @@ function LayoutShell() {
             className="relative w-[340px] shrink-0 border-l border-border bg-sidebar p-5 overflow-y-auto animate-page-in"
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-medium">Entry detail</h2>
+              <h2 ref={detailHeading} tabIndex={-1} className="font-medium outline-none">
+                Entry detail
+              </h2>
               <Button
-                autoFocus
                 variant="ghost"
                 size="icon"
                 aria-label="Close entry details"
@@ -297,6 +334,7 @@ function LayoutShell() {
             primary action before Home (27a). */}
         {mobile && !sheet && location.pathname !== '/settings' && (
           <button
+            ref={fabRef}
             aria-label="Add transaction"
             onClick={() => openAddTransactionModal('expense')}
             aria-hidden={fabHidden}
@@ -327,6 +365,7 @@ function LayoutShell() {
           {/* Detail is its own surface at every width, never the add/edit
               modal (LED-79): bottom sheet on phones, side sheet above. */}
           <SheetContent
+            finalFocus={triggerFocus}
             side={mobile ? 'bottom' : 'right'}
             className={cn(
               'overflow-y-auto',
@@ -355,6 +394,7 @@ function LayoutShell() {
           }}
         >
           <DialogContent
+            finalFocus={triggerFocus}
             className={cn(
               'max-w-md max-h-[90dvh] overflow-y-auto',
               mobile && 'm3-bottom-sheet',

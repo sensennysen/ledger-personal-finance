@@ -126,7 +126,7 @@ export function LoanPurchaseForm({ accountId, currency, categories, initialValue
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem>
                 <FormLabel>Purchase</FormLabel>
-                <FormControl><Input autoFocus placeholder="e.g. Microwave oven" {...field} /></FormControl>
+                <FormControl><Input placeholder="e.g. Microwave oven" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

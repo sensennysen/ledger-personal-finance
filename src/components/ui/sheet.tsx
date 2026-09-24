@@ -39,15 +39,24 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  initialFocus,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  // Open on the heading, not the first field (LED-91). Closing returns
+  // focus to the trigger, which is base-ui's default.
+  const popupRef = React.useRef<HTMLDivElement>(null)
+  const focusTitle = () =>
+    popupRef.current?.querySelector<HTMLElement>('[data-slot="sheet-title"]') ??
+    true
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Popup
+        ref={popupRef}
+        initialFocus={initialFocus ?? focusTitle}
         data-slot="sheet-content"
         data-side={side}
         className={cn(
@@ -102,8 +111,9 @@ function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
+      tabIndex={-1}
       className={cn(
-        "font-heading text-base font-medium text-foreground",
+        "outline-none font-heading text-base font-medium text-foreground",
         className
       )}
       {...props}

@@ -59,6 +59,8 @@ function CommandDialog({
           className
         )}
         showCloseButton={showCloseButton}
+        // Search opens on its input: typing is the point (LED-91).
+        initialFocus
       >
         {children}
       </DialogContent>

@@ -876,7 +876,6 @@ export default function TransactionsPage() {
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder="e.g. Daily commute"
                   onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTemplateConfirm() }}
-                  autoFocus
                 />
               </div>
               <div className="flex justify-end gap-2">

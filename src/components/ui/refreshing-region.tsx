@@ -9,16 +9,18 @@ export function RefreshingRegion({
   refreshing,
   label,
   className,
+  style,
   children,
 }: {
   refreshing: boolean
   /** What is loading, e.g. "Loading October 2026…". */
   label: string
   className?: string
+  style?: React.CSSProperties
   children: React.ReactNode
 }) {
   return (
-    <div className={cn('relative', className)} aria-busy={refreshing || undefined}>
+    <div className={cn('relative', className)} style={style} aria-busy={refreshing || undefined}>
       {refreshing && (
         <div className="mb-3 space-y-1.5">
           <div className="relative h-0.5 overflow-hidden rounded-full bg-muted">

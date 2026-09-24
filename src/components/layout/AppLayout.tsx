@@ -17,7 +17,7 @@ import { QueueReviewSheet } from './QueueReviewSheet'
 import { PWAInstallBanner } from './PWAInstallBanner'
 import { resolveHeaderMeta } from '@/lib/pageChrome'
 import { CycleProvider } from '@/contexts/CycleContext'
-import { EntryContext } from '@/contexts/EntryContext'
+import { EntryContext, type EntryActions } from '@/contexts/EntryContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { authErrorActionLabel } from '@/lib/authErrors'
@@ -93,7 +93,7 @@ function LayoutShell() {
     useState<TransactionKind>('expense')
   const [entry, setEntry] = useState<{
     transaction: Transaction
-    onEdit?: () => void
+    actions?: EntryActions
   } | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -171,14 +171,30 @@ function LayoutShell() {
       </AvatarFallback>
     </Avatar>
   )
+  // Every action closes detail first, then hands off to the page that owns it.
+  const closeThen = (action?: () => void) =>
+    action
+      ? () => {
+          setSheet(null)
+          action()
+        }
+      : undefined
+  const entryDetail = entry && (
+    <EntryDetail
+      transaction={entry.transaction}
+      onEdit={closeThen(entry.actions?.onEdit)}
+      onDelete={closeThen(entry.actions?.onDelete)}
+      onSplit={closeThen(entry.actions?.onSplit)}
+    />
+  )
   const title =
     sheet === 'account'
       ? 'Your account'
       : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]
   return (
     <EntryContext.Provider
-      value={(transaction, onEdit) => {
-        setEntry({ transaction, onEdit })
+      value={(transaction, actions) => {
+        setEntry({ transaction, actions })
         setSheet('detail')
       }}
     >
@@ -256,17 +272,7 @@ function LayoutShell() {
                 <X />
               </Button>
             </div>
-            <EntryDetail
-              transaction={entry.transaction}
-              onEdit={
-                entry.onEdit
-                  ? () => {
-                      setSheet(null)
-                      entry.onEdit?.()
-                    }
-                  : undefined
-              }
-            />
+            {entryDetail}
           </aside>
         )}
         </div>
@@ -315,17 +321,7 @@ function LayoutShell() {
             </SheetHeader>
             {entry && (
               <div className="px-4 pb-4">
-                <EntryDetail
-                  transaction={entry.transaction}
-                  onEdit={
-                    entry.onEdit
-                      ? () => {
-                          setSheet(null)
-                          entry.onEdit?.()
-                        }
-                      : undefined
-                  }
-                />
+                {entryDetail}
               </div>
             )}
           </SheetContent>

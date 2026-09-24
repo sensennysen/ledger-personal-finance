@@ -44,7 +44,6 @@ import {
   TransactionForm,
   type TransactionFormValues,
 } from '@/components/transactions/TransactionForm'
-import { QuickEntry } from '@/components/transactions/QuickEntry'
 import {
   TRANSACTION_KIND_DIALOG_TITLES,
   type TransactionKind,
@@ -433,23 +432,15 @@ function LayoutShell() {
               <DialogTitle>{title}</DialogTitle>
             </DialogHeader>
             <FormError error={formError} className="px-0 mt-0" />
-            {sheet === 'add' &&
-              (mobile ? (
-                <QuickEntry
-                  initialKind={transactionKind}
-                  targetAccountId={targetAccountId}
-                  onSubmit={handleCreate}
-                  onClose={() => setSheet(null)}
-                />
-              ) : (
-                <TransactionForm
-                  entryKind={transactionKind}
-                  lockedCardAccountId={transactionKind === 'card-payment' ? targetAccountId : undefined}
-                  lockedLoanAccountId={transactionKind === 'loan-repayment' ? targetAccountId : undefined}
-                  onSubmit={handleCreate}
-                  onClose={() => setSheet(null)}
-                />
-              ))}
+            {sheet === 'add' && (
+              <TransactionForm
+                entryKind={transactionKind}
+                lockedCardAccountId={transactionKind === 'card-payment' ? targetAccountId : undefined}
+                lockedLoanAccountId={transactionKind === 'loan-repayment' ? targetAccountId : undefined}
+                onSubmit={handleCreate}
+                onClose={() => setSheet(null)}
+              />
+            )}
             {sheet === 'account' && (
               <div className="space-y-5">
                 <div className="flex items-center gap-3">

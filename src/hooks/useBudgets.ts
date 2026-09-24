@@ -9,6 +9,7 @@ import { sumBudgetSpend } from '@/lib/budgetSpend'
 import { readAllPages } from '@/lib/pagedRead'
 import { canRollover, nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
+import { resolveRefresh } from '@/lib/loadState'
 
 function localDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -30,7 +31,18 @@ export function useBudgets(
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Cycle key the budgets on screen were read for; differs from the requested
+  // key while a new cycle loads with the previous one still showing.
+  const [dataKey, setDataKey] = useState<string | null>(null)
+  const dataKeyRef = useRef<string | null>(null)
   const requestId = useRef(0)
+  const requestedKey = selectedMonth ? `${selectedMonth}:${startDay}` : 'current'
+
+  const showBudgets = useCallback((next: Budget[], key: string | null) => {
+    setBudgets(next)
+    setDataKey(key)
+    dataKeyRef.current = key
+  }, [])
 
   const fetch = useCallback(async () => {
     const request = ++requestId.current
@@ -43,18 +55,25 @@ export function useBudgets(
       setLoading(true)
       return
     }
+    const key = selectedMonth ? `${selectedMonth}:${startDay}` : 'current'
     const cacheKey = `${user.id}:budgets${selectedMonth ? `:${selectedMonth}:${startDay}` : ''}:${deficitBehaviour}`
     const cached = readCache<Budget[]>(cacheKey)
     if (cached) {
-      setBudgets(cached)
+      showBudgets(cached, key)
       setLoading(false)
     } else {
-      setBudgets([])
+      // Keep the previous cycle on screen while this one loads (LED-95).
       setLoading(true)
     }
-    if (!navigator.onLine) {
-      if (!cached) setError('Budgets for this cycle are not cached. Reconnect to load them.')
+    // A failed read for a new cycle must not leave the old cycle posing as it.
+    const failNewCycle = (message: string) => {
+      if (dataKeyRef.current !== key) showBudgets([], null)
+      setError(message)
       setLoading(false)
+    }
+    if (!navigator.onLine) {
+      if (!cached) failNewCycle('Budgets for this cycle are not cached. Reconnect to load them.')
+      else setLoading(false)
       return
     }
 
@@ -67,8 +86,7 @@ export function useBudgets(
 
     if (request !== requestId.current) return
     if (budgetError) {
-      setError(budgetError.message)
-      setLoading(false)
+      failNewCycle(budgetError.message)
       return
     }
 
@@ -102,8 +120,7 @@ export function useBudgets(
 
     if (request !== requestId.current) return
     if (spentError) {
-      setError(spentError)
-      setLoading(false)
+      failNewCycle(spentError)
       return
     }
 
@@ -185,10 +202,10 @@ export function useBudgets(
       }
     })
 
-    setBudgets(enriched)
+    showBudgets(enriched, key)
     writeCache(cacheKey, enriched)
     setLoading(false)
-  }, [user, selectedMonth, startDay, deficitBehaviour])
+  }, [user, selectedMonth, startDay, deficitBehaviour, showBudgets])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -244,9 +261,18 @@ export function useBudgets(
     return { error: error?.message ?? null }
   }
 
+  const { refreshing } = resolveRefresh({
+    loading,
+    hasData: budgets.length > 0,
+    dataKey,
+    requestedKey,
+  })
+
   return {
     budgets,
     loading,
+    /** Previous cycle's budgets are on screen while the selected one loads. */
+    refreshing,
     error,
     refetch: fetch,
     createBudget,

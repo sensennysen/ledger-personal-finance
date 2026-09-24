@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { RefreshingRegion } from '@/components/ui/refreshing-region'
 import { resolveLoadState } from '@/lib/loadState'
 import { Textarea } from '@/components/ui/textarea'
 import { ColorPicker } from '@/components/ui/color-picker'
@@ -743,7 +744,7 @@ function BudgetTransactionsDialog({
         </div>
       </div>
 
-      {loading ? (
+      {loadState === 'loading' ? (
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14" />)}
         </div>
@@ -973,7 +974,9 @@ function SavingsGoalCard({
 export default function BudgetsPage() {
   const { profile } = useAuth()
   const { selectedMonth, startDay } = useCycle()
-  const { budgets, loading, error: budgetError, createBudget, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
+  const { budgets, loading, refreshing: budgetsRefreshing, error: budgetError, refetch: refetchBudgets, createBudget, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
+  const budgetsLoadState = resolveLoadState({ loading, error: budgetError, hasData: budgets.length > 0 })
+  const budgetsRefreshLabel = `Loading ${new Date(`${selectedMonth}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}…`
   const { goals, loading: goalsLoading, error: goalsError, refetch: refetchGoals, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
   const goalsLoadState = resolveLoadState({ loading: goalsLoading, error: goalsError, hasData: goals.length > 0 })
 
@@ -1063,7 +1066,9 @@ export default function BudgetsPage() {
         </PageActions>
       </div>
 
-      {budgetError && <p role="alert" className="rounded-xl bg-expense-container text-expense p-4 text-sm">{budgetError}</p>}
+      {budgetsLoadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh your budgets. Showing what was last loaded." onRetry={() => void refetchBudgets()} />
+      )}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="budgets" className="gap-1.5">
@@ -1079,7 +1084,9 @@ export default function BudgetsPage() {
 
         {/* Budgets tab */}
         <TabsContent value="budgets" className="mt-4 space-y-4">
-          {loading ? (
+          {budgetsLoadState === 'error' ? (
+            <ErrorState title="Couldn't load your budgets" detail={budgetError} onRetry={() => void refetchBudgets()} />
+          ) : budgetsLoadState === 'loading' ? (
             <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36" />)}</div>
           ) : budgets.length === 0 ? (
             <Card className="text-center py-16">
@@ -1090,7 +1097,9 @@ export default function BudgetsPage() {
               </CardContent>
             </Card>
           ) : (
-            budgets.map((budget, idx) => {
+            <RefreshingRegion refreshing={budgetsRefreshing} label={budgetsRefreshLabel}>
+            <div className="space-y-4">
+            {budgets.map((budget, idx) => {
               const spent = budget.spent ?? 0
               const effective = budget.effective_amount ?? budget.amount
               const pct = Math.min((spent / (effective || 1)) * 100, 100)
@@ -1226,13 +1235,17 @@ export default function BudgetsPage() {
                   </CardContent>
                 </InteractiveRow>
               )
-            })
+            })}
+            </div>
+            </RefreshingRegion>
           )}
         </TabsContent>
 
         {/* History tab */}
         <TabsContent value="history" className="mt-4 space-y-4">
-          {loading ? (
+          {budgetsLoadState === 'error' ? (
+            <ErrorState title="Couldn't load your budget history" detail={budgetError} onRetry={() => void refetchBudgets()} />
+          ) : budgetsLoadState === 'loading' ? (
             <div className="space-y-4">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-48" />)}</div>
           ) : monthlyBudgets.length === 0 ? (
             <Card className="text-center py-16">
@@ -1245,7 +1258,9 @@ export default function BudgetsPage() {
               </CardContent>
             </Card>
           ) : (
-            monthlyBudgets.map((budget) => (
+            <RefreshingRegion refreshing={budgetsRefreshing} label={budgetsRefreshLabel}>
+            <div className="space-y-4">
+            {monthlyBudgets.map((budget) => (
               <Card key={budget.id}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
@@ -1263,7 +1278,9 @@ export default function BudgetsPage() {
                   <BudgetHistoryCard budget={budget} />
                 </CardContent>
               </Card>
-            ))
+            ))}
+            </div>
+            </RefreshingRegion>
           )}
           {budgets.some((b) => b.period !== 'monthly') && (
             <p className="text-xs text-center text-muted-foreground pt-1">

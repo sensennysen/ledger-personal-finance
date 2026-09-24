@@ -726,7 +726,7 @@ export default function TransactionsPage() {
         )}
         {loadState === 'error' ? (
           <ErrorState title="Couldn't load your transactions" detail={error} onRetry={() => void refetch()} />
-        ) : loading ? (
+        ) : loadState === 'loading' ? (
           <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
         ) : transactions.length === 0 ? (
           <EmptyState

@@ -69,18 +69,21 @@ function LayoutShell() {
   const desktop = useMediaQuery('(min-width: 1024px)')
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
-  const { transactions, generateDueRecurring, createTransaction } = useTransactions()
-  const { accounts } = useAccounts()
+  const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
+  const { accounts, loading: accountsLoading } = useAccounts()
   // ⌘F in search scopes to the account page it opened over.
   const accountRouteId = useMatch('/accounts/:accountId')?.params.accountId
   const routeAccount = accounts.find((account) => account.id === accountRouteId)
   const currentAccount = routeAccount ? { id: routeAccount.id, name: routeAccount.name } : null
   const { cycleConfirmed } = useFirstRunChecklist()
-  const setupComplete = isSetupComplete({
-    hasAccount: accounts.length > 0,
-    hasTransaction: transactions.length > 0,
-    cycleConfirmed,
-  })
+  const setupComplete = isSetupComplete(
+    {
+      hasAccount: accounts.length > 0,
+      hasTransaction: transactions.length > 0,
+      cycleConfirmed,
+    },
+    { loading: accountsLoading || transactionsLoading },
+  )
   const hasGenerated = useRef(false)
   const [sheet, setSheet] = useState<'add' | 'account' | 'detail' | null>(null)
   const [transactionKind, setTransactionKind] =

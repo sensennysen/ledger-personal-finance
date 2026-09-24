@@ -231,7 +231,6 @@ function SearchBody({
           </button>
           <CommandInput
             bare
-            autoFocus
             value={query}
             onValueChange={(value) => {
               setQuery(value)
@@ -253,7 +252,6 @@ function SearchBody({
         </div>
       ) : (
         <CommandInput
-          autoFocus
           value={query}
           onValueChange={(value) => {
             setQuery(value)

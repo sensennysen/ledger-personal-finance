@@ -386,8 +386,8 @@ export default function TransactionsPage() {
     const rows = txs.map((t) => ({
       type: t.type,
       account_id: t.account_id,
-      to_account_id: null as string | null,
-      category_id: null as string | null,
+      to_account_id: t.to_account_id,
+      category_id: t.category_id as string | null,
       subcategory_id: null as string | null,
       amount: t.amount,
       currency: t.currency,

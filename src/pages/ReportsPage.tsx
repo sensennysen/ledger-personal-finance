@@ -32,6 +32,14 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCycle } from '@/contexts/cycleState'
 import { getReportRange } from '@/lib/reportCycle'
 import {
+  compareToPrevious,
+  cycleMonthLabel,
+  formatComparison,
+  netWorthEffect,
+  previousCycleKey,
+  summarizeRange,
+} from '@/lib/periodCompare'
+import {
   DEFAULT_LOOKBACK,
   LOOKBACK_OPTIONS,
   getLookbackBuckets,
@@ -294,6 +302,7 @@ function StatCard({
   sub,
   icon: Icon,
   color,
+  comparison,
   loading,
 }: {
   title: string
@@ -301,6 +310,7 @@ function StatCard({
   sub?: string
   icon: React.ElementType
   color: string
+  comparison?: { text: string; color: string }
   loading?: boolean
 }) {
   return (
@@ -321,6 +331,11 @@ function StatCard({
           )}
           {sub && !loading && (
             <p className="text-[0.6875rem] text-muted-foreground mt-1 wrap-break-word">{sub}</p>
+          )}
+          {comparison && !loading && (
+            <p className="text-[0.6875rem] font-medium tabular-nums mt-1 wrap-break-word" style={{ color: comparison.color }}>
+              {comparison.text}
+            </p>
           )}
         </div>
         <div
@@ -447,9 +462,7 @@ export default function ReportsPage() {
   }, [transactions, start, end])
 
   const goToPreviousPeriod = () => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const date = new Date(year, month - 2, 1)
-    setSelectedMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`)
+    setSelectedMonth(previousCycleKey(selectedMonth))
   }
 
   const categoryById = useMemo(
@@ -463,15 +476,31 @@ export default function ReportsPage() {
   )
 
   // Summary stats
-  const { totalIncome, totalExpenses, netChange } = useMemo(() => {
-    let totalIncome = 0
-    let totalExpenses = 0
-    for (const t of filtered) {
-      if (t.type === 'income') totalIncome += t.amount * (t.exchange_rate ?? 1)
-      else if (t.type === 'expense') totalExpenses += t.amount * (t.exchange_rate ?? 1)
-    }
-    return { totalIncome, totalExpenses, netChange: totalIncome - totalExpenses }
-  }, [filtered])
+  const { income: totalIncome, expenses: totalExpenses, net: netChange } = useMemo(
+    () => summarizeRange(transactions, start, end),
+    [transactions, start, end]
+  )
+
+  // Same figures for the previous cycle, so each stat card has a reference point.
+  const previousLabel = cycleMonthLabel(previousCycleKey(selectedMonth))
+  const previousTotals = useMemo(() => {
+    const range = getReportRange(previousCycleKey(selectedMonth), startDay)
+    return summarizeRange(transactions, range.start, range.end)
+  }, [transactions, selectedMonth, startDay])
+  const netWorthChange = useMemo(
+    () => filtered.reduce((sum, t) => sum + netWorthEffect(t), 0),
+    [filtered]
+  )
+  // good: which direction is good news for this figure. Hidden when a read
+  // failed, since partial data would produce a false comparison.
+  const compare = (current: number, previous: number, good: 'up' | 'down') => {
+    if (loadFailed) return undefined
+    const cmp = compareToPrevious(current, previous)
+    const color = cmp.direction === 'flat' || cmp.pct === null
+      ? 'var(--muted-foreground)'
+      : cmp.direction === good ? INCOME : EXPENSE
+    return { text: formatComparison(cmp, previousLabel), color }
+  }
 
   // Category breakdown (expenses only)
   const categoryBreakdown = useMemo(
@@ -519,9 +548,7 @@ export default function ReportsPage() {
       const boundary = boundaries[i].date
       while (txIdx < allTransactionsSorted.length && allTransactionsSorted[txIdx].date > boundary) {
         const tx = allTransactionsSorted[txIdx]
-        if (tx.type === 'income') netWorth -= tx.amount
-        else if (tx.type === 'expense' && !tx.to_account_id) netWorth += tx.amount
-        else if (tx.type === 'transfer') netWorth += (tx.transfer_fee ?? 0)
+        netWorth -= netWorthEffect(tx)
         txIdx++
       }
       data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
@@ -666,6 +693,7 @@ export default function ReportsPage() {
           value={formatCurrency(totalIncome, currency)}
           icon={TrendingUp}
           color={INCOME}
+          comparison={compare(totalIncome, previousTotals.income, 'up')}
           loading={loading}
         />
         <StatCard
@@ -673,14 +701,18 @@ export default function ReportsPage() {
           value={formatCurrency(totalExpenses, currency)}
           icon={TrendingDown}
           color={EXPENSE}
+          comparison={compare(totalExpenses, previousTotals.expenses, 'down')}
           loading={loading}
         />
         <StatCard
           title="Net Change"
           value={formatCurrency(netChange, currency)}
-          sub={netChange >= 0 ? 'Surplus' : 'Deficit'}
+          sub={netChange >= 0 && totalIncome > 0
+            ? `Surplus · ${Math.round((netChange / totalIncome) * 100)}% of income kept`
+            : netChange >= 0 ? 'Surplus' : 'Deficit'}
           icon={netChange >= 0 ? TrendingUp : TrendingDown}
           color={netChange >= 0 ? INCOME : EXPENSE}
+          comparison={compare(netChange, previousTotals.net, 'up')}
           loading={loading}
         />
         <StatCard
@@ -691,6 +723,12 @@ export default function ReportsPage() {
             : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
           icon={Wallet}
           color={'var(--foreground)'}
+          comparison={loadFailed ? undefined : {
+            text: netWorthChange === 0
+              ? 'No change this cycle'
+              : `${netWorthChange > 0 ? '↑' : '↓'} ${formatCurrency(Math.abs(netWorthChange), currency)} this cycle`,
+            color: netWorthChange > 0 ? INCOME : netWorthChange < 0 ? EXPENSE : 'var(--muted-foreground)',
+          }}
           loading={loading}
         />
       </div>

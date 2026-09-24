@@ -250,7 +250,7 @@ export function LoanPurchaseForm({ accountId, currency, categories, initialValue
                       <FormItem>
                         <FormLabel>Installments already paid</FormLabel>
                         <div className="flex items-center gap-2">
-                          <FormControl><Input inputMode="numeric" type="number" min={0} max={Number(termMonths)} step={1} {...numberInputProps(field)} /></FormControl>
+                          <FormControl className="min-w-0 flex-1"><Input inputMode="numeric" type="number" min={0} max={Number(termMonths)} step={1} {...numberInputProps(field)} /></FormControl>
                           <span className="shrink-0 text-xs text-muted-foreground">of {Number(termMonths) || '—'}</span>
                         </div>
                         <FormMessage />
@@ -298,16 +298,16 @@ export function LoanPurchaseForm({ accountId, currency, categories, initialValue
                       <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Final payment</dt><dd>{formatDate(preview.finalDate)}</dd></div>
                       <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Last installment</dt><dd className="money">{formatCurrency(preview.finalInstallment, currency)}</dd></div>
                       {Number(installmentsPaid) > 0 && (
-                        <div className="flex justify-between gap-3">
-                          <dt className="text-muted-foreground">Opening progress</dt>
-                          <dd className="text-right">{Number(installmentsPaid)} of {Number(termMonths)}<br /><span className="money text-muted-foreground">{formatCurrency(openingPaidAmount, currency)} treated as already paid</span></dd>
-                        </div>
+                        <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Opening progress</dt><dd>{Number(installmentsPaid)} of {Number(termMonths)}</dd></div>
                       )}
                     </dl>
+                    {Number(installmentsPaid) > 0 && (
+                      <p className="mt-0.5 text-right text-xs text-muted-foreground">{formatCurrency(openingPaidAmount, currency)} treated as already paid</p>
+                    )}
                   </div>
                   {loanEffect && loanContext && (
                     <div className="border-t pt-2.5">
-                      <p className="text-xs font-semibold">Adds to this loan</p>
+                      <p className="text-xs font-semibold">{initialValues ? 'Effect on this loan' : 'Adds to this loan'}</p>
                       <dl className="mt-1 space-y-0.5 text-xs">
                         <div className="flex justify-between gap-3"><dt className="text-muted-foreground">Outstanding now</dt><dd className="money">{formatCurrency(loanContext.baseOwed + (initialValues?.remaining_balance ?? 0), currency)}</dd></div>
                         <div className="flex justify-between gap-3"><dt className="text-muted-foreground">{initialValues ? 'After saving' : 'After adding'}</dt><dd className="money font-semibold">{formatCurrency(loanEffect.owedAfter, currency)}</dd></div>

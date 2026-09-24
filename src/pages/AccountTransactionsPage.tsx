@@ -43,6 +43,7 @@ import { cardAmountDue, loanProgress } from '@/lib/accountsOverview'
 import { buildCategoryBreakdown } from '@/lib/categoryBreakdown'
 import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
+import type { LoanDeadline } from '@/lib/loanInstallments'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
@@ -103,6 +104,8 @@ export default function AccountTransactionsPage() {
     }, { replace: true })
   }, [handoffQuery, setSearchParams])
   const [createOpen, setCreateOpen] = useState(false)
+  /** Set by the tracker's "Record this payment"; cleared whenever the create dialog closes. */
+  const [repaymentPrefill, setRepaymentPrefill] = useState<{ amount: number; date: string } | null>(null)
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editAccountOpen, setEditAccountOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
@@ -253,6 +256,15 @@ export default function AccountTransactionsPage() {
     setFormError(null)
     refetchAccounts()
     setCreateOpen(false)
+    setRepaymentPrefill(null)
+  }
+
+  // Dated on the due date so the server splits it across purchases exactly as the schedule shows.
+  const handleRecordPayment = (deadline: LoanDeadline) => {
+    setFormError(null)
+    setTransactionKind('loan-repayment')
+    setRepaymentPrefill({ amount: deadline.total, date: deadline.dueDate })
+    setCreateOpen(true)
   }
 
   const handleEdit = async (values: TransactionFormValues) => {
@@ -490,7 +502,7 @@ export default function AccountTransactionsPage() {
             />
             </div>
           )}
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setRepaymentPrefill(null) }}>
               <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
               <DialogHeader>
                 <DialogTitle>
@@ -501,7 +513,7 @@ export default function AccountTransactionsPage() {
               <TransactionForm
                 entryKind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
                 onSubmit={handleCreate}
-                onClose={() => { setCreateOpen(false); setFormError(null) }}
+                onClose={() => { setCreateOpen(false); setRepaymentPrefill(null); setFormError(null) }}
                 lockedAccountId={account?.type === 'loan' || transactionKind === 'card-payment' ? undefined : accountId}
                 lockedCardAccountId={
                   account?.type === 'credit_card' && transactionKind === 'card-payment' ? account.id : undefined
@@ -516,6 +528,7 @@ export default function AccountTransactionsPage() {
                       category_id: null,
                       currency: account.currency,
                       description: `Loan payment - ${account.name}`,
+                      ...repaymentPrefill,
                     }
                   : account?.type === 'credit_card' && transactionKind === 'card-payment'
                     ? {
@@ -764,6 +777,7 @@ export default function AccountTransactionsPage() {
             onAccountChanged={refetchAccounts}
             loanData={loanData}
             onSetLoanAmount={handleSetLoanAmount}
+            onRecordPayment={handleRecordPayment}
           />
         )}
 

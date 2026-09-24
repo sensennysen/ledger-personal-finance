@@ -1,7 +1,29 @@
-import { useState, useCallback, useRef } from 'react'
-import { Upload, X, AlertCircle, Loader2, FileText } from 'lucide-react'
+import { useState, useCallback, useRef, useMemo } from 'react'
+import { Upload, X, AlertCircle, AlertTriangle, Loader2, FileText, Copy, Filter } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
-import { formatCurrency } from '@/lib/utils'
+import { useImportDuplicates } from '@/hooks/useImportDuplicates'
+import { useRenderWindow } from '@/hooks/useRenderWindow'
+import { duplicateSpan, matchDuplicates, type ExistingTx } from '@/lib/importDuplicates'
+import {
+  buildRows,
+  EMPTY_DESCRIPTION,
+  fixableByOtherOrder,
+  groupProblems,
+  importableRows,
+  isProblem,
+  isSkipped,
+  processFile,
+  rowIssues,
+  sortProblemsFirst,
+  summarise,
+  type BankFormat,
+  type CauseId,
+  type DateOrder,
+  type ParsedFile,
+  type Severity,
+} from '@/lib/csvImport'
+import { WINDOW_STEP } from '@/lib/transactionWindow'
+import { cn, formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -24,219 +46,7 @@ interface Props {
   onImport: (txs: ImportTx[]) => Promise<{ imported: number; error: string | null }>
 }
 
-type BankFormat = 'BDO' | 'BPI' | 'Metrobank' | 'Generic'
-
-interface ParsedRow {
-  date: string
-  description: string
-  amount: number
-  type: 'income' | 'expense'
-}
-
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024
-const MAX_IMPORT_ROWS = 5000
-const PREVIEW_ROW_COUNT = 8
-
-function parseCSVText(text: string): string[][] {
-  const rows: string[][] = []
-  const normalized = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  let currentRow: string[] = []
-  let currentCell = ''
-  let inQuotes = false
-
-  for (let i = 0; i < normalized.length; i++) {
-    const ch = normalized[i]
-    const next = normalized[i + 1]
-
-    if (ch === '"') {
-      if (inQuotes && next === '"') {
-        currentCell += '"'
-        i++
-      } else {
-        inQuotes = !inQuotes
-      }
-      continue
-    }
-
-    if (ch === ',' && !inQuotes) {
-      currentRow.push(currentCell.trim())
-      currentCell = ''
-      continue
-    }
-
-    if (ch === '\n' && !inQuotes) {
-      currentRow.push(currentCell.trim())
-      if (currentRow.some((cell) => cell.length > 0)) {
-        rows.push(currentRow)
-      }
-      currentRow = []
-      currentCell = ''
-      continue
-    }
-
-    currentCell += ch
-  }
-
-  if (inQuotes) {
-    throw new Error('The CSV file has an unmatched quote. Please export the file again and retry.')
-  }
-
-  if (currentCell.length > 0 || currentRow.length > 0) {
-    currentRow.push(currentCell.trim())
-    if (currentRow.some((cell) => cell.length > 0)) {
-      rows.push(currentRow)
-    }
-  }
-
-  return rows
-}
-
-function findHeaderRowIndex(rows: string[][]): number {
-  const keywords = ['date', 'description', 'amount', 'debit', 'credit', 'balance', 'remarks', 'particulars']
-  for (let i = 0; i < Math.min(rows.length, 25); i++) {
-    const row = rows[i].map((cell) => cell.toLowerCase())
-    const matches = keywords.filter((keyword) => row.some((cell) => cell.includes(keyword))).length
-    if (matches >= 2) return i
-  }
-  return -1
-}
-
-function detectFormat(headers: string[]): BankFormat {
-  const normalized = headers.map((cell) => cell.toLowerCase().trim())
-  const has = (term: string) => normalized.some((cell) => cell.includes(term))
-  if (has('post date') || has('ref. no') || has('reference no')) return 'Metrobank'
-  if (has('transaction date') || (has('date') && has('debit') && has('credit'))) return 'BDO'
-  if (has('date') && has('amount') && !has('debit') && !has('credit')) return 'BPI'
-  return 'Generic'
-}
-
-function normalizeDate(value: string): string | null {
-  if (!value) return null
-  const clean = value.trim()
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean
-
-  const monthDayYear = clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (monthDayYear) return `${monthDayYear[3]}-${monthDayYear[1].padStart(2, '0')}-${monthDayYear[2].padStart(2, '0')}`
-
-  const shortMonthMap: Record<string, string> = {
-    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
-    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
-  }
-
-  const dayMonYear = clean.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/)
-  if (dayMonYear) {
-    const month = shortMonthMap[dayMonYear[2].toLowerCase()]
-    if (month) return `${dayMonYear[3]}-${month}-${dayMonYear[1].padStart(2, '0')}`
-  }
-
-  const monDayYear = clean.match(/^([A-Za-z]{3})\s+(\d{1,2}),?\s*(\d{4})$/)
-  if (monDayYear) {
-    const month = shortMonthMap[monDayYear[1].toLowerCase()]
-    if (month) return `${monDayYear[3]}-${month}-${monDayYear[2].padStart(2, '0')}`
-  }
-
-  return null
-}
-
-function parseAmt(value: string): number {
-  const cleaned = value.replace(/[,₱$\s]/g, '').replace(/^\((.+)\)$/, '-$1')
-  return parseFloat(cleaned) || 0
-}
-
-function parseRows(rows: string[][], headerIdx: number, format: BankFormat): ParsedRow[] {
-  const headers = rows[headerIdx].map((cell) => cell.toLowerCase().trim())
-  const col = (terms: string[]) => headers.findIndex((header) => terms.some((term) => header.includes(term)))
-
-  const dateIdx = col(['transaction date', 'post date', 'date'])
-  const descIdx = col(['description', 'remarks', 'particulars', 'details', 'memo', 'narration'])
-  const amountIdx = col(['amount'])
-  const debitIdx = col(['debit amount', 'debit'])
-  const creditIdx = col(['credit amount', 'credit'])
-
-  const result: ParsedRow[] = []
-
-  for (let i = headerIdx + 1; i < rows.length; i++) {
-    const row = rows[i]
-    if (!row.length || row.every((cell) => !cell)) continue
-
-    const dateStr = dateIdx >= 0 ? (row[dateIdx] ?? '') : ''
-    const date = normalizeDate(dateStr)
-    if (!date) continue
-
-    const rawDesc = descIdx >= 0 ? (row[descIdx] ?? '') : (row[1] ?? '')
-    const description = rawDesc.replace(/^"|"$/g, '').trim()
-    if (!description) continue
-
-    const lowerDescription = description.toLowerCase()
-    if (
-      lowerDescription.includes('beg balance') ||
-      lowerDescription.includes('beginning balance') ||
-      lowerDescription.includes('end balance') ||
-      lowerDescription.includes('opening balance')
-    ) {
-      continue
-    }
-
-    let parsedRow: ParsedRow | null = null
-
-    if (format === 'BPI' || (format === 'Generic' && amountIdx >= 0)) {
-      const rawAmount = parseAmt(row[amountIdx] ?? '')
-      if (rawAmount === 0) continue
-      parsedRow = rawAmount < 0
-        ? { date, description, amount: Math.abs(rawAmount), type: 'expense' }
-        : { date, description, amount: rawAmount, type: 'income' }
-    } else {
-      const debit = debitIdx >= 0 ? parseAmt(row[debitIdx] ?? '') : 0
-      const credit = creditIdx >= 0 ? parseAmt(row[creditIdx] ?? '') : 0
-      if (debit > 0) {
-        parsedRow = { date, description, amount: debit, type: 'expense' }
-      } else if (credit > 0) {
-        parsedRow = { date, description, amount: credit, type: 'income' }
-      }
-    }
-
-    if (parsedRow) {
-      result.push(parsedRow)
-    }
-  }
-
-  return result
-}
-
-function processFile(text: string): { format: BankFormat; rows: ParsedRow[] } | { error: string } {
-  let rawRows: string[][]
-  try {
-    rawRows = parseCSVText(text)
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Could not parse this CSV file.' }
-  }
-
-  if (rawRows.length < 2) {
-    return { error: 'File appears to be empty or has no data rows.' }
-  }
-
-  const headerIdx = findHeaderRowIndex(rawRows)
-  if (headerIdx < 0) {
-    return {
-      error:
-        'Could not detect a valid header row. Make sure this is a bank CSV export with columns like Date, Description, Debit, or Credit.',
-    }
-  }
-
-  const format = detectFormat(rawRows[headerIdx])
-  const rows = parseRows(rawRows, headerIdx, format)
-  if (rows.length === 0) {
-    return { error: 'No valid transactions found in the file.' }
-  }
-  if (rows.length > MAX_IMPORT_ROWS) {
-    return {
-      error: `This file contains ${rows.length} rows. The current import limit is ${MAX_IMPORT_ROWS} rows to keep the app responsive.`,
-    }
-  }
-
-  return { format, rows }
-}
 
 const FORMAT_LABELS: Record<BankFormat, string> = {
   BDO: 'BDO',
@@ -245,37 +55,89 @@ const FORMAT_LABELS: Record<BankFormat, string> = {
   Generic: 'Generic CSV',
 }
 
+const SEVERITY_ICON: Record<Severity, { icon: typeof AlertCircle; className: string }> = {
+  error: { icon: AlertCircle, className: 'text-destructive' },
+  warning: { icon: AlertTriangle, className: 'text-muted-foreground' },
+  duplicate: { icon: Copy, className: 'text-muted-foreground' },
+}
+
+const ORDER_LABELS: Record<DateOrder, string> = { DMY: 'D/M/Y', MDY: 'M/D/Y' }
+
+const toggled = <T,>(set: ReadonlySet<T>, value: T): Set<T> => {
+  const next = new Set(set)
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  return next
+}
+
+const plural = (count: number, word: string) => `${count.toLocaleString()} ${word}${count !== 1 ? 's' : ''}`
+
 export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const { accounts } = useAccounts()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [parsed, setParsed] = useState<{ format: BankFormat; rows: ParsedRow[] } | null>(null)
+  const [file, setFile] = useState<ParsedFile | null>(null)
+  const [fileKey, setFileKey] = useState(0)
+  const [dateOrder, setDateOrder] = useState<DateOrder>('MDY')
   const [parseError, setParseError] = useState<string | null>(null)
   const [accountId, setAccountId] = useState<string>('')
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ imported: number; account: string } | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [skipped, setSkipped] = useState<Set<CauseId>>(new Set())
+  const [includedDupes, setIncludedDupes] = useState<Set<number>>(new Set())
+  const [activeCause, setActiveCause] = useState<CauseId | null>(null)
+  const [onlyProblems, setOnlyProblems] = useState(false)
 
   const selectedAccount = accounts.find((account) => account.id === accountId)
+  const currency = selectedAccount?.currency ?? 'PHP'
+
+  const built = useMemo(
+    () => (file ? buildRows(file.raw, file.headerIdx, file.format, dateOrder) : { rows: [], ignored: 0 }),
+    [file, dateOrder],
+  )
+  const rows = built.rows
+  const span = useMemo(() => duplicateSpan(rows), [rows])
+  const dupeCheck = useImportDuplicates(accountId, span)
+  const duplicates = useMemo(() => matchDuplicates(rows, dupeCheck.existing), [rows, dupeCheck.existing])
+
+  const selection = { duplicates, skipped, includedDuplicates: includedDupes }
+  const summary = summarise(rows, selection)
+  const toImport = importableRows(rows, selection)
+  const causes = useMemo(() => groupProblems(rows, duplicates), [rows, duplicates])
+  const cause = causes.find((item) => item.id === activeCause) ?? causes[0]
+
+  const listed = useMemo(() => {
+    const sorted = sortProblemsFirst(rows, duplicates)
+    return onlyProblems ? sorted.filter((row) => isProblem(row, duplicates)) : sorted
+  }, [rows, duplicates, onlyProblems])
+  const { rendered, sentinelRef } = useRenderWindow(listed.length, {
+    step: WINDOW_STEP.desktop,
+    resetKey: `${fileKey}|${onlyProblems}|${dateOrder}`,
+  })
 
   const reset = () => {
-    setParsed(null)
+    setFile(null)
     setParseError(null)
     setAccountId('')
     setImportResult(null)
+    setSkipped(new Set())
+    setIncludedDupes(new Set())
+    setActiveCause(null)
+    setOnlyProblems(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleFile = useCallback(
-    (file: File) => {
-      if (file.size === 0) {
+    (picked: File) => {
+      if (picked.size === 0) {
         setParseError('Empty files cannot be imported.')
         return
       }
-      if (!file.name.match(/\.(csv|txt)$/i)) {
+      if (!picked.name.match(/\.(csv|txt)$/i)) {
         setParseError('Please upload a CSV file (.csv or .txt).')
         return
       }
-      if (file.size > MAX_IMPORT_FILE_SIZE) {
+      if (picked.size > MAX_IMPORT_FILE_SIZE) {
         setParseError('File too large. Maximum import size is 5 MB.')
         return
       }
@@ -286,38 +148,49 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         const result = processFile(text)
         if ('error' in result) {
           setParseError(result.error)
-          setParsed(null)
+          setFile(null)
           return
         }
 
-        setParsed(result)
+        setFile(result)
+        setFileKey((key) => key + 1)
+        setDateOrder(result.dateOrder)
         setParseError(null)
+        setSkipped(new Set())
+        setIncludedDupes(new Set())
+        setActiveCause(null)
+        setOnlyProblems(false)
         if (!accountId && accounts.length > 0) {
           setAccountId(accounts[0].id)
         }
       }
-      reader.readAsText(file)
+      reader.readAsText(picked)
     },
     [accountId, accounts],
   )
 
   const handleFileInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) handleFile(file)
+    const picked = event.target.files?.[0]
+    if (picked) handleFile(picked)
   }
 
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault()
     setDragOver(false)
-    const file = event.dataTransfer.files[0]
-    if (file) handleFile(file)
+    const picked = event.dataTransfer.files[0]
+    if (picked) handleFile(picked)
   }
 
+  const blocked = summary.errors > 0 || dupeCheck.loading || Boolean(dupeCheck.error)
+
   const handleImport = async () => {
-    if (!parsed || !accountId || !selectedAccount) return
+    if (!file || !accountId || !selectedAccount || blocked || toImport.length === 0) return
     setImporting(true)
-    const txs: ImportTx[] = parsed.rows.map((row) => ({
-      ...row,
+    const txs: ImportTx[] = toImport.map((row) => ({
+      date: row.date!,
+      description: row.description || EMPTY_DESCRIPTION,
+      amount: row.amount!,
+      type: row.type!,
       account_id: accountId,
       currency: selectedAccount.currency,
       category_id: null,
@@ -331,6 +204,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     }
   }
 
+  const describeMatch = (match: ExistingTx) =>
+    `${match.date} · ${match.description || EMPTY_DESCRIPTION} · ${formatCurrency(Number(match.amount), currency)}`
+
+  const firstShown = listed.length > 0 ? 1 : 0
+
   return (
     <Dialog
       open={open}
@@ -339,7 +217,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         onOpenChange(isOpen)
       }}
     >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-4 h-4" />
@@ -372,7 +250,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
           </div>
         ) : (
           <div className="space-y-4">
-            {!parsed && (
+            {!file && (
               <div
                 className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
                   dragOver
@@ -409,13 +287,14 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
               </div>
             )}
 
-            {parsed && (
+            {file && (
               <>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{FORMAT_LABELS[parsed.format]}</Badge>
+                    <Badge variant="secondary">{FORMAT_LABELS[file.format]}</Badge>
                     <span className="text-sm text-muted-foreground">
-                      {parsed.rows.length} transactions found
+                      {plural(rows.length, 'row')} parsed
+                      {built.ignored > 0 && ` · ${plural(built.ignored, 'balance or zero line')} ignored`}
                     </span>
                   </div>
                   <Button variant="ghost" size="sm" onClick={reset} className="gap-1.5 h-7">
@@ -440,53 +319,223 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                   </Select>
                 </div>
 
+                {dupeCheck.error && (
+                  <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span className="flex-1">Couldn't check for duplicates: {dupeCheck.error}</span>
+                    <Button variant="outline" size="sm" className="h-7" onClick={dupeCheck.retry}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-lg border bg-border overflow-hidden">
+                  {[
+                    { label: 'Ready', value: summary.ready.toLocaleString(), tone: '' },
+                    { label: 'Errors · blocks import', value: summary.errors.toLocaleString(), tone: summary.errors > 0 ? 'text-destructive' : '' },
+                    { label: 'Warnings · imports anyway', value: summary.warnings.toLocaleString(), tone: '' },
+                    { label: 'Likely duplicates', value: dupeCheck.loading ? '…' : dupeCheck.error ? '—' : summary.duplicates.toLocaleString(), tone: '' },
+                  ].map((stat) => (
+                    <div key={stat.label} className="bg-popover px-3 py-2.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+                      <p className={cn('text-xl font-semibold tabular-nums mt-0.5', stat.tone)}>{stat.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {cause && (
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,15rem)_1fr] rounded-lg border p-3">
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Problems by cause</p>
+                      {causes.map((item) => {
+                        const { icon: Icon, className } = SEVERITY_ICON[item.severity]
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            aria-pressed={item.id === cause.id}
+                            onClick={() => setActiveCause(item.id)}
+                            className={cn(
+                              'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left transition-colors',
+                              item.id === cause.id ? 'bg-muted font-medium' : 'hover:bg-muted/50',
+                            )}
+                          >
+                            <Icon className={cn('w-3.5 h-3.5 shrink-0', className)} />
+                            <span className={cn('flex-1 truncate', skipped.has(item.id) && 'line-through text-muted-foreground')}>
+                              {item.label}
+                            </span>
+                            <span className="tabular-nums text-muted-foreground">{item.lines.length.toLocaleString()}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <div className="space-y-2 text-sm sm:border-l sm:pl-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {cause.severity === 'duplicate'
+                          ? `${plural(cause.lines.length, 'row')} already in Ledger`
+                          : `Fix all ${cause.lines.length.toLocaleString()} at once`}
+                      </p>
+
+                      {cause.id === 'bad-date' && (
+                        <>
+                          <p className="text-muted-foreground">
+                            Dates in these rows read <code className="text-foreground">{cause.sample || '(empty)'}</code>.
+                            {' '}Parse every slash date in the file as
+                          </p>
+                          <div className="inline-flex rounded-full border p-0.5">
+                            {(['DMY', 'MDY'] as DateOrder[]).map((order) => (
+                              <button
+                                key={order}
+                                type="button"
+                                aria-pressed={dateOrder === order}
+                                onClick={() => setDateOrder(order)}
+                                className={cn(
+                                  'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+                                  dateOrder === order ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                                )}
+                              >
+                                {ORDER_LABELS[order]}
+                              </button>
+                            ))}
+                          </div>
+                          {fixableByOtherOrder(rows, dateOrder) === 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Switching the order won't fix these. Correct the dates in the file, or skip these rows.
+                            </p>
+                          )}
+                        </>
+                      )}
+
+                      {cause.id === 'bad-amount' && (
+                        <p className="text-muted-foreground">
+                          Amounts in these rows read <code className="text-foreground">{cause.sample || '(empty)'}</code>.
+                          Correct them in the file, or skip these rows.
+                        </p>
+                      )}
+
+                      {cause.id === 'empty-description' && (
+                        <p className="text-muted-foreground">These rows import as “{EMPTY_DESCRIPTION}”.</p>
+                      )}
+
+                      {cause.id === 'duplicate' ? (
+                        <p className="text-muted-foreground">
+                          Skipped unless you tick a row below to import it anyway.
+                        </p>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7"
+                          onClick={() => setSkipped((current) => toggled(current, cause.id))}
+                        >
+                          {skipped.has(cause.id) ? 'Import these rows again' : 'Skip these rows'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Preview - first {Math.min(parsed.rows.length, PREVIEW_ROW_COUNT)} of {parsed.rows.length}
-                  </p>
-                  <div className="rounded-lg border overflow-hidden">
+                  <div className="rounded-lg border overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-muted/50">
+                          <th className="w-8 px-2 py-2"><span className="sr-only">Import</span></th>
+                          <th className="text-right px-2 py-2 font-medium text-xs text-muted-foreground">Row</th>
                           <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Date</th>
                           <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Description</th>
                           <th className="text-right px-3 py-2 font-medium text-xs text-muted-foreground">Amount</th>
-                          <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground">Type</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {parsed.rows.slice(0, PREVIEW_ROW_COUNT).map((row, index) => (
-                          <tr key={index} className="border-b last:border-0 hover:bg-muted/30">
-                            <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{row.date}</td>
-                            <td className="px-3 py-2 max-w-50 truncate">{row.description}</td>
-                            <td
-                              className={`px-3 py-2 text-right font-medium tabular-nums ${
-                                row.type === 'expense'
-                                  ? 'text-expense'
-                                  : 'text-income'
-                              }`}
+                        {listed.slice(0, rendered).map((row) => {
+                          const issues = rowIssues(row, duplicates)
+                          const match = duplicates.get(row.line)
+                          return (
+                            <tr
+                              key={row.line}
+                              className={cn('border-b last:border-0 hover:bg-muted/30', isSkipped(row, selection) && 'opacity-50')}
                             >
-                              {row.type === 'expense' ? '-' : '+'}
-                              {formatCurrency(row.amount, selectedAccount?.currency ?? 'PHP')}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <Badge
-                                variant={row.type === 'expense' ? 'destructive' : 'secondary'}
-                                className="text-xs capitalize"
-                              >
-                                {row.type}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
+                              <td className="px-2 py-2 text-center">
+                                {match && (
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`Import row ${row.line} anyway`}
+                                    checked={includedDupes.has(row.line)}
+                                    onChange={() => setIncludedDupes((current) => toggled(current, row.line))}
+                                  />
+                                )}
+                              </td>
+                              <td className="px-2 py-2 text-right text-xs text-muted-foreground tabular-nums">{row.line}</td>
+                              <td className="px-3 py-2 text-xs whitespace-nowrap">
+                                {issues.includes('bad-date') ? (
+                                  <span className="flex items-center gap-1 text-destructive">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    {row.rawDate || '(empty)'}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">{row.date}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 max-w-72">
+                                <span className="flex items-center gap-1.5 min-w-0">
+                                  {match && <Copy className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                                  {issues.includes('empty-description') ? (
+                                    <span className="flex items-center gap-1 italic text-muted-foreground">
+                                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                      {EMPTY_DESCRIPTION}
+                                    </span>
+                                  ) : (
+                                    <span className="truncate">{row.description}</span>
+                                  )}
+                                  {match && (
+                                    <Badge variant="secondary" className="text-[10px] shrink-0">already in Ledger</Badge>
+                                  )}
+                                </span>
+                                {match && (
+                                  <span className="block text-xs text-muted-foreground truncate">
+                                    Matches {describeMatch(match)}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">
+                                {issues.includes('bad-amount') ? (
+                                  <span className="inline-flex items-center gap-1 text-destructive">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    {row.rawAmount || '(empty)'}
+                                  </span>
+                                ) : (
+                                  <span className={row.type === 'expense' ? 'text-expense' : 'text-income'}>
+                                    {row.type === 'expense' ? '-' : '+'}
+                                    {formatCurrency(row.amount ?? 0, currency)}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
+                    <div ref={sentinelRef} />
                   </div>
-                  {parsed.rows.length > PREVIEW_ROW_COUNT && (
-                    <p className="text-xs text-muted-foreground mt-1.5 text-center">
-                      +{parsed.rows.length - PREVIEW_ROW_COUNT} more transactions
+                  <div className="flex items-center justify-between mt-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      {causes.length > 0 ? 'Showing problems first · ' : ''}
+                      rows {firstShown}–{rendered.toLocaleString()} of {listed.length.toLocaleString()}
                     </p>
-                  )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn('gap-1.5 h-7', onlyProblems && 'text-foreground bg-muted')}
+                      aria-pressed={onlyProblems}
+                      disabled={causes.length === 0}
+                      onClick={() => setOnlyProblems((value) => !value)}
+                    >
+                      <Filter className="w-3.5 h-3.5" />
+                      Only problems
+                    </Button>
+                  </div>
                 </div>
 
                 <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
@@ -505,15 +554,22 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
               >
                 Cancel
               </Button>
-              {parsed && (
-                <Button onClick={handleImport} disabled={!accountId || importing}>
+              {file && (
+                <Button onClick={handleImport} disabled={!accountId || importing || blocked || toImport.length === 0}>
                   {importing ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                       Importing...
                     </>
+                  ) : dupeCheck.loading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      Checking for duplicates...
+                    </>
+                  ) : summary.errors > 0 ? (
+                    `Fix or skip ${plural(summary.errors, 'error row')}`
                   ) : (
-                    `Import ${parsed.rows.length} transaction${parsed.rows.length !== 1 ? 's' : ''}`
+                    `Import ${plural(toImport.length, 'row')}`
                   )}
                 </Button>
               )}

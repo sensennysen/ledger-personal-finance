@@ -6,6 +6,7 @@ import type { Budget, BudgetHistoryEntry } from '@/types'
 import { getCurrentCycleMonthKey } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { sumBudgetSpend } from '@/lib/budgetSpend'
+import { readAllPages } from '@/lib/pagedRead'
 import { canRollover, nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 
@@ -86,22 +87,27 @@ export function useBudgets(
       new Date(now.getFullYear() + 1, 0, Math.max(1, startDay - 1)),
     )
 
-    const { data: spentData, error: spentError } = await supabase
-      .from('transactions')
-      .select('category_id, amount, date, currency, exchange_rate')
-      .eq('user_id', user.id)
-      .eq('type', 'expense')
-      .gte('date', fetchStart)
-      .lte('date', fetchEnd)
+    const { rows: spentData, error: spentError } = await readAllPages((from, to) =>
+      supabase
+        .from('transactions')
+        .select('category_id, amount, date, currency, exchange_rate')
+        .eq('user_id', user.id)
+        .eq('type', 'expense')
+        .gte('date', fetchStart)
+        .lte('date', fetchEnd)
+        .order('date', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    )
 
     if (request !== requestId.current) return
     if (spentError) {
-      setError(spentError.message)
+      setError(spentError)
       setLoading(false)
       return
     }
 
-    const allTx = spentData ?? []
+    const allTx = spentData
     const currentMonthStart = new Date(
       now.getFullYear(),
       now.getMonth(),

@@ -40,6 +40,8 @@ interface TransactionRowProps {
    * relative to this account (used in AccountTransactionsPage).
    */
   contextAccountId?: string
+  /** Compact density from the result bar (LED-61): tighter padding and a smaller icon tile. */
+  dense?: boolean
 }
 
 export function TransactionRow({
@@ -52,6 +54,7 @@ export function TransactionRow({
   selected,
   onSelect,
   contextAccountId,
+  dense,
 }: TransactionRowProps) {
   const openDetail = useEntryDetail()
   const [receiptOpen, setReceiptOpen] = useState(false)
@@ -102,7 +105,7 @@ export function TransactionRow({
       : tx.amount
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-card border hover:bg-accent/50 transition-colors group">
+    <div className={`flex items-center gap-3 ${dense ? 'px-3 py-2' : 'p-3'} rounded-lg bg-card border hover:bg-accent/50 transition-colors group`}>
       {/* Checkbox (bulk select) */}
       {selectable && (
         <input
@@ -116,7 +119,7 @@ export function TransactionRow({
       )}
       {/* Icon */}
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-base"
+        className={`${dense ? 'w-8 h-8' : 'w-10 h-10'} rounded-xl flex items-center justify-center shrink-0 text-base`}
         style={{ backgroundColor: 'var(--'+tx.type+'-container)' }}
       >
         {tx.category ? tx.category.icon : <Icon className={`w-4 h-4 ${TRANSACTION_TYPE_COLOR[tx.type]}`} />}

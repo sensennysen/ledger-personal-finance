@@ -8,7 +8,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { usePreferences } from '@/hooks/usePreferences'
-import { formatDate, formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
+import { formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -28,6 +28,14 @@ import { PageActions } from '@/components/layout/PageActions'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { inferTransactionKind, TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
+import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
+import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
+import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
+import { useRenderWindow } from '@/hooks/useRenderWindow'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { buildMonthNets } from '@/lib/monthJump'
+import { searchMatcher } from '@/lib/globalSearch'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
 import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
@@ -44,6 +52,7 @@ export default function TransactionsPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const { prefs, set: setPref } = usePreferences()
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
+  const [sort, setSort] = useState<TxSort>('newest')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
 
@@ -68,6 +77,26 @@ export default function TransactionsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Search handoff (LED-64): "See all" from the palette arrives as ?q=. Take it
+  // while rendering, clear filters that would hide matches, then drop the param.
+  const handoffQuery = searchParams.get('q')
+  const [takenQuery, setTakenQuery] = useState<string | null>(null)
+  if (handoffQuery !== takenQuery) {
+    setTakenQuery(handoffQuery)
+    if (handoffQuery !== null) {
+      setSearch(handoffQuery)
+      setFilterType('all')
+      setActiveTagFilter(null)
+    }
+  }
+  useEffect(() => {
+    if (handoffQuery === null) return
+    setSearchParams((params) => {
+      params.delete('q')
+      return params
+    }, { replace: true })
+  }, [handoffQuery, setSearchParams])
 
   // ── Templates ─────────────────────────────────────────────
   const { templates, addTemplate, removeTemplate } = useTransactionTemplates()
@@ -198,15 +227,8 @@ export default function TransactionsPage() {
   const filtered = useMemo(() => {
     let result = cycleOnly
     if (filterType !== 'all') result = result.filter((t) => t.type === filterType)
-    if (search) {
-      const q = search.toLowerCase()
-      result = result.filter(
-        (t) =>
-          t.description.toLowerCase().includes(q) ||
-          t.category?.name.toLowerCase().includes(q) ||
-          t.account?.name.toLowerCase().includes(q)
-      )
-    }
+    // Same rule as the search palette, so its "See all" count matches (LED-64).
+    if (search) result = result.filter(searchMatcher(search))
     if (activeTagFilter) {
       result = result.filter((t) => t.tags?.includes(activeTagFilter))
     }
@@ -228,6 +250,22 @@ export default function TransactionsPage() {
     [selectedMonth, setSelectedMonth]
   )
 
+  // Month jump (LED-62): every cycle with its net, unfiltered; picking one moves
+  // the shared cycle, as the stepper does, and returns to the top of the list.
+  const pageTopRef = useRef<HTMLDivElement>(null)
+  const months = useMemo(
+    () => buildMonthNets(transactions, { startDay, currentKey: getCurrentCycleMonthKey(startDay) }),
+    [transactions, startDay]
+  )
+  const showMonthJump = (loadState === 'ready' || loadState === 'stale-error') && months.length > 0
+  const jumpToMonth = useCallback(
+    (key: string) => {
+      setSelectedMonth(key)
+      pageTopRef.current?.scrollIntoView({ block: 'start' })
+    },
+    [setSelectedMonth]
+  )
+
   const clearActivityFilters = useCallback(() => {
     setFilterType('all')
     setSearch('')
@@ -239,14 +277,17 @@ export default function TransactionsPage() {
     [transactions]
   )
 
-  const grouped = useMemo(() => {
-    const groups: Record<string, Transaction[]> = {}
-    for (const tx of filtered) {
-      if (!groups[tx.date]) groups[tx.date] = []
-      groups[tx.date].push(tx)
-    }
-    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
-  }, [filtered])
+  const grouped = useMemo(() => groupByDay(filtered, undefined, sort), [filtered, sort])
+  const flatSorted = useMemo(() => sortByDate(filtered, sort), [filtered, sort])
+  const matchSum = useMemo(() => sumByCurrency(filtered), [filtered])
+
+  // Window the list (LED-60). The cycle is left out of the reset key so
+  // stepping it keeps the window and the scroll position.
+  const compactList = useMediaQuery('(max-width: 767px)')
+  const { rendered, sentinelRef } = useRenderWindow(filtered.length, {
+    step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
+    resetKey: JSON.stringify([filterType, search, activeTagFilter, prefs.txView, sort]),
+  })
 
   // ── Handlers ───────────────────────────────────────────────
 
@@ -371,514 +412,513 @@ export default function TransactionsPage() {
 
   // ── Render ─────────────────────────────────────────────────
 
+  const renderRow = (tx: Transaction) => (
+    <TransactionRow
+      key={tx.id}
+      tx={tx}
+      onEdit={setEditingTx}
+      onDelete={handleDelete}
+      onSplit={setSplittingTx}
+      onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
+      selectable={selectMode}
+      selected={selectedIds.has(tx.id)}
+      onSelect={toggleSelect}
+      dense={prefs.txDensity === 'compact'}
+    />
+  )
+
+  const resultBar = (
+    <ResultBar
+      matchCount={filtered.length}
+      total={cycleOnly.length}
+      totalLabel="this cycle"
+      rangeLabel={`${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
+      sum={matchSum}
+      sort={sort}
+      onSortChange={setSort}
+      density={prefs.txDensity}
+      onDensityChange={(density) => setPref('txDensity', density)}
+      compact={compactList}
+    />
+  )
+
   return (
-    <div className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold md:hidden">Activity</h1>
-          <span
-            className="hidden sm:inline-flex items-center gap-1 text-[0.625rem] text-muted-foreground border border-border rounded px-1.5 py-0.5 select-none"
-            title="Keyboard shortcuts: N = new transaction"
-          >
-            <Keyboard className="w-2.5 h-2.5" />N
-          </span>
+    <div className="flex justify-center gap-6 lg:pr-6">
+      <div ref={pageTopRef} className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto min-w-0 flex-1">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold md:hidden">Activity</h1>
+            <span
+              className="hidden sm:inline-flex items-center gap-1 text-[0.625rem] text-muted-foreground border border-border rounded px-1.5 py-0.5 select-none"
+              title="Keyboard shortcuts: N = new transaction"
+            >
+              <Keyboard className="w-2.5 h-2.5" />N
+            </span>
+          </div>
+          <PageActions>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="hidden gap-2 sm:inline-flex"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import</span>
+            </Button>
+            <TransactionKindMenu
+              onSelect={(kind) => {
+                setTemplateDefaults(undefined)
+                setFormError(null)
+                setTransactionKind(kind)
+                setCreateOpen(true)
+              }}
+              trigger={
+                <Button className="gap-2" size="sm">
+                  <Plus className="w-4 h-4" />Add
+                </Button>
+              }
+            />
+            <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
+              <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+                <DialogHeader><DialogTitle>{TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}</DialogTitle></DialogHeader>
+                {formError && <FormError>{formError}</FormError>}
+                <TransactionForm
+                  entryKind={transactionKind}
+                  defaultValues={templateDefaults}
+                  onSubmit={handleCreate}
+                  onClose={() => { setCreateOpen(false); setTemplateDefaults(undefined); setFormError(null) }}
+                />
+              </DialogContent>
+            </Dialog>
+          </PageActions>
         </div>
-        <PageActions>
+
+        {/* Bulk action bar / Filter row */}
+        {selectMode && selectedIds.size > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-xl">
+            <span className="text-sm font-medium flex-1 min-w-0">
+              {selectedIds.size} selected
+            </span>
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={selectAll}>
+              Select all ({filtered.length})
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={deselectAll}>
+              Deselect
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => setRecategorizeOpen(true)}
+            >
+              <Tag className="w-3.5 h-3.5" />
+              Re-categorize
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={handleBulkDelete}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete ({selectedIds.size})
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search transactions..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Button
+              type="button"
+              variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
+              className="relative shrink-0 gap-1.5 sm:hidden"
+              aria-label={`Filter transactions${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
+              onClick={() => setFiltersOpen(true)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filter
+              {activeFilterCount > 0 && (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[0.625rem] text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+            <Tabs value={filterType} onValueChange={setFilterType} className="hidden w-auto sm:block">
+              <TabsList className="w-full sm:w-auto">
+                <TabsTrigger value="all" className="flex-1 sm:flex-none">All</TabsTrigger>
+                <TabsTrigger value="income" className="flex-1 sm:flex-none">Income</TabsTrigger>
+                <TabsTrigger value="expense" className="flex-1 sm:flex-none">Expense</TabsTrigger>
+                <TabsTrigger value="transfer" className="flex-1 sm:flex-none">Transfer</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
+
+        {/* Templates strip */}
+        {templates.length > 0 && (
+          <div className="space-y-1.5">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              aria-expanded={templatesOpen}
+              onClick={() => setTemplatesOpen((open) => !open)}
+            >
+              <span className="flex items-center gap-1.5"><Bookmark className="w-3 h-3" />Quick add</span>
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${templatesOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {templatesOpen && <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+              {templates.map((tmpl) => (
+                <InteractiveRow
+                  as="div"
+                  key={tmpl.id}
+                  aria-label={`Use ${tmpl.name} template`}
+                  className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                  onActivate={() => handleUseTemplate(tmpl.id)}
+                >
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-medium truncate max-w-30">{tmpl.name}</span>
+                    <span className={`text-[0.6875rem] ${TRANSACTION_TYPE_COLOR[tmpl.values.type]}`}>
+                      {tmpl.values.type === 'income' ? '+' : tmpl.values.type === 'expense' ? '-' : ''}
+                      {formatCurrency(tmpl.values.amount, tmpl.values.currency)}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-muted border border-border text-muted-foreground hover:text-destructive"
+                    onClick={(e) => { e.stopPropagation(); removeTemplate(tmpl.id) }}
+                    aria-label={`Remove ${tmpl.name} template`}
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </InteractiveRow>
+              ))}
+            </div>}
+          </div>
+        )}
+
+        {/* View controls row */}
+        <div className="hidden items-center justify-between gap-2 sm:flex">
           <Button
             variant="ghost"
             size="sm"
-            className="hidden gap-2 sm:inline-flex"
-            onClick={() => setImportOpen(true)}
+            className="gap-1.5 text-xs"
+            onClick={() => setPref('txView', prefs.txView === 'grouped' ? 'flat' : 'grouped')}
+            title={prefs.txView === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
           >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Import</span>
+            {prefs.txView === 'grouped' ? <LayoutList className="w-3.5 h-3.5" /> : <AlignJustify className="w-3.5 h-3.5" />}
+            <span>{prefs.txView === 'grouped' ? 'Grouped' : 'Flat'}</span>
           </Button>
-          <TransactionKindMenu
-            onSelect={(kind) => {
-              setTemplateDefaults(undefined)
-              setFormError(null)
-              setTransactionKind(kind)
-              setCreateOpen(true)
-            }}
-            trigger={
-              <Button className="gap-2" size="sm">
-                <Plus className="w-4 h-4" />Add
+          <Button
+            variant={selectMode ? 'secondary' : 'ghost'}
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={toggleSelectMode}
+          >
+            {selectMode ? (
+              <CheckSquare className="w-3.5 h-3.5" />
+            ) : (
+              <Square className="w-3.5 h-3.5" />
+            )}
+            <span>Select</span>
+          </Button>
+        </div>
+
+        {/* Tag filter chips */}
+        {allTags.length > 0 && (
+          <div className="hidden flex-wrap gap-1.5 sm:flex">
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium transition-colors ${
+                  activeTagFilter === tag
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background text-muted-foreground border-border hover:border-primary/40'
+                }`}
+              >
+                <Tag className="w-2.5 h-2.5" />{tag}
+              </button>
+            ))}
+            {activeTagFilter && (
+              <button
+                type="button"
+                onClick={() => setActiveTagFilter(null)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3 h-3" />Clear
+              </button>
+            )}
+          </div>
+        )}
+
+        <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <SheetContent side="bottom" className="max-h-[85dvh] rounded-t-xl">
+            <SheetHeader>
+              <SheetTitle>Activity filters</SheetTitle>
+              <SheetDescription>Choose what appears in the transaction list.</SheetDescription>
+            </SheetHeader>
+            <div className="space-y-5 overflow-y-auto px-4 pb-2">
+              <div className="space-y-2">
+                <Label>Transaction type</Label>
+                <Tabs value={filterType} onValueChange={setFilterType}>
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="all">All</TabsTrigger>
+                    <TabsTrigger value="income">Income</TabsTrigger>
+                    <TabsTrigger value="expense">Expense</TabsTrigger>
+                    <TabsTrigger value="transfer">Transfer</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              {allTags.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Tag</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button size="sm" variant={activeTagFilter === null ? 'secondary' : 'outline'} onClick={() => setActiveTagFilter(null)}>All tags</Button>
+                    {allTags.map((tag) => (
+                      <Button key={tag} size="sm" variant={activeTagFilter === tag ? 'secondary' : 'outline'} onClick={() => setActiveTagFilter(tag)}>
+                        {tag}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>List view</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant={prefs.txView === 'grouped' ? 'secondary' : 'outline'} onClick={() => setPref('txView', 'grouped')}>
+                    <LayoutList /> Grouped
+                  </Button>
+                  <Button variant={prefs.txView === 'flat' ? 'secondary' : 'outline'} onClick={() => setPref('txView', 'flat')}>
+                    <AlignJustify /> Flat
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 border-t pt-4">
+                <Button variant="outline" onClick={() => { setFiltersOpen(false); setImportOpen(true) }}>
+                  <Upload /> Import CSV
+                </Button>
+                <Button variant="outline" onClick={() => { setFiltersOpen(false); toggleSelectMode() }}>
+                  <CheckSquare /> Select multiple
+                </Button>
+              </div>
+            </div>
+            <SheetFooter>
+              <Button onClick={() => setFiltersOpen(false)}>Show {filtered.length} transaction{filtered.length === 1 ? '' : 's'}</Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+
+        {/* Transaction list */}
+        {loadState === 'stale-error' && (
+          <InlineLoadError message="Couldn't refresh your transactions. Showing what was last loaded." onRetry={() => void refetch()} />
+        )}
+        {loadState === 'error' ? (
+          <ErrorState title="Couldn't load your transactions" detail={error} onRetry={() => void refetch()} />
+        ) : loading ? (
+          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+        ) : transactions.length === 0 ? (
+          <EmptyState
+            icon={ArrowLeftRight}
+            title="Nothing recorded yet"
+            action={
+              <>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
+                  <Upload className="w-3.5 h-3.5" />Import CSV
+                </Button>
+                <TransactionKindMenu
+                  onSelect={(kind) => {
+                    setTemplateDefaults(undefined)
+                    setFormError(null)
+                    setTransactionKind(kind)
+                    setCreateOpen(true)
+                  }}
+                  trigger={
+                    <Button size="sm" className="gap-2">
+                      <Plus className="w-3.5 h-3.5" />Add transaction
+                    </Button>
+                  }
+                />
+              </>
+            }
+          />
+        ) : cycleOnly.length === 0 ? (
+          <EmptyState
+            icon={ArrowLeftRight}
+            title={`No transactions in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
+            action={
+              <Button variant="outline" size="sm" onClick={() => goToAdjacentCycle(-1)}>
+                Try previous cycle
               </Button>
             }
           />
-          <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
-            <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-              <DialogHeader><DialogTitle>{TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}</DialogTitle></DialogHeader>
-              {formError && <FormError>{formError}</FormError>}
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={ArrowLeftRight}
+            title={`No ${filterType === 'all' ? 'transactions' : filterType} in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
+            description={`${cycleOnly.length} transaction${cycleOnly.length === 1 ? '' : 's'} this cycle`}
+            action={
+              <Button variant="outline" size="sm" onClick={clearActivityFilters}>
+                Show all {cycleOnly.length}
+              </Button>
+            }
+          />
+        ) : prefs.txView === 'flat' ? (
+          <ResultBarLayout bar={resultBar}>
+            <div className="space-y-1">{flatSorted.slice(0, rendered).map(renderRow)}</div>
+            <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
+          </ResultBarLayout>
+        ) : (
+          <ResultBarLayout bar={resultBar}>
+            <TransactionDayList groups={sliceGroups(grouped, rendered)} renderRow={renderRow} compact={compactList} />
+            <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
+          </ResultBarLayout>
+        )}
+
+        {/* Edit dialog */}
+        <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
+          <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+            <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
+            {formError && <FormError>{formError}</FormError>}
+            {editingTx && (
               <TransactionForm
-                entryKind={transactionKind}
-                defaultValues={templateDefaults}
-                onSubmit={handleCreate}
-                onClose={() => { setCreateOpen(false); setTemplateDefaults(undefined); setFormError(null) }}
-              />
-            </DialogContent>
-          </Dialog>
-        </PageActions>
-      </div>
-
-      {/* Bulk action bar / Filter row */}
-      {selectMode && selectedIds.size > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-xl">
-          <span className="text-sm font-medium flex-1 min-w-0">
-            {selectedIds.size} selected
-          </span>
-          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={selectAll}>
-            Select all ({filtered.length})
-          </Button>
-          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={deselectAll}>
-            Deselect
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            onClick={() => setRecategorizeOpen(true)}
-          >
-            <Tag className="w-3.5 h-3.5" />
-            Re-categorize
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="h-8 gap-1.5 text-xs"
-            onClick={handleBulkDelete}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Delete ({selectedIds.size})
-          </Button>
-        </div>
-      ) : (
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search transactions..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Button
-            type="button"
-            variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
-            className="relative shrink-0 gap-1.5 sm:hidden"
-            aria-label={`Filter transactions${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
-            onClick={() => setFiltersOpen(true)}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filter
-            {activeFilterCount > 0 && (
-              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[0.625rem] text-primary-foreground">
-                {activeFilterCount}
-              </span>
-            )}
-          </Button>
-          <Tabs value={filterType} onValueChange={setFilterType} className="hidden w-auto sm:block">
-            <TabsList className="w-full sm:w-auto">
-              <TabsTrigger value="all" className="flex-1 sm:flex-none">All</TabsTrigger>
-              <TabsTrigger value="income" className="flex-1 sm:flex-none">Income</TabsTrigger>
-              <TabsTrigger value="expense" className="flex-1 sm:flex-none">Expense</TabsTrigger>
-              <TabsTrigger value="transfer" className="flex-1 sm:flex-none">Transfer</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      )}
-
-      {/* Templates strip */}
-      {templates.length > 0 && (
-        <div className="space-y-1.5">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between rounded-lg px-1 py-1 text-left text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
-            aria-expanded={templatesOpen}
-            onClick={() => setTemplatesOpen((open) => !open)}
-          >
-            <span className="flex items-center gap-1.5"><Bookmark className="w-3 h-3" />Quick add</span>
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${templatesOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {templatesOpen && <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-            {templates.map((tmpl) => (
-              <InteractiveRow
-                as="div"
-                key={tmpl.id}
-                aria-label={`Use ${tmpl.name} template`}
-                className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
-                onActivate={() => handleUseTemplate(tmpl.id)}
-              >
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-medium truncate max-w-30">{tmpl.name}</span>
-                  <span className={`text-[0.6875rem] ${TRANSACTION_TYPE_COLOR[tmpl.values.type]}`}>
-                    {tmpl.values.type === 'income' ? '+' : tmpl.values.type === 'expense' ? '-' : ''}
-                    {formatCurrency(tmpl.values.amount, tmpl.values.currency)}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-muted border border-border text-muted-foreground hover:text-destructive"
-                  onClick={(e) => { e.stopPropagation(); removeTemplate(tmpl.id) }}
-                  aria-label={`Remove ${tmpl.name} template`}
-                >
-                  <X className="w-2.5 h-2.5" />
-                </button>
-              </InteractiveRow>
-            ))}
-          </div>}
-        </div>
-      )}
-
-      {/* View controls row */}
-      <div className="hidden items-center justify-between gap-2 sm:flex">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 text-xs"
-          onClick={() => setPref('txView', prefs.txView === 'grouped' ? 'flat' : 'grouped')}
-          title={prefs.txView === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
-        >
-          {prefs.txView === 'grouped' ? <LayoutList className="w-3.5 h-3.5" /> : <AlignJustify className="w-3.5 h-3.5" />}
-          <span>{prefs.txView === 'grouped' ? 'Grouped' : 'Flat'}</span>
-        </Button>
-        <Button
-          variant={selectMode ? 'secondary' : 'ghost'}
-          size="sm"
-          className="gap-1.5 text-xs"
-          onClick={toggleSelectMode}
-        >
-          {selectMode ? (
-            <CheckSquare className="w-3.5 h-3.5" />
-          ) : (
-            <Square className="w-3.5 h-3.5" />
-          )}
-          <span>Select</span>
-        </Button>
-      </div>
-
-      {/* Tag filter chips */}
-      {allTags.length > 0 && (
-        <div className="hidden flex-wrap gap-1.5 sm:flex">
-          {allTags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => setActiveTagFilter(activeTagFilter === tag ? null : tag)}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium transition-colors ${
-                activeTagFilter === tag
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-background text-muted-foreground border-border hover:border-primary/40'
-              }`}
-            >
-              <Tag className="w-2.5 h-2.5" />{tag}
-            </button>
-          ))}
-          {activeTagFilter && (
-            <button
-              type="button"
-              onClick={() => setActiveTagFilter(null)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-3 h-3" />Clear
-            </button>
-          )}
-        </div>
-      )}
-
-      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
-        <SheetContent side="bottom" className="max-h-[85dvh] rounded-t-xl">
-          <SheetHeader>
-            <SheetTitle>Activity filters</SheetTitle>
-            <SheetDescription>Choose what appears in the transaction list.</SheetDescription>
-          </SheetHeader>
-          <div className="space-y-5 overflow-y-auto px-4 pb-2">
-            <div className="space-y-2">
-              <Label>Transaction type</Label>
-              <Tabs value={filterType} onValueChange={setFilterType}>
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="income">Income</TabsTrigger>
-                  <TabsTrigger value="expense">Expense</TabsTrigger>
-                  <TabsTrigger value="transfer">Transfer</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </div>
-
-            {allTags.length > 0 && (
-              <div className="space-y-2">
-                <Label>Tag</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  <Button size="sm" variant={activeTagFilter === null ? 'secondary' : 'outline'} onClick={() => setActiveTagFilter(null)}>All tags</Button>
-                  {allTags.map((tag) => (
-                    <Button key={tag} size="sm" variant={activeTagFilter === tag ? 'secondary' : 'outline'} onClick={() => setActiveTagFilter(tag)}>
-                      {tag}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>List view</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant={prefs.txView === 'grouped' ? 'secondary' : 'outline'} onClick={() => setPref('txView', 'grouped')}>
-                  <LayoutList /> Grouped
-                </Button>
-                <Button variant={prefs.txView === 'flat' ? 'secondary' : 'outline'} onClick={() => setPref('txView', 'flat')}>
-                  <AlignJustify /> Flat
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 border-t pt-4">
-              <Button variant="outline" onClick={() => { setFiltersOpen(false); setImportOpen(true) }}>
-                <Upload /> Import CSV
-              </Button>
-              <Button variant="outline" onClick={() => { setFiltersOpen(false); toggleSelectMode() }}>
-                <CheckSquare /> Select multiple
-              </Button>
-            </div>
-          </div>
-          <SheetFooter>
-            <Button onClick={() => setFiltersOpen(false)}>Show {filtered.length} transaction{filtered.length === 1 ? '' : 's'}</Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-
-      {/* Transaction list */}
-      {loadState === 'stale-error' && (
-        <InlineLoadError message="Couldn't refresh your transactions. Showing what was last loaded." onRetry={() => void refetch()} />
-      )}
-      {loadState === 'error' ? (
-        <ErrorState title="Couldn't load your transactions" detail={error} onRetry={() => void refetch()} />
-      ) : loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
-      ) : transactions.length === 0 ? (
-        <EmptyState
-          icon={ArrowLeftRight}
-          title="Nothing recorded yet"
-          action={
-            <>
-              <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
-                <Upload className="w-3.5 h-3.5" />Import CSV
-              </Button>
-              <TransactionKindMenu
-                onSelect={(kind) => {
-                  setTemplateDefaults(undefined)
-                  setFormError(null)
-                  setTransactionKind(kind)
-                  setCreateOpen(true)
+                isEditing
+                defaultValues={{
+                  type: editingTx.type,
+                  account_id: editingTx.account_id,
+                  to_account_id: editingTx.to_account_id,
+                  category_id: editingTx.category_id,
+                  amount: editingTx.amount,
+                  currency: editingTx.currency,
+                  exchange_rate: editingTx.exchange_rate ?? 1,
+                  description: editingTx.description,
+                  notes: editingTx.notes,
+                  date: editingTx.date,
+                  transfer_fee: editingTx.transfer_fee,
+                  is_recurring: editingTx.is_recurring,
+                  recurrence_interval: editingTx.recurrence_interval,
+                  recurrence_end_date: editingTx.recurrence_end_date,
+                  receipt_url: editingTx.receipt_url,
                 }}
-                trigger={
-                  <Button size="sm" className="gap-2">
-                    <Plus className="w-3.5 h-3.5" />Add transaction
-                  </Button>
-                }
+                onSubmit={handleEdit}
+                onClose={() => { setEditingTx(null); setFormError(null) }}
               />
-            </>
-          }
-        />
-      ) : cycleOnly.length === 0 ? (
-        <EmptyState
-          icon={ArrowLeftRight}
-          title={`No transactions in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
-          action={
-            <Button variant="outline" size="sm" onClick={() => goToAdjacentCycle(-1)}>
-              Try previous cycle
-            </Button>
-          }
-        />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={ArrowLeftRight}
-          title={`No ${filterType === 'all' ? 'transactions' : filterType} in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
-          description={`${cycleOnly.length} transaction${cycleOnly.length === 1 ? '' : 's'} this cycle`}
-          action={
-            <Button variant="outline" size="sm" onClick={clearActivityFilters}>
-              Show all {cycleOnly.length}
-            </Button>
-          }
-        />
-      ) : prefs.txView === 'flat' ? (
-        <div className="space-y-1">
-          {[...filtered].sort((a, b) => b.date.localeCompare(a.date)).map((tx) => (
-            <TransactionRow
-              key={tx.id}
-              tx={tx}
-              onEdit={setEditingTx}
-              onDelete={handleDelete}
-              onSplit={setSplittingTx}
-              onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
-              selectable={selectMode}
-              selected={selectedIds.has(tx.id)}
-              onSelect={toggleSelect}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {grouped.map(([date, txs]) => (
-            <div key={date}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  {formatDate(date)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {txs.length} transaction{txs.length > 1 ? 's' : ''}
-                </p>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk re-categorize dialog */}
+        <Dialog open={recategorizeOpen} onOpenChange={setRecategorizeOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Tag className="w-4 h-4" />
+                Re-categorize {selectedIds.size} transaction{selectedIds.size !== 1 ? 's' : ''}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-1">
+              <div className="space-y-1.5">
+                <Label>New category</Label>
+                <Select value={recategorizeCategoryId} onValueChange={(v) => setRecategorizeCategoryId(v ?? '')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category">
+                      {recategorizeCategoryId === UNCATEGORIZED_VALUE
+                        ? 'Uncategorized'
+                        : (() => {
+                            const cat = categories.find((c) => c.id === recategorizeCategoryId)
+                            return cat ? `${cat.icon} ${cat.name}` : 'Select category'
+                          })()}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNCATEGORIZED_VALUE}>Uncategorized</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.icon} {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="space-y-1">
-                {txs.map((tx) => (
-                  <TransactionRow
-                    key={tx.id}
-                    tx={tx}
-                    onEdit={setEditingTx}
-                    onDelete={handleDelete}
-                    onSplit={setSplittingTx}
-                    onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
-                    selectable={selectMode}
-                    selected={selectedIds.has(tx.id)}
-                    onSelect={toggleSelect}
-                  />
-                ))}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setRecategorizeOpen(false)}>Cancel</Button>
+                <Button onClick={handleBulkRecategorize}>Apply</Button>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </DialogContent>
+        </Dialog>
 
-      {/* Edit dialog */}
-      <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
-        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-          <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
-          {formError && <FormError>{formError}</FormError>}
-          {editingTx && (
-            <TransactionForm
-              isEditing
-              defaultValues={{
-                type: editingTx.type,
-                account_id: editingTx.account_id,
-                to_account_id: editingTx.to_account_id,
-                category_id: editingTx.category_id,
-                amount: editingTx.amount,
-                currency: editingTx.currency,
-                exchange_rate: editingTx.exchange_rate ?? 1,
-                description: editingTx.description,
-                notes: editingTx.notes,
-                date: editingTx.date,
-                transfer_fee: editingTx.transfer_fee,
-                is_recurring: editingTx.is_recurring,
-                recurrence_interval: editingTx.recurrence_interval,
-                recurrence_end_date: editingTx.recurrence_end_date,
-                receipt_url: editingTx.receipt_url,
-              }}
-              onSubmit={handleEdit}
-              onClose={() => { setEditingTx(null); setFormError(null) }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+        {/* Save as template dialog */}
+        <Dialog open={!!templateSourceTx} onOpenChange={(open) => { if (!open) { setTemplateSourceTx(null); setTemplateName('') } }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Bookmark className="w-4 h-4" />Save as Template
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-1">
+              <div className="space-y-1.5">
+                <Label htmlFor="template-name">Template name</Label>
+                <Input
+                  id="template-name"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="e.g. Daily commute"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTemplateConfirm() }}
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setTemplateSourceTx(null); setTemplateName('') }}>Cancel</Button>
+                <Button onClick={handleSaveTemplateConfirm} disabled={!templateName.trim()}>Save</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
-      {/* Bulk re-categorize dialog */}
-      <Dialog open={recategorizeOpen} onOpenChange={setRecategorizeOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Tag className="w-4 h-4" />
-              Re-categorize {selectedIds.size} transaction{selectedIds.size !== 1 ? 's' : ''}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-1">
-            <div className="space-y-1.5">
-              <Label>New category</Label>
-              <Select value={recategorizeCategoryId} onValueChange={(v) => setRecategorizeCategoryId(v ?? '')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category">
-                    {recategorizeCategoryId === UNCATEGORIZED_VALUE
-                      ? 'Uncategorized'
-                      : (() => {
-                          const cat = categories.find((c) => c.id === recategorizeCategoryId)
-                          return cat ? `${cat.icon} ${cat.name}` : 'Select category'
-                        })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNCATEGORIZED_VALUE}>Uncategorized</SelectItem>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.icon} {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setRecategorizeOpen(false)}>Cancel</Button>
-              <Button onClick={handleBulkRecategorize}>Apply</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        {/* Split transaction dialog */}
+        {splittingTx && (
+          <SplitTransactionDialog
+            tx={splittingTx}
+            open={!!splittingTx}
+            onOpenChange={(open) => { if (!open) setSplittingTx(null) }}
+            onConfirm={handleSplitConfirm}
+          />
+        )}
 
-      {/* Save as template dialog */}
-      <Dialog open={!!templateSourceTx} onOpenChange={(open) => { if (!open) { setTemplateSourceTx(null); setTemplateName('') } }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Bookmark className="w-4 h-4" />Save as Template
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-1">
-            <div className="space-y-1.5">
-              <Label htmlFor="template-name">Template name</Label>
-              <Input
-                id="template-name"
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="e.g. Daily commute"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTemplateConfirm() }}
-                autoFocus
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setTemplateSourceTx(null); setTemplateName('') }}>Cancel</Button>
-              <Button onClick={handleSaveTemplateConfirm} disabled={!templateName.trim()}>Save</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Split transaction dialog */}
-      {splittingTx && (
-        <SplitTransactionDialog
-          tx={splittingTx}
-          open={!!splittingTx}
-          onOpenChange={(open) => { if (!open) setSplittingTx(null) }}
-          onConfirm={handleSplitConfirm}
+        {/* Import CSV dialog */}
+        <ImportCSVDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onImport={handleImport}
         />
-      )}
 
-      {/* Import CSV dialog */}
-      <ImportCSVDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImport={handleImport}
-      />
+        {/* Undo delete toast */}
+        {undoState && (
+          <UndoToast
+            message={undoState.message}
+            onUndo={handleUndoDelete}
+            onDismiss={() => {
+              if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+              setUndoState(null)
+            }}
+          />
+        )}
 
-      {/* Undo delete toast */}
-      {undoState && (
-        <UndoToast
-          message={undoState.message}
-          onUndo={handleUndoDelete}
-          onDismiss={() => {
-            if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-            setUndoState(null)
-          }}
-        />
-      )}
+        {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} />}
+      </div>
+      {showMonthJump && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} />}
     </div>
   )
 }

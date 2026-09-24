@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { isNearScrollEnd } from '@/lib/scrollEnd'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import {
   Tag,
   FileBarChart2,
@@ -71,6 +71,10 @@ function LayoutShell() {
   const { isOnline, pendingCount } = networkStatus
   const { transactions, generateDueRecurring, createTransaction } = useTransactions()
   const { accounts } = useAccounts()
+  // ⌘F in search scopes to the account page it opened over.
+  const accountRouteId = useMatch('/accounts/:accountId')?.params.accountId
+  const routeAccount = accounts.find((account) => account.id === accountRouteId)
+  const currentAccount = routeAccount ? { id: routeAccount.id, name: routeAccount.name } : null
   const { cycleConfirmed } = useFirstRunChecklist()
   const setupComplete = isSetupComplete({
     hasAccount: accounts.length > 0,
@@ -283,6 +287,7 @@ function LayoutShell() {
           onOpenChange={setSearchOpen}
           mobile={mobile}
           onAddTransaction={openAddTransactionModal}
+          currentAccount={currentAccount}
         />
         <Dialog
           open={sheet !== null && !(desktop && sheet === 'detail')}

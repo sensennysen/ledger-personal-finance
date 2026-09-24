@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
+import { readAllPages } from '@/lib/pagedRead'
 import type { SavingsGoal, Transaction } from '@/types'
 
 export interface GoalWithContributions extends SavingsGoal {
@@ -46,13 +47,22 @@ export function useSavingsGoals() {
     const goalIds = (data as SavingsGoal[]).map((g) => g.id)
     let linkedTxs: Transaction[] = []
     if (goalIds.length > 0) {
-      const { data: txData } = await supabase
-        .from('transactions')
-        .select('*, category:categories(id,name,color,icon), account:accounts!transactions_account_id_fkey(id,name,color,currency)')
-        .eq('user_id', user.id)
-        .in('goal_id', goalIds)
-        .order('date', { ascending: false })
-      linkedTxs = (txData as Transaction[]) ?? []
+      const { rows, error: txError } = await readAllPages<Transaction>((from, to) =>
+        supabase
+          .from('transactions')
+          .select('*, category:categories(id,name,color,icon), account:accounts!transactions_account_id_fkey(id,name,color,currency)')
+          .eq('user_id', user.id)
+          .in('goal_id', goalIds)
+          .order('date', { ascending: false })
+          .order('id', { ascending: false })
+          .range(from, to),
+      )
+      if (txError) {
+        setError(txError)
+        setLoading(false)
+        return
+      }
+      linkedTxs = rows
     }
 
     const enriched: GoalWithContributions[] = (data as SavingsGoal[]).map((g) => {

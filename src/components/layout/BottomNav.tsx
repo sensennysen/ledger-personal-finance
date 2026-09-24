@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   Wallet,
@@ -8,7 +8,12 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { BOTTOM_NAV_TABS, isLocked, type NavIconKey } from '@/lib/navDestinations'
+import {
+  BOTTOM_NAV_TABS,
+  isDestinationActive,
+  isLocked,
+  type NavIconKey,
+} from '@/lib/navDestinations'
 
 const ICONS: Partial<Record<NavIconKey, LucideIcon>> = {
   home: LayoutDashboard,
@@ -21,6 +26,7 @@ export default function BottomNav({
 }: {
   setupComplete?: boolean
 }) {
+  const { pathname } = useLocation()
   return (
     <nav
       aria-label="Main navigation"
@@ -30,34 +36,34 @@ export default function BottomNav({
         const { to, label, exact } = tab
         const locked = isLocked(tab, setupComplete)
         const Icon = locked ? Lock : (ICONS[tab.icon] ?? LayoutDashboard)
+        const active = isDestinationActive(pathname, tab)
         return (
         <NavLink
           key={to}
           to={to}
           end={exact}
+          aria-current={active ? 'page' : undefined}
           className="flex-1 min-w-0"
           title={locked ? `${label} (finish setup to unlock)` : undefined}
         >
-          {({ isActive }) => (
+          <span
+            className={cn(
+              'flex flex-col items-center gap-1 text-xs font-medium',
+              !locked && active ? 'text-foreground' : 'text-muted-foreground',
+            )}
+          >
             <span
               className={cn(
-                'flex flex-col items-center gap-1 text-xs font-medium',
-                !locked && isActive ? 'text-foreground' : 'text-muted-foreground',
+                'flex h-8 w-[60px] items-center justify-center rounded-full transition-colors duration-(--dur-base)',
+                !locked &&
+                  active &&
+                  'bg-sidebar-accent text-sidebar-accent-foreground',
               )}
             >
-              <span
-                className={cn(
-                  'flex h-8 w-[60px] items-center justify-center rounded-full transition-colors duration-(--dur-base)',
-                  !locked &&
-                    isActive &&
-                    'bg-sidebar-accent text-sidebar-accent-foreground',
-                )}
-              >
-                <Icon className="size-5" />
-              </span>
-              {label}
+              <Icon className="size-5" />
             </span>
-          )}
+            {label}
+          </span>
         </NavLink>
         )
       })}

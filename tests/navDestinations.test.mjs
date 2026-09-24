@@ -6,6 +6,8 @@ import {
   SETTINGS_DESTINATION,
   isDestinationActive,
   isLocked,
+  nextTabIndex,
+  rovingTabStop,
 } from '../src/lib/navDestinations.ts'
 
 const tab = (label) => NAV_TABS.find((t) => t.label === label)
@@ -68,4 +70,35 @@ test('locked destinations unlock once setup is complete', () => {
 test('Home and Accounts never lock, setup complete or not', () => {
   assert.equal(isLocked(tab('Home'), false), false)
   assert.equal(isLocked(tab('Accounts'), false), false)
+})
+
+test('the active tab holds the one tab stop', () => {
+  assert.equal(rovingTabStop(NAV_TABS, '/transactions'), 2)
+  assert.equal(rovingTabStop(NAV_TABS, '/accounts/abc'), 1)
+})
+
+test('with no tab active the first tab takes the stop', () => {
+  assert.equal(rovingTabStop(NAV_TABS, '/settings'), 0)
+  assert.equal(rovingTabStop(NAV_TABS, '/thirteenth-month'), 0)
+})
+
+test('arrow keys move between tabs and wrap at both ends', () => {
+  assert.equal(nextTabIndex(0, 'ArrowRight', 6), 1)
+  assert.equal(nextTabIndex(5, 'ArrowRight', 6), 0)
+  assert.equal(nextTabIndex(0, 'ArrowLeft', 6), 5)
+})
+
+test('Home and End jump to the first and last tab', () => {
+  assert.equal(nextTabIndex(3, 'Home', 6), 0)
+  assert.equal(nextTabIndex(3, 'End', 6), 5)
+})
+
+test('other keys are left to the browser', () => {
+  assert.equal(nextTabIndex(2, 'Enter', 6), null)
+  assert.equal(nextTabIndex(2, 'Tab', 6), null)
+})
+
+test('a locked tab is still reachable with the arrow keys', () => {
+  const locked = NAV_TABS.findIndex((t) => isLocked(t, false))
+  assert.equal(nextTabIndex(locked - 1, 'ArrowRight', NAV_TABS.length), locked)
 })

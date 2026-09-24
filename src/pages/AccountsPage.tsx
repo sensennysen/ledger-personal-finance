@@ -291,7 +291,7 @@ export default function AccountsPage() {
         {...dragProps(account, flatRearrange)}
         {...openProps(account, flatRearrange)}
         className={cn(
-          'reorder-motion grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 px-4 py-2.5 animate-fade-up md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem]',
+          'reorder-motion grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 px-4 py-2.5 animate-fade-up md:grid-cols-[minmax(0,1.5fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem]',
           'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
           flatRearrange ? 'cursor-grab' : 'cursor-pointer hover:bg-muted/50',
           draggedAccountId === account.id && 'is-dragging',
@@ -306,11 +306,12 @@ export default function AccountsPage() {
             <p className="truncate text-sm font-medium">{account.name}</p>
             <p className="truncate text-xs text-muted-foreground md:hidden">
               {ACCOUNT_TYPE_LABELS[account.type]}
-              {row.excluded ? ' · Not in totals' : row.sharePct !== null ? ` · ${formatShare(row.sharePct)} of assets` : ''}
+              {row.excluded ? ' · Not in totals' : row.sharePct !== null ? ` · ${formatShare(row.sharePct)}` : ''}
             </p>
+            <p className="hidden truncate text-xs text-muted-foreground md:block 2xl:hidden">{ACCOUNT_TYPE_LABELS[account.type]}</p>
           </div>
         </div>
-        <span className="hidden truncate text-xs text-muted-foreground md:block">{ACCOUNT_TYPE_LABELS[account.type]}</span>
+        <span className="hidden truncate text-xs text-muted-foreground 2xl:block">{ACCOUNT_TYPE_LABELS[account.type]}</span>
         <span className="hidden text-xs text-muted-foreground md:block">{account.currency}</span>
         <div className="hidden items-center gap-2 md:flex">
           {row.excluded ? (
@@ -423,7 +424,7 @@ export default function AccountsPage() {
     const wrap = (children: React.ReactNode) =>
       column === 'assets'
         ? <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border bg-card">{children}</div>
-        : <div className="grid gap-3 xl:grid-cols-2">{children}</div>
+        : <div className="grid gap-3 2xl:grid-cols-2">{children}</div>
 
     if (prefs.accView === 'flat') {
       const columnAccounts = accounts.filter((account) => inColumn(account.type))
@@ -609,14 +610,14 @@ export default function AccountsPage() {
               <p className="money mt-1 text-lg font-semibold">{formatCurrency(overview.totals.liabilities, defaultCurrency)}</p>
               <p className="text-xs text-muted-foreground">{liabilityMix}</p>
             </div>
-            <div className="border-r border-border/60 p-4">
+            <div className="col-span-2 border-b border-border/60 p-4 lg:col-span-1 lg:border-b-0 lg:border-r">
               <p className="text-xs text-muted-foreground">Net Worth</p>
               <p className="money mt-1 text-lg font-bold">{formatCurrency(overview.totals.netWorth, defaultCurrency)}</p>
               {overview.excludedCurrencies.length > 0 && (
                 <p className="text-xs text-muted-foreground">{defaultCurrency} accounts only</p>
               )}
             </div>
-            <div className="p-4">
+            <div className="col-span-2 p-4 lg:col-span-1">
               <p className="text-xs text-muted-foreground">Coming up</p>
               {loansError ? (
                 <p className="mt-1 text-xs text-muted-foreground">Loan dates didn't load.</p>
@@ -646,8 +647,8 @@ export default function AccountsPage() {
                   <p className="money text-sm font-semibold">{formatCurrency(overview.totals.assets, defaultCurrency)}</p>
                 </div>
                 {prefs.accView === 'flat' && (
-                  <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] gap-x-3 px-4 text-[0.6875rem] uppercase tracking-wide text-muted-foreground md:grid">
-                    <span>Account</span><span>Type</span><span>Currency</span><span>Share</span><span className="text-right">Balance</span><span />
+                  <div className="hidden grid-cols-[minmax(0,1.5fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] gap-x-3 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] px-4 text-[0.6875rem] uppercase tracking-wide text-muted-foreground md:grid">
+                    <span>Account</span><span className="hidden 2xl:block">Type</span><span>Currency</span><span>Share</span><span className="text-right">Balance</span><span />
                   </div>
                 )}
                 {renderColumn('assets')}

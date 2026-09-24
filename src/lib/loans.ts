@@ -30,7 +30,7 @@ export function normalizeLiabilityBalanceForStorage<T extends { type: string; ba
   return { ...values, balance: -values.balance }
 }
 
-export function formatLoanSchedule(account: Account): string | null {
+export function formatLoanSchedule(account: Pick<Account, 'type' | 'loan_pay_period' | 'loan_due_days' | 'loan_due_weekday'>): string | null {
   if (account.type !== 'loan' || !account.loan_pay_period) return null
 
   const period = LOAN_PAY_PERIOD_LABELS[account.loan_pay_period]

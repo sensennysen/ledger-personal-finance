@@ -1,5 +1,17 @@
 import { z } from 'zod'
 
+export type LoanPayPeriodValue = 'monthly' | 'twice_monthly' | 'weekly' | 'daily' | 'quarterly' | 'bi_yearly' | 'yearly'
+export type LoanScheduleControl = 'two-days' | 'weekday' | 'none' | 'one-day'
+
+/** Which schedule field a loan period needs. The form shows it and superRefine checks it. */
+export function loanScheduleControl(period: LoanPayPeriodValue | null | undefined): LoanScheduleControl | null {
+  if (!period) return null
+  if (period === 'twice_monthly') return 'two-days'
+  if (period === 'weekly') return 'weekday'
+  if (period === 'daily') return 'none'
+  return 'one-day'
+}
+
 export const accountSchema = z.object({
   name: z.string().min(1, 'Name is required').max(50),
   type: z.enum(['cash', 'digital_wallet', 'credit_card', 'savings', 'checking', 'investment', 'loan', 'other']),
@@ -17,16 +29,17 @@ export const accountSchema = z.object({
   notes: z.string().nullable(),
 }).superRefine((data, ctx) => {
   if (data.type !== 'loan') return
-  if (data.loan_pay_period === 'twice_monthly' && data.loan_due_days?.length !== 2) {
+  const control = loanScheduleControl(data.loan_pay_period)
+  if (control === 'two-days' && data.loan_due_days?.length !== 2) {
     ctx.addIssue({ code: 'custom', message: 'Enter both monthly due days', path: ['loan_due_days'] })
   }
-  if (data.loan_pay_period === 'twice_monthly' && data.loan_due_days?.[0] === data.loan_due_days?.[1]) {
+  if (control === 'two-days' && data.loan_due_days?.[0] === data.loan_due_days?.[1]) {
     ctx.addIssue({ code: 'custom', message: 'Choose two different due days', path: ['loan_due_days'] })
   }
-  if (data.loan_pay_period === 'weekly' && data.loan_due_weekday == null) {
+  if (control === 'weekday' && data.loan_due_weekday == null) {
     ctx.addIssue({ code: 'custom', message: 'Select a due weekday', path: ['loan_due_weekday'] })
   }
-  if (data.loan_pay_period && !['daily', 'weekly', 'twice_monthly'].includes(data.loan_pay_period) && !data.loan_due_days?.[0]) {
+  if (control === 'one-day' && !data.loan_due_days?.[0]) {
     ctx.addIssue({ code: 'custom', message: 'Enter a due day', path: ['loan_due_days'] })
   }
 })

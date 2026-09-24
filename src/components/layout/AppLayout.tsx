@@ -53,7 +53,8 @@ import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
 import type { Transaction } from '@/types'
 
 export type AppLayoutContext = {
-  openAddTransactionModal: (kind: TransactionKind) => void
+  /** `targetAccountId` locks the card or loan for card-payment and loan-repayment. */
+  openAddTransactionModal: (kind: TransactionKind, options?: { targetAccountId?: string }) => void
 }
 export default function AppLayout() {
   return (
@@ -91,6 +92,7 @@ function LayoutShell() {
   const [sheet, setSheet] = useState<'add' | 'account' | 'detail' | null>(null)
   const [transactionKind, setTransactionKind] =
     useState<TransactionKind>('expense')
+  const [targetAccountId, setTargetAccountId] = useState<string | undefined>()
   const [entry, setEntry] = useState<{
     transaction: Transaction
     actions?: EntryActions
@@ -123,9 +125,10 @@ function LayoutShell() {
     return () => observer.disconnect()
   }, [location.pathname])
   const touchStart = useRef<number | null>(null)
-  const openAddTransactionModal = (kind: TransactionKind) => {
+  const openAddTransactionModal = (kind: TransactionKind, options?: { targetAccountId?: string }) => {
     setFormError(null)
     setTransactionKind(kind)
+    setTargetAccountId(options?.targetAccountId)
     setSheet('add')
   }
   useEffect(() => {
@@ -372,12 +375,15 @@ function LayoutShell() {
               (mobile ? (
                 <QuickEntry
                   initialKind={transactionKind}
+                  targetAccountId={targetAccountId}
                   onSubmit={handleCreate}
                   onClose={() => setSheet(null)}
                 />
               ) : (
                 <TransactionForm
                   entryKind={transactionKind}
+                  lockedCardAccountId={transactionKind === 'card-payment' ? targetAccountId : undefined}
+                  lockedLoanAccountId={transactionKind === 'loan-repayment' ? targetAccountId : undefined}
                   onSubmit={handleCreate}
                   onClose={() => setSheet(null)}
                 />

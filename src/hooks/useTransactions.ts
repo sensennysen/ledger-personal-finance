@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
+import { readAllPages } from '@/lib/pagedRead'
 import { notifyAccountsRefresh, notifyLoanPurchasesRefresh } from '@/lib/cacheEvents'
 import { addRecurringIntervalToDateString } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
@@ -62,33 +63,41 @@ export function useTransactions(filters: TransactionFilters = {}) {
       setLoading(true)
     }
     if (!navigator.onLine) return
-    let query = supabase
-      .from('transactions')
-      .select(`
-        *,
-        account:accounts!transactions_account_id_fkey(id, name, color, currency),
-        to_account:accounts!transactions_to_account_id_fkey(id, name, color, currency),
-        category:categories(id, name, color, icon),
-        subcategory:subcategories(id, name)
-      `)
-      .eq('user_id', user.id)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
+    const buildQuery = () => {
+      let query = supabase
+        .from('transactions')
+        .select(`
+          *,
+          account:accounts!transactions_account_id_fkey(id, name, color, currency),
+          to_account:accounts!transactions_to_account_id_fkey(id, name, color, currency),
+          category:categories(id, name, color, icon),
+          subcategory:subcategories(id, name)
+        `)
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
 
-    if (filters.accountId) query = query.or(`account_id.eq.${filters.accountId},to_account_id.eq.${filters.accountId}`)
-    if (filters.categoryId) query = query.eq('category_id', filters.categoryId)
-    if (filters.type) query = query.eq('type', filters.type)
-    if (filters.startDate) query = query.gte('date', filters.startDate)
-    if (filters.endDate) query = query.lte('date', filters.endDate)
-    if (filters.limit) query = query.limit(filters.limit)
+      if (filters.accountId) query = query.or(`account_id.eq.${filters.accountId},to_account_id.eq.${filters.accountId}`)
+      if (filters.categoryId) query = query.eq('category_id', filters.categoryId)
+      if (filters.type) query = query.eq('type', filters.type)
+      if (filters.startDate) query = query.gte('date', filters.startDate)
+      if (filters.endDate) query = query.lte('date', filters.endDate)
+      return query
+    }
 
-    const { data, error } = await query
+    // An explicit limit is one request; otherwise page past PostgREST's 1,000-row cap.
+    const { rows, error } = filters.limit
+      ? await buildQuery()
+          .limit(filters.limit)
+          .then(({ data, error }) => ({ rows: (data ?? []) as Transaction[], error: error?.message ?? null }))
+      : await readAllPages<Transaction>((from, to) => buildQuery().range(from, to))
     if (error) {
-      setError(error.message)
+      setError(error)
     } else {
       setError(null)
-      setTransactions(data as Transaction[])
-      writeCache(cacheKey, data)
+      setTransactions(rows)
+      writeCache(cacheKey, rows)
     }
     setLoading(false)
   }, [user, buildCacheKey, filters.accountId, filters.categoryId, filters.type, filters.startDate, filters.endDate, filters.limit])

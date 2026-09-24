@@ -14,6 +14,7 @@ import {
   selectAll,
   sortProblemsFirst,
   summarise,
+  withCategoryIssues,
 } from '../src/lib/csvImport.ts'
 
 const rowsOf = (text, order) => {
@@ -206,4 +207,15 @@ test('select all ticks every selectable row, duplicates included; clearing untic
   const cleared = { ...base, toggled: selectAll(rows, all, false) }
   assert.deepEqual(importableRows(rows, cleared), [])
   assert.equal(summarise(rows, cleared).excludedDuplicates, 1)
+})
+
+test('rows with no category match are a warning that still imports', () => {
+  const { rows } = rowsOf(BDO)
+  const flagged = withCategoryIssues(rows, new Set([1]))
+  assert.deepEqual(
+    groupProblems(flagged, new Set()).map((cause) => [cause.id, cause.severity, cause.lines]),
+    [['no-category', 'warning', [1]]],
+  )
+  assert.deepEqual(importableRows(flagged, none).map((row) => row.line), [1, 2])
+  assert.equal(withCategoryIssues(rows, new Set()), rows)
 })

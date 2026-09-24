@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useMemo } from 'react'
 import { Upload, X, AlertCircle, AlertTriangle, Loader2, FileText, Copy, Filter, ArrowLeftRight } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
+import { useCategories } from '@/hooks/useCategories'
+import { useImportCategoryMemory } from '@/hooks/useImportCategoryMemory'
 import { useImportDuplicates } from '@/hooks/useImportDuplicates'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { duplicateSpan, matchDuplicates, type ExistingTx } from '@/lib/importDuplicates'
@@ -14,17 +16,19 @@ import {
   isSelectable,
   isSelected,
   isSkipped,
-  selectAll,
   processFile,
   rowIssues,
+  selectAll,
   sortProblemsFirst,
   summarise,
+  withCategoryIssues,
   type BankFormat,
   type CauseId,
   type DateOrder,
   type ParsedFile,
   type Severity,
 } from '@/lib/csvImport'
+import { suggestCategory, type Suggestion } from '@/lib/importCategories'
 import { convertAmount, currencyState, effectiveRate } from '@/lib/importCurrency'
 import { looksLikeTransfer, transferCandidates, transferLegs } from '@/lib/importTransfer'
 import { WINDOW_STEP } from '@/lib/transactionWindow'
@@ -32,7 +36,16 @@ import { CURRENCIES } from '@/types'
 import { cn, formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -46,7 +59,7 @@ export interface ImportTx {
   account_id: string
   to_account_id: string | null
   currency: string
-  category_id: null
+  category_id: string | null
 }
 
 interface Props {
@@ -79,7 +92,9 @@ const flip = <T,>(set: ReadonlySet<T>, value: T): Set<T> => {
   return next
 }
 
-const NOT_A_TRANSFER = 'none'
+// The row's Category control holds a category or a transfer: `cat:<id>`,
+// `to:<account id>`, or NO_CATEGORY.
+const NO_CATEGORY = 'none'
 
 const plural = (count: number, word: string) => `${count.toLocaleString()} ${word}${count !== 1 ? 's' : ''}`
 
@@ -97,11 +112,16 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const [skipped, setSkipped] = useState<Set<CauseId>>(new Set())
   const [toggled, setToggled] = useState<Set<number>>(new Set())
   const [transfers, setTransfers] = useState<Map<number, string>>(new Map())
+  /** Categories the user chose; '' means they chose none. */
+  const [picks, setPicks] = useState<Map<number, string>>(new Map())
   const [pickedCurrency, setPickedCurrency] = useState('')
   const [rateInput, setRateInput] = useState('')
   const [activeCause, setActiveCause] = useState<CauseId | null>(null)
   const [onlyProblems, setOnlyProblems] = useState(false)
 
+  const { categories } = useCategories()
+  const categoryMemory = useImportCategoryMemory(Boolean(file))
+  const categoryById = new Map(categories.map((category) => [category.id, category]))
   const selectedAccount = accounts.find((account) => account.id === accountId)
   const accountCurrency = selectedAccount?.currency ?? ''
   const statementCurrency = pickedCurrency || accountCurrency
@@ -113,8 +133,20 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     () => (file ? buildRows(file.raw, file.headerIdx, file.format, dateOrder) : { rows: [], ignored: 0 }),
     [file, dateOrder],
   )
-  const rows = built.rows
-  const span = useMemo(() => duplicateSpan(rows), [rows])
+  const span = useMemo(() => duplicateSpan(built.rows), [built.rows])
+  const suggestions = new Map<number, Suggestion>()
+  const uncategorised = new Set<number>()
+  for (const row of built.rows) {
+    if (row.type === null || transfers.has(row.line)) continue
+    const suggestion = suggestCategory(row, categoryMemory.rules, categoryMemory.memory, categoryById)
+    if (suggestion) suggestions.set(row.line, suggestion)
+    else if (!picks.has(row.line) && !categoryMemory.loading) uncategorised.add(row.line)
+  }
+  const rows = withCategoryIssues(built.rows, uncategorised)
+  const categoryOf = (line: number): string | null => {
+    const pick = picks.get(line)
+    return pick !== undefined ? pick || null : (suggestions.get(line)?.categoryId ?? null)
+  }
   const dupeCheck = useImportDuplicates(accountId, span)
   // Compare in the account's currency: that's what the existing rows are in.
   const duplicates = matchDuplicates(
@@ -144,6 +176,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     setSkipped(new Set())
     setToggled(new Set())
     setTransfers(new Map())
+    setPicks(new Map())
     setPickedCurrency('')
     setRateInput('')
     setActiveCause(null)
@@ -183,6 +216,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         setSkipped(new Set())
         setToggled(new Set())
         setTransfers(new Map())
+        setPicks(new Map())
         setActiveCause(null)
         setOnlyProblems(false)
         // Only an unambiguous target is picked for the user (LED-75).
@@ -213,16 +247,22 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     setTransfers(new Map())
   }
 
-  const setTransfer = (line: number, otherId: string) =>
+  const setKind = (line: number, value: string) => {
+    const transferTo = value.startsWith('to:') ? value.slice(3) : null
     setTransfers((current) => {
       const next = new Map(current)
-      if (otherId === NOT_A_TRANSFER) next.delete(line)
-      else next.set(line, otherId)
+      if (transferTo) next.set(line, transferTo)
+      else next.delete(line)
       return next
     })
+    if (!transferTo) {
+      setPicks((current) => new Map(current).set(line, value.startsWith('cat:') ? value.slice(4) : ''))
+    }
+  }
 
   const needsRate = conversion.kind === 'needs-rate'
-  const blocked = summary.errors > 0 || dupeCheck.loading || Boolean(dupeCheck.error) || needsRate
+  const blocked =
+    summary.errors > 0 || dupeCheck.loading || Boolean(dupeCheck.error) || needsRate || categoryMemory.loading
   const selectableRows = rows.filter((row) => isSelectable(row, selection))
   const allSelected = selectableRows.length > 0 && selectableRows.every((row) => isSelected(row, selection))
 
@@ -235,12 +275,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         description: row.description || EMPTY_DESCRIPTION,
         amount: convertAmount(row.amount!, rate),
         currency: selectedAccount.currency,
-        category_id: null,
       }
       const other = transfers.get(row.line)
       return other
-        ? { ...base, type: 'transfer', ...transferLegs(row.type!, accountId, other) }
-        : { ...base, type: row.type!, account_id: accountId, to_account_id: null }
+        ? { ...base, type: 'transfer', category_id: null, ...transferLegs(row.type!, accountId, other) }
+        : { ...base, type: row.type!, account_id: accountId, to_account_id: null, category_id: categoryOf(row.line) }
     })
     const result = await onImport(txs)
     setImporting(false)
@@ -290,8 +329,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                 {importResult.imported} transaction{importResult.imported !== 1 ? 's' : ''} imported
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Added to <span className="font-medium">{importResult.account}</span>. You can
-                bulk re-categorize them from the transactions list.
+                Added to <span className="font-medium">{importResult.account}</span>.
               </p>
             </div>
             <Button
@@ -424,6 +462,19 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                   </div>
                 )}
 
+                {categoryMemory.error && (
+                  <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span className="flex-1">
+                      Couldn't load category suggestions: {categoryMemory.error}. Rows import uncategorized unless you
+                      choose one.
+                    </span>
+                    <Button variant="outline" size="sm" className="h-7" onClick={categoryMemory.retry}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
                 {dupeCheck.error && (
                   <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -519,6 +570,13 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                         </p>
                       )}
 
+                      {cause.id === 'no-category' && (
+                        <p className="text-muted-foreground">
+                          No rule or past transaction matches these payees. Choose a category in the table, or they
+                          import uncategorized.
+                        </p>
+                      )}
+
                       {cause.id === 'empty-description' && (
                         <p className="text-muted-foreground">These rows import as “{EMPTY_DESCRIPTION}”.</p>
                       )}
@@ -558,7 +616,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                           <th className="text-right px-2 py-2 font-medium text-xs text-muted-foreground">Row</th>
                           <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Date</th>
                           <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Description</th>
-                          <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Transfer</th>
+                          <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Category</th>
                           <th className="text-right px-3 py-2 font-medium text-xs text-muted-foreground">Amount</th>
                         </tr>
                       </thead>
@@ -569,7 +627,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                           const selectable = isSelectable(row, selection)
                           const selected = isSelected(row, selection)
                           const transferTo = transfers.get(row.line)
-                          const suggestTransfer = !transferTo && looksLikeTransfer(row.description)
+                          const suggestTransfer = !transferTo && looksLikeTransfer(row.description, categoryMemory.rules)
+                          const categoryId = categoryOf(row.line)
+                          const category = categoryId ? categoryById.get(categoryId) : undefined
+                          const auto = Boolean(category) && !picks.has(row.line)
+                          const fitting = categories.filter((item) => item.type === row.type || item.type === 'both')
                           return (
                             <tr
                               key={row.line}
@@ -621,15 +683,17 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                 )}
                               </td>
                               <td className="px-3 py-2 whitespace-nowrap">
-                                {candidates.length > 0 && row.type !== null && (transferTo || suggestTransfer || selectable) ? (
-                                  <Select value={transferTo ?? NOT_A_TRANSFER} onValueChange={(value) => setTransfer(row.line, value ?? NOT_A_TRANSFER)}>
+                                {row.type !== null ? (
+                                  <Select
+                                    value={transferTo ? `to:${transferTo}` : categoryId ? `cat:${categoryId}` : NO_CATEGORY}
+                                    onValueChange={(value) => setKind(row.line, value ?? NO_CATEGORY)}
+                                  >
                                     <SelectTrigger
                                       size="sm"
-                                      aria-label={`Row ${row.line} transfer`}
+                                      aria-label={`Row ${row.line} category`}
                                       className={cn(
-                                        'h-7 w-auto text-xs',
-                                        !transferTo && !suggestTransfer && 'border-transparent text-muted-foreground',
-                                        suggestTransfer && 'border-dashed',
+                                        'h-7 w-auto max-w-48 text-xs',
+                                        !transferTo && !category && 'border-dashed text-muted-foreground',
                                       )}
                                     >
                                       <SelectValue>
@@ -639,21 +703,44 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                               <ArrowLeftRight className="w-3 h-3" />
                                               {row.type === 'expense' ? 'To' : 'From'} {accountName(transferTo)}
                                             </span>
-                                          ) : suggestTransfer ? (
+                                          ) : category ? (
+                                            <span className="inline-flex items-center gap-1.5 min-w-0">
+                                              <span className="truncate">{category.name}</span>
+                                              {auto && <span className="text-[10px] text-muted-foreground">auto</span>}
+                                            </span>
+                                          ) : suggestTransfer && candidates.length > 0 ? (
                                             'Make a transfer?'
                                           ) : (
-                                            '—'
+                                            'Choose…'
                                           )
                                         }
                                       </SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value={NOT_A_TRANSFER}>Not a transfer</SelectItem>
-                                      {candidates.map((account) => (
-                                        <SelectItem key={account.id} value={account.id}>
-                                          {row.type === 'expense' ? 'Transfer to' : 'Transfer from'} {account.name}
-                                        </SelectItem>
-                                      ))}
+                                      <SelectItem value={NO_CATEGORY}>No category</SelectItem>
+                                      {fitting.length > 0 && (
+                                        <SelectGroup>
+                                          <SelectLabel>Categories</SelectLabel>
+                                          {fitting.map((item) => (
+                                            <SelectItem key={item.id} value={`cat:${item.id}`}>
+                                              {item.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectGroup>
+                                      )}
+                                      {candidates.length > 0 && (
+                                        <>
+                                          <SelectSeparator />
+                                          <SelectGroup>
+                                            <SelectLabel>Transfer</SelectLabel>
+                                            {candidates.map((account) => (
+                                              <SelectItem key={account.id} value={`to:${account.id}`}>
+                                                {row.type === 'expense' ? 'Transfer to' : 'Transfer from'} {account.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectGroup>
+                                        </>
+                                      )}
                                     </SelectContent>
                                   </Select>
                                 ) : (
@@ -713,9 +800,6 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                   </div>
                 </div>
 
-                <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-                  Transactions will be imported uncategorized. Use bulk re-categorize after import to assign categories quickly.
-                </p>
               </>
             )}
 
@@ -740,6 +824,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                     <>
                       <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                       Checking for duplicates...
+                    </>
+                  ) : categoryMemory.loading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      Matching categories...
                     </>
                   ) : summary.errors > 0 ? (
                     `Fix or skip ${plural(summary.errors, 'error row')}`

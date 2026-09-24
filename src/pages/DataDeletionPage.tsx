@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Trash2, CheckCircle2 } from 'lucide-react'
-import { Separator } from '@/components/ui/separator'
+import { AlertTriangle } from 'lucide-react'
+import { LegalPage } from '@/components/legal/LegalPage'
+import { cn } from '@/lib/utils'
 
 const LAST_UPDATED = 'May 2, 2026'
 
@@ -35,89 +35,35 @@ const steps = [
   },
 ]
 
+const TOC = [
+  { id: 'what-we-hold', label: 'Data we hold about you' },
+  { id: 'how-to-delete', label: 'How to delete it' },
+  { id: 'no-grace-period', label: 'There is no grace period' },
+]
+
 export default function DataDeletionPage() {
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-
-      {/* ── Atmospheric background ── */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-175 h-125 rounded-full"
-          style={{ background: 'radial-gradient(ellipse, oklch(0.570 0.170 18 / 0.04) 0%, transparent 70%)' }}
-        />
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, var(--foreground) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
-        <div className="absolute -top-40 -left-40 w-120 h-120 rounded-full border border-destructive/5" />
-        <div className="absolute -bottom-48 -right-48 w-125 h-125 rounded-full border border-destructive/5" />
-      </div>
-
-      <div className="relative z-10 max-w-3xl mx-auto px-4 py-12 md:py-16">
-
-        {/* ── Back links ── */}
-        <div className="flex items-center gap-4 mb-10">
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
-          >
-            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-            Back
-          </Link>
-          <span className="text-border">·</span>
-          <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Privacy Policy
-          </Link>
-        </div>
-
-        {/* ── Header ── */}
-        <div className="mb-10">
-          <div className="flex items-center gap-3 mb-4">
-            <div
-              className="flex items-center justify-center w-10 h-10 rounded-xl"
-              style={{ background: 'var(--expense-container)' }}
-            >
-              <Trash2 className="w-5 h-5" style={{ color: 'var(--expense)' }} />
-            </div>
-            <div>
-              <h1
-                className="text-3xl md:text-4xl font-bold tracking-tight"
-                style={{ fontFamily: "Roboto, system-ui, sans-serif" }}
-              >
-                Data Deletion Instructions
-              </h1>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Last updated: <span className="font-medium text-foreground">{LAST_UPDATED}</span>
-          </p>
-          <p className="mt-4 text-muted-foreground leading-relaxed max-w-2xl">
-            You have the right to delete all personal data Ledger holds about you.
-            This page describes exactly what data we store and how to permanently remove it
-            directly from within the app — no email request needed.
-          </p>
-        </div>
-
-        <Separator className="mb-10 opacity-50" />
-
+    <LegalPage
+      current="data-deletion"
+      title="Data Deletion Instructions"
+      lastUpdated={LAST_UPDATED}
+      intro={
+        <p>
+          You have the right to delete all personal data Ledger holds about you.
+          This page describes exactly what data we store and how to permanently remove it
+          directly from within the app — no email request needed.
+        </p>
+      }
+      toc={TOC}
+    >
+      <div className="space-y-10">
         {/* ── What we store ── */}
-        <section className="mb-10">
-          <h2
-            className="text-base font-semibold mb-4"
-            style={{ color: 'var(--expense)' }}
-          >
-            Data We Hold About You
-          </h2>
+        <section id="what-we-hold" className="scroll-mt-8">
+          <h2 className="text-base font-semibold text-foreground mb-4">Data We Hold About You</h2>
           <ul className="space-y-2">
             {dataItems.map((item, i) => (
               <li key={i} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
-                <span
-                  className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full"
-                  style={{ background: 'oklch(0.570 0.170 18 / 0.5)' }}
-                />
+                <span className="mt-2 shrink-0 w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
                 {item}
               </li>
             ))}
@@ -125,49 +71,53 @@ export default function DataDeletionPage() {
         </section>
 
         {/* ── How to delete ── */}
-        <section className="mb-10">
-          <h2
-            className="text-base font-semibold mb-6"
-            style={{ color: 'var(--expense)' }}
-          >
-            How to Request Deletion
-          </h2>
-          <div className="space-y-6">
-            {steps.map((step) => (
-              <div key={step.number} className="flex gap-5">
-                <div
-                  className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold tabular-nums"
-                  style={{
-                    background: 'var(--expense-container)',
-                    color: 'var(--expense)',
-                    fontFamily: "'DM Mono', monospace",
-                  }}
-                >
-                  {step.number}
-                </div>
-                <div className="pt-1.5">
-                  <p className="text-sm font-semibold text-foreground mb-1">{step.heading}</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+        <section id="how-to-delete" className="scroll-mt-8">
+          <h2 className="text-base font-semibold text-foreground mb-6">How to delete it</h2>
+          <ol className="space-y-6">
+            {steps.map((step, i) => {
+              // Red marks only the irreversible step (LED-88).
+              const destructive = i === steps.length - 1
+              return (
+                <li key={step.number} className="flex gap-5">
+                  <div
+                    className={cn(
+                      'shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold tabular-nums',
+                      !destructive && 'bg-muted text-foreground',
+                    )}
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      ...(destructive && { background: 'var(--expense-container)', color: 'var(--expense)' }),
+                    }}
+                  >
+                    {step.number}
+                  </div>
+                  <div className="pt-1.5">
+                    <p className="text-sm font-semibold text-foreground mb-1">{step.heading}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{step.body}</p>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
         </section>
 
-        {/* ── Confirmation box ── */}
-        <div
-          className="rounded-xl border p-5 mb-10 flex gap-4"
+        {/* ── No grace period ── */}
+        <section
+          id="no-grace-period"
+          role="note"
+          className="scroll-mt-8 rounded-xl border p-5 flex gap-4"
           style={{
             borderColor: 'var(--expense)',
             background: 'var(--expense-container)',
           }}
         >
-          <CheckCircle2
+          <AlertTriangle
             className="mt-0.5 shrink-0 w-5 h-5"
             style={{ color: 'var(--expense)' }}
+            aria-hidden="true"
           />
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">What happens after deletion</p>
+            <h2 className="text-sm font-semibold text-foreground">There is no grace period</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Deletion is <span className="font-medium text-foreground">immediate and permanent</span>.
               The moment you confirm, your profile, accounts, transactions, categories, and budgets are
@@ -176,15 +126,8 @@ export default function DataDeletionPage() {
               (e.g., total number of active users) may be retained for analytics.
             </p>
           </div>
-        </div>
-
-        <Separator className="mb-10 opacity-50" />
-
-        {/* ── Footer ── */}
-        <p className="text-xs text-muted-foreground/60 text-center">
-          © {new Date().getFullYear()} Ledger. All rights reserved.
-        </p>
+        </section>
       </div>
-    </div>
+    </LegalPage>
   )
 }

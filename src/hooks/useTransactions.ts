@@ -22,6 +22,7 @@ import {
   wasRecurringGenerated,
   withTransactionDefaults,
 } from '@/hooks/useTransactions.helpers'
+import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 // ---------- hook ----------
 
@@ -29,7 +30,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
   const { user } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
 
   const buildCacheKey = useCallback(
     () =>
@@ -93,9 +94,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
           .then(({ data, error }) => ({ rows: (data ?? []) as Transaction[], error: error?.message ?? null }))
       : await readAllPages<Transaction>((from, to) => buildQuery().range(from, to))
     if (error) {
-      setError(error)
+      setLoadFailure(describeDataError(error, { action: 'load' }))
     } else {
-      setError(null)
+      setLoadFailure(null)
       setTransactions(rows)
       writeCache(cacheKey, rows)
     }
@@ -139,7 +140,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
 
   // ---------- mutations ----------
 
-  const createTransaction = async (values: TransactionUpsertValues) => {
+  const createTransaction = async (values: TransactionUpsertValues): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const now = new Date().toISOString()
@@ -170,10 +171,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       await fetch()
       notifyLoanPurchasesRefresh()
     }
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'transaction' })
   }
 
-  const updateTransaction = async (id: string, values: Partial<Transaction>) => {
+  const updateTransaction = async (id: string, values: Partial<Transaction>): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const existing = transactions.find((t) => t.id === id)
@@ -194,10 +195,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       await fetch()
       notifyLoanPurchasesRefresh()
     }
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'transaction' })
   }
 
-  const deleteTransaction = async (id: string) => {
+  const deleteTransaction = async (id: string): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const existing = transactions.find((t) => t.id === id)
@@ -213,10 +214,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       await fetch()
       notifyLoanPurchasesRefresh()
     }
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'delete', entity: 'transaction' })
   }
 
-  const bulkDeleteTransactions = async (ids: string[]) => {
+  const bulkDeleteTransactions = async (ids: string[]): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const toDelete = transactions.filter((t) => ids.includes(t.id))
@@ -236,10 +237,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       await fetch()
       notifyLoanPurchasesRefresh()
     }
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'delete' })
   }
 
-  const bulkUpdateCategory = async (ids: string[], categoryId: string | null) => {
+  const bulkUpdateCategory = async (ids: string[], categoryId: string | null): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       updateTransactionCache(transactions.map((t) =>
@@ -264,10 +265,10 @@ export function useTransactions(filters: TransactionFilters = {}) {
       .in('id', ids)
       .eq('user_id', user.id)
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save' })
   }
 
-  const bulkCreateTransactions = async (rows: TransactionUpsertValues[]) => {
+  const bulkCreateTransactions = async (rows: TransactionUpsertValues[]): Promise<MutationResult & { imported: number }> => {
     if (!user) return { error: 'Not authenticated', imported: 0 }
     if (!navigator.onLine) {
       const now = new Date().toISOString()
@@ -289,7 +290,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       .from('transactions')
       .insert(rows.map((row) => ({ ...withTransactionDefaults(row), user_id: user.id })))
     if (!error) await fetch()
-    return { error: error?.message ?? null, imported: error ? 0 : rows.length }
+    return { ...toResult(error, { action: 'save' }), imported: error ? 0 : rows.length }
   }
 
   const generateDueRecurring = useCallback(async (): Promise<number> => {
@@ -341,10 +342,13 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return generated
   }, [user, fetch])
 
+  const error = loadFailure?.message ?? null
+  const errorDetail = loadFailure?.detail ?? null
   return {
     transactions,
     loading,
     error,
+    errorDetail,
     refetch: fetch,
     createTransaction,
     updateTransaction,

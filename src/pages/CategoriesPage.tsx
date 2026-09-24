@@ -48,6 +48,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { cn } from '@/lib/utils'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
+import type { FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
 import type { Category, Subcategory } from '@/types'
 
@@ -235,11 +236,11 @@ function CategoryForm({
 function SubcategoryPanel({ category }: { category: Category }) {
   const { subcategories, loading, createSubcategory, updateSubcategory, deleteSubcategory, updateSubcategoryOrder } = useSubcategories(category.id)
   const [addName, setAddName] = useState('')
-  const [addError, setAddError] = useState<string | null>(null)
+  const [addError, setAddError] = useState<FormErrorValue>(null)
   const [adding, setAdding] = useState(false)
   const [editSub, setEditSub] = useState<Subcategory | null>(null)
   const [editName, setEditName] = useState('')
-  const [editError, setEditError] = useState<string | null>(null)
+  const [editError, setEditError] = useState<FormErrorValue>(null)
   const [rearrangeMode, setRearrangeMode] = useState(false)
   const [draggedSubcategoryId, setDraggedSubcategoryId] = useState<string | null>(null)
   const [dropTargetSubcategoryId, setDropTargetSubcategoryId] = useState<string | null>(null)
@@ -267,9 +268,9 @@ function SubcategoryPanel({ category }: { category: Category }) {
     const trimmed = addName.trim()
     if (!trimmed) { setAddError('Name is required'); return }
     setAdding(true)
-    const { error } = await createSubcategory(trimmed)
+    const { error, errorDetail } = await createSubcategory(trimmed)
     setAdding(false)
-    if (error) { setAddError(error); return }
+    if (error) { setAddError({ message: error, detail: errorDetail ?? null }); return }
     setAddName('')
     setAddError(null)
   }
@@ -284,8 +285,8 @@ function SubcategoryPanel({ category }: { category: Category }) {
     if (!editSub) return
     const trimmed = editName.trim()
     if (!trimmed) { setEditError('Name is required'); return }
-    const { error } = await updateSubcategory(editSub.id, { name: trimmed })
-    if (error) { setEditError(error); return }
+    const { error, errorDetail } = await updateSubcategory(editSub.id, { name: trimmed })
+    if (error) { setEditError({ message: error, detail: errorDetail ?? null }); return }
     setEditSub(null)
   }
 
@@ -382,7 +383,7 @@ function SubcategoryPanel({ category }: { category: Category }) {
                     onKeyDown={(e) => { if (e.key === 'Enter') handleEditSave(); if (e.key === 'Escape') setEditSub(null) }}
                     autoFocus
                   />
-                  {editError && <span role="alert" className="text-xs text-destructive">{editError}</span>}
+                  <FormError error={editError} className="text-xs px-0 mt-0" />
                   <Button size="sm" className="h-7 text-xs px-2" onClick={handleEditSave}>Save</Button>
                   <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditSub(null)}>Cancel</Button>
                 </>
@@ -460,17 +461,17 @@ function SubcategoryPanel({ category }: { category: Category }) {
           <Plus className="w-3 h-3" />{adding ? 'Adding...' : 'Add'}
         </Button>
       </div>
-      {addError && <FormError className="text-xs px-0 pl-1 mt-0">{addError}</FormError>}
+      <FormError error={addError} className="text-xs px-0 pl-1 mt-0" />
     </div>
   )
 }
 
 export default function CategoriesPage() {
-  const { categories, loading, error, refetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder } = useCategories()
+  const { categories, loading, error, errorDetail, refetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder } = useCategories()
   const loadState = resolveLoadState({ loading, error, hasData: categories.length > 0 })
   const [createOpen, setCreateOpen] = useState(false)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   const [expandedCategoryId, setExpandedCategoryId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense')
   const [rearrangeMode, setRearrangeMode] = useState(false)
@@ -501,16 +502,16 @@ export default function CategoriesPage() {
   }, [])
 
   const handleCreate = async (values: FormValues) => {
-    const { error } = await createCategory(values)
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await createCategory(values)
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setCreateOpen(false)
   }
 
   const handleEdit = async (values: FormValues) => {
     if (!editCategory) return
-    const { error } = await updateCategory(editCategory.id, values)
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await updateCategory(editCategory.id, values)
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setEditCategory(null)
   }
@@ -700,7 +701,7 @@ export default function CategoriesPage() {
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle>Add Category</DialogTitle></DialogHeader>
-              {formError && <FormError>{formError}</FormError>}
+              <FormError error={formError} />
               <CategoryForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} />
             </DialogContent>
           </Dialog>
@@ -711,7 +712,7 @@ export default function CategoriesPage() {
         <InlineLoadError message="Couldn't refresh your categories. Showing what was last loaded." onRetry={() => void refetch()} />
       )}
       {loadState === 'error' ? (
-        <ErrorState title="Couldn't load your categories" detail={error} onRetry={() => void refetch()} />
+        <ErrorState title="Couldn't load your categories" description={error} detail={errorDetail} onRetry={() => void refetch()} />
       ) : loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : (
@@ -746,7 +747,7 @@ export default function CategoriesPage() {
       <Dialog open={!!editCategory} onOpenChange={(o) => { if (!o) { setEditCategory(null); setFormError(null) } }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Edit Category</DialogTitle></DialogHeader>
-          {formError && <FormError>{formError}</FormError>}
+          <FormError error={formError} />
           {editCategory && (
             <CategoryForm
               defaultValues={editCategory as Partial<FormValues>}

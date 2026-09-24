@@ -5,8 +5,8 @@ import { CycleStepper } from './CycleStepper'
 // Row 2 of the shell. Reads only the route and the cycle, never page data,
 // so it is interactive from the first frame.
 export function PageHeader() {
-  const { pathname } = useLocation()
-  const { title, showStepper, titleIsHeading } = resolveHeaderMeta(pathname)
+  const { pathname, search } = useLocation()
+  const { title, showStepper, titleIsHeading } = resolveHeaderMeta(pathname, search)
   return (
     <>
     {showStepper && (

@@ -325,6 +325,17 @@
 .anim-delay-7,
 .anim-delay-8 { --anim-delay: 240ms; }
 
+/* Refresh progress rule: an indeterminate sweep over content that is
+   still on screen while newer data loads (LED-95). */
+@keyframes progress-rule {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(250%);  }
+}
+
+.progress-rule {
+  animation: progress-rule 1.2s var(--ease-out) infinite;
+}
+
 /* Touch press / tap feedback */
 .press-scale {
   transition: transform var(--dur-instant) ease, opacity var(--dur-instant) ease;
@@ -413,5 +424,11 @@
   }
   .hover-lift:hover {
     transform: none;
+  }
+  /* Static full-width rule instead of a sweep. */
+  .progress-rule {
+    animation: none !important;
+    width: 100% !important;
+    opacity: 0.6;
   }
 }

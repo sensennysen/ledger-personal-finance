@@ -21,11 +21,11 @@ export function DashboardTransactionRow({
   rightDetail,
   className = 'hover:bg-white/3',
 }: DashboardTransactionRowProps) {
-  const rowClassName = `grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 transition-colors ${className}`
+  const rowClassName = `grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors 2xl:py-1 ${className}`
   const content = (
     <>
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-sm shrink-0"
+        className="w-10 h-10 2xl:w-8 2xl:h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
         style={{ backgroundColor: iconBackgroundColor }}
       >
         {icon}

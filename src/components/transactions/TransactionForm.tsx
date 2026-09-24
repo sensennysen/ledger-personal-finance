@@ -567,6 +567,7 @@ export function TransactionForm({
                 <FormControl>
                   <Input
                     type="number"
+                    inputMode="decimal"
                     step="0.01"
                     name={field.name}
                     ref={field.ref}

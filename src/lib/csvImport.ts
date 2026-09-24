@@ -1,11 +1,12 @@
 // CSV import parsing and problem grouping (LED-65, spec §7 V6). Rows that
 // can't be imported are kept and flagged instead of silently dropped, then
 // grouped by cause so fixing one cause (a date order, say) clears every row
-// under it. Errors block the import; warnings import anyway.
+// under it. Errors block the import; warnings import anyway. Rows with no
+// category match (LED-74) are a warning: they import uncategorized.
 
 export type BankFormat = 'BDO' | 'BPI' | 'Metrobank' | 'Generic'
 export type DateOrder = 'MDY' | 'DMY'
-export type CauseId = 'bad-date' | 'bad-amount' | 'empty-description' | 'duplicate'
+export type CauseId = 'bad-date' | 'bad-amount' | 'empty-description' | 'no-category' | 'duplicate'
 export type Severity = 'error' | 'warning' | 'duplicate'
 
 export const MAX_IMPORT_ROWS = 5000
@@ -15,10 +16,11 @@ export const CAUSES: Record<CauseId, { label: string; severity: Severity }> = {
   'bad-date': { label: 'Unparseable date', severity: 'error' },
   'bad-amount': { label: 'Amount not a number', severity: 'error' },
   'empty-description': { label: 'Description empty', severity: 'warning' },
+  'no-category': { label: 'No category match', severity: 'warning' },
   duplicate: { label: 'Matches existing row', severity: 'duplicate' },
 }
 
-const CAUSE_ORDER: CauseId[] = ['bad-date', 'bad-amount', 'empty-description', 'duplicate']
+const CAUSE_ORDER: CauseId[] = ['bad-date', 'bad-amount', 'empty-description', 'no-category', 'duplicate']
 
 export interface ImportRow {
   /** 1-based data row number, counted from the row after the header. */
@@ -29,7 +31,7 @@ export interface ImportRow {
   description: string
   amount: number | null
   type: 'income' | 'expense' | null
-  /** Parse problems; duplicates are added later, once the check has run. */
+  /** Parse problems; duplicates and category misses are added later. */
   issues: CauseId[]
 }
 
@@ -312,12 +314,18 @@ export function processFile(text: string): ParsedFile | { error: string } {
   return { format, raw, headerIdx, dateOrder }
 }
 
+/** The rows with `no-category` added to those in `uncategorised`. */
+export function withCategoryIssues(rows: ImportRow[], uncategorised: ReadonlySet<number>): ImportRow[] {
+  if (uncategorised.size === 0) return rows
+  return rows.map((row) => (uncategorised.has(row.line) ? { ...row, issues: [...row.issues, 'no-category'] } : row))
+}
+
 /** A row's parse issues plus `duplicate` when the check matched it. */
 export function rowIssues(row: ImportRow, duplicates: ReadonlySet<number> | ReadonlyMap<number, unknown>): CauseId[] {
   return duplicates.has(row.line) ? [...row.issues, 'duplicate'] : row.issues
 }
 
-function hasError(issues: CauseId[]): boolean {
+export function hasError(issues: CauseId[]): boolean {
   return issues.some((id) => CAUSES[id].severity === 'error')
 }
 
@@ -365,18 +373,21 @@ export interface ImportSelection {
   duplicates: ReadonlySet<number> | ReadonlyMap<number, unknown>
   /** Causes the user chose to skip: every row under them stays out. */
   skipped: ReadonlySet<CauseId>
-  /** Duplicate rows the user ticked to import anyway. */
-  includedDuplicates: ReadonlySet<number>
+  /**
+   * Rows the user flipped from their default (LED-75): a duplicate ticked in,
+   * or any other row ticked out. Rows with an error can't be selected.
+   */
+  toggled: ReadonlySet<number>
 }
 
-type RowState = 'skipped' | 'error' | 'excluded-duplicate' | 'ready'
+type RowState = 'skipped' | 'error' | 'deselected' | 'ready'
 
 function rowState(row: ImportRow, selection: ImportSelection): RowState {
   const issues = rowIssues(row, selection.duplicates)
   if (issues.some((id) => selection.skipped.has(id))) return 'skipped'
   if (hasError(issues)) return 'error'
-  if (issues.includes('duplicate') && !selection.includedDuplicates.has(row.line)) return 'excluded-duplicate'
-  return 'ready'
+  const selectedByDefault = !issues.includes('duplicate')
+  return selectedByDefault !== selection.toggled.has(row.line) ? 'ready' : 'deselected'
 }
 
 export interface ImportSummary {
@@ -389,18 +400,35 @@ export interface ImportSummary {
   /** Rows matching an existing transaction, ticked or not. */
   duplicates: number
   skipped: number
+  /** Rows the user can tick but hasn't. */
+  deselected: number
+  /** The deselected rows that are duplicates. */
+  excludedDuplicates: number
 }
 
 export function summarise(rows: ImportRow[], selection: ImportSelection): ImportSummary {
-  const summary: ImportSummary = { ready: 0, errors: 0, warnings: 0, duplicates: 0, skipped: 0 }
+  const summary: ImportSummary = {
+    ready: 0,
+    errors: 0,
+    warnings: 0,
+    duplicates: 0,
+    skipped: 0,
+    deselected: 0,
+    excludedDuplicates: 0,
+  }
   for (const row of rows) {
     const issues = rowIssues(row, selection.duplicates)
-    if (issues.includes('duplicate')) summary.duplicates++
+    const duplicate = issues.includes('duplicate')
+    if (duplicate) summary.duplicates++
     if (issues.some((id) => CAUSES[id].severity === 'warning')) summary.warnings++
     const state = rowState(row, selection)
     if (state === 'ready') summary.ready++
     else if (state === 'error') summary.errors++
     else if (state === 'skipped') summary.skipped++
+    else {
+      summary.deselected++
+      if (duplicate) summary.excludedDuplicates++
+    }
   }
   return summary
 }
@@ -413,6 +441,28 @@ export function importableRows(rows: ImportRow[], selection: ImportSelection): I
 
 export function isSkipped(row: ImportRow, selection: ImportSelection): boolean {
   return rowState(row, selection) === 'skipped'
+}
+
+/** Whether the row has a checkbox: not under a skipped cause and error-free. */
+export function isSelectable(row: ImportRow, selection: ImportSelection): boolean {
+  const state = rowState(row, selection)
+  return state === 'ready' || state === 'deselected'
+}
+
+export function isSelected(row: ImportRow, selection: ImportSelection): boolean {
+  return rowState(row, selection) === 'ready'
+}
+
+/** The toggles that tick (or untick) every selectable row, leaving the rest alone. */
+export function selectAll(rows: ImportRow[], selection: ImportSelection, value: boolean): Set<number> {
+  const next = new Set(selection.toggled)
+  for (const row of rows) {
+    if (!isSelectable(row, selection)) continue
+    const selectedByDefault = !rowIssues(row, selection.duplicates).includes('duplicate')
+    if (selectedByDefault === value) next.delete(row.line)
+    else next.add(row.line)
+  }
+  return next
 }
 
 /** Errors, then duplicates, then warnings, then clean rows; file order within each. */

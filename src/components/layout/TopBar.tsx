@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   ArrowLeftRight,
@@ -22,6 +22,8 @@ import {
   SETTINGS_DESTINATION,
   isDestinationActive,
   isLocked,
+  nextTabIndex,
+  rovingTabStop,
   type NavIconKey,
 } from '@/lib/navDestinations'
 
@@ -33,6 +35,20 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   categories: Tag,
   reports: FileBarChart2,
   settings: Settings,
+}
+
+// Arrow keys move focus within a tab row; Tab leaves it (LED-90).
+function moveTabFocus(event: KeyboardEvent<HTMLDivElement>) {
+  const tabs = Array.from(
+    event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'),
+  )
+  const current = tabs.indexOf(document.activeElement as HTMLElement)
+  if (current === -1) return
+  const next = nextTabIndex(current, event.key, tabs.length)
+  if (next === null) return
+  event.preventDefault()
+  tabs[next].focus()
+  tabs[next].scrollIntoView({ inline: 'nearest', block: 'nearest' })
 }
 
 export function TopBar({
@@ -58,6 +74,7 @@ export function TopBar({
       ?.scrollIntoView({ inline: 'center', block: 'nearest' })
   }, [pathname])
   const { theme, toggleTheme } = useTheme()
+  const tabStop = rovingTabStop(NAV_TABS, pathname)
   const SettingsIcon = ICONS[SETTINGS_DESTINATION.icon]
   return (
     <>
@@ -75,8 +92,14 @@ export function TopBar({
           Ledger
         </span>
       </NavLink>
-      <nav aria-label="Main navigation" className="flex items-center gap-1">
-        {NAV_TABS.map((tab) => {
+      <nav aria-label="Main navigation">
+        <div
+          role="tablist"
+          aria-label="Sections"
+          onKeyDown={moveTabFocus}
+          className="flex items-center gap-1"
+        >
+        {NAV_TABS.map((tab, index) => {
           const locked = isLocked(tab, setupComplete)
           const Icon = locked ? Lock : ICONS[tab.icon]
           const active = isDestinationActive(pathname, tab)
@@ -85,7 +108,10 @@ export function TopBar({
               key={tab.to}
               to={tab.to}
               end={tab.exact}
+              role="tab"
+              aria-selected={active}
               aria-current={active ? 'page' : undefined}
+              tabIndex={index === tabStop ? 0 : -1}
               title={locked ? `${tab.label} (finish setup to unlock)` : tab.label}
               className={cn(
                 'flex h-10 items-center gap-2 rounded-full px-3 lg:px-4 text-[0.8125rem] font-medium transition-colors press-scale',
@@ -101,6 +127,7 @@ export function TopBar({
             </NavLink>
           )
         })}
+        </div>
       </nav>
       <div className="flex-1" />
       <button
@@ -180,19 +207,25 @@ export function TopBar({
           </button>
         </div>
       </div>
-      <nav
-        ref={tabStrip}
-        aria-label="Sections"
-        className="flex gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none]"
-      >
-        {NAV_TABS.map((tab) => {
+      <nav aria-label="Sections">
+        <div
+          ref={tabStrip}
+          role="tablist"
+          aria-label="Sections"
+          onKeyDown={moveTabFocus}
+          className="flex gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none]"
+        >
+        {NAV_TABS.map((tab, index) => {
           const active = isDestinationActive(pathname, tab)
           return (
             <NavLink
               key={tab.to}
               to={tab.to}
               end={tab.exact}
+              role="tab"
+              aria-selected={active}
               aria-current={active ? 'page' : undefined}
+              tabIndex={index === tabStop ? 0 : -1}
               className={cn(
                 'shrink-0 rounded-full px-4 py-2 text-[0.8125rem] font-medium transition-colors',
                 active
@@ -204,6 +237,7 @@ export function TopBar({
             </NavLink>
           )
         })}
+        </div>
       </nav>
     </header>
     </>

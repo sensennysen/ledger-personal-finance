@@ -18,9 +18,9 @@ function getBudgetAmountColor(over: boolean, percentage: number) {
 }
 
 function getBudgetProgressClass(over: boolean, percentage: number) {
-  if (over) return '[&>div]:bg-expense'
-  if (percentage > BUDGET_WARNING_THRESHOLD) return '[&>div]:bg-primary'
-  return '[&>div]:bg-primary'
+  if (over) return '[&_[data-slot=progress-indicator]]:bg-expense'
+  if (percentage > BUDGET_WARNING_THRESHOLD) return '[&_[data-slot=progress-indicator]]:bg-primary'
+  return '[&_[data-slot=progress-indicator]]:bg-primary'
 }
 
 export function DashboardBudgetProgressCard({

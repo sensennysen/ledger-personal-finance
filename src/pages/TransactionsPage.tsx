@@ -7,6 +7,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
+import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { usePreferences } from '@/hooks/usePreferences'
 import { formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -19,10 +20,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
+import type { FormErrorValue } from '@/lib/dataErrors'
 import { InteractiveRow } from '@/components/ui/interactive-row'
 import { resolveLoadState } from '@/lib/loadState'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { UndoToast } from '@/components/ui/undo-toast'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { PageActions } from '@/components/layout/PageActions'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
@@ -49,7 +50,7 @@ export default function TransactionsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [transactionKind, setTransactionKind] = useState<TransactionKind>('expense')
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   const { prefs, set: setPref } = usePreferences()
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
   const [sort, setSort] = useState<TxSort>('newest')
@@ -107,15 +108,11 @@ export default function TransactionsPage() {
   // pre-filled values when opening "Add" dialog from a template
   const [templateDefaults, setTemplateDefaults] = useState<Partial<TransactionFormValues> | undefined>(undefined)
 
-  // ── Undo delete ───────────────────────────────────────────
-  type UndoState = { snapshots: Transaction[]; message: string }
-  const [undoState, setUndoState] = useState<UndoState | null>(null)
-  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const {
     transactions,
     loading,
     error,
+    errorDetail,
     refetch,
     createTransaction,
     updateTransaction,
@@ -130,40 +127,7 @@ export default function TransactionsPage() {
 
   // ── Helpers ────────────────────────────────────────────────
 
-  const showUndo = useCallback((snapshots: Transaction[], message: string) => {
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    setUndoState({ snapshots, message })
-    undoTimerRef.current = setTimeout(() => {
-      setUndoState(null)
-      undoTimerRef.current = null
-    }, 5000)
-  }, [])
-
-  const handleUndoDelete = useCallback(async () => {
-    if (!undoState) return
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    setUndoState(null)
-    for (const tx of undoState.snapshots) {
-      await createTransaction({
-        type: tx.type,
-        account_id: tx.account_id,
-        to_account_id: tx.to_account_id,
-        category_id: tx.category_id,
-        subcategory_id: tx.subcategory_id,
-        amount: tx.amount,
-        currency: tx.currency,
-        exchange_rate: tx.exchange_rate,
-        description: tx.description,
-        notes: tx.notes,
-        date: tx.date,
-        transfer_fee: tx.transfer_fee,
-        is_recurring: tx.is_recurring,
-        recurrence_interval: tx.recurrence_interval,
-        recurrence_end_date: tx.recurrence_end_date,
-        receipt_url: tx.receipt_url,
-      })
-    }
-  }, [undoState, createTransaction])
+  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createTransaction)
 
   // ── Keyboard shortcuts ─────────────────────────────────────
   useKeyboardShortcut('n', useCallback(() => {
@@ -292,16 +256,16 @@ export default function TransactionsPage() {
   // ── Handlers ───────────────────────────────────────────────
 
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error } = await createTransaction(values as Parameters<typeof createTransaction>[0])
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await createTransaction(values as Parameters<typeof createTransaction>[0])
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setCreateOpen(false)
   }
 
   const handleEdit = async (values: TransactionFormValues) => {
     if (!editingTx) return
-    const { error } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setEditingTx(null)
   }
@@ -309,10 +273,21 @@ export default function TransactionsPage() {
   const handleDelete = async (id: string) => {
     const snapshot = transactions.find((t) => t.id === id)
     const { error } = await deleteTransaction(id)
-    if (error) { console.error('Failed to delete transaction:', error); return }
-    if (snapshot) {
-      showUndo([snapshot], `"${snapshot.description}" deleted`)
+    if (error) {
+      announceDeleteFailed("Couldn't delete that transaction", () => void handleDelete(id))
+      return
     }
+    if (snapshot) announceDeleted([snapshot], `"${snapshot.description}" deleted`)
+  }
+
+  const deleteMany = async (ids: string[], snapshots: Transaction[]) => {
+    const label = `${ids.length} transaction${ids.length !== 1 ? 's' : ''}`
+    const { error } = await bulkDeleteTransactions(ids)
+    if (error) {
+      announceDeleteFailed(`Couldn't delete ${label}`, () => void deleteMany(ids, snapshots))
+      return
+    }
+    announceDeleted(snapshots, `${label} deleted`)
   }
 
   const handleBulkDelete = async () => {
@@ -320,9 +295,7 @@ export default function TransactionsPage() {
     const snapshots = transactions.filter((t) => ids.includes(t.id))
     setSelectedIds(new Set())
     setSelectMode(false)
-    const { error } = await bulkDeleteTransactions(ids)
-    if (error) { console.error('Bulk delete failed:', error); return }
-    showUndo(snapshots, `${ids.length} transaction${ids.length !== 1 ? 's' : ''} deleted`)
+    await deleteMany(ids, snapshots)
   }
 
   const handleBulkRecategorize = async () => {
@@ -386,8 +359,8 @@ export default function TransactionsPage() {
     const rows = txs.map((t) => ({
       type: t.type,
       account_id: t.account_id,
-      to_account_id: null as string | null,
-      category_id: null as string | null,
+      to_account_id: t.to_account_id,
+      category_id: t.category_id as string | null,
       subcategory_id: null as string | null,
       amount: t.amount,
       currency: t.currency,
@@ -482,7 +455,7 @@ export default function TransactionsPage() {
             <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
               <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
                 <DialogHeader><DialogTitle>{TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}</DialogTitle></DialogHeader>
-                {formError && <FormError>{formError}</FormError>}
+                <FormError error={formError} />
                 <TransactionForm
                   entryKind={transactionKind}
                   defaultValues={templateDefaults}
@@ -725,8 +698,8 @@ export default function TransactionsPage() {
           <InlineLoadError message="Couldn't refresh your transactions. Showing what was last loaded." onRetry={() => void refetch()} />
         )}
         {loadState === 'error' ? (
-          <ErrorState title="Couldn't load your transactions" detail={error} onRetry={() => void refetch()} />
-        ) : loading ? (
+          <ErrorState title="Couldn't load your transactions" description={error} detail={errorDetail} onRetry={() => void refetch()} />
+        ) : loadState === 'loading' ? (
           <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
         ) : transactions.length === 0 ? (
           <EmptyState
@@ -790,7 +763,7 @@ export default function TransactionsPage() {
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
           <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
             <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
-            {formError && <FormError>{formError}</FormError>}
+            <FormError error={formError} />
             {editingTx && (
               <TransactionForm
                 isEditing
@@ -876,7 +849,6 @@ export default function TransactionsPage() {
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder="e.g. Daily commute"
                   onKeyDown={(e) => { if (e.key === 'Enter') handleSaveTemplateConfirm() }}
-                  autoFocus
                 />
               </div>
               <div className="flex justify-end gap-2">
@@ -904,17 +876,6 @@ export default function TransactionsPage() {
           onImport={handleImport}
         />
 
-        {/* Undo delete toast */}
-        {undoState && (
-          <UndoToast
-            message={undoState.message}
-            onUndo={handleUndoDelete}
-            onDismiss={() => {
-              if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-              setUndoState(null)
-            }}
-          />
-        )}
 
         {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} />}
       </div>

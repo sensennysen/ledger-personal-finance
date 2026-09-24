@@ -44,7 +44,8 @@ export function DashboardCategoryPieCard({
       ) : (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex justify-center sm:block sm:w-[50%]">
-            <ResponsiveContainer width="100%" height={200}>
+            <div className="h-[200px] 2xl:h-[168px]">
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={expensesByCategory}
@@ -67,6 +68,7 @@ export function DashboardCategoryPieCard({
                 />
               </PieChart>
             </ResponsiveContainer>
+            </div>
           </div>
           <div className="flex-1 space-y-1.5 min-w-0">
             {expensesByCategory.map((category, index) => (

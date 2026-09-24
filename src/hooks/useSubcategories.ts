@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
 import type { Subcategory } from '@/types'
+import { toResult, type MutationResult } from '@/lib/dataErrors'
 
 export function useSubcategories(categoryId: string | null) {
   const { user } = useAuth()
@@ -41,16 +42,16 @@ export function useSubcategories(categoryId: string | null) {
     })
   }, [fetch])
 
-  const createSubcategory = async (name: string) => {
+  const createSubcategory = async (name: string): Promise<MutationResult> => {
     if (!user || !categoryId) return { error: 'Not authenticated' }
     const { error } = await supabase
       .from('subcategories')
       .insert({ name, category_id: categoryId, user_id: user.id, sort_order: subcategories.length })
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'subcategory' })
   }
 
-  const updateSubcategory = async (id: string, values: Partial<Subcategory>) => {
+  const updateSubcategory = async (id: string, values: Partial<Subcategory>): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     const { error } = await supabase
       .from('subcategories')
@@ -58,10 +59,10 @@ export function useSubcategories(categoryId: string | null) {
       .eq('id', id)
       .eq('user_id', user.id)
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'subcategory' })
   }
 
-  const deleteSubcategory = async (id: string) => {
+  const deleteSubcategory = async (id: string): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     const { error } = await supabase
       .from('subcategories')
@@ -69,10 +70,10 @@ export function useSubcategories(categoryId: string | null) {
       .eq('id', id)
       .eq('user_id', user.id)
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'delete', entity: 'subcategory' })
   }
 
-  const updateSubcategoryOrder = async (orderedIds: string[]) => {
+  const updateSubcategoryOrder = async (orderedIds: string[]): Promise<MutationResult> => {
     if (!user || !categoryId) return { error: 'Not authenticated' }
 
     const orderMap = new Map(orderedIds.map((id, index) => [id, index]))
@@ -103,7 +104,7 @@ export function useSubcategories(categoryId: string | null) {
     const failed = results.find((result) => result.error)
     if (failed?.error) {
       await fetch()
-      return { error: failed.error.message }
+      return toResult(failed.error, { action: 'save' })
     }
     return { error: null }
   }

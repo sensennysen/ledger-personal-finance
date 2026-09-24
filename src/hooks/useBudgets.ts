@@ -9,6 +9,8 @@ import { sumBudgetSpend } from '@/lib/budgetSpend'
 import { readAllPages } from '@/lib/pagedRead'
 import { canRollover, nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
+import { resolveRefresh } from '@/lib/loadState'
+import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 function localDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -29,12 +31,23 @@ export function useBudgets(
   const startDay = cycle?.startDay ?? 1
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
+  // Cycle key the budgets on screen were read for; differs from the requested
+  // key while a new cycle loads with the previous one still showing.
+  const [dataKey, setDataKey] = useState<string | null>(null)
+  const dataKeyRef = useRef<string | null>(null)
   const requestId = useRef(0)
+  const requestedKey = selectedMonth ? `${selectedMonth}:${startDay}` : 'current'
+
+  const showBudgets = useCallback((next: Budget[], key: string | null) => {
+    setBudgets(next)
+    setDataKey(key)
+    dataKeyRef.current = key
+  }, [])
 
   const fetch = useCallback(async () => {
     const request = ++requestId.current
-    setError(null)
+    setLoadFailure(null)
     if (!user) {
       setLoading(false)
       return
@@ -43,18 +56,25 @@ export function useBudgets(
       setLoading(true)
       return
     }
+    const key = selectedMonth ? `${selectedMonth}:${startDay}` : 'current'
     const cacheKey = `${user.id}:budgets${selectedMonth ? `:${selectedMonth}:${startDay}` : ''}:${deficitBehaviour}`
     const cached = readCache<Budget[]>(cacheKey)
     if (cached) {
-      setBudgets(cached)
+      showBudgets(cached, key)
       setLoading(false)
     } else {
-      setBudgets([])
+      // Keep the previous cycle on screen while this one loads (LED-95).
       setLoading(true)
     }
-    if (!navigator.onLine) {
-      if (!cached) setError('Budgets for this cycle are not cached. Reconnect to load them.')
+    // A failed read for a new cycle must not leave the old cycle posing as it.
+    const failNewCycle = (failure: DescribedError | null) => {
+      if (dataKeyRef.current !== key) showBudgets([], null)
+      setLoadFailure(failure)
       setLoading(false)
+    }
+    if (!navigator.onLine) {
+      if (!cached) failNewCycle({ message: 'Budgets for this cycle are not cached. Reconnect to load them.', detail: null })
+      else setLoading(false)
       return
     }
 
@@ -67,8 +87,7 @@ export function useBudgets(
 
     if (request !== requestId.current) return
     if (budgetError) {
-      setError(budgetError.message)
-      setLoading(false)
+      failNewCycle(describeDataError(budgetError, { action: 'load' }))
       return
     }
 
@@ -102,8 +121,7 @@ export function useBudgets(
 
     if (request !== requestId.current) return
     if (spentError) {
-      setError(spentError)
-      setLoading(false)
+      failNewCycle(describeDataError(spentError, { action: 'load' }))
       return
     }
 
@@ -185,10 +203,10 @@ export function useBudgets(
       }
     })
 
-    setBudgets(enriched)
+    showBudgets(enriched, key)
     writeCache(cacheKey, enriched)
     setLoading(false)
-  }, [user, selectedMonth, startDay, deficitBehaviour])
+  }, [user, selectedMonth, startDay, deficitBehaviour, showBudgets])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -210,17 +228,17 @@ export function useBudgets(
       | 'effective_amount'
       | 'history'
     >,
-  ) => {
+  ): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add a budget.' }
     const { error } = await supabase
       .from('budgets')
       .insert({ ...values, user_id: user.id })
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'budget' })
   }
 
-  const updateBudget = async (id: string, values: Partial<Budget>) => {
+  const updateBudget = async (id: string, values: Partial<Budget>): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this budget.' }
     const { error } = await supabase
@@ -229,10 +247,10 @@ export function useBudgets(
       .eq('id', id)
       .eq('user_id', user.id)
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'save', entity: 'budget' })
   }
 
-  const deleteBudget = async (id: string) => {
+  const deleteBudget = async (id: string): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to remove this budget.' }
     const { error } = await supabase
@@ -241,13 +259,25 @@ export function useBudgets(
       .eq('id', id)
       .eq('user_id', user.id)
     if (!error) await fetch()
-    return { error: error?.message ?? null }
+    return toResult(error, { action: 'delete', entity: 'budget' })
   }
 
+  const { refreshing } = resolveRefresh({
+    loading,
+    hasData: budgets.length > 0,
+    dataKey,
+    requestedKey,
+  })
+
+  const error = loadFailure?.message ?? null
+  const errorDetail = loadFailure?.detail ?? null
   return {
     budgets,
     loading,
+    /** Previous cycle's budgets are on screen while the selected one loads. */
+    refreshing,
     error,
+    errorDetail,
     refetch: fetch,
     createBudget,
     updateBudget,

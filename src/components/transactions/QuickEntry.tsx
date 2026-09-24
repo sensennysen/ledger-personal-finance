@@ -14,10 +14,13 @@ import type { TransactionKind } from './transactionKinds'
 
 export function QuickEntry({
   initialKind,
+  targetAccountId,
   onSubmit,
   onClose,
 }: {
   initialKind: TransactionKind
+  /** The card or loan a card-payment / loan-repayment is for. */
+  targetAccountId?: string
   onSubmit: (values: TransactionFormValues) => Promise<void>
   onClose: () => void
 }) {
@@ -60,7 +63,7 @@ export function QuickEntry({
     type,
     amount: Number(amount),
     account_id: account?.id ?? '',
-    to_account_id: type === 'transfer' ? destination || null : null,
+    to_account_id: targetAccountId ?? (type === 'transfer' ? destination || null : null),
     category_id: type === 'transfer' ? null : categoryId,
     subcategory_id: null,
     currency: account?.currency ?? 'USD',
@@ -91,6 +94,8 @@ export function QuickEntry({
       <TransactionForm
         entryKind={initialKind === 'loan-repayment' || initialKind === 'card-payment' ? initialKind : type}
         defaultValues={values}
+        lockedCardAccountId={initialKind === 'card-payment' ? targetAccountId : undefined}
+        lockedLoanAccountId={initialKind === 'loan-repayment' ? targetAccountId : undefined}
         onSubmit={onSubmit}
         onClose={onClose}
       />

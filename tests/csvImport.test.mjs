@@ -6,9 +6,12 @@ import {
   fixableByOtherOrder,
   groupProblems,
   importableRows,
+  isSelectable,
+  isSelected,
   parseAmount,
   parseDate,
   processFile,
+  selectAll,
   sortProblemsFirst,
   summarise,
 } from '../src/lib/csvImport.ts'
@@ -19,7 +22,7 @@ const rowsOf = (text, order) => {
   return buildRows(file.raw, file.headerIdx, file.format, order ?? file.dateOrder)
 }
 
-const none = { duplicates: new Set(), skipped: new Set(), includedDuplicates: new Set() }
+const none = { duplicates: new Set(), skipped: new Set(), toggled: new Set() }
 
 const BDO = [
   'Transaction Date,Description,Debit,Credit,Balance',
@@ -153,13 +156,13 @@ test('errors block the import until fixed or skipped; warnings do not', () => {
 
   const resolved = { ...blocked, skipped: new Set(['bad-date', 'bad-amount']) }
   const summary = summarise(rows, resolved)
-  assert.deepEqual(summary, { ready: 2, errors: 0, warnings: 1, duplicates: 1, skipped: 4 })
+  assert.deepEqual(summary, { ready: 2, errors: 0, warnings: 1, duplicates: 1, skipped: 4, deselected: 1, excludedDuplicates: 1 })
   assert.deepEqual(importableRows(rows, resolved).map((row) => row.line), [3, 4])
 })
 
 test('duplicates are left out until ticked', () => {
   const { rows } = rowsOf(MESSY, 'MDY')
-  const selection = { duplicates: new Set([6]), skipped: new Set(['bad-date', 'bad-amount']), includedDuplicates: new Set([6]) }
+  const selection = { duplicates: new Set([6]), skipped: new Set(['bad-date', 'bad-amount']), toggled: new Set([6]) }
   assert.deepEqual(importableRows(rows, selection).map((row) => row.line), [3, 4, 6])
   assert.equal(summarise(rows, selection).ready, 3)
 })
@@ -173,4 +176,34 @@ test('skipping a warning cause keeps those rows out', () => {
 test('problem rows sort first: errors, duplicates, warnings, then file order', () => {
   const { rows } = rowsOf(MESSY, 'MDY')
   assert.deepEqual(sortProblemsFirst(rows, new Set([6])).map((row) => row.line), [1, 2, 5, 7, 6, 4, 3])
+})
+
+test('any clean row can be unticked, and stays out of the import', () => {
+  const { rows } = rowsOf(MESSY, 'MDY')
+  const selection = { ...none, skipped: new Set(['bad-date', 'bad-amount']), toggled: new Set([3]) }
+  assert.deepEqual(importableRows(rows, selection).map((row) => row.line), [4, 6])
+  const summary = summarise(rows, selection)
+  assert.equal(summary.ready, 2)
+  assert.equal(summary.deselected, 1)
+  assert.equal(summary.excludedDuplicates, 0)
+})
+
+test('rows with an error or under a skipped cause have no checkbox', () => {
+  const { rows } = rowsOf(MESSY, 'MDY')
+  const byLine = new Map(rows.map((row) => [row.line, row]))
+  const selection = { ...none, skipped: new Set(['empty-description']), toggled: new Set([1]) }
+  assert.equal(isSelectable(byLine.get(1), selection), false)
+  assert.equal(isSelected(byLine.get(1), selection), false)
+  assert.equal(isSelectable(byLine.get(4), selection), false)
+  assert.equal(isSelectable(byLine.get(3), selection), true)
+})
+
+test('select all ticks every selectable row, duplicates included; clearing unticks them', () => {
+  const { rows } = rowsOf(MESSY, 'MDY')
+  const base = { duplicates: new Set([6]), skipped: new Set(['bad-date', 'bad-amount']), toggled: new Set([3]) }
+  const all = { ...base, toggled: selectAll(rows, base, true) }
+  assert.deepEqual(importableRows(rows, all).map((row) => row.line), [3, 4, 6])
+  const cleared = { ...base, toggled: selectAll(rows, all, false) }
+  assert.deepEqual(importableRows(rows, cleared), [])
+  assert.equal(summarise(rows, cleared).excludedDuplicates, 1)
 })

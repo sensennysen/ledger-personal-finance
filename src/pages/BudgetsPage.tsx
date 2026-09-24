@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -12,7 +12,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { useBudgets } from '@/hooks/useBudgets'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
-import { canRollover } from '@/lib/budgetRollover'
+import { budgetAllowance, canRollover, nextCycleOpensAt } from '@/lib/budgetRollover'
+import { deficitSettingLabel } from '@/lib/overspending'
+import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { budgetUsage } from '@/lib/budgetUsage'
 import { goalPace } from '@/lib/goalPace'
 import { useCycle } from '@/contexts/cycleState'
@@ -85,10 +87,13 @@ const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
 
 function BudgetForm({
   defaultValues,
+  current,
   onSubmit,
   onClose,
 }: {
   defaultValues?: Partial<BudgetFormValues>
+  /** The saved budget with this cycle's figures, when editing. */
+  current?: Budget
   onSubmit: (values: BudgetFormValues) => Promise<void>
   onClose: () => void
 }) {
@@ -114,6 +119,32 @@ function BudgetForm({
   const rolloverAllowed = canRollover(period)
   const { selectedMonth, startDay } = useCycle()
   const cycle = getBudgetCycleRange(period, selectedMonth, startDay)
+  const deficitBehaviour = useDeficitBehaviour()
+
+  const [watchedAmount, rolloverEnabled, watchedCurrency] = useWatch({
+    control: form.control,
+    name: ['amount', 'rollover_enabled', 'currency'],
+  })
+  const rolloverOn = rolloverAllowed && rolloverEnabled === true
+  const savedRolloverOn = !!current && current.rollover_enabled && canRollover(current.period)
+  const carriedIn = savedRolloverOn ? current.rollover_amount ?? 0 : 0
+  const allowance = budgetAllowance(Number(watchedAmount) || 0, carriedIn, rolloverOn)
+  // Carried-in comes from the saved budget's history; the form can't replay it.
+  const allowanceStale = !!current && (rolloverOn !== savedRolloverOn || allowance.base !== current.amount)
+
+  const spent = current?.spent ?? 0
+  const savedEffective = current ? current.effective_amount ?? current.amount : 0
+  const overBy = current ? spent - savedEffective : 0
+  const opensAt = current && deficitBehaviour
+    ? nextCycleOpensAt(current.amount, carriedIn, spent, savedRolloverOn, deficitBehaviour)
+    : null
+  const rolloverHelp = !rolloverAllowed
+    ? 'Only monthly budgets carry a balance. On any other period this setting has no effect.'
+    : deficitBehaviour === 'carry'
+      ? "Underspend is added to next period's limit — and overspend is subtracted from it. The balance accumulates across periods."
+      : deficitBehaviour === 'reset'
+        ? "Underspend is added to next period's limit. Overspend isn't subtracted: your setting is Start the next cycle fresh."
+        : "Underspend is added to next period's limit."
   const initialPeriod = defaultValues?.period ?? 'monthly'
 
   // Only clear the flag when the user moves a budget off monthly in this edit;
@@ -277,11 +308,7 @@ function BudgetForm({
                   <RefreshCw className="w-3.5 h-3.5" />
                   Rollover unused budget
                 </FormLabel>
-                <p className="text-xs text-muted-foreground">
-                  {rolloverAllowed
-                    ? 'Carry surplus (or debt) to the following month'
-                    : 'Rollover only applies to monthly budgets'}
-                </p>
+                <p className="text-xs text-muted-foreground">{rolloverHelp}</p>
               </div>
               <FormControl>
                 <Switch
@@ -293,6 +320,56 @@ function BudgetForm({
             </FormItem>
           )}
         />
+        {rolloverOn && (
+          <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">Base limit</p>
+                <p className="font-medium tabular-nums">{formatCurrency(allowance.base, watchedCurrency)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Carried in</p>
+                <p className={`font-medium tabular-nums ${allowance.carriedIn < 0 ? 'text-destructive' : allowance.carriedIn > 0 ? 'text-income' : ''}`}>
+                  {allowance.carriedIn > 0 ? '+' : allowance.carriedIn < 0 ? '−' : ''}{formatCurrency(Math.abs(allowance.carriedIn), watchedCurrency)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Effective this period</p>
+                <p className="font-semibold tabular-nums">{formatCurrency(allowance.effective, watchedCurrency)}</p>
+              </div>
+            </div>
+            {allowanceStale && (
+              <p className="text-xs text-muted-foreground">Carried in is from your saved budget and updates after you save.</p>
+            )}
+          </div>
+        )}
+        {current && overBy > 0 && deficitBehaviour && opensAt !== null && (
+          <div className="rounded-lg border border-destructive/30 p-3 space-y-2 text-sm">
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">You went over this cycle</p>
+                <p className="font-medium tabular-nums text-destructive">{formatCurrency(overBy, current.currency)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">This cycle</p>
+                <p className="font-medium tabular-nums">{formatCurrency(savedEffective, current.currency)}</p>
+                <p className="text-xs text-muted-foreground tabular-nums">{formatCurrency(spent, current.currency)} spent</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Next cycle opens at</p>
+                <p className="font-medium tabular-nums">{formatCurrency(opensAt, current.currency)}</p>
+                <p className="text-xs text-muted-foreground">{opensAt < current.amount ? 'reduced' : opensAt > current.amount ? 'plus carried surplus' : 'fresh start'}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {savedRolloverOn
+                ? <>Your setting is <strong className="text-foreground">{deficitSettingLabel(deficitBehaviour)}</strong>. </>
+                : <>Rollover is off, so nothing carries into next cycle. </>}
+              The {formatCurrency(overBy, current.currency)} appears in Reports → Overspending.{' '}
+              <Link to="/settings" className="font-semibold text-primary hover:underline">Change this setting</Link>
+            </p>
+          </div>
+        )}
         <div className="flex gap-2 justify-end pt-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={form.formState.isSubmitting}>
@@ -1450,6 +1527,7 @@ export default function BudgetsPage() {
           {editBudget && (
             <BudgetForm
               defaultValues={editBudget}
+              current={editBudget}
               onSubmit={handleEditBudget}
               onClose={() => { setEditBudget(null); setFormError(null) }}
             />

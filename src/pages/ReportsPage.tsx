@@ -329,6 +329,9 @@ function StatCard({
               {value}
             </p>
           )}
+          {loading && [sub, comparison].filter(Boolean).map((_, i) => (
+            <div key={i} className="flex h-4 items-center mt-1"><Skeleton className="h-3 w-24" /></div>
+          ))}
           {sub && !loading && (
             <p className="text-[0.6875rem] text-muted-foreground mt-1 wrap-break-word">{sub}</p>
           )}
@@ -385,7 +388,7 @@ function IncomeExpenseCard({
         </select>
       </div>
   {loading ? (
-        <div className="flex-1 min-h-52 lg:min-h-72"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
+        <div className="flex-1 min-h-52 lg:min-h-72"><Skeleton className="h-full w-full rounded-lg" /></div>
       ) : (
         <div className="flex-1 min-h-52 lg:min-h-72">
           <ResponsiveContainer width="100%" height="100%">
@@ -426,6 +429,17 @@ function IncomeExpenseCard({
 }
 
 const RIGHT_ALIGNED = new Set<ReportColumn>(['amount', 'balance'])
+
+// Text-run widths for the loading table, roughly the width of each column's content.
+const SKELETON_WIDTH: Record<ReportColumn, string> = {
+  date: 'w-12',
+  description: 'w-32',
+  category: 'w-20',
+  account: 'w-24',
+  type: 'w-14',
+  amount: 'w-16',
+  balance: 'w-16',
+}
 
 // ─── main page ────────────────────────────────────────────────────────────────
 
@@ -599,6 +613,23 @@ export default function ReportsPage() {
   const wide = useMediaQuery('(min-width: 768px)')
   const [visibleColumns, setVisibleColumns] = useState(() => defaultColumns(wide))
   const columns = REPORT_COLUMNS.filter((c) => visibleColumns.has(c.key))
+  const tableHead = (
+    <thead className="sticky top-0 bg-card z-10">
+      <tr className="border-b border-border/40">
+        {columns.map((c) => (
+          <th
+            key={c.key}
+            className={cn(
+              'px-2 py-2.5 first:pl-4 last:pr-4 text-[0.6875rem] font-medium text-muted-foreground tracking-wide',
+              RIGHT_ALIGNED.has(c.key) ? 'text-right' : 'text-left',
+            )}
+          >
+            {c.label}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  )
   const balanceSummary = getBalanceSummary(activeAccounts)
   const totalBalance = balanceSummary.netWorth
 
@@ -748,8 +779,17 @@ export default function ReportsPage() {
         <div className="order-3 lg:col-span-2 rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
           <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Account Balances</p>
           {loading ? (
-            <div className="flex flex-col gap-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            <div className="flex flex-col gap-1" aria-hidden>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="flex h-5 items-center gap-2.5 min-w-0">
+                    <Skeleton className="w-2 h-2 rounded-full" />
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3.5 w-12" />
+                  </div>
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              ))}
             </div>
           ) : activeAccounts.length === 0 ? (
             <p className="text-[0.8125rem] text-muted-foreground text-center py-4">No accounts</p>
@@ -828,18 +868,22 @@ export default function ReportsPage() {
         </div>
 
         {loading ? (
-          <div className="flex flex-col gap-0">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-border/40 last:border-0">
-                <Skeleton className="h-8 w-8 rounded-lg" />
-                <div className="flex-1 flex flex-col gap-1.5">
-                  <Skeleton className="h-3.5 w-40" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-                <Skeleton className="h-4 w-20" />
-              </div>
-            ))}
-          </div>
+          <table className="w-full text-[0.8125rem]" aria-hidden>
+            {tableHead}
+            <tbody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <tr key={i} className="border-b border-border/30 last:border-0">
+                  {columns.map((c) => (
+                    <td key={c.key} className="px-2 py-3 first:pl-4 last:pr-4">
+                      <div className={cn('flex h-5 items-center', RIGHT_ALIGNED.has(c.key) && 'justify-end')}>
+                        <Skeleton className={cn('h-3', SKELETON_WIDTH[c.key])} />
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         ) : transactions.length === 0 ? (
           <EmptyState icon={FileBarChart2} title="Nothing recorded yet" bare />
         ) : sortedTransactions.length === 0 ? (
@@ -856,21 +900,7 @@ export default function ReportsPage() {
         ) : (
           <ScrollArea className="max-h-120">
             <table className="w-full min-w-max text-[0.8125rem]">
-              <thead className="sticky top-0 bg-card z-10">
-                <tr className="border-b border-border/40">
-                  {columns.map((c) => (
-                    <th
-                      key={c.key}
-                      className={cn(
-                        'px-2 py-2.5 first:pl-4 last:pr-4 text-[0.6875rem] font-medium text-muted-foreground tracking-wide',
-                        RIGHT_ALIGNED.has(c.key) ? 'text-right' : 'text-left',
-                      )}
-                    >
-                      {c.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+              {tableHead}
               <tbody>
                 {sortedTransactions.map((t, i) => {
                   const isIncome = t.type === 'income'
@@ -971,7 +1001,7 @@ export default function ReportsPage() {
               <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time — Last 13 months · monthly</p>
             </div>
             {loading ? (
-              <div className="h-52 md:h-72 xl:h-80"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
+              <div className="h-52 md:h-72 xl:h-80"><Skeleton className="h-full w-full rounded-lg" /></div>
             ) : (
               <div className="h-52 md:h-72 xl:h-80">
                 <ResponsiveContainer width="100%" height="100%">
@@ -1033,8 +1063,19 @@ export default function ReportsPage() {
               <span className="text-[0.6875rem] text-muted-foreground">{rangeLabel}</span>
             </div>
             {loading ? (
-              <div className="flex flex-col gap-2">
-                {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-8 rounded-lg bg-muted animate-pulse" />)}
+              <div className="flex flex-col gap-2.5" aria-hidden>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex flex-col gap-1">
+                    <div className="flex h-4 items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[0.6875rem] tabular-nums text-muted-foreground w-4 text-right shrink-0">{i}</span>
+                        <Skeleton className="h-3 w-28" />
+                      </div>
+                      <Skeleton className="h-3 w-14" />
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted" />
+                  </div>
+                ))}
               </div>
             ) : merchantBreakdown.length === 0 ? (
               <EmptyState icon={Store} title="No expense transactions in this period" bare />

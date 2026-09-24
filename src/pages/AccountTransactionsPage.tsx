@@ -39,6 +39,7 @@ import { dateSpan, groupByDay, sliceGroups, sumByCurrency, WINDOW_STEP, type TxS
 import { buildMonthNets, monthJumpTarget } from '@/lib/monthJump'
 import { cardAmountDue, loanProgress } from '@/lib/accountsOverview'
 import { buildCategoryBreakdown } from '@/lib/categoryBreakdown'
+import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
@@ -601,7 +602,8 @@ export default function AccountTransactionsPage() {
                 <Progress
                   value={Math.min(getCreditUtilizationPct(account), 100)}
                   aria-label="Credit utilisation"
-                  className={getCreditUtilizationPct(account) >= (account.utilization_target_pct ?? 30) ? '[&_[data-slot=progress-indicator]]:bg-expense' : '[&_[data-slot=progress-indicator]]:bg-income'}
+                  className={TONED_PROGRESS_CLASS}
+                  style={utilizationToneStyle(getCreditUtilizationPct(account), account.utilization_target_pct ?? 30) as React.CSSProperties}
                 />
               </div>
             ) : account.type === 'loan' && loanRepayment ? (

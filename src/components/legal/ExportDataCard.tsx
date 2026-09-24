@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useTransactions } from '@/hooks/useTransactions'
 import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
 import { resolveLoadState } from '@/lib/loadState'
+import { getLocalDateString } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { InlineLoadError } from '@/components/ui/error-state'
@@ -58,8 +59,8 @@ function SignedInExport() {
   }
 
   const handleExport = () => {
-    const today = new Date().toISOString().slice(0, 10)
-    downloadCsv(buildTransactionsCsv(transactions), `ledger-export_${today}.csv`)
+    // Local date: toISOString() is UTC and names the file after yesterday before 8am in Manila.
+    downloadCsv(buildTransactionsCsv(transactions), `ledger-export_${getLocalDateString()}.csv`)
   }
 
   return (

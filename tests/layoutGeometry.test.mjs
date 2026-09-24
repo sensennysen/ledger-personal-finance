@@ -35,7 +35,10 @@ test('entry-detail pane docks only where it fits beside the full-width Activity 
   const pane = px(layout, /aria-label="Entry detail"\s+className="relative w-\[(\d+)px\]/)
   const dock = px(layout, /const wide = useMediaQuery\('\(min-width: (\d+)px\)'\)/)
   assert.equal(dock, 1920)
-  assert.ok(dock - pane >= list, 'docked at 1920 the list keeps its capped width')
+  // Activity's month rail (LED-62) sits beside the list at lg+: Tailwind w-60 = 240px.
+  const rail = 240
+  assert.match(read('components/transactions/MonthJump.tsx'), /aria-label="Month jump" className="sticky top-4 hidden w-60/)
+  assert.ok(dock - pane >= list + rail, 'docked at 1920 the list and month rail keep their width')
   assert.ok(1024 - pane < list, 'at lg a docked column would squeeze the list')
   // Below the dock width the pane is an overlay sheet, never a column.
   assert.match(layout, /\{wide && sheet === 'detail' && entry && \(\s*<aside/)

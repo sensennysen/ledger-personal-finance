@@ -27,6 +27,7 @@ import { normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 import { formatLoanSchedule } from '@/lib/loans'
 import { buildAccountsOverview, formatShare, isLiability, type AssetRow, type LiabilityRow } from '@/lib/accountsOverview'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
+import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
 
 function formatDueIn(days: number) {
   if (days < 0) return `${-days}d overdue`
@@ -367,7 +368,8 @@ export default function AccountsPage() {
               <>
                 <Progress
                   value={Math.min(row.utilizationPct, 100)}
-                  className={row.utilizationPct >= target ? '[&_[data-slot=progress-indicator]]:bg-expense' : '[&_[data-slot=progress-indicator]]:bg-income'}
+                  className={TONED_PROGRESS_CLASS}
+                  style={utilizationToneStyle(row.utilizationPct, target) as React.CSSProperties}
                   aria-label={`${account.name} utilisation`}
                 />
                 <p className="text-xs text-muted-foreground">

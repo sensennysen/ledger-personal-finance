@@ -185,8 +185,8 @@ LED-30 unblocks every per-screen layout ticket. Do not start Epic 6 before it la
 
 ### LED-30 · Two-row top bar replaces the rails — **MOD / REMOVE** · XL
 `AppLayout`, `Sidebar.tsx` (deleted), new header components · [2B sections] · spec §2.1
-Row 1: wordmark, seven destination tabs, search (`⌘K`), theme toggle, settings, avatar. Row 2: page title or breadcrumb, period stepper, page controls, primary action. Below tablet: row 1 collapses to title + search + avatar, tabs scroll in their own row, bottom nav takes over.
-**Accept:** all seven destinations are tabs at desktop and tablet — **including `/categories`, which has no desktop or tablet nav entry today**; the period stepper is one control owned by the shell, replacing the four that render it now; the 240px and 80px rails are deleted; the shell is interactive from the first frame and never shows a skeleton (LED-95).
+Row 1: wordmark, six destination tabs, search (`⌘K`), theme toggle, settings, avatar. Row 2: page title or breadcrumb, period stepper, page controls, primary action. Below tablet: row 1 collapses to title + search + avatar, tabs scroll in their own row, bottom nav takes over.
+**Accept:** all six destinations are tabs at desktop and tablet — **including `/categories`, which has no desktop or tablet nav entry today**; the period stepper is one control owned by the shell, replacing the four that render it now; the 240px and 80px rails are deleted; the shell is interactive from the first frame and never shows a skeleton (LED-95).
 **Split before starting** — suggested: shell + row 1 / row 2 controls + stepper ownership / responsive collapse + bottom nav.
 **Blocks:** LED-21, LED-33, LED-40, Epic 6.
 
@@ -373,7 +373,7 @@ Ordered by value. Reports, Accounts and Home gain most from the freed width — 
 ### Accessibility and focus [27a]
 
 - **LED-90 · `aria-current`, roving tabindex, skip link — ADD · M.** **`aria-current` has zero occurrences in the codebase** — `Sidebar.tsx` and `BottomNav.tsx` mark the active destination by background tint alone. Blocking for 2B, which puts seven tabs where the rail was. Seven tabs must also be **one tab stop**: roving `tabIndex` (active `0`, others `-1`, arrows move) + `role="tablist"`, or 2B costs six extra stops before content on every screen. Add one `<a href="#main">` skip link, visible on focus — nine stops to content at 1920 under 2B.
-- **LED-91 · Focus restore — MOD · S.** On open, focus the heading, not the first field; on close, return to the trigger. Matters most for 5a → form and 5b picker → form.
+- **LED-91 · Focus restore — MOD · S.** On open, focus the heading, not the first field; on close, return to the trigger. Matters most for 5a → form; the 5b picker → form step was not built by any ticket (now LED-105).
 
 ### Error and loading states [26a, 25a]
 

@@ -4,53 +4,29 @@ import { Info, TriangleAlert } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/ui/error-state'
-import { useOverspending } from '@/hooks/useOverspending'
-import { resolveLoadState } from '@/lib/loadState'
-import { monthCycleRange } from '@/lib/cycleRange'
-import { getBudgetCycleRange } from '@/lib/budgetCycle'
+import type { OverspendingReport } from '@/hooks/useOverspendingReport'
 import { formatCurrency, formatDateShort, cn } from '@/lib/utils'
-import {
-  computeOverspending,
-  deficitSettingLabel,
-  shiftMonthKey,
-  streakLabel,
-} from '@/lib/overspending'
-import type { DeficitBehaviour } from '@/lib/budgetRollover'
+import { deficitSettingLabel, shiftMonthKey, streakLabel } from '@/lib/overspending'
 import type { Category } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 interface OverspendingCardProps {
   categories: Category[]
-  startDay: number
+  /** Selected cycle as "YYYY-MM". */
   month: string
-  /** Null while the profile is still loading; the card waits instead of guessing. */
-  deficitBehaviour: DeficitBehaviour | null
+  /** From useOverspendingReport, which Reports calls once for this card and its stat card. */
+  report: OverspendingReport
 }
 
 /**
  * D1b: the record of what went over budget, shown under either deficit
  * setting. Follows the global cycle chosen in the top-bar stepper (LED-21).
  */
-export function OverspendingCard({ categories, startDay, month, deficitBehaviour }: OverspendingCardProps) {
+export function OverspendingCard({ categories, month, report }: OverspendingCardProps) {
   const ink = useCategoryInk()
-  const behaviour: DeficitBehaviour = deficitBehaviour ?? 'carry'
-  const range = monthCycleRange(month, startDay)
-  const { budgets, txs, loading, error, refetch } = useOverspending(range.end)
-  const result = useMemo(
-    () =>
-      computeOverspending({
-        budgets,
-        txs,
-        month,
-        startDay,
-        behaviour,
-        rangeFor: (period) => getBudgetCycleRange(period, month, startDay),
-      }),
-    [budgets, txs, month, startDay, behaviour],
-  )
+  const { range, result, state, refetch, behaviour } = report
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
-  const state = resolveLoadState({ loading: loading || !deficitBehaviour, error, hasData: budgets.length > 0 && Boolean(deficitBehaviour) })
   const nextMonthLabel = new Date(`${shiftMonthKey(month, 1)}-01T00:00:00`).toLocaleDateString(
     'en-US',
     { month: 'long' },

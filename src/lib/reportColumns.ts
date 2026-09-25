@@ -32,3 +32,12 @@ export function toggleColumn(visible: Set<ReportColumn>, key: ReportColumn): Set
   else next.add(key)
   return next
 }
+
+/**
+ * The columns an export carries: the ones visible in the table, in table order.
+ * Required columns are always present, so a stale or empty set cannot produce a
+ * file without a date, description or amount.
+ */
+export function exportColumns(visible: Set<ReportColumn>): ReportColumn[] {
+  return REPORT_COLUMNS.filter((c) => c.required || visible.has(c.key)).map((c) => c.key)
+}

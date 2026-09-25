@@ -4,6 +4,7 @@ import {
   Download,
   TrendingUp,
   TrendingDown,
+  TriangleAlert,
   Wallet,
   FileBarChart2,
   Store,
@@ -47,9 +48,9 @@ import {
   type Lookback,
 } from '@/lib/reportLookback'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
-import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
+import { buildReportCsv, downloadCsv } from '@/lib/transactionCsv'
 import { abbreviateTick } from '@/lib/chartTicks'
-import { REPORT_COLUMNS, defaultColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
+import { REPORT_COLUMNS, defaultColumns, exportColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -70,6 +71,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { INCOME, EXPENSE, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import { OverspendingCard } from '@/components/reports/OverspendingCard'
+import { useOverspendingReport } from '@/hooks/useOverspendingReport'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { summarizeBalances } from '@/lib/accountsOverview'
 import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
@@ -104,6 +106,8 @@ function exportToPdf(
   categoryBreakdown: CategorySlice[],
   merchantBreakdown: { displayName: string; amount: number; count: number }[],
   filenameLabel: string,
+  columns: ReportColumn[],
+  balanceMap: Map<string, number>,
 ) {
   // jsPDF's built-in Helvetica font only covers Latin-1, so Unicode currency
   // symbols (₱, €, £, ¥, …) render as garbled characters. Use the ISO currency
@@ -207,26 +211,38 @@ function exportToPdf(
   doc.setFontSize(10)
   doc.text('Transactions', margin, currentY)
   currentY += 4
+  // Same columns, in the same order, as the table on screen (the Columns control).
+  const pdfCell = (column: ReportColumn, t: Transaction): string => {
+    switch (column) {
+      case 'date': return t.date
+      case 'description': return t.description
+      case 'category': return t.category?.name ?? '—'
+      case 'account': return t.account?.name ?? '—'
+      case 'type': return t.type.charAt(0).toUpperCase() + t.type.slice(1)
+      case 'amount': return `${t.type === 'income' ? '+' : t.type === 'transfer' ? '~' : '-'} ${pdfFmt(t.amount, t.currency)}`
+      case 'balance': {
+        const balance = balanceMap.get(t.id)
+        return balance === undefined ? '—' : pdfFmt(balance, t.account?.currency ?? t.currency)
+      }
+    }
+  }
+  const labelOf = new Map(REPORT_COLUMNS.map((c) => [c.key, c.label]))
+  const columnStyles: Record<number, { halign?: 'right'; cellWidth: number | 'auto' }> = {}
+  columns.forEach((column, index) => {
+    if (column === 'date') columnStyles[index] = { cellWidth: 22 }
+    else if (column === 'description') columnStyles[index] = { cellWidth: 'auto' }
+    else if (column === 'category') columnStyles[index] = { cellWidth: 30 }
+    else if (column === 'account') columnStyles[index] = { cellWidth: 32 }
+    else if (column === 'type') columnStyles[index] = { cellWidth: 20 }
+    else columnStyles[index] = { halign: 'right', cellWidth: 28 }
+  })
   autoTable(doc, {
     startY: currentY,
-    head: [['Date', 'Description', 'Category', 'Account', 'Amount']],
-    body: transactions.map((t) => [
-      t.date,
-      t.description,
-      t.category?.name ?? '—',
-      t.account?.name ?? '—',
-      `${t.type === 'income' ? '+' : t.type === 'transfer' ? '~' : '-'} ${pdfFmt(t.amount, t.currency)}`,
-
-    ]),
+    head: [columns.map((column) => labelOf.get(column) ?? column)],
+    body: transactions.map((t) => columns.map((column) => pdfCell(column, t))),
     styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak' },
     headStyles: { fillColor: [45, 45, 45], textColor: 255, fontStyle: 'bold' },
-    columnStyles: {
-      0: { cellWidth: 22 },
-      1: { cellWidth: 'auto' },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 32 },
-      4: { halign: 'right', cellWidth: 28 },
-    },
+    columnStyles,
     margin: { left: margin, right: margin },
   })
 
@@ -403,6 +419,7 @@ export default function ReportsPage() {
   }
 
   const { startDay, selectedMonth, setSelectedMonth } = useCycle()
+  const overspending = useOverspendingReport({ startDay, month: selectedMonth, deficitBehaviour })
   const [activeTab, setActiveTab] = useState('overview')
   const { start, end, label: rangeLabel, filenameLabel } = useMemo(
     () => getReportRange(selectedMonth, startDay),
@@ -465,8 +482,23 @@ export default function ReportsPage() {
     [filtered, categoryById]
   )
 
+  // Over budget stat card: the report's total in the display currency, against last cycle.
+  const overspendingReady = overspending.state === 'ready' || overspending.state === 'stale-error'
+  const overNow = overspending.result.totals.find((total) => total.currency === currency)?.over ?? 0
+  const overPrevious = overspending.previous.totals.find((total) => total.currency === currency)?.over ?? 0
+  const overCategories = overspending.result.rows.length
+  const overOtherCurrencies = overspending.result.totals.filter((total) => total.currency !== currency)
+  const overspendingSub =
+    overspending.state === 'error'
+      ? "Couldn't load your budgets"
+      : overspending.state === 'empty'
+        ? 'No budgets set'
+        : `${overCategories} ${overCategories === 1 ? 'category' : 'categories'}${
+            overOtherCurrencies.length > 0 ? ` · plus ${overOtherCurrencies.map((total) => total.currency).join(', ')}` : ''
+          }`
+
   const handleExport = () => {
-    downloadCsv(buildTransactionsCsv(sortedTransactions, txBalanceMap), `ledger-report_${filenameLabel}.csv`)
+    downloadCsv(buildReportCsv(sortedTransactions, exportColumns(visibleColumns), txBalanceMap), `ledger-report_${filenameLabel}.csv`)
   }
 
   const handleExportPdf = () => {
@@ -480,6 +512,8 @@ export default function ReportsPage() {
       categoryBreakdown,
       merchantBreakdown,
       filenameLabel,
+      exportColumns(visibleColumns),
+      txBalanceMap,
     )
   }
 
@@ -628,9 +662,12 @@ export default function ReportsPage() {
             <div className="flex items-center gap-2">
               <Link
                 to="/thirteenth-month"
+                aria-label="13th Month Pay"
                 className="inline-flex items-center gap-1 shrink-0 text-xs font-medium text-muted-foreground hover:text-primary"
               >
-                13th Month Pay
+                {/* 9a draws the short label below lg; the full name stays the accessible name. */}
+                <span aria-hidden className="lg:hidden">13th Mo</span>
+                <span aria-hidden className="hidden lg:inline">13th Month Pay</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
               <DropdownMenu>
@@ -654,14 +691,9 @@ export default function ReportsPage() {
         </PageActions>
 
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
-          <OverspendingCard
-            categories={categories}
-            startDay={startDay}
-            month={selectedMonth}
-            deficitBehaviour={deficitBehaviour}
-          />
+          <OverspendingCard categories={categories} month={selectedMonth} report={overspending} />
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         <StatCard
           title="Total Income"
           value={formatCurrency(totalIncome, currency)}
@@ -705,6 +737,15 @@ export default function ReportsPage() {
             color: netWorthChange > 0 ? INCOME : netWorthChange < 0 ? EXPENSE : 'var(--muted-foreground)',
           }}
           loading={loading}
+        />
+        <StatCard
+          title="Over budget"
+          value={overspendingReady ? formatCurrency(overNow, currency) : '—'}
+          sub={overspendingSub}
+          icon={TriangleAlert}
+          color={overNow > 0 ? 'var(--warning)' : 'var(--foreground)'}
+          comparison={overspendingReady ? compare(overNow, overPrevious, 'down') : undefined}
+          loading={overspending.state === 'loading'}
         />
       </div>
 

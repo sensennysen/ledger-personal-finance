@@ -120,3 +120,14 @@ export function previewOther(other: OtherSlice): { shown: CategorySlice[]; more:
   if (rest.length === 0) return { shown, more: null }
   return { shown, more: { count: rest.length, amount: rest.reduce((sum, r) => sum + r.amount, 0) } }
 }
+
+/** The rail's "Top categories, this filter" (29a): the biggest few, the rest as one "Other" line. */
+export function topCategories(
+  rows: CategorySlice[],
+  count = 4,
+): { top: CategorySlice[]; other: { count: number; amount: number } | null } {
+  const top = rows.slice(0, count)
+  const tail = rows.slice(count)
+  if (tail.length === 0) return { top, other: null }
+  return { top, other: { count: tail.length, amount: tail.reduce((sum, r) => sum + r.amount, 0) } }
+}

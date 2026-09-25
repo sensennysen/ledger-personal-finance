@@ -350,7 +350,8 @@ function LayoutShell() {
           </aside>
         )}
         </div>
-        {/* The FAB comes before the nav in the DOM, so Tab reaches the page's
+        {/* While the month-jump bar (56px, above the nav) is on the page the FAB rides above it (LED-149).
+            The FAB comes before the nav in the DOM, so Tab reaches the page's
             primary action before Home (27a). */}
         {mobile && !sheet && location.pathname !== '/settings' && (
           <button
@@ -360,7 +361,7 @@ function LayoutShell() {
             aria-hidden={fabHidden}
             tabIndex={fabHidden ? -1 : 0}
             className={cn(
-              'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-(--dur-base)',
+              'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] [body:has([data-month-jump-bar])_&]:bottom-[calc(160px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-(--dur-base)',
               fabHidden && 'opacity-0 pointer-events-none',
             )}
           >

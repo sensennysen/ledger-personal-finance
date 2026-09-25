@@ -37,6 +37,7 @@ import { looksLikeTransfer, transferCandidates, transferLegs } from '@/lib/impor
 import { WINDOW_STEP } from '@/lib/transactionWindow'
 import { CURRENCIES } from '@/types'
 import { cn, formatCurrency } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -871,7 +872,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                 ) : (
                                   <>
                                     <span className={cn('block', transferTo ? 'text-foreground' : row.type === 'expense' ? 'text-expense' : 'text-income')}>
-                                      {row.type === 'expense' ? '-' : '+'}
+                                      {row.type === 'expense' ? MINUS : '+'}
                                       {statementCurrency
                                         ? formatCurrency(row.amount ?? 0, statementCurrency)
                                         : (row.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

@@ -1,3 +1,5 @@
+import { signPrefix } from './netSign.ts'
+
 // Transaction lists render a window of rows that grows on scroll (spec §7 V1):
 // 60 rows per step on desktop, 30 on mobile. Day headers always describe the
 // whole day, even when only part of it is inside the window.
@@ -10,6 +12,7 @@ interface WindowedTx {
   currency: string
   exchange_rate?: number | null
   to_account_id?: string | null
+  to_account?: { currency?: string | null } | null
 }
 
 export interface DayGroup<T> {
@@ -38,6 +41,39 @@ export function signedAmount(tx: WindowedTx, contextAccountId?: string): number 
   return 0
 }
 
+/**
+ * The currency signedAmount is in. Money arriving in an account is carried at the exchange
+ * rate, so it is in the destination account's currency, not the source's (LED-149).
+ */
+export function signedCurrency(tx: WindowedTx, contextAccountId?: string): string {
+  const incoming =
+    contextAccountId !== undefined &&
+    (tx.type === 'transfer' || tx.type === 'expense') &&
+    tx.to_account_id === contextAccountId
+  return incoming ? (tx.to_account?.currency ?? tx.currency) : tx.currency
+}
+
+/**
+ * What a transaction row prints for its amount: the sign, then the size. It follows
+ * signedAmount, so the row, the day header and the result-bar sum cannot disagree.
+ * Two display-only rules: money arriving is carried at the exchange rate (already in
+ * signedAmount), and a transfer going out of the account shows no sign, because it
+ * is a move between the user's own accounts, not spending.
+ */
+export function amountDisplay(tx: WindowedTx, contextAccountId?: string): { sign: string; value: number; currency: string } {
+  const signed = signedAmount(tx, contextAccountId)
+  const sign = tx.type === 'transfer' && signed < 0 ? '' : signPrefix(signed)
+  return { sign, value: signed === 0 ? tx.amount : Math.abs(signed), currency: signedCurrency(tx, contextAccountId) }
+}
+
+/**
+ * The density the list actually uses. The stored preference is per browser, but the
+ * toggle is hidden on a phone, so a Compact set on desktop must not stick there.
+ */
+export function effectiveDensity(preference: 'comfortable' | 'compact', mobile: boolean): 'comfortable' | 'compact' {
+  return mobile ? 'comfortable' : preference
+}
+
 /** Result-bar sort (spec §7 V2). Date only, so day groups stay intact either way. */
 export type TxSort = 'newest' | 'oldest'
 
@@ -54,7 +90,8 @@ export function sortByDate<T extends { date: string }>(txs: T[], sort: TxSort): 
 export function sumByCurrency(txs: WindowedTx[], contextAccountId?: string): Record<string, number> {
   const sum: Record<string, number> = {}
   for (const tx of txs) {
-    sum[tx.currency] = (sum[tx.currency] ?? 0) + signedAmount(tx, contextAccountId)
+    const currency = signedCurrency(tx, contextAccountId)
+    sum[currency] = (sum[currency] ?? 0) + signedAmount(tx, contextAccountId)
   }
   return sum
 }
@@ -86,8 +123,9 @@ export function groupByDay<T extends WindowedTx>(
     }
     group.items.push(tx)
     group.count += 1
-    // Keyed by tx.currency, the currency TransactionRow labels the amount with.
-    group.net[tx.currency] = (group.net[tx.currency] ?? 0) + signedAmount(tx, contextAccountId)
+    // Keyed by the currency TransactionRow labels the amount with.
+    const currency = signedCurrency(tx, contextAccountId)
+    group.net[currency] = (group.net[currency] ?? 0) + signedAmount(tx, contextAccountId)
   }
   return [...byDate.values()].sort((a, b) => compareDates(a.date, b.date, sort))
 }

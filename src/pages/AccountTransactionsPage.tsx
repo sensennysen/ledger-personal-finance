@@ -38,7 +38,10 @@ import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
 import { usePreferences } from '@/hooks/usePreferences'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { dateSpan, groupByDay, sliceGroups, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { dateSpan, effectiveDensity, groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { buildRunningBalanceMap } from '@/lib/runningBalance'
+import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
+import { FilterTopCategories } from '@/components/transactions/FilterTopCategories'
 import { buildMonthNets, monthJumpTarget } from '@/lib/monthJump'
 import { cardAmountDue, loanProgress } from '@/lib/accountsOverview'
 import { buildCategoryBreakdown } from '@/lib/categoryBreakdown'
@@ -162,6 +165,13 @@ export default function AccountTransactionsPage() {
 
   // Window the list (LED-60); nets in the day headers are relative to this account.
   const compactList = useMediaQuery('(max-width: 767px)')
+  const density = effectiveDensity(prefs.txDensity, compactList)
+  // Export match (29a): exactly the rows the result bar counts, in the order on screen.
+  const exportMatch = () =>
+    downloadCsv(
+      buildTransactionsCsv(sortByDate(filtered, sort), buildRunningBalanceMap(accounts, transactions)),
+      `ledger-${(account?.name ?? 'account').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`,
+    )
   const windowKey = (type: string, query: string) => JSON.stringify([accountId, type, query, sort])
   const { rendered, sentinelRef, ensure } = useRenderWindow(filtered.length, {
     step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
@@ -760,8 +770,9 @@ export default function AccountTransactionsPage() {
                 sum={matchSum}
                 sort={sort}
                 onSortChange={setSort}
-                density={prefs.txDensity}
-                onDensityChange={(density) => setPref('txDensity', density)}
+                density={density}
+                onDensityChange={(next) => setPref('txDensity', next)}
+                onExport={exportMatch}
                 compact={compactList}
               />
             }
@@ -776,7 +787,7 @@ export default function AccountTransactionsPage() {
                   onEdit={setEditingTx}
                   onDelete={handleDelete}
                   contextAccountId={accountId}
-                  dense={prefs.txDensity === 'compact'}
+                  dense={density === 'compact'}
                 />
               )}
             />
@@ -821,7 +832,7 @@ export default function AccountTransactionsPage() {
 
         {showMonthJump && <MonthJumpBar months={months} activeKey={null} onPick={jumpToMonth} />}
       </div>
-      {showMonthJump && <MonthRail months={months} activeKey={null} onPick={jumpToMonth} />}
+      {showMonthJump && <MonthRail months={months} activeKey={null} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} />} />}
     </div>
   )
 }

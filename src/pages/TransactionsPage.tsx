@@ -12,6 +12,7 @@ import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { usePreferences } from '@/hooks/usePreferences'
 import { formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -37,7 +38,10 @@ import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
 import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { effectiveDensity, groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { buildRunningBalanceMap } from '@/lib/runningBalance'
+import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
+import { FilterTopCategories } from '@/components/transactions/FilterTopCategories'
 import { buildMonthNets } from '@/lib/monthJump'
 import { searchMatcher } from '@/lib/globalSearch'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
@@ -254,6 +258,7 @@ export default function TransactionsPage() {
   // Window the list (LED-60). The cycle is left out of the reset key so
   // stepping it keeps the window and the scroll position.
   const compactList = useMediaQuery('(max-width: 767px)')
+  const density = effectiveDensity(prefs.txDensity, compactList)
   const { rendered, sentinelRef } = useRenderWindow(filtered.length, {
     step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
     resetKey: JSON.stringify([filterType, search, activeTagFilter, prefs.txView, sort]),
@@ -395,9 +400,16 @@ export default function TransactionsPage() {
       selectable={selectMode}
       selected={selectedIds.has(tx.id)}
       onSelect={toggleSelect}
-      dense={prefs.txDensity === 'compact'}
+      dense={density === 'compact'}
     />
   )
+
+  // Export match (29a): exactly the rows the bar counts, in the order on screen, not just the rendered window.
+  const exportMatch = () =>
+    downloadCsv(
+      buildTransactionsCsv(sortByDate(filtered, sort), buildRunningBalanceMap(accounts, transactions)),
+      `ledger-activity_${selectedMonth}.csv`,
+    )
 
   const resultBar = (
     <ResultBar
@@ -408,8 +420,9 @@ export default function TransactionsPage() {
       sum={matchSum}
       sort={sort}
       onSortChange={setSort}
-      density={prefs.txDensity}
-      onDensityChange={(density) => setPref('txDensity', density)}
+      density={density}
+      onDensityChange={(next) => setPref('txDensity', next)}
+      onExport={exportMatch}
       compact={compactList}
     />
   )
@@ -558,7 +571,7 @@ export default function TransactionsPage() {
                   <div className="flex flex-col min-w-0">
                     <span className="text-xs font-medium truncate max-w-30">{tmpl.name}</span>
                     <span className={`text-[0.6875rem] ${TRANSACTION_TYPE_COLOR[tmpl.values.type]}`}>
-                      {tmpl.values.type === 'income' ? '+' : tmpl.values.type === 'expense' ? '-' : ''}
+                      {tmpl.values.type === 'income' ? '+' : tmpl.values.type === 'expense' ? MINUS : ''}
                       {formatCurrency(tmpl.values.amount, tmpl.values.currency)}
                     </span>
                   </div>
@@ -876,9 +889,9 @@ export default function TransactionsPage() {
         />
 
 
-        {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} />}
+        {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} onSelect={toggleSelectMode} selecting={selectMode} />}
       </div>
-      {showMonthJump && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} />}
+      {showMonthJump && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} />} />}
     </div>
   )
 }

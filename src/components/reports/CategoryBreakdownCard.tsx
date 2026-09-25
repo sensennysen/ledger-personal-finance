@@ -122,16 +122,19 @@ function OtherRow({ other, max, currency }: { other: OtherSlice; max: number; cu
   )
 }
 
-function RankedBars({
+/** Ranked bars with an expandable Other row. `resetKey` closes that row when it changes (e.g. the cycle). */
+export function RankedBars({
   top,
   other,
   currency,
   grouped,
+  resetKey,
 }: {
   top: CategorySlice[]
   other: OtherSlice | null
   currency: string
   grouped: boolean
+  resetKey?: string
 }) {
   const max = Math.max(top[0]?.amount ?? 0, other?.amount ?? 0)
   return (
@@ -142,7 +145,7 @@ function RankedBars({
           {grouped && <SubcategoryRows slice={slice} currency={currency} />}
         </div>
       ))}
-      {other && <OtherRow other={other} max={max} currency={currency} />}
+      {other && <OtherRow key={resetKey} other={other} max={max} currency={currency} />}
     </div>
   )
 }

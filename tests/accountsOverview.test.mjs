@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildAccountsOverview, formatShare, loanProgress } from '../src/lib/accountsOverview.ts'
+import { buildAccountsOverview, formatShare, loanProgress, summarizeBalances } from '../src/lib/accountsOverview.ts'
 
 const acct = (over) => ({
   id: over.name, name: over.name, type: 'checking', currency: 'USD', balance: 0, color: '#000',
@@ -58,4 +58,50 @@ test('loan progress counts paid installments across purchases', () => {
   assert.equal(p.totalInstallments, 4)
   assert.equal(p.pct, 50)
   assert.equal(loanProgress([], []), null)
+})
+
+test('summarizeBalances counts only the base currency and names what it left out', () => {
+  const s = summarizeBalances([
+    acct({ name: 'Checking', balance: 1000 }),
+    acct({ name: 'Card', type: 'credit_card', balance: -300, credit_limit: 2000 }),
+    acct({ name: 'Travel', balance: 1850, currency: 'EUR' }),
+    acct({ name: 'Yen', balance: 90000, currency: 'JPY' }),
+    acct({ name: 'Travel 2', balance: 10, currency: 'EUR' }),
+  ], 'USD')
+  assert.equal(s.netWorth, 700)
+  assert.equal(s.totalAssets, 1000)
+  assert.equal(s.totalCreditCardDebt, 300)
+  assert.deepEqual(s.excludedCurrencies, ['EUR', 'JPY'])
+})
+
+test('summarizeBalances with one currency excludes nothing', () => {
+  const s = summarizeBalances([acct({ name: 'A', balance: 5 }), acct({ name: 'B', balance: -2 })], 'USD')
+  assert.equal(s.netWorth, 3)
+  assert.deepEqual(s.excludedCurrencies, [])
+})
+
+test('an overdrawn asset lowers net worth, and Accounts agrees with Home and Reports', () => {
+  const accounts = [
+    acct({ name: 'Checking', balance: -50 }),
+    acct({ name: 'Savings', balance: 200 }),
+    acct({ name: 'Car loan', type: 'loan', balance: -120 }),
+    acct({ name: 'Travel', balance: 999, currency: 'EUR' }),
+  ]
+  const summary = summarizeBalances(accounts, 'USD')
+  const overview = buildAccountsOverview(accounts, 'USD', undefined, today)
+  assert.equal(summary.netWorth, 30)
+  assert.equal(overview.totals.netWorth, summary.netWorth)
+  assert.deepEqual(overview.excludedCurrencies, summary.excludedCurrencies)
+})
+
+test('net worth is rounded to cents', () => {
+  const s = summarizeBalances([acct({ name: 'A', balance: 0.1 }), acct({ name: 'B', balance: 0.2 })], 'USD')
+  assert.equal(s.netWorth, 0.3)
+})
+
+test('the caller decides which accounts count: inactive ones left out do not appear', () => {
+  const active = [acct({ name: 'A', balance: 10 })]
+  const withInactive = [...active, acct({ name: 'Old', balance: 500, is_active: false })]
+  assert.equal(summarizeBalances(active, 'USD').netWorth, 10)
+  assert.equal(summarizeBalances(withInactive.filter((a) => a.is_active !== false), 'USD').netWorth, 10)
 })

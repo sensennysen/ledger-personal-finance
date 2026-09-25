@@ -7,11 +7,11 @@ import {
 } from '@/lib/utils'
 import { addRecurringInterval, computeNextDueDate } from '@/lib/recurringTransactions'
 import {
-  getBalanceSummary,
   getCreditCardSpending,
   getCreditUtilizationPct,
   daysUntilDayOfMonth,
 } from '@/lib/creditCards'
+import { summarizeBalances } from '@/lib/accountsOverview'
 import { getLoanDeadlines, getPurchaseInstallments } from '@/lib/loanInstallments'
 import { formatLoanSchedule } from '@/lib/loans'
 import type { Account, Category, LoanPaymentAllocation, LoanPurchase, Transaction } from '@/types'
@@ -40,6 +40,8 @@ export type DashboardStatsSummary = {
   totalBalance: number
   totalAssets: number
   totalCreditCardDebt: number
+  /** Currencies left out of the balance figures (no exchange rate). */
+  excludedCurrencies: string[]
   income: number
   expenses: number
   net: number
@@ -335,6 +337,7 @@ export function useDashboardData({
   chartPeriod,
   selectedMonth,
   startDay,
+  baseCurrency,
 }: {
   accounts: Account[]
   categories: Category[]
@@ -344,6 +347,7 @@ export function useDashboardData({
   chartPeriod: DashboardChartPeriod
   selectedMonth: string
   startDay: number
+  baseCurrency: string
 }) {
   const { start: monthStart, end: monthEnd } = useMemo(
     () => getCustomMonthRange(selectedMonth, startDay),
@@ -393,7 +397,7 @@ export function useDashboardData({
   }, [monthTransactions])
 
   const stats = useMemo<DashboardStatsSummary>(() => {
-    const balanceSummary = getBalanceSummary(accounts)
+    const balanceSummary = summarizeBalances(accounts, baseCurrency)
     const income = sumTransactionsByType(monthTransactions, 'income')
     const expenses = sumTransactionsByType(monthTransactions, 'expense')
 
@@ -404,7 +408,7 @@ export function useDashboardData({
       expenses,
       net: income - expenses,
     }
-  }, [accounts, monthTransactions])
+  }, [accounts, baseCurrency, monthTransactions])
 
   const cashFlowData = useMemo<DashboardCashFlowPoint[]>(() => {
     const periods = getCashFlowPeriods(chartPeriod, selectedMonth, monthStart, monthEnd, startDay)

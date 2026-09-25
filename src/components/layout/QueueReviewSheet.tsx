@@ -1,6 +1,7 @@
 import { AlertTriangle, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import type { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { keepTheirs, listQueue, type QueueItem } from '@/lib/offlineQueue'
+import { MAX_ATTEMPTS, canKeepMine, describeConflict } from '@/lib/queueState'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -20,10 +21,18 @@ function itemTitle(item: QueueItem) {
 }
 
 function itemNote(item: QueueItem) {
-  if (item.status === 'conflict') return 'Edited on another device since you queued this'
+  if (item.status === 'conflict') {
+    if (item.conflictKind === 'deleted') return 'Deleted on another device since you queued this'
+    return `Edited on another device since you queued this${item.operation === 'delete' ? ' delete' : ''}`
+  }
+  if (item.status === 'failed') return `Couldn't save after ${MAX_ATTEMPTS} tries${item.lastError ? `: ${item.lastError}` : ''}`
   if (item.status === 'expired') return 'Waited more than 30 days to sync'
   return `${OPERATION_LABEL[item.operation]} · ${item.table.replace(/_/g, ' ')}`
 }
+
+const fieldLabel = (field: string) => field.replace(/_/g, ' ')
+const showValue = (value: unknown) =>
+  value === null || value === undefined || value === '' ? 'empty' : typeof value === 'string' ? value : JSON.stringify(value)
 
 function age(timestamp: number) {
   const days = Math.floor((Date.now() - timestamp) / 86_400_000)
@@ -41,7 +50,7 @@ export function QueueReviewSheet({
   onOpenChange: (open: boolean) => void
   status: ReturnType<typeof useNetworkStatus>
 }) {
-  const { isSyncing, pendingCount, flaggedCount, syncNow, resolve, refreshCount } = status
+  const { isSyncing, pendingCount, flaggedCount, syncNow, resolve, retry, refreshCount } = status
   const items = open ? listQueue() : []
 
   return (
@@ -77,15 +86,35 @@ export function QueueReviewSheet({
                   <span className="block text-xs text-muted-foreground">
                     {itemNote(item)} · {age(item.timestamp)}
                   </span>
+                  {describeConflict(item).map((change) => (
+                    <span key={change.field} className="block text-xs">
+                      <span className="capitalize">{fieldLabel(change.field)}</span>:{' '}
+                      <span className="text-muted-foreground">yours</span> {showValue(change.mine)}
+                      {' · '}
+                      <span className="text-muted-foreground">theirs</span> {showValue(change.theirs)}
+                    </span>
+                  ))}
                 </span>
-                {item.status && (
+                {item.status === 'failed' && (
                   <span className="flex shrink-0 gap-2">
                     <Button size="sm" variant="outline" disabled={isSyncing} onClick={() => resolve(item.id, 'theirs')}>
-                      Keep theirs
+                      Discard
                     </Button>
-                    <Button size="sm" disabled={isSyncing} onClick={() => resolve(item.id, 'mine')}>
-                      Keep mine
+                    <Button size="sm" disabled={isSyncing} onClick={() => retry(item.id)}>
+                      Retry
                     </Button>
+                  </span>
+                )}
+                {item.status && item.status !== 'failed' && (
+                  <span className="flex shrink-0 gap-2">
+                    <Button size="sm" variant="outline" disabled={isSyncing} onClick={() => resolve(item.id, 'theirs')}>
+                      {canKeepMine(item) ? 'Keep theirs' : 'Discard'}
+                    </Button>
+                    {canKeepMine(item) && (
+                      <Button size="sm" disabled={isSyncing} onClick={() => resolve(item.id, 'mine')}>
+                        Keep mine
+                      </Button>
+                    )}
                   </span>
                 )}
               </li>

@@ -159,6 +159,8 @@ export function useAccounts() {
 
   const updateAccountOrder = async (orderedIds: string[]): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
+    // A reorder is one write per account, so it is not queued; say so rather than do nothing.
+    if (!navigator.onLine) return { error: 'Connect to the internet to change the order.' }
 
     const orderMap = new Map(orderedIds.map((id, index) => [id, index]))
     const nextAccounts = accounts

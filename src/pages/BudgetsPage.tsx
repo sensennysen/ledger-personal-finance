@@ -15,7 +15,7 @@ import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { budgetAllowance, canRollover, nextCycleOpensAt } from '@/lib/budgetRollover'
 import { deficitSettingLabel } from '@/lib/overspending'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
-import { budgetUsage } from '@/lib/budgetUsage'
+import { BUDGET_TONE_BAR_CLASS, budgetTone, budgetUsage } from '@/lib/budgetUsage'
 import { goalPace } from '@/lib/goalPace'
 import { useCycle } from '@/contexts/cycleState'
 import { PageActions } from '@/components/layout/PageActions'
@@ -25,7 +25,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { CURRENCIES, ACCOUNT_COLORS } from '@/types'
 import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
 import { INCOME, EXPENSE } from '@/constants/colors'
-import { BUDGET_WARNING_THRESHOLD, DEFAULT_CURRENCY } from '@/constants/accounts'
+import { DEFAULT_CURRENCY } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -791,7 +791,7 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
                     <div className="w-14 hidden sm:block">
                       <Progress
                         value={pct}
-                        className={`h-1.5 ${over ? '[&_[data-slot=progress-indicator]]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&_[data-slot=progress-indicator]]:bg-gold' : '[&_[data-slot=progress-indicator]]:bg-income'}`}
+                        className={`h-1.5 ${BUDGET_TONE_BAR_CLASS[budgetTone(pct, over)]}`}
                       />
                     </div>
                     {over
@@ -1281,7 +1281,7 @@ export default function BudgetsPage() {
                             {over && (
                               <Badge variant="destructive" className="text-xs">Over budget</Badge>
                             )}
-                            {!over && pct >= BUDGET_WARNING_THRESHOLD && (
+                            {budgetTone(pct, over) === 'gold' && (
                               <Badge variant="outline" className="text-xs text-warning border-warning/40">Warning</Badge>
                             )}
                           </div>
@@ -1350,7 +1350,7 @@ export default function BudgetsPage() {
                     <div className="flex items-center gap-3">
                       <Progress
                         value={pct}
-                        className={`flex-1 ${over ? '[&_[data-slot=progress-indicator]]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&_[data-slot=progress-indicator]]:bg-gold' : ''}`}
+                        className={`flex-1 ${BUDGET_TONE_BAR_CLASS[budgetTone(pct, over)]}`}
                       />
                       <span className={`shrink-0 text-sm font-medium tabular-nums ${over ? 'text-destructive' : 'text-muted-foreground'}`}>
                         {usedPct === null ? 'Over' : `${usedPct}%`}

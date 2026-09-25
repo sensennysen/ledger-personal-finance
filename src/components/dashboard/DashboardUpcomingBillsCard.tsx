@@ -1,5 +1,5 @@
 import { Bell, CircleDollarSign } from 'lucide-react'
-import { EXPENSE } from '@/constants/colors'
+import { EXPENSE, WARNING_INK } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { UpcomingBill } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
@@ -15,7 +15,7 @@ interface DashboardUpcomingBillsCardProps {
 
 function getUpcomingBillDayColor(daysUntil: number) {
   if (daysUntil === 0) return EXPENSE
-  if (daysUntil <= 3) return 'var(--primary)'
+  if (daysUntil <= 3) return WARNING_INK
   return 'var(--muted-foreground)'
 }
 

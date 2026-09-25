@@ -1,5 +1,11 @@
 import type { useNetworkStatus } from '@/hooks/useNetworkStatus'
-import { AlertTriangle, CloudOff } from 'lucide-react'
+import { AlertTriangle, Clock, CloudOff, RefreshCw } from 'lucide-react'
+
+const TONES = {
+  offline: { background: 'var(--expense-container)', color: 'var(--expense)' },
+  syncing: { background: 'var(--primary)', color: 'var(--primary-foreground)' },
+  pending: { background: 'var(--warning-container)', color: 'var(--warning)' },
+}
 
 export function OfflineBanner({
   status,
@@ -34,10 +40,7 @@ export function OfflineBanner({
       role="status"
       aria-live="polite"
       className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium"
-      style={{
-        background: isOnline ? 'var(--primary)' : 'var(--expense-container)',
-        color: isOnline ? 'var(--primary-foreground)' : 'var(--expense)',
-      }}
+      style={TONES[!isOnline ? 'offline' : isSyncing ? 'syncing' : 'pending']}
     >
       {!isOnline && (
         <>
@@ -61,9 +64,15 @@ export function OfflineBanner({
       )}
       {isOnline && !isSyncing && pendingCount > 0 && (
         <>
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-current opacity-80" />
-          {pendingCount} change{pendingCount !== 1 ? 's' : ''} queued
-          <button type="button" onClick={() => void syncNow()} className="underline underline-offset-2 font-semibold">
+          <Clock className="size-4 shrink-0" aria-hidden />
+          Back online — {pendingCount} change{pendingCount !== 1 ? 's' : ''} still queued
+          <button
+            type="button"
+            onClick={() => void syncNow()}
+            className="ml-1 inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold"
+            style={{ background: 'var(--warning)', color: 'var(--warning-container)' }}
+          >
+            <RefreshCw className="size-3" aria-hidden />
             Sync now
           </button>
         </>

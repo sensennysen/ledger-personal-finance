@@ -1,5 +1,5 @@
 import { BUDGET_WARNING_THRESHOLD } from '@/constants/accounts'
-import { EXPENSE } from '@/constants/colors'
+import { EXPENSE, WARNING_INK } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { Budget } from '@/types'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
@@ -13,14 +13,14 @@ interface DashboardBudgetProgressCardProps {
 
 function getBudgetAmountColor(over: boolean, percentage: number) {
   if (over) return EXPENSE
-  if (percentage > BUDGET_WARNING_THRESHOLD) return 'var(--primary)'
+  if (percentage > BUDGET_WARNING_THRESHOLD) return WARNING_INK
   return 'var(--muted-foreground)'
 }
 
 function getBudgetProgressClass(over: boolean, percentage: number) {
   if (over) return '[&_[data-slot=progress-indicator]]:bg-expense'
-  if (percentage > BUDGET_WARNING_THRESHOLD) return '[&_[data-slot=progress-indicator]]:bg-primary'
-  return '[&_[data-slot=progress-indicator]]:bg-primary'
+  if (percentage > BUDGET_WARNING_THRESHOLD) return '[&_[data-slot=progress-indicator]]:bg-gold'
+  return '[&_[data-slot=progress-indicator]]:bg-income'
 }
 
 export function DashboardBudgetProgressCard({

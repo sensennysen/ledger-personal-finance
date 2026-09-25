@@ -4,9 +4,9 @@ import { utilizationTone } from '../src/lib/utilizationTone.ts'
 
 test('utilisation colour is a scale through gold at the target', () => {
   assert.equal(utilizationTone(0, 30), 'var(--income)')
-  assert.equal(utilizationTone(15, 30), 'color-mix(in oklch, var(--primary) 50%, var(--income))')
-  assert.equal(utilizationTone(30, 30), 'var(--primary)')
-  assert.equal(utilizationTone(65, 30), 'color-mix(in oklch, var(--expense) 50%, var(--primary))')
+  assert.equal(utilizationTone(15, 30), 'color-mix(in oklch, var(--gold) 50%, var(--income))')
+  assert.equal(utilizationTone(30, 30), 'var(--gold)')
+  assert.equal(utilizationTone(65, 30), 'color-mix(in oklch, var(--expense) 50%, var(--gold))')
   assert.equal(utilizationTone(100, 30), 'var(--expense)')
   assert.equal(utilizationTone(250, 30), 'var(--expense)')
 })

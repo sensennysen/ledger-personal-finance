@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { LedgerMark } from '@/components/brand/LedgerMark'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -80,11 +81,7 @@ export function TopBar({
     <>
     <header className="hidden md:flex shrink-0 h-16 items-center gap-6 border-b border-border bg-sidebar px-6 lg:px-8">
       <NavLink to="/" className="flex items-center gap-2.5 shrink-0">
-        <img
-          src={theme === 'dark' ? '/l-white.png' : '/l-black.png'}
-          alt=""
-          className="size-8 object-contain"
-        />
+        <LedgerMark decorative className="size-8 text-foreground" />
         <span
           className="hidden lg:inline text-sm font-semibold tracking-[0.08em] uppercase text-foreground/80"
           style={{ fontFamily: '"Roboto", sans-serif' }}

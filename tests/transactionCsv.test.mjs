@@ -81,3 +81,10 @@ test('the full export is unchanged: all twelve headers, in order', () => {
   assert.equal(buildTransactionsCsv([tx()]).split('\n')[0], TRANSACTION_CSV_HEADERS.join(','))
   assert.equal(TRANSACTION_CSV_HEADERS.length, 12)
 })
+
+test('a negative number stays a number, while text that starts with a minus is still neutralised (LED-143)', async () => {
+  const { escapeCsvCell } = await import('../src/lib/transactionCsv.ts')
+  assert.equal(escapeCsvCell(-3000), '-3000')
+  assert.equal(escapeCsvCell('-3000'), "'-3000")
+  assert.equal(escapeCsvCell('=SUM(A1)'), "'=SUM(A1)")
+})

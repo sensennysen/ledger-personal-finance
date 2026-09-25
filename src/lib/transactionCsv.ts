@@ -6,8 +6,9 @@ import type { ReportColumn } from './reportColumns.ts'
 
 export function escapeCsvCell(value: string | number | null | undefined): string {
   let str = String(value ?? '')
-  // Neutralize spreadsheet formulas when the CSV is opened in Excel/Sheets.
-  if (/^[=+\-@]/.test(str)) {
+  // Neutralize spreadsheet formulas when the CSV is opened in Excel/Sheets. A number is not text a
+  // formula can hide in, and a negative balance (a card, a loan) must stay a number (LED-143).
+  if (typeof value === 'string' && /^[=+\-@]/.test(str)) {
     str = `'${str}`
   }
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {

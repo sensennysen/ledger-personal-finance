@@ -46,7 +46,6 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
   const valid = lines.length >= 2 && split.blockers.length === 0
   const blankLines = new Set(split.blockers.find((b) => b.kind === 'blank-description')?.lines ?? [])
   const zeroLines = new Set(split.blockers.find((b) => b.kind === 'zero-amount')?.lines ?? [])
-  const carriesExtras = !!tx.receipt_url || (tx.tags?.length ?? 0) > 0
 
   const update = (id: string, field: keyof SplitInput, value: string | number | null) => {
     setTouched(true)
@@ -225,8 +224,7 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
           </div>
 
           <p className="text-xs text-muted-foreground">
-            The original transaction is deleted and replaced by {lines.length} entries. This can't be undone.
-            {carriesExtras && " Its receipt and tags won't carry over."}
+            The original transaction is deleted and replaced by {lines.length} entries that keep its date, tags, receipt and goal. This can't be undone.
           </p>
 
           <FormError error={error} className="mt-0 px-0" />

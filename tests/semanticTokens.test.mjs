@@ -30,3 +30,8 @@ for (const file of STATUS_FILES) {
     assert.deepEqual(offenders, [])
   })
 }
+
+test('utilisation tone is a fill; it passes through --gold, so it is never text colour', () => {
+  const src = read('components/dashboard/DashboardCreditCardMonitor.tsx')
+  assert.equal(/color:\s*utilizationTone\(/.test(src), false)
+})

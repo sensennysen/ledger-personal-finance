@@ -3,7 +3,7 @@
 // flagged before the write, so a re-imported or overlapping statement doesn't
 // silently add every row twice.
 //
-// Transfers (LED-75) match on date + amount + direction only: the other bank
+// Transfers and loan repayments (LED-75, LED-147) match on date + amount + direction only: the other bank
 // words the same movement differently, so once one statement's side is
 // imported as a transfer, the other statement's side is flagged too.
 
@@ -49,6 +49,11 @@ function transferKey(date: string, amount: number, direction: 'income' | 'expens
   return `${date}|${Math.round(amount * 100)}|${direction}`
 }
 
+/** Money moved between two of the user's accounts: a transfer, or an expense paid to a loan. */
+function isMovement(tx: ExistingTx): boolean {
+  return tx.type === 'transfer' || (tx.type === 'expense' && tx.to_account_id !== null)
+}
+
 function push<T>(buckets: Map<string, T[]>, key: string, value: T) {
   const bucket = buckets.get(key)
   if (bucket) bucket.push(value)
@@ -70,11 +75,14 @@ export function matchDuplicates<T extends ImportCandidate>(
   const buckets = new Map<string, ExistingTx[]>()
   const transfers = new Map<string, ExistingTx[]>()
   for (const tx of existing) {
-    if (tx.type === 'transfer') {
+    // A loan repayment is an expense with a target account (LED-147); the loan's statement words it
+    // differently from the payer's, so it matches like a transfer: date, amount and direction.
+    if (isMovement(tx)) {
       if (tx.account_id === importAccountId) {
         push(transfers, transferKey(tx.date, Number(tx.amount), 'expense'), tx)
       } else if (tx.to_account_id === importAccountId) {
-        push(transfers, transferKey(tx.date, Number(tx.amount) * Number(tx.exchange_rate ?? 1), 'income'), tx)
+        const received = tx.type === 'transfer' ? Number(tx.amount) * Number(tx.exchange_rate ?? 1) : Number(tx.amount)
+        push(transfers, transferKey(tx.date, received, 'income'), tx)
       }
       continue
     }

@@ -11,8 +11,8 @@ function mix(from: string, to: string, t: number): string {
 export function utilizationTone(pct: number, targetPct: number = 30): string {
   const target = Math.min(99, Math.max(1, targetPct))
   if (!Number.isFinite(pct) || pct <= 0) return 'var(--income)'
-  if (pct < target) return mix('--income', '--primary', pct / target)
-  return mix('--primary', '--expense', (pct - target) / (100 - target))
+  if (pct < target) return mix('--income', '--gold', pct / target)
+  return mix('--gold', '--expense', (pct - target) / (100 - target))
 }
 
 /** Pass as `style` to <Progress>; its indicator reads --progress-tone. */

@@ -23,7 +23,7 @@ import { usePreferences } from '@/hooks/usePreferences'
 import { useFlipReorder } from '@/hooks/useFlipReorder'
 import { formatCurrency, getCurrencySymbol, getLocalDateString, cn } from '@/lib/utils'
 import { useCycle } from '@/contexts/cycleState'
-import { INCOME, EXPENSE, GOLD } from '@/constants/colors'
+import { INCOME, EXPENSE } from '@/constants/colors'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { InlineLoadError } from '@/components/ui/error-state'
@@ -71,7 +71,7 @@ function StatCard({
   const accentColor =
     variant === 'income' ? INCOME
     : variant === 'expense' ? EXPENSE
-    : GOLD
+    : 'var(--primary)'
 
   return (
     <div

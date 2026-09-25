@@ -1,5 +1,5 @@
 import { CalendarClock, CreditCard } from 'lucide-react'
-import { GOLD } from '@/constants/colors'
+import { WARNING_INK } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import { TONED_PROGRESS_CLASS, utilizationTone, utilizationToneStyle } from '@/lib/utilizationTone'
 import type { CreditCardWithState } from '@/hooks/useDashboardData'
@@ -63,7 +63,7 @@ export function DashboardCreditCardMonitor({
               )}
             </p>
             {(card.paymentReminder || card.statementReminder) && (
-              <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: card.paymentReminder ? GOLD : undefined }}>
+              <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: card.paymentReminder ? WARNING_INK : undefined }}>
                 <CalendarClock className="w-3.5 h-3.5 shrink-0" aria-hidden />
                 {[
                   card.paymentReminder && `Payment due ${formatCountdown(card.dueCountdown)}`,

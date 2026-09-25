@@ -791,7 +791,7 @@ function BudgetHistoryCard({ budget }: { budget: Budget }) {
                     <div className="w-14 hidden sm:block">
                       <Progress
                         value={pct}
-                        className={`h-1.5 ${over ? '[&_[data-slot=progress-indicator]]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&_[data-slot=progress-indicator]]:bg-primary' : '[&_[data-slot=progress-indicator]]:bg-income'}`}
+                        className={`h-1.5 ${over ? '[&_[data-slot=progress-indicator]]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&_[data-slot=progress-indicator]]:bg-gold' : '[&_[data-slot=progress-indicator]]:bg-income'}`}
                       />
                     </div>
                     {over
@@ -1350,7 +1350,7 @@ export default function BudgetsPage() {
                     <div className="flex items-center gap-3">
                       <Progress
                         value={pct}
-                        className={`flex-1 ${over ? '[&_[data-slot=progress-indicator]]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&_[data-slot=progress-indicator]]:bg-primary' : ''}`}
+                        className={`flex-1 ${over ? '[&_[data-slot=progress-indicator]]:bg-destructive' : pct > BUDGET_WARNING_THRESHOLD ? '[&_[data-slot=progress-indicator]]:bg-gold' : ''}`}
                       />
                       <span className={`shrink-0 text-sm font-medium tabular-nums ${over ? 'text-destructive' : 'text-muted-foreground'}`}>
                         {usedPct === null ? 'Over' : `${usedPct}%`}

@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
 import { resolveEditTarget } from '@/lib/editTarget'
+import { resolveInitialLoanId } from '@/lib/loanPicker'
 import { daysUntilDayOfMonth } from '@/lib/creditCards'
 import {
   defaultCardPaymentDescription,
@@ -270,9 +271,10 @@ export function TransactionForm({
   }, [cardAccounts, handleCardChange, isCardPayment, selectedLoanId])
 
   useEffect(() => {
-    if (!isLoanRepayment || selectedLoanId || loanAccounts.length === 0) return
-    handleLoanChange(loanAccounts[0].id)
-  }, [handleLoanChange, isLoanRepayment, loanAccounts, selectedLoanId])
+    if (!isLoanRepayment || selectedLoanId) return
+    const initialLoanId = resolveInitialLoanId(loanAccounts, lockedLoanAccountId, editTarget)
+    if (initialLoanId) handleLoanChange(initialLoanId)
+  }, [editTarget, handleLoanChange, isLoanRepayment, loanAccounts, lockedLoanAccountId, selectedLoanId])
 
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
     const repaymentLoan = loanAccounts.find((account) => account.id === values.to_account_id)

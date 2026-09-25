@@ -4,7 +4,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
-  Plus, Pencil, Trash2, Target, History, PiggyBank,
+  Plus, Pencil, Trash2, Target, CopyPlus, History, PiggyBank,
   RefreshCw, CheckCircle2, CalendarDays, ChevronDown, ChevronRight as ChevronR, Smile,
 } from 'lucide-react'
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
@@ -13,6 +13,15 @@ import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { useBudgets } from '@/hooks/useBudgets'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { budgetAllowance, canRollover, nextCycleOpensAt } from '@/lib/budgetRollover'
+import { replayCarriedIn } from '@/lib/budgetHistory'
+import { cycleDaysLeft, needsAttention, sortByUsage, summarizeBudgets } from '@/lib/budgetSummary'
+import { lastCycleCandidates, spendByCategory } from '@/lib/budgetSuggestions'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { BudgetSummaryTiles } from '@/components/budgets/BudgetSummaryTiles'
+import { NeedsAttention } from '@/components/budgets/NeedsAttention'
+import { BudgetTable } from '@/components/budgets/BudgetTable'
+import { DeleteBudgetButton } from '@/components/budgets/DeleteBudgetButton'
+import { AddFromLastCycleDialog } from '@/components/budgets/AddFromLastCycleDialog'
 import { deficitSettingLabel } from '@/lib/overspending'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { BUDGET_TONE_BAR_CLASS, budgetTone, budgetUsage } from '@/lib/budgetUsage'
@@ -129,16 +138,23 @@ function BudgetForm({
   })
   const rolloverOn = rolloverAllowed && rolloverEnabled === true
   const savedRolloverOn = !!current && current.rollover_enabled && canRollover(current.period)
-  const carriedIn = savedRolloverOn ? current.rollover_amount ?? 0 : 0
+  const savedCarriedIn = savedRolloverOn ? current.rollover_amount ?? 0 : 0
+  // The same replay the list used, run with the amount and switch as edited, so the
+  // form and the list show one figure. Without the period spends (a cache from before
+  // they were kept) the saved figure stands and the note below says so.
+  const periodSpends = current?.period_spends
+  const canReplay = !!periodSpends && !!deficitBehaviour
+  const carriedIn = canReplay
+    ? replayCarriedIn(periodSpends, Number(watchedAmount) || 0, rolloverOn, deficitBehaviour)
+    : savedCarriedIn
   const allowance = budgetAllowance(Number(watchedAmount) || 0, carriedIn, rolloverOn)
-  // Carried-in comes from the saved budget's history; the form can't replay it.
-  const allowanceStale = !!current && (rolloverOn !== savedRolloverOn || allowance.base !== current.amount)
+  const allowanceStale = !canReplay && !!current && (rolloverOn !== savedRolloverOn || allowance.base !== current.amount)
 
   const spent = current?.spent ?? 0
   const savedEffective = current ? current.effective_amount ?? current.amount : 0
   const overBy = current ? spent - savedEffective : 0
   const opensAt = current && deficitBehaviour
-    ? nextCycleOpensAt(current.amount, carriedIn, spent, savedRolloverOn, deficitBehaviour)
+    ? nextCycleOpensAt(current.amount, savedCarriedIn, spent, savedRolloverOn, deficitBehaviour)
     : null
   const rolloverHelp = !rolloverAllowed
     ? 'Only monthly budgets carry a balance. On any other period this setting has no effect.'
@@ -1114,7 +1130,7 @@ export default function BudgetsPage() {
   const { profile } = useAuth()
   const notify = useNotify()
   const { selectedMonth, startDay } = useCycle()
-  const { budgets, loading, refreshing: budgetsRefreshing, error: budgetError, errorDetail: budgetErrorDetail, refetch: refetchBudgets, createBudget, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
+  const { budgets, loading, refreshing: budgetsRefreshing, error: budgetError, errorDetail: budgetErrorDetail, refetch: refetchBudgets, previousCycle, createBudget, createBudgets, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
   const budgetsLoadState = resolveLoadState({ loading, error: budgetError, hasData: budgets.length > 0 })
   const budgetsRefreshLabel = `Loading ${new Date(`${selectedMonth}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}…`
   const { goals, loading: goalsLoading, error: goalsError, errorDetail: goalsErrorDetail, refetch: refetchGoals, createGoal, updateGoal, deleteGoal, addContribution } = useSavingsGoals()
@@ -1196,6 +1212,54 @@ export default function BudgetsPage() {
 
   const monthlyBudgets = budgets.filter((b) => b.period === 'monthly')
 
+  // Summary, ordering and the attention list all read the one budgets array, so they follow the stepper.
+  const isTableSurface = useMediaQuery('(min-width: 768px)')
+  const cycleRange = getBudgetCycleRange('monthly', selectedMonth, startDay)
+  const daysLeft = cycleDaysLeft(cycleRange.start, cycleRange.end, getLocalDateString())
+  const summary = summarizeBudgets(budgets, defaultCurrency)
+  const sortedBudgets = sortByUsage(budgets)
+  const attention = needsAttention(budgets)
+
+  // "Add from last cycle": categories spent in last cycle that have no budget yet.
+  const { categories: allCategories } = useCategories()
+  const [addFromLastOpen, setAddFromLastOpen] = useState(false)
+  const lastCycleSpend = previousCycle
+    ? spendByCategory(previousCycle.txs, previousCycle.start, previousCycle.end, defaultCurrency)
+    : null
+  const categoryById = new Map(allCategories.map((category) => [category.id, category]))
+  const suggestions = lastCycleSpend
+    ? lastCycleCandidates(lastCycleSpend, budgets.map((budget) => budget.category_id)).flatMap((candidate) => {
+        const category = categoryById.get(candidate.category_id)
+        return category ? [{ ...candidate, name: category.name, icon: category.icon }] : []
+      })
+    : []
+  const suggestionUnrated = [
+    ...new Set(
+      (lastCycleSpend ?? [])
+        .filter((row) => suggestions.some((suggestion) => suggestion.category_id === row.category_id))
+        .flatMap((row) => row.unrated),
+    ),
+  ].sort()
+  const addFromLastReason = !previousCycle
+    ? "Last cycle's spending is not loaded yet, or you are offline."
+    : suggestions.length === 0
+      ? 'Every category you spent in last cycle already has a budget.'
+      : null
+  const handleAddFromLast = () =>
+    createBudgets(
+      suggestions.map((suggestion) => ({
+        name: suggestion.name,
+        category_id: suggestion.category_id,
+        amount: suggestion.amount,
+        currency: defaultCurrency,
+        period: 'monthly' as const,
+        start_date: previousCycle?.start ?? getLocalDateString(),
+        end_date: null,
+        is_active: true,
+        rollover_enabled: false,
+      })),
+    )
+
   // Search's "Edit the <category> budget" lands here as ?edit=<id>: open that
   // budget's editor once the list has loaded, then drop the param so a refresh
   // does not reopen it. A budget that no longer exists is said so, not ignored.
@@ -1214,16 +1278,30 @@ export default function BudgetsPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold md:hidden">Budgets & Goals</h1>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0 max-md:basis-full">
+          {/* The phone header already names the page; keep one visible title and one h1. */}
+          <h1 className="sr-only md:hidden">Budgets & Goals</h1>
           <p className="text-muted-foreground text-sm">Track spending limits and savings targets</p>
         </div>
         <PageActions>
           {activeTab === 'budgets' && (
-            <Button className="gap-2" size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="w-4 h-4" />Add Budget
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                className="gap-2"
+                size="sm"
+                disabled={addFromLastReason !== null}
+                aria-describedby={addFromLastReason ? 'add-from-last-reason' : undefined}
+                onClick={() => setAddFromLastOpen(true)}
+              >
+                <CopyPlus className="w-4 h-4" />Add from last cycle
+              </Button>
+              {addFromLastReason && <span id="add-from-last-reason" className="sr-only">{addFromLastReason}</span>}
+              <Button className="gap-2" size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="w-4 h-4" />Add Budget
+              </Button>
+            </>
           )}
           {activeTab === 'goals' && (
             <Button className="gap-2" size="sm" onClick={() => setCreateGoalOpen(true)}>
@@ -1263,7 +1341,20 @@ export default function BudgetsPage() {
           ) : (
             <RefreshingRegion refreshing={budgetsRefreshing} label={budgetsRefreshLabel}>
             <div className="space-y-4">
-            {budgets.map((budget, idx) => {
+            <BudgetSummaryTiles summary={summary} currency={defaultCurrency} daysLeft={daysLeft} />
+            <NeedsAttention items={attention} daysLeft={daysLeft} />
+            {isTableSurface ? (
+              <BudgetTable
+                budgets={sortedBudgets}
+                defaultCurrency={defaultCurrency}
+                periodLabel={(period) => BUDGET_PERIOD_LABELS[period]}
+                onSelect={setSelectedBudget}
+                onEdit={setEditBudget}
+                onDelete={(budget) => deleteBudget(budget.id)}
+              />
+            ) : (
+            <div className="space-y-4">
+            {sortedBudgets.map((budget, idx) => {
               const spent = budget.spent ?? 0
               const effective = budget.effective_amount ?? budget.amount
               const { usedPct, barPct: pct, over } = budgetUsage(spent, effective)
@@ -1317,33 +1408,7 @@ export default function BudgetsPage() {
                         >
                           <Pencil className="w-3 h-3" />
                         </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger render={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive"
-                              onClick={(event) => event.stopPropagation()}
-                            />
-                          }>
-                            <Trash2 className="w-3 h-3" />
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete budget?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete "{budget.name}".
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={async () => {
-                                const { error } = await deleteBudget(budget.id)
-                                if (error) console.error('Failed to delete budget:', error)
-                              }}>Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <DeleteBudgetButton name={budget.name} onDelete={() => deleteBudget(budget.id)} />
                       </div>
                     </div>
                   </CardHeader>
@@ -1404,6 +1469,8 @@ export default function BudgetsPage() {
                 </InteractiveRow>
               )
             })}
+            </div>
+            )}
             </div>
             </RefreshingRegion>
           )}
@@ -1540,6 +1607,15 @@ export default function BudgetsPage() {
         </DialogContent>
       </Dialog>
 
+      <AddFromLastCycleDialog
+        open={addFromLastOpen}
+        onOpenChange={setAddFromLastOpen}
+        rows={suggestions}
+        currency={defaultCurrency}
+        cycleLabel={previousCycle ? `${formatCycleDay(previousCycle.start)} – ${formatCycleDay(previousCycle.end)}` : 'last cycle'}
+        unrated={suggestionUnrated}
+        onConfirm={handleAddFromLast}
+      />
       <Dialog open={!!editBudget} onOpenChange={(o) => { if (!o) { setEditBudget(null); setFormError(null) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Budget</DialogTitle></DialogHeader>

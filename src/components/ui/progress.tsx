@@ -12,7 +12,8 @@ function Progress({
     <ProgressPrimitive.Root
       value={value}
       data-slot="progress"
-      className={cn("flex flex-wrap gap-3", className)}
+      // base-ui appends a visually-hidden "x" span to the root; display:none keeps it out of innerText.
+      className={cn("flex flex-wrap gap-3 [&>span[role=presentation]]:hidden", className)}
       {...props}
     >
       {children}

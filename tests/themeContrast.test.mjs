@@ -43,6 +43,7 @@ const pairs = [
   ['--expense', '--expense-container'],
   ['--transfer', '--transfer-container'],
   ['--warning', '--warning-container'],
+  ['--foreground', '--warning-container'],
   ['--income', '--card'],
   ['--expense', '--card'],
   ['--warning', '--card'],

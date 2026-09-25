@@ -31,15 +31,16 @@ import {
 import { InlineLoadError } from '@/components/ui/error-state'
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { useGlobalSearch } from '@/hooks/useGlobalSearch'
+import { KIND_SHORTCUTS } from '@/lib/kindMenu'
 import { DESTINATIONS, type SearchAction, type SearchScope } from '@/lib/globalSearch'
 import { cn, formatCurrency, formatDateShort } from '@/lib/utils'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import type { Transaction } from '@/types'
 
 const ACTIONS: (SearchAction & { kind: TransactionKind; icon: typeof ArrowUpRight })[] = [
-  { id: 'expense', kind: 'expense', label: 'New expense', keywords: ['add', 'spend', 'record'], key: 'E', icon: ArrowUpRight },
-  { id: 'income', kind: 'income', label: 'New income', keywords: ['add', 'earn', 'record'], key: 'I', icon: ArrowDownLeft },
-  { id: 'transfer', kind: 'transfer', label: 'New transfer', keywords: ['add', 'move', 'record'], key: 'T', icon: ArrowLeftRight },
+  { id: 'expense', kind: 'expense', label: 'New expense', keywords: ['add', 'spend', 'record'], key: KIND_SHORTCUTS.expense, icon: ArrowUpRight },
+  { id: 'income', kind: 'income', label: 'New income', keywords: ['add', 'earn', 'record'], key: KIND_SHORTCUTS.income, icon: ArrowDownLeft },
+  { id: 'transfer', kind: 'transfer', label: 'New transfer', keywords: ['add', 'move', 'record'], key: KIND_SHORTCUTS.transfer, icon: ArrowLeftRight },
 ]
 
 const DESTINATION_ICONS: Record<string, LucideIcon> = {

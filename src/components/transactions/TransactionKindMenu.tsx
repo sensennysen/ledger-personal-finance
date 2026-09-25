@@ -17,12 +17,13 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { kindMenuItems } from '@/lib/kindMenu'
+import { kindForShortcut, kindMenuItems } from '@/lib/kindMenu'
 import { formatCurrency } from '@/lib/utils'
 
 interface TransactionKindMenuProps {
@@ -57,6 +58,7 @@ export function TransactionKindMenu({
   // below it (LED-109). Same breakpoint as AppLayout's `mobile`.
   const compact = useMediaQuery('(max-width: 767px)')
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
   const items = kindMenuItems(accounts, {
@@ -79,6 +81,7 @@ export function TransactionKindMenu({
           <span className="block font-medium leading-tight">{item.label}</span>
           <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{item.description}</span>
         </span>
+        {item.shortcut && <DropdownMenuShortcut className="mt-0.5 tracking-normal">{item.shortcut}</DropdownMenuShortcut>}
       </DropdownMenuItem>
     )
   }
@@ -133,9 +136,23 @@ export function TransactionKindMenu({
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger render={trigger} />
-      <DropdownMenuContent align={align} side={side} className="w-80 p-1.5">
+      <DropdownMenuContent
+        align={align}
+        side={side}
+        className="w-80 p-1.5"
+        // The letter selects the item and opens the dialog; base-ui typeahead
+        // alone would only move focus to a label that starts with it.
+        onKeyDown={(event) => {
+          if (event.metaKey || event.ctrlKey || event.altKey) return
+          const kind = kindForShortcut(event.key)
+          if (!kind || !items.some((item) => item.kind === kind)) return
+          event.preventDefault()
+          setMenuOpen(false)
+          onSelect(kind)
+        }}
+      >
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2 py-1.5">What would you like to record?</DropdownMenuLabel>
           {primary.map(renderItem)}

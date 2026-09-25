@@ -105,3 +105,34 @@ test('below md the menu is a bottom sheet fed by the same list', () => {
   assert.equal(source.match(/primary\.map\(/g).length, 2)
   assert.equal(source.match(/liabilities\.map\(/g).length, 2)
 })
+
+test('E / I / T map to the three primary kinds and nothing else', async () => {
+  const { KIND_SHORTCUTS, kindForShortcut } = await import('../src/lib/kindMenu.ts')
+  assert.deepEqual({ ...KIND_SHORTCUTS }, { expense: 'E', income: 'I', transfer: 'T' })
+  assert.equal(kindForShortcut('e'), 'expense')
+  assert.equal(kindForShortcut('I'), 'income')
+  assert.equal(kindForShortcut('t'), 'transfer')
+  assert.equal(kindForShortcut('l'), null)
+  assert.equal(kindForShortcut('c'), null)
+})
+
+test('only the primary kinds carry a key cap', () => {
+  const items = kindMenuItems(
+    [cash, acct({ name: 'Car', type: 'loan', balance: -100 }), acct({ name: 'Visa', type: 'credit_card', balance: -50 })],
+    opts,
+  )
+  assert.deepEqual(items.map((i) => i.shortcut), ['E', 'I', 'T', undefined, undefined])
+})
+
+test('the dropdown renders key caps and the sheet does not', () => {
+  const source = readFileSync(new URL('../src/components/transactions/TransactionKindMenu.tsx', import.meta.url), 'utf8')
+  const sheetPart = source.slice(source.indexOf('if (compact)'), source.indexOf('return (\n    <DropdownMenu'))
+  assert.ok(!sheetPart.includes('shortcut'), 'the sheet must not show key caps')
+  assert.match(source, /<DropdownMenuShortcut/)
+})
+
+test('the search palette reads the shared mapping instead of its own letters', () => {
+  const source = readFileSync(new URL('../src/components/search/SearchPalette.tsx', import.meta.url), 'utf8')
+  assert.match(source, /import \{ KIND_SHORTCUTS \} from '@\/lib\/kindMenu'/)
+  assert.ok(!/key: '[EIT]'/.test(source))
+})

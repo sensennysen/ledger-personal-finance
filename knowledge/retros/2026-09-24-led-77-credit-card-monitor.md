@@ -4,6 +4,7 @@
 - One card with a divided row per credit card: name, "Spent X of Y" and % on top, then the bar, then one meta line (statement · due · to pay · remaining). The four-deep nesting is gone.
 - The reminder strips are one inline line. A due payment uses `GOLD`; a statement reminder uses muted text. There are no raw amber/sky classes left on Home.
 - `src/lib/utilizationTone.ts` (tested) grades the colour: `--income` at 0%, `--primary` (gold) at the card's target, `--expense` at 100%, mixed in oklch. `TONED_PROGRESS_CLASS` plus `utilizationToneStyle` drive the `<Progress>` indicator through `--progress-tone`.
+  - Superseded by LED-115: `--primary` is no longer gold after LED-100.
 - The same tone is on the Accounts and account-detail utilisation bars.
 - The monitor no longer spans two columns.
 

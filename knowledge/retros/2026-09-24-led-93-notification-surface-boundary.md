@@ -13,6 +13,7 @@
   - if the payment record or the statement update then fails, the user gets "Payment recorded, statement not updated", and Fix reruns only the steps that failed.
 - `ErrorBoundary` wraps the routed page content and the entry detail, with copy from the design ("This section didn't load …"), "Reload this section" and "Copy error details". `App.tsx` keeps `variant="app"` as the last resort, which reloads the page.
 - BudgetsPage bars and warning text use `primary` (GOLD) / `income`.
+  - Superseded by LED-115: `--primary` is no longer gold after LED-100.
 
 ## Acceptance (browser, local user, 1280 and 390, dark and light)
 - One surface with three severities — PASS.

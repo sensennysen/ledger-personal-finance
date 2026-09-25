@@ -17,6 +17,7 @@
   color tokens were needed to satisfy "gold for pending, red only for
   genuine failure"; only the copy, the missing `Sync now` action, and the
   11px→12px (`text-xs`) type size were actually wrong.
+  - Superseded by LED-115: `--primary` is no longer gold after LED-100.
 - `drainQueue`'s per-item progress callback (`onProgress`) is I/O-adjacent
   like the rest of the function, so it isn't unit-tested — same gap
   [[LED-05]]'s retro already flagged (no supabase/localStorage mock

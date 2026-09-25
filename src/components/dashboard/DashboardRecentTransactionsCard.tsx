@@ -3,6 +3,7 @@ import { useEntryDetail } from '@/contexts/EntryContext'
 import { useNavigate } from 'react-router-dom'
 import { EXPENSE, INCOME, TRANSFER } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import type { Transaction } from '@/types'
 import { Button } from '@/components/ui/button'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
@@ -26,7 +27,7 @@ function getTransactionAmountColor(type: Transaction['type']) {
 
 function getTransactionPrefix(type: Transaction['type']) {
   if (type === 'income') return '+'
-  if (type === 'expense') return '-'
+  if (type === 'expense') return MINUS
   return ''
 }
 

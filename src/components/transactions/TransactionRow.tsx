@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { amountDisplay } from '@/lib/transactionWindow'
 import { inferTransactionKind } from '@/components/transactions/transactionKinds'
 import type { Transaction } from '@/types'
 
@@ -96,17 +97,7 @@ export function TransactionRow({
         : TRANSACTION_TYPE_COLOR.transfer
     : TRANSACTION_TYPE_COLOR[tx.type]
 
-  const amountPrefix =
-    tx.type === 'income' || (contextAccountId !== undefined && isIncoming)
-      ? '+'
-      : tx.type === 'expense'
-        ? '-'
-        : ''
-
-  const displayAmount =
-    contextAccountId !== undefined && isIncoming
-      ? tx.amount * (tx.exchange_rate ?? 1)
-      : tx.amount
+  const { sign: amountPrefix, value: displayAmount, currency: displayCurrency } = amountDisplay(tx, contextAccountId)
 
   return (
     <div className={`flex items-center gap-3 ${dense ? 'px-3 py-2' : 'p-3'} rounded-lg bg-card border hover:bg-accent/50 transition-colors group`}>
@@ -139,7 +130,7 @@ export function TransactionRow({
             onSplit: onSplit && tx.type !== 'transfer' ? ()=>onSplit(tx) : undefined,
           }) : onEdit(tx)}>{tx.description}</button>
           <p className={`money text-sm font-semibold shrink-0 ${amountColorClass}`}>
-            {amountPrefix}{formatCurrency(displayAmount, tx.currency)}
+            {amountPrefix}{formatCurrency(displayAmount, displayCurrency)}
           </p>
         </div>
         {/* Row 2: labels | currency */}

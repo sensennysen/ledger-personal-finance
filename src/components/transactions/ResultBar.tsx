@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, Rows3 } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Download, Rows3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatNet } from '@/lib/formatNet'
 import type { TxSort } from '@/lib/transactionWindow'
@@ -28,6 +28,7 @@ export function ResultBar({
   onSortChange,
   density,
   onDensityChange,
+  onExport,
   compact,
 }: {
   matchCount: number
@@ -39,6 +40,8 @@ export function ResultBar({
   onSortChange: (sort: TxSort) => void
   density: Density
   onDensityChange: (density: Density) => void
+  /** Downloads the matching rows as CSV (29a "Export match"). */
+  onExport?: () => void
   compact: boolean
 }) {
   const nextSort: TxSort = sort === 'newest' ? 'oldest' : 'newest'
@@ -84,6 +87,19 @@ export function ResultBar({
           >
             <Rows3 className="w-3.5 h-3.5" />
             <span>Compact</span>
+          </Button>
+        )}
+        {onExport && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs text-primary"
+            onClick={onExport}
+            disabled={matchCount === 0}
+            aria-label={`Export ${matchCount.toLocaleString()} matching transactions as CSV`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            {!compact && <span>Export match</span>}
           </Button>
         )}
       </div>

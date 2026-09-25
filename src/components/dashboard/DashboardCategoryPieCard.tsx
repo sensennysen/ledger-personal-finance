@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
@@ -7,6 +8,8 @@ import { InteractiveRow } from '@/components/ui/interactive-row'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DASHBOARD_CHART_TOOLTIP_STYLE } from '@/components/dashboard/chartTooltipStyle'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
+import { rollupBreakdown, type CategorySlice } from '@/lib/categoryBreakdown'
+import { RankedBars } from '@/components/reports/CategoryBreakdownCard'
 
 interface DashboardCategoryPieCardProps {
   expensesByCategory: DashboardExpenseCategoryBreakdown[]
@@ -26,19 +29,55 @@ export function DashboardCategoryPieCard({
   style,
 }: DashboardCategoryPieCardProps) {
   const ink = useCategoryInk()
+  // Same rule as Reports (spec §7 V4): a pie up to 12 categories, ranked bars with an Other row above.
+  const rollup = useMemo(() => {
+    const total = expensesByCategory.reduce((sum, c) => sum + c.amount, 0)
+    const slices: CategorySlice[] = expensesByCategory.map((c, index) => ({
+      key: `${index}:${c.name}`,
+      name: c.name,
+      color: ink(c.color),
+      amount: c.amount,
+      share: total > 0 ? c.amount / total : 0,
+      subcategories: [],
+    }))
+    return rollupBreakdown(slices)
+  }, [expensesByCategory, ink])
+  const ariaLabel = `View expenses by category for ${monthLabel}`
+  const header = (
+    <DashboardCardHeader
+      title="Expenses by Category"
+      subtitle={`${monthLabel} spending breakdown`}
+      action={<ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5" />}
+    />
+  )
+
+  // Ranked mode holds a button of its own (the Other row), so only the header opens the details;
+  // a button inside a button is not valid.
+  if (!loading && rollup.mode === 'ranked') {
+    return (
+      <div className="w-full rounded-[20px] border border-border p-4 md:p-5 bg-card" style={style}>
+        <InteractiveRow
+          as="button"
+          aria-label={ariaLabel}
+          className="w-full text-left rounded-lg cursor-pointer transition-colors duration-(--dur-base) hover:bg-elevated focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+          onActivate={onClick}
+        >
+          {header}
+        </InteractiveRow>
+        <RankedBars top={rollup.top} other={rollup.other} currency={currency} grouped={false} resetKey={monthLabel} />
+      </div>
+    )
+  }
+
   return (
     <InteractiveRow
       as="button"
-      aria-label={`View expenses by category for ${monthLabel}`}
+      aria-label={ariaLabel}
       className="w-full text-left rounded-[20px] border border-border p-4 md:p-5 bg-card cursor-pointer transition-colors duration-(--dur-base) hover:bg-elevated focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
       style={style}
       onActivate={onClick}
     >
-      <DashboardCardHeader
-        title="Expenses by Category"
-        subtitle={`${monthLabel} spending breakdown`}
-        action={<ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5" />}
-      />
+      {header}
       {loading ? (
         <Skeleton className="h-56 w-full" />
       ) : expensesByCategory.length === 0 ? (

@@ -1,6 +1,7 @@
 import { ArrowRight, BarChart3, Repeat, TrendingDown, TrendingUp } from 'lucide-react'
 import { EXPENSE, INCOME } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import type { DashboardCashFlowForecast } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -99,7 +100,7 @@ export function DashboardCashFlowForecastCard({
                     className="money font-medium shrink-0"
                     style={{ color: item.tx.type === 'income' ? INCOME : EXPENSE }}
                   >
-                    {item.tx.type === 'income' ? '+' : '-'}
+                    {item.tx.type === 'income' ? '+' : MINUS}
                     {formatCurrency(item.total, currency)}
                   </span>
                 </div>

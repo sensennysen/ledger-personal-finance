@@ -88,3 +88,11 @@ test('a negative number stays a number, while text that starts with a minus is s
   assert.equal(escapeCsvCell('-3000'), "'-3000")
   assert.equal(escapeCsvCell('=SUM(A1)'), "'=SUM(A1)")
 })
+
+test('Export match writes one line per row it is given, in the order given, and nothing else (LED-149)', () => {
+  const matches = [tx({ id: 'a', description: 'One' }), tx({ id: 'b', description: 'Two' }), tx({ id: 'c', description: 'Three' })]
+  const lines = buildTransactionsCsv(matches).split('\n')
+  assert.equal(lines.length, matches.length + 1)
+  assert.deepEqual(lines.slice(1).map((line) => line.split(',')[2]), ['One', 'Two', 'Three'])
+  assert.equal(buildTransactionsCsv([]), TRANSACTION_CSV_HEADERS.join(','))
+})

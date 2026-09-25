@@ -4,6 +4,7 @@ import { EXPENSE, INCOME } from '@/constants/colors'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { getAccountNetWorthContribution } from '@/lib/creditCards'
 import { formatCurrency } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import type { DashboardExpenseCategoryDetail, DashboardStatsSummary } from '@/hooks/useDashboardData'
 import type { Account, Transaction } from '@/types'
 import { DialogHeader } from '@/components/ui/dialog'
@@ -71,7 +72,7 @@ function TransactionListDialog({
                 subtitle={`${tx.category?.name ?? 'Uncategorized'} - ${tx.date}`}
                 amount={
                   <span style={{ color: totalColor }}>
-                    {prefix}
+                    {prefix === '-' ? MINUS : prefix}
                     {formatCurrency(tx.amount, tx.currency)}
                   </span>
                 }

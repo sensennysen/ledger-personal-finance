@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Wallet, MoreHorizontal, GripVertical, ArrowUp, ArrowDown, Check, LayoutList, AlignJustify, CreditCard, Banknote } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotify } from '@/contexts/notificationState'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { usePreferences } from '@/hooks/usePreferences'
@@ -43,6 +44,7 @@ export default function AccountsPage() {
   const { accounts, loading, error, errorDetail, refetch, createAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder } = useAccounts()
   const loadState = resolveLoadState({ loading, error, hasData: accounts.length > 0 })
   const { prefs, set: setPref } = usePreferences()
+  const notify = useNotify()
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
@@ -132,6 +134,11 @@ export default function AccountsPage() {
       })
   }
 
+  const saveAccountOrder = async (next: string[]) => {
+    const { error: orderError } = await updateAccountOrder(next)
+    if (orderError) notify({ severity: 'failure', title: "Couldn't change the order", body: orderError })
+  }
+
   const reorderAccount = (fromId: string, toId: string) => {
     const base = accounts.map((account) => account.id)
     const from = base.indexOf(fromId)
@@ -140,7 +147,7 @@ export default function AccountsPage() {
     const next = [...base]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    updateAccountOrder(next)
+    void saveAccountOrder(next)
   }
 
   // Arrows swap with the neighbour in the same column, not in the whole list.
@@ -152,7 +159,7 @@ export default function AccountsPage() {
     const to = next.indexOf(neighbour)
     next[from] = neighbour
     next[to] = id
-    updateAccountOrder(next)
+    void saveAccountOrder(next)
   }
 
   const moveGroup = (type: AccountType, direction: -1 | 1, columnTypes: AccountType[]) => {

@@ -31,6 +31,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
 import { isSetupComplete } from '@/lib/firstRunChecklist'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
+import { NetworkStatusProvider } from '@/contexts/NetworkStatusContext'
 import {
   Dialog,
   DialogContent,
@@ -61,7 +62,9 @@ export default function AppLayout() {
   return (
     <CycleProvider>
       <NotificationProvider>
-        <LayoutShell />
+        <NetworkStatusProvider>
+          <LayoutShell />
+        </NetworkStatusProvider>
       </NotificationProvider>
     </CycleProvider>
   )

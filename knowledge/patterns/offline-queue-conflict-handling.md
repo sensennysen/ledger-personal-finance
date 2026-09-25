@@ -1,4 +1,19 @@
-# Offline queue: conflicts and expiries
-Pure queue logic lives in `src/lib/queueState.ts` so it is testable; `offlineQueue.ts` does the I/O. Flagged items sort first after a drain and pending order is preserved (LED-05).
-**Known gaps:** update-only conflict detection, `drainQueue` write race, no retry failure state. See the LED-05 retro backlog.
-**`useNetworkStatus()` is not a singleton** — every call site gets its own `online`-event listener that independently triggers `syncNow()`/`drainQueue()`. Only call it once per page (today: `AppLayout`, which threads `status` down via props to `OfflineBanner`/`QueueReviewSheet`). A component that only needs a reactive `isOnline` flag for UI gating should use its own minimal listener instead — see `useIsOnline()` in `LoanPurchaseTracker.tsx` (LED-53).
+# Offline queue: conflicts, expiries and failures
+Three layers, so the drain can be tested without Supabase or localStorage (LED-05, LED-128):
+- `src/lib/queueState.ts` — pure state helpers (status, expiry, conflict fields, attempt counting).
+- `src/lib/queueDrain.ts` — the drain itself, with the client, storage and receipt store passed in (`drainWith`, `discardFlagged`, `singleFlight`).
+- `src/lib/offlineQueue.ts` — wires the real supabase, localStorage and receipt store. Tests use `tests/helpers/fakeSupabase.mjs` and `fakeQueueStore.mjs`.
+
+**Statuses.** An item with no status is pending. `conflict` (the server row was edited, or deleted, since it was queued), `expired` (older than 30 days) and `failed` (a database error five times) are flagged: the drain skips them until the user decides. Flagged items sort first after a drain and pending order is preserved.
+- Update to a deleted row: `conflict` with `conflictKind: 'deleted'`. Only Discard is offered; there is nothing left to overwrite.
+- Delete of an already-deleted row counts as synced. Delete of a row edited since is a `conflict`.
+- Only a database error carrying a `code` counts toward `failed`. A dropped connection never does.
+- Expiry flags on a timer in `NetworkStatusProvider`, not only on the next drain.
+
+**One drain at a time.** `drainQueue` is wrapped in `singleFlight`, and `mergeDrainResult` re-reads the queue before writing so items enqueued or resolved mid-drain survive.
+
+**`useNetworkStatus()` reads one provider.** `NetworkStatusProvider` (mounted in `AppLayout`) owns the `online`/`offline` listeners and the drain trigger; the hook is a context read, so a second call site adds nothing. `useIsOnline()` in `LoanPurchaseTracker.tsx` predates this and is still a plain listener.
+
+**Colour.** Pending is gold; red is for a genuine failure. Conflict and expired keep their LED-05 treatment.
+
+**Not queued:** reordering accounts or categories (one write per row) and splitting a transaction. Both refuse offline with a message.

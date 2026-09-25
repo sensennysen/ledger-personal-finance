@@ -18,6 +18,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
+import { useNotify } from '@/contexts/notificationState'
 import { useCategories } from '@/hooks/useCategories'
 import { useSubcategories } from '@/hooks/useSubcategories'
 import { useFlipReorder } from '@/hooks/useFlipReorder'
@@ -469,6 +470,7 @@ function SubcategoryPanel({ category }: { category: Category }) {
 
 export default function CategoriesPage() {
   const ink = useCategoryInk()
+  const notify = useNotify()
   const { categories, loading, error, errorDetail, refetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder } = useCategories()
   const loadState = resolveLoadState({ loading, error, hasData: categories.length > 0 })
   const [createOpen, setCreateOpen] = useState(false)
@@ -532,7 +534,7 @@ export default function CategoriesPage() {
       nextVisibleIds
     )
     const { error } = await updateCategoryOrder(nextIds)
-    if (error) console.error('Failed to update category order:', error)
+    if (error) notify({ severity: 'failure', title: "Couldn't change the order", body: error })
   }
 
   const reorderCategory = (fromId: string, toId: string) => {

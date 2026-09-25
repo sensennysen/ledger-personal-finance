@@ -14,7 +14,7 @@ export function OfflineBanner({
   status: ReturnType<typeof useNetworkStatus>
   onReview: () => void
 }) {
-  const { isOnline, isSyncing, pendingCount, flaggedCount, syncProgress, syncNow } = status
+  const { isOnline, isSyncing, pendingCount, flaggedCount, failedCount, syncProgress, syncNow } = status
 
   if (isOnline && pendingCount === 0 && flaggedCount === 0) return null
 
@@ -26,7 +26,8 @@ export function OfflineBanner({
         style={{ background: 'var(--expense-container)', color: 'var(--expense)' }}
       >
         <AlertTriangle className="size-4 shrink-0" />
-        {flaggedCount} change{flaggedCount !== 1 ? 's' : ''} didn't sync and need
+        {flaggedCount} change{flaggedCount !== 1 ? 's' : ''}{' '}
+        {failedCount === flaggedCount ? "couldn't be saved and" : "didn't sync and"} need
         {flaggedCount === 1 ? 's' : ''} your review
         <button type="button" onClick={onReview} className="underline underline-offset-2 font-semibold">
           Review

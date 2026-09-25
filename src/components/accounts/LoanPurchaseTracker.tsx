@@ -21,10 +21,8 @@ import type { LoanDeadline } from '@/lib/loanInstallments'
 import type { Account, LoanPurchase } from '@/types'
 
 /**
- * Local, listener-only connectivity flag for UI gating. Deliberately not
- * useNetworkStatus(): that hook also drives the offline-queue drain on
- * reconnect and isn't a singleton, so a second instance here would race
- * AppLayout's and could double-submit queued writes.
+ * Local, listener-only connectivity flag for UI gating. It predates the
+ * NetworkStatusProvider; useNetworkStatus() is now safe to call here too.
  */
 function useIsOnline() {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)

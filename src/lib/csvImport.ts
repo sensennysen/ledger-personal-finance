@@ -443,6 +443,15 @@ export function isSkipped(row: ImportRow, selection: ImportSelection): boolean {
   return rowState(row, selection) === 'skipped'
 }
 
+/** Why a row stays out of the import, in words; null when it is imported or blocked by an error. */
+export function skipReason(row: ImportRow, selection: ImportSelection): string | null {
+  const state = rowState(row, selection)
+  if (state === 'deselected') return 'Not selected'
+  if (state !== 'skipped') return null
+  const cause = rowIssues(row, selection.duplicates).find((id) => selection.skipped.has(id))
+  return cause ? `Skipped - ${CAUSES[cause].label.toLowerCase()}` : null
+}
+
 /** Whether the row has a checkbox: not under a skipped cause and error-free. */
 export function isSelectable(row: ImportRow, selection: ImportSelection): boolean {
   const state = rowState(row, selection)

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarCheck, Info, CheckSquare, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
+import { CalendarCheck, Info, CheckSquare, SquareMinus, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
@@ -304,7 +304,7 @@ export default function ThirteenthMonthPage() {
                         {allOn
                           ? <CheckSquare className="w-4 h-4" style={{ color: INCOME }} />
                           : someOn
-                            ? <CheckSquare className="w-4 h-4 opacity-50" style={{ color: INCOME }} />
+                            ? <SquareMinus className="w-4 h-4" style={{ color: INCOME }} aria-label="Some selected" />
                             : <Square className="w-4 h-4" />
                         }
                       </button>
@@ -339,7 +339,6 @@ export default function ThirteenthMonthPage() {
                               key={tx.id}
                               className={cn(
                                 'flex items-center gap-3 px-5 py-2.5 cursor-pointer hover:bg-muted/30 transition-colors',
-                                !isOn && 'opacity-50',
                               )}
                             >
                               <input
@@ -349,11 +348,12 @@ export default function ThirteenthMonthPage() {
                                 className="w-4 h-4 accent-primary rounded shrink-0"
                               />
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
+                                <p className={cn('text-sm font-medium truncate', !isOn && 'line-through text-muted-foreground')}>
                                   {tx.description || '(no description)'}
                                 </p>
                                 <p className="text-[0.6875rem] text-muted-foreground flex items-center gap-1.5">
                                   <span>{formatDate(tx.date)}</span>
+                                  {!isOn && <span className="font-medium">Not counted</span>}
                                   {tx.category && (
                                     <>
                                       <span className="text-muted-foreground">–</span>
@@ -364,7 +364,7 @@ export default function ThirteenthMonthPage() {
                               </div>
                               <span className={cn(
                                 'text-sm font-semibold tabular-nums shrink-0',
-                                isOn ? 'text-foreground' : 'text-muted-foreground',
+                                isOn ? 'text-foreground' : 'line-through text-muted-foreground',
                               )}>
                                 {formatCurrency(txAmt(tx), currency)}
                               </span>

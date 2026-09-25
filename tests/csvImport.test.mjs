@@ -11,6 +11,7 @@ import {
   parseAmount,
   parseDate,
   processFile,
+  skipReason,
   selectAll,
   sortProblemsFirst,
   summarise,
@@ -197,6 +198,17 @@ test('rows with an error or under a skipped cause have no checkbox', () => {
   assert.equal(isSelected(byLine.get(1), selection), false)
   assert.equal(isSelectable(byLine.get(4), selection), false)
   assert.equal(isSelectable(byLine.get(3), selection), true)
+})
+
+test('a row kept out of the import says why, in text', () => {
+  const { rows } = rowsOf(MESSY, 'MDY')
+  const byLine = new Map(rows.map((row) => [row.line, row]))
+  const selection = { duplicates: new Set([6]), skipped: new Set(['empty-description']), toggled: new Set([3]) }
+  assert.equal(skipReason(byLine.get(4), selection), 'Skipped - description empty')
+  assert.equal(skipReason(byLine.get(3), selection), 'Not selected')
+  assert.equal(skipReason(byLine.get(6), selection), 'Not selected')
+  assert.equal(skipReason(byLine.get(1), selection), null)
+  assert.equal(skipReason(byLine.get(3), { ...selection, toggled: new Set() }), null)
 })
 
 test('select all ticks every selectable row, duplicates included; clearing unticks them', () => {

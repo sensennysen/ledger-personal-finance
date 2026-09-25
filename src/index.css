@@ -63,6 +63,12 @@
      on page, card, muted and the disabled fill. */
   --disabled: #E7E5EA;
   --disabled-foreground: #7A7883;
+  /* Google's sign-in button guidance: white or neutral ground with a hairline and dark ink, so the
+     multicolour G stays legal. Light: white, #747775, #1F1F1F. Dark: #131314, #8E918F, #E3E3E3. */
+  --google-surface: #FFFFFF;
+  --google-surface-hover: #F8F9FA;
+  --google-line: #747775;
+  --google-ink: #1F1F1F;
 
   /* Charts alias the semantics so Recharts needs no per-series colors */
   --chart-1: var(--primary);
@@ -133,6 +139,10 @@
   --gold: #C9AC6A;
   --disabled: #34333C;
   --disabled-foreground: #96949E;   /* design dark disabled ink */
+  --google-surface: #131314;
+  --google-surface-hover: #1E1E20;
+  --google-line: #8E918F;
+  --google-ink: #E3E3E3;
 
   --chart-1: var(--primary);
   --chart-2: var(--income);
@@ -173,6 +183,10 @@
   --color-gold: var(--gold);
   --color-disabled: var(--disabled);
   --color-disabled-foreground: var(--disabled-foreground);
+  --color-google-surface: var(--google-surface);
+  --color-google-surface-hover: var(--google-surface-hover);
+  --color-google-line: var(--google-line);
+  --color-google-ink: var(--google-ink);
 
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);

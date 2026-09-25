@@ -151,21 +151,27 @@ export function categoryMatches<T extends SearchableTransaction>(matches: T[]): 
 
 /**
  * Design 29a: a category shows up when its name matches or when matched
- * transactions sit inside it ("Transport · contains 211 matches"). Name matches
- * lead in their incoming order; the rest follow by match count, most first.
+ * transactions sit inside it ("Transport · contains 211 matches"). Ranked by
+ * relevance: most matched transactions first, so a heavy match is never hidden
+ * behind a name-only match under the group cap (LED-137). A name match breaks
+ * ties; equal rows keep their incoming order.
  */
 export function mergeCategoryResults<T extends SearchableNamed>(
   categories: T[],
   query: string,
   matchCounts: Map<string, number>,
 ): T[] {
-  if (!query.trim()) return []
-  const named = searchNamed(categories, query)
-  const seen = new Set(named.map((category) => category.id))
-  const containing = categories
-    .filter((category) => !seen.has(category.id) && (matchCounts.get(category.id) ?? 0) > 0)
-    .sort((a, b) => (matchCounts.get(b.id) ?? 0) - (matchCounts.get(a.id) ?? 0))
-  return [...named, ...containing]
+  const needle = query.trim().toLowerCase()
+  if (!needle) return []
+  return categories
+    .map((category) => ({
+      category,
+      named: includes(category.name, needle),
+      count: matchCounts.get(category.id) ?? 0,
+    }))
+    .filter((row) => row.named || row.count > 0)
+    .sort((a, b) => b.count - a.count || Number(b.named) - Number(a.named))
+    .map((row) => row.category)
 }
 
 export interface SearchHandoff {
@@ -324,3 +330,88 @@ export function summarizeLoans(deadlines: DeadlineLike[]): { count: number; owed
   }
   return { count: purchases.size, owed: Math.round((owed + Number.EPSILON) * 100) / 100 }
 }
+
+export interface TextPart {
+  text: string
+  match: boolean
+}
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Splits `text` around case-insensitive occurrences of the query, for <mark>.
+ * An amount query matches on numbers, not text, so it highlights nothing.
+ */
+export function highlightParts(text: string, query: string): TextPart[] {
+  const needle = query.trim()
+  if (!text || !needle || parseAmountQuery(needle) !== null) return [{ text, match: false }]
+  const parts: TextPart[] = []
+  let last = 0
+  for (const found of text.matchAll(new RegExp(escapeRegExp(needle), 'gi'))) {
+    const at = found.index ?? 0
+    if (at > last) parts.push({ text: text.slice(last, at), match: false })
+    parts.push({ text: found[0], match: true })
+    last = at + found[0].length
+  }
+  if (last < text.length) parts.push({ text: text.slice(last), match: false })
+  return parts.length > 0 ? parts : [{ text, match: false }]
+}
+
+export type SearchGroupId = 'transactions' | 'accounts' | 'categories' | 'actions'
+export type SearchChip = 'all' | SearchGroupId
+
+export interface ChipCount {
+  id: SearchChip
+  label: string
+  count: number
+}
+
+const CHIP_LABELS: Record<SearchGroupId, string> = {
+  transactions: 'Transactions',
+  accounts: 'Accounts',
+  categories: 'Categories',
+  actions: 'Actions',
+}
+
+/**
+ * Filter chips for 16a: "All" plus one per group that has results. Counts are
+ * the groups' true totals (the same numbers the headings state), never the
+ * capped rows drawn.
+ */
+export function groupChips(totals: Record<SearchGroupId, number>): ChipCount[] {
+  const groups = (Object.keys(CHIP_LABELS) as SearchGroupId[]).filter((id) => totals[id] > 0)
+  const all = groups.reduce((sum, id) => sum + totals[id], 0)
+  if (all === 0) return []
+  return [
+    { id: 'all', label: 'All', count: all },
+    ...groups.map((id) => ({ id, label: CHIP_LABELS[id], count: totals[id] })),
+  ]
+}
+
+/** The chip in force: a chip whose group emptied after typing falls back to All. */
+export function resolveChip(active: SearchChip, chips: ChipCount[]): SearchChip {
+  return chips.some((chip) => chip.id === active) ? active : 'all'
+}
+
+export const chipShows = (chip: SearchChip, group: SearchGroupId) => chip === 'all' || chip === group
+
+export type CategoryAction =
+  | { id: 'new'; kind: 'expense' | 'income'; label: string }
+  | { id: 'edit-budget'; label: string; budgetId: string }
+
+/**
+ * What a category row offers beyond opening Categories: a new entry in it
+ * (income for an income-only category) and, when it has a budget, its editor.
+ */
+export function categoryActions(
+  category: { name: string; type: 'expense' | 'income' | 'transfer' | 'both' },
+  budgetId: string | null,
+): CategoryAction[] {
+  const kind = category.type === 'income' ? 'income' : 'expense'
+  const actions: CategoryAction[] = [{ id: 'new', kind, label: `New ${kind} in ${category.name}` }]
+  if (budgetId) actions.push({ id: 'edit-budget', label: `Edit the ${category.name} budget`, budgetId })
+  return actions
+}
+
+/** Budgets opens the edit dialog for this budget once it has loaded. */
+export const budgetEditPath = (budgetId: string) => `/budgets?edit=${encodeURIComponent(budgetId)}`

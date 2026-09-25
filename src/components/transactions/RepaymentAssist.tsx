@@ -10,9 +10,9 @@ import { monthCycleRange } from '@/lib/cycleRange'
 import { resolveLoadState } from '@/lib/loadState'
 import { getLoanDeadlines } from '@/lib/loanInstallments'
 import { nextDeadlineInCycle } from '@/lib/loanPicker'
-import { getRepaymentPresets, summariseRepayment } from '@/lib/loanRepayment'
+import { getRepaymentPresets, previewLoanAllocation, summariseRepayment } from '@/lib/loanRepayment'
 import { getLoanAmountOwed } from '@/lib/loans'
-import { formatCurrency, formatDateShort, getCurrentCycleMonthKey } from '@/lib/utils'
+import { formatCurrency, formatDate, formatDateShort, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
 import type { Account } from '@/types'
 
 interface RepaymentAssistProps {
@@ -36,6 +36,7 @@ export function RepaymentAssist({ loan, form }: RepaymentAssistProps) {
   const { profile } = useAuth()
   const { purchases, allocations, loading, error, refetch } = useLoanPurchases(loan.id)
   const amountValue = useWatch({ control: form.control, name: 'amount' })
+  const date = useWatch({ control: form.control, name: 'date' })
   const defaulted = useRef(false)
 
   const startDay = profile?.month_start_day ?? 1
@@ -47,7 +48,24 @@ export function RepaymentAssist({ loan, form }: RepaymentAssistProps) {
   const outstanding = getLoanAmountOwed(loan)
   const presets = useMemo(() => getRepaymentPresets(outstanding, deadline), [deadline, outstanding])
   const amount = Number(amountValue)
-  const summary = summariseRepayment({ outstanding, deadline, amount, purchases, allocations, today: new Date() })
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date ?? '') ? date : null
+  const summary = summariseRepayment({
+    outstanding,
+    deadline,
+    amount,
+    date: validDate ?? getLocalDateString(),
+    purchases,
+    allocations,
+    today: new Date(),
+  })
+  // The split depends on what is due on the payment's date, so the preview follows the Date field.
+  const preview = useMemo(
+    () =>
+      validDate && amount > 0 && !summary.overpays && purchases.length > 0
+        ? previewLoanAllocation(purchases, allocations, amount, validDate)
+        : null,
+    [allocations, amount, purchases, summary.overpays, validDate],
+  )
   const loadState = resolveLoadState({ loading, error, hasData: purchases.length > 0 })
   const deadlineKnown = loadState !== 'error' && loadState !== 'loading'
 
@@ -131,6 +149,29 @@ export function RepaymentAssist({ loan, form }: RepaymentAssistProps) {
           Custom
         </Button>
       </div>
+      {preview && validDate && preview.rows.length > 0 && (
+        <div className="space-y-1.5 rounded-lg border border-border/70 p-3 text-sm" aria-label="How this payment is applied">
+          <p className="text-xs text-muted-foreground">
+            How this payment is applied, as paid on {formatDate(validDate)}
+          </p>
+          <ul className="space-y-1.5">
+            {preview.rows.map((row) => (
+              <li key={row.purchaseId} className="flex items-start justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{row.purchaseName}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Installment {row.installmentNumber} of {row.termMonths}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-semibold">{money(row.applied)}</span>
+                  <span className="block text-xs text-muted-foreground">{money(row.remainingAfter)} left</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

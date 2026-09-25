@@ -331,8 +331,8 @@ function SearchBody({
         </div>
       )}
       {!isEmptyQuery && (
-        <div className="flex items-center gap-2 px-2 pb-1.5">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto" role="group" aria-label="Filter results">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2 pb-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5" role="group" aria-label="Filter results">
             {chips.map((option) => (
               <button
                 key={option.id}
@@ -355,7 +355,7 @@ function SearchBody({
             type="button"
             aria-pressed={scope === 'all'}
             onClick={() => setScope((current) => (current === 'cycle' ? 'all' : 'cycle'))}
-            className="min-h-8 shrink-0 rounded-md px-2 text-xs font-medium text-foreground hover:bg-muted"
+            className="ml-auto min-h-8 shrink-0 rounded-md px-2 text-xs font-medium text-foreground hover:bg-muted"
           >
             {scope === 'cycle' ? 'Search all time' : 'Limit to this cycle'}
           </button>
@@ -634,7 +634,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
     <>
       {highlightParts(text, query).map((part, index) =>
         part.match ? (
-          <mark key={index} className="rounded-sm bg-warning-container px-0.5 font-medium text-warning">
+          <mark key={index} className="rounded-sm bg-warning-container font-medium text-warning">
             {part.text}
           </mark>
         ) : (

@@ -43,7 +43,7 @@ export default function BottomNav({
           to={to}
           end={exact}
           aria-current={active ? 'page' : undefined}
-          className="flex-1 min-w-0"
+          className="flex-1 min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
           title={locked ? `${label} (finish setup to unlock)` : undefined}
         >
           <span

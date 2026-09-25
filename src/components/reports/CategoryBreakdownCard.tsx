@@ -177,15 +177,19 @@ function CategoryTreemap({ rows, currency }: { rows: CategorySlice[]; currency: 
     .map((r) => `${r.name} ${formatShare(r.share)}`)
     .join(', ')
   return (
-    <div className="h-72" role="img" aria-label={`Treemap of ${rows.length} categories. Largest: ${summary}.`}>
-      <ResponsiveContainer width="100%" height="100%">
-        <Treemap data={data} dataKey="value" nameKey="name" content={TreemapCell} isAnimationActive={false}>
-          <Tooltip
-            formatter={(value) => formatCurrency(value as number, currency)}
-            contentStyle={DASHBOARD_CHART_TOOLTIP_STYLE}
-          />
-        </Treemap>
-      </ResponsiveContainer>
+    <div className="flex flex-col gap-2">
+      <div className="h-72" role="img" aria-label={`Treemap of ${rows.length} categories. Largest: ${summary}. The Ranked view lists every category.`}>
+        <ResponsiveContainer width="100%" height="100%">
+          <Treemap data={data} dataKey="value" nameKey="name" content={TreemapCell} isAnimationActive={false}>
+            <Tooltip
+              formatter={(value) => formatCurrency(value as number, currency)}
+              contentStyle={DASHBOARD_CHART_TOOLTIP_STYLE}
+            />
+          </Treemap>
+        </ResponsiveContainer>
+      </div>
+      {/* The cells cannot be reached by keyboard; Ranked is the accessible equivalent (LED-148). */}
+      <p className="text-xs text-muted-foreground">Switch to Ranked for the full list, with keyboard access.</p>
     </div>
   )
 }

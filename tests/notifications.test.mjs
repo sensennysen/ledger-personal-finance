@@ -4,6 +4,7 @@ import {
   notificationDefaults,
   createNotification,
   dismissNotification,
+  announcementFor,
 } from '../src/lib/notifications.ts'
 
 test('success closes itself and is announced politely', () => {
@@ -26,4 +27,9 @@ test('dismissing an old notification leaves a newer one alone', () => {
   const current = createNotification({ severity: 'success', title: 'Saved' }, 2)
   assert.equal(dismissNotification(current, 1), current)
   assert.equal(dismissNotification(current, 2), null)
+})
+
+test('a screen reader hears the title, then the body', () => {
+  assert.equal(announcementFor({ title: 'Saved' }), 'Saved')
+  assert.equal(announcementFor({ title: "Couldn't delete", body: 'Try again.' }), "Couldn't delete. Try again.")
 })

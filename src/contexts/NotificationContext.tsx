@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { NotificationSurface } from '@/components/ui/notification'
+import { NotificationAnnouncer, NotificationSurface } from '@/components/ui/notification'
 import {
   createNotification,
   dismissNotification,
@@ -24,6 +24,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   return (
     <NotificationContext.Provider value={notify}>
       {children}
+      <NotificationAnnouncer notification={current} />
       {current && <NotificationSurface key={current.id} notification={current} onDismiss={dismiss} />}
     </NotificationContext.Provider>
   )

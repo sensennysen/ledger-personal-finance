@@ -80,7 +80,8 @@ export function TopBar({
   return (
     <>
     <header className="hidden md:flex shrink-0 h-16 items-center gap-6 border-b border-border bg-sidebar px-6 lg:px-8">
-      <NavLink to="/" className="flex items-center gap-2.5 shrink-0">
+      {/* Out of the tab order (LED-148): Home is the next stop and the tab group is the way in. */}
+      <NavLink to="/" tabIndex={-1} aria-label="Ledger home" className="flex items-center gap-2.5 shrink-0">
         <LedgerMark decorative className="size-8 text-foreground" />
         <span
           className="hidden lg:inline text-sm font-semibold tracking-[0.08em] uppercase text-foreground/80"
@@ -111,7 +112,7 @@ export function TopBar({
               tabIndex={index === tabStop ? 0 : -1}
               title={locked ? `${tab.label} (finish setup to unlock)` : tab.label}
               className={cn(
-                'flex h-10 items-center gap-2 rounded-full px-3 lg:px-4 text-[0.8125rem] font-medium transition-colors press-scale',
+                'flex h-10 items-center gap-2 rounded-full px-3 lg:px-4 text-[0.8125rem] font-medium transition-colors press-scale focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
                 locked
                   ? 'text-muted-foreground hover:text-foreground hover:bg-foreground/4'
                   : active
@@ -224,7 +225,7 @@ export function TopBar({
               aria-current={active ? 'page' : undefined}
               tabIndex={index === tabStop ? 0 : -1}
               className={cn(
-                'shrink-0 rounded-full px-4 py-2 text-[0.8125rem] font-medium transition-colors',
+                'shrink-0 rounded-full px-4 py-2 text-[0.8125rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
                 active
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
                   : 'text-muted-foreground',

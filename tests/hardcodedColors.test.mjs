@@ -18,8 +18,6 @@ const ALLOWED = [
   ['components/ui/alert-dialog.tsx', /bg-black\/\d+/],
   ['components/ui/dialog.tsx', /bg-black\/\d+/],
   ['components/ui/sheet.tsx', /bg-black\/\d+/],
-  // Treemap label: white text with a dark halo reads on any cell hue.
-  ['components/reports/CategoryBreakdownCard.tsx', /fill="white"|stroke="rgba\(0,0,0,0\.35\)"/],
   // Google brand mark.
   ['pages/LoginPage.tsx', /<path d=".*" fill="#[0-9A-F]{6}"/],
   // Stored default for a new goal; rendered through categoryInk.

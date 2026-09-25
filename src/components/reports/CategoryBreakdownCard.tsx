@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, TrendingDown } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Treemap, type TreemapNode } from 'recharts'
 import { formatCurrency, cn } from '@/lib/utils'
+import { readableInk } from '@/lib/contrast'
 import {
   previewOther,
   rollupBreakdown,
@@ -160,10 +161,7 @@ function TreemapCell(node: TreemapNode) {
           y={y + 16}
           fontSize={11}
           fontWeight={500}
-          fill="white"
-          stroke="rgba(0,0,0,0.35)"
-          strokeWidth={2}
-          paintOrder="stroke"
+          fill={readableInk(color) ?? 'var(--card)'}
         >
           {name.length > width / 7 ? `${name.slice(0, Math.max(1, Math.floor(width / 7) - 1))}…` : name}
         </text>

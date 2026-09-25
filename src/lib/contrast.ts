@@ -19,3 +19,17 @@ export function contrastRatio(a: string, b: string): number {
   const [hi, lo] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x)
   return (hi + 0.05) / (lo + 0.05)
 }
+
+/** Label inks for text drawn on an arbitrary category colour. */
+/** Black and white, not the design ink: their better contrast is at least 4.58:1 on any colour. */
+export const INK_ON_LIGHT = '#000000'
+export const INK_ON_DARK = '#FFFFFF'
+
+/** The label ink with the higher contrast on `bg`, or null when `bg` is not #RRGGBB. */
+export function readableInk(bg: string): string | null {
+  try {
+    return contrastRatio(INK_ON_DARK, bg) >= contrastRatio(INK_ON_LIGHT, bg) ? INK_ON_DARK : INK_ON_LIGHT
+  } catch {
+    return null
+  }
+}

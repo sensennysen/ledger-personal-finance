@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { registerLoanPurchasesListener } from '@/lib/cacheEvents'
+import { readAllPages } from '@/lib/pagedRead'
 import { enrichLoanPurchase, getLoanDeadlines, roundMoney } from '@/lib/loanInstallments'
 import { supabase } from '@/lib/supabase'
 import type { LoanPaymentAllocation, LoanPurchase } from '@/types'
@@ -61,19 +62,24 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
     let nextAllocations: LoanPaymentAllocation[] = []
 
     if (purchaseIds.length > 0) {
-      const { data: allocationRows, error: allocationError } = await supabase
-        .from('loan_payment_allocations')
-        .select('*, transaction:transactions(id, date, description)')
-        .eq('user_id', userId)
-        .in('loan_purchase_id', purchaseIds)
-        .order('created_at', { ascending: true })
+      // A read across every loan can pass PostgREST's 1,000-row cap, so page it.
+      const { rows: allocationRows, error: allocationError } = await readAllPages(
+        (from, to) => supabase
+          .from('loan_payment_allocations')
+          .select('*, transaction:transactions(id, date, description)')
+          .eq('user_id', userId)
+          .in('loan_purchase_id', purchaseIds)
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to),
+      )
 
       if (allocationError) {
         setLoadFailure(describeDataError(allocationError, { action: 'load' }))
         setLoading(false)
         return
       }
-      nextAllocations = (allocationRows as LoanPaymentAllocation[]) ?? []
+      nextAllocations = allocationRows as LoanPaymentAllocation[]
     }
 
     setPurchases(nextPurchases)

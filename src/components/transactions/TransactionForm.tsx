@@ -16,6 +16,7 @@ import {
 } from '@/components/transactions/transactionFormSchema'
 import { TransactionDescriptionField } from '@/components/transactions/TransactionDescriptionField'
 import { AccountCombobox } from '@/components/transactions/AccountCombobox'
+import { LoanPicker } from '@/components/transactions/LoanPicker'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionTagsField } from '@/components/transactions/TransactionTagsField'
 import { TransactionGoalField } from '@/components/transactions/TransactionGoalField'
@@ -27,7 +28,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
 import { resolveEditTarget } from '@/lib/editTarget'
-import { resolveInitialLoanId } from '@/lib/loanPicker'
+import { hasLoanPickerStep, resolveInitialLoanId } from '@/lib/loanPicker'
 import { daysUntilDayOfMonth } from '@/lib/creditCards'
 import {
   defaultCardPaymentDescription,
@@ -80,6 +81,9 @@ export function TransactionForm({
   const [tagInput, setTagInput] = useState('')
   const [autoCatCategoryId, setAutoCatCategoryId] = useState<string | null>(null)
   const [showMoreDetails, setShowMoreDetails] = useState(false)
+  // With 2+ loans the repayment form opens on the loan picker; a loan already supplied by the caller skips it.
+  const [loanChosen, setLoanChosen] = useState(Boolean(defaultValues?.to_account_id))
+  const [returnedToPicker, setReturnedToPicker] = useState(false)
 
   const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -276,6 +280,10 @@ export function TransactionForm({
     if (initialLoanId) handleLoanChange(initialLoanId)
   }, [editTarget, handleLoanChange, isLoanRepayment, loanAccounts, lockedLoanAccountId, selectedLoanId])
 
+  const hasPickerStep =
+    isLoanRepayment &&
+    hasLoanPickerStep({ loanCount: loanAccounts.length, lockedLoanAccountId, isEditing })
+
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
     const repaymentLoan = loanAccounts.find((account) => account.id === values.to_account_id)
     if (isLoanRepayment && !repaymentLoan) {
@@ -316,6 +324,27 @@ export function TransactionForm({
     isRecurring ||
     hasReceipt(receiptReference)
   const effectiveSubmitLabel = isLiabilityPayment && submitLabel === 'Save Transaction' ? 'Record Payment' : submitLabel
+
+  if (hasPickerStep && !loanChosen) {
+    return (
+      <div className="space-y-4">
+        <LoanPicker
+          loans={loanAccounts}
+          selectedLoanId={selectedLoanId}
+          restoreFocus={returnedToPicker}
+          onChoose={(loanId) => {
+            handleLoanChange(loanId)
+            setLoanChosen(true)
+          }}
+        />
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <Form {...form}>
@@ -788,6 +817,18 @@ export function TransactionForm({
         </div>
 
         <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t bg-popover/95 px-0 py-3 backdrop-blur supports-backdrop-filter:bg-popover/80 sm:static sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-0">
+          {hasPickerStep && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setReturnedToPicker(true)
+                setLoanChosen(false)
+              }}
+            >
+              Back
+            </Button>
+          )}
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>

@@ -1,28 +1,10 @@
 import { useCallback } from 'react'
 import { useNotify } from '@/contexts/notificationState'
 import type { TransactionUpsertValues } from '@/hooks/useTransactions.helpers'
+import { restoreTransactionInput } from '@/lib/undoRestore'
 import type { Transaction } from '@/types'
 
 type CreateTransaction = (values: TransactionUpsertValues) => Promise<{ error: string | null }>
-
-const restoreInput = (tx: Transaction): TransactionUpsertValues => ({
-  type: tx.type,
-  account_id: tx.account_id,
-  to_account_id: tx.to_account_id,
-  category_id: tx.category_id,
-  subcategory_id: tx.subcategory_id,
-  amount: tx.amount,
-  currency: tx.currency,
-  exchange_rate: tx.exchange_rate,
-  description: tx.description,
-  notes: tx.notes,
-  date: tx.date,
-  transfer_fee: tx.transfer_fee,
-  is_recurring: tx.is_recurring,
-  recurrence_interval: tx.recurrence_interval,
-  recurrence_end_date: tx.recurrence_end_date,
-  receipt_url: tx.receipt_url,
-})
 
 const count = (n: number) => `${n} transaction${n !== 1 ? 's' : ''}`
 
@@ -37,7 +19,7 @@ export function useUndoDelete(createTransaction: CreateTransaction, onRestored?:
     const restore = async (pending: Transaction[]) => {
       const failed: Transaction[] = []
       for (const tx of pending) {
-        const { error } = await createTransaction(restoreInput(tx))
+        const { error } = await createTransaction(restoreTransactionInput(tx))
         if (error) failed.push(tx)
       }
       onRestored?.()

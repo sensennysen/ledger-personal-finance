@@ -75,9 +75,10 @@ export function DashboardCategoryPieCard({
           <div className="flex-1 space-y-1.5 min-w-0">
             {expensesByCategory.map((category, index) => (
               <div key={index} className="flex items-center gap-2 text-sm">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: ink(category.color) }} aria-hidden />
                 <span className="text-base">{category.icon}</span>
                 <span className="truncate flex-1 text-xs text-muted-foreground">{category.name}</span>
-                <span className="money text-xs font-medium shrink-0" style={{ color: ink(category.color) }}>
+                <span className="money text-xs font-medium shrink-0 text-foreground">
                   {formatCurrency(category.amount, currency)}
                 </span>
               </div>

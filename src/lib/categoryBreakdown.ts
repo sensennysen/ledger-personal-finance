@@ -71,7 +71,7 @@ export function buildCategoryBreakdown(
     let entry = map.get(key)
     if (!entry) {
       const cat = t.category_id ? categoryById.get(t.category_id) : undefined
-      entry = { name: cat?.name ?? 'Uncategorized', color: cat?.color ?? '#888', amount: 0, subs: new Map() }
+      entry = { name: cat?.name ?? 'Uncategorized', color: cat?.color ?? 'var(--muted-foreground)', amount: 0, subs: new Map() }
       map.set(key, entry)
     }
     entry.amount += amount

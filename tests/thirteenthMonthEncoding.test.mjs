@@ -11,7 +11,7 @@ test('page source has no replacement characters', () => {
 test('subtitle, card title and meta separator use an en dash', () => {
   assert.match(src, /Computed under PD 851 – Select which income records/)
   assert.match(src, /Income Records – \{year\}/)
-  assert.match(src, /<span className="text-border">–<\/span>/)
+  assert.match(src, /<span className="text-muted-foreground">–<\/span>/)
 })
 
 test('neutral Records Included count is not coloured as an expense', () => {

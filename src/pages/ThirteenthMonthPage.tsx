@@ -356,7 +356,7 @@ export default function ThirteenthMonthPage() {
                                   <span>{formatDate(tx.date)}</span>
                                   {tx.category && (
                                     <>
-                                      <span className="text-border">–</span>
+                                      <span className="text-muted-foreground">–</span>
                                       <span>{tx.category.icon} {tx.category.name}</span>
                                     </>
                                   )}

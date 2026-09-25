@@ -5,7 +5,12 @@ import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
-import { notifyAccountsRefresh, notifyLoanPurchasesRefresh } from '@/lib/cacheEvents'
+import {
+  notifyAccountsRefresh,
+  notifyLoanPurchasesRefresh,
+  notifyTransactionsRefresh,
+  registerTransactionsListener,
+} from '@/lib/cacheEvents'
 import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/lib/splitState'
 import { addRecurringIntervalToDateString } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
@@ -49,7 +54,17 @@ export function useTransactions(filters: TransactionFilters = {}) {
   const updateTransactionCache = useCallback((next: Transaction[]) => {
     setTransactions(next)
     writeCache(buildCacheKey(), next)
+    // Another mounted instance (Home beside the layout's add form) has its own copy of this list.
+    notifyTransactionsRefresh()
   }, [buildCacheKey])
+
+  const reloadFromCache = useCallback(() => {
+    if (!user) return
+    const cached = readCache<Transaction[]>(buildCacheKey())
+    if (cached) setTransactions(cached)
+  }, [user, buildCacheKey])
+
+  useEffect(() => registerTransactionsListener(reloadFromCache), [reloadFromCache])
 
   const fetch = useCallback(async () => {
     if (!user) {

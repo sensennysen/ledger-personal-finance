@@ -1,11 +1,12 @@
 import type { Account, LoanPaymentAllocation, LoanPurchase } from '@/types'
-import { daysUntilDayOfMonth, getCreditCardSpending, getCreditUtilizationPct } from './creditCards.ts'
+import { daysUntilDayOfMonth, getBalanceSummary, getCreditCardSpending, getCreditUtilizationPct, type BalanceSummary } from './creditCards.ts'
 import { getLoanAmountOwed } from './loans.ts'
 import { getLoanDeadlines, getPurchaseInstallments, roundMoney } from './loanInstallments.ts'
 
 // The Accounts page compares assets with liabilities (LED-76). There is no
 // exchange-rate table, so totals only count accounts in the base currency and
-// every other account is marked excluded on its own row.
+// every other account is marked excluded on its own row. Home and Reports use
+// `summarizeBalances` so all three screens show the same net worth.
 
 export interface LoanProgress {
   paidInstallments: number
@@ -45,6 +46,25 @@ export interface AccountsOverview {
   totals: { assets: number; liabilities: number; netWorth: number }
   excludedCurrencies: string[]
   comingUp: ComingUpItem[]
+}
+
+export interface BalancesSummary extends BalanceSummary {
+  /** Currencies left out of every figure because no exchange rate converts them. */
+  excludedCurrencies: string[]
+}
+
+/** Balance totals over the accounts in `baseCurrency`, naming the currencies left out. */
+export function summarizeBalances(accounts: Account[], baseCurrency: string): BalancesSummary {
+  const counted = accounts.filter((account) => account.currency === baseCurrency)
+  const summary = getBalanceSummary(counted)
+  return {
+    ...summary,
+    // Net worth sums signed balances, so a card in credit adds to it (see creditCards.ts).
+    netWorth: roundMoney(summary.netWorth),
+    excludedCurrencies: [
+      ...new Set(accounts.filter((account) => account.currency !== baseCurrency).map((account) => account.currency)),
+    ].sort(),
+  }
 }
 
 export function isLiability(account: Pick<Account, 'type'>): boolean {
@@ -136,14 +156,13 @@ export function buildAccountsOverview(
   const totalLiabilities = roundMoney(
     liabilities.filter((row) => !row.excluded).reduce((sum, row) => sum + row.owed, 0),
   )
-  // Net worth sums signed balances, so a card in credit adds to it (see creditCards.ts).
-  const netWorth = roundMoney(accounts.filter(counted).reduce((sum, account) => sum + account.balance, 0))
+  const { netWorth, excludedCurrencies } = summarizeBalances(accounts, baseCurrency)
 
   return {
     assets,
     liabilities,
     totals: { assets: totalAssets, liabilities: totalLiabilities, netWorth },
-    excludedCurrencies: [...new Set(accounts.filter((account) => !counted(account)).map((account) => account.currency))].sort(),
+    excludedCurrencies,
     comingUp: comingUp.sort((left, right) => left.days - right.days),
   }
 }

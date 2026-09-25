@@ -71,7 +71,8 @@ import { INCOME, EXPENSE, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import { OverspendingCard } from '@/components/reports/OverspendingCard'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
-import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
+import { summarizeBalances } from '@/lib/accountsOverview'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { buildCategoryBreakdown, rollupBreakdown, type CategorySlice } from '@/lib/categoryBreakdown'
 import { CategoryBreakdownCard } from '@/components/reports/CategoryBreakdownCard'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
@@ -242,6 +243,7 @@ function StatCard({
   color,
   comparison,
   loading,
+  note,
 }: {
   title: string
   value: string
@@ -250,6 +252,7 @@ function StatCard({
   color: string
   comparison?: { text: string; color: string }
   loading?: boolean
+  note?: React.ReactNode
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-border/60 p-4 sm:p-5 bg-card">
@@ -278,6 +281,7 @@ function StatCard({
               {comparison.text}
             </p>
           )}
+          {note && !loading && <div className="mt-1.5">{note}</div>}
         </div>
         <div
           className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0"
@@ -482,7 +486,7 @@ export default function ReportsPage() {
   // ── Net Worth Over Time (last 13 months) ──
   const netWorthData = useMemo(() => {
     const now = new Date()
-    const currentNetWorth = accounts.reduce((sum, a) => sum + getAccountNetWorthContribution(a), 0)
+    const currentNetWorth = summarizeBalances(accounts, currency).netWorth
     const boundaries: { date: string; label: string }[] = []
     for (let i = 12; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -507,7 +511,7 @@ export default function ReportsPage() {
       data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
     }
     return data
-  }, [accounts, allTransactionsSorted])
+  }, [accounts, allTransactionsSorted, currency])
 
   // ── Income vs Expenses trend (own lookback, independent of the cycle) ──
   const [lookback, setLookback] = useState<Lookback>(DEFAULT_LOOKBACK)
@@ -569,7 +573,7 @@ export default function ReportsPage() {
       </tr>
     </thead>
   )
-  const balanceSummary = getBalanceSummary(activeAccounts)
+  const balanceSummary = summarizeBalances(activeAccounts, currency)
   const totalBalance = balanceSummary.netWorth
 
   // Sorted transactions for table (newest first)
@@ -693,6 +697,7 @@ export default function ReportsPage() {
             : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
           icon={Wallet}
           color={'var(--foreground)'}
+          note={<UnratedCurrencyNotice currencies={balanceSummary.excludedCurrencies} subject="balances" />}
           comparison={loadFailed ? undefined : {
             text: netWorthChange === 0
               ? 'No change this cycle'
@@ -763,6 +768,9 @@ export default function ReportsPage() {
                 <span className="text-[0.8125rem] font-bold tabular-nums" style={{ color: 'var(--foreground)' }}>
                   {formatCurrency(totalBalance, currency)}
                 </span>
+              </div>
+              <div className="px-3">
+                <UnratedCurrencyNotice currencies={balanceSummary.excludedCurrencies} subject="balances" />
               </div>
             </div>
           )}

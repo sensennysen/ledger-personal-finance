@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { inferTransactionKind } from '@/components/transactions/transactionKinds'
 import type { Transaction } from '@/types'
 
 interface TransactionRowProps {
@@ -62,7 +63,10 @@ export function TransactionRow({
   const [receiptLoading, setReceiptLoading] = useState(false)
   const Icon = TRANSACTION_TYPE_ICON[tx.type]
   const isIncoming = (tx.type === 'transfer' || tx.type === 'expense') && tx.to_account_id === contextAccountId
-  const isLoanRepayment = tx.type === 'expense' && Boolean(tx.to_account_id)
+  // An expense with a target is a payment against a liability; the target's account type says which,
+  // the same rule the form uses (inferTransactionKind).
+  const paymentKind = inferTransactionKind(tx.type, tx.to_account_id, tx.to_account?.type)
+  const isLoanRepayment = paymentKind === 'loan-repayment' || paymentKind === 'card-payment'
   const hasReceipt = !!tx.receipt_url && !isPendingReceiptReference(tx.receipt_url)
   const displayedReceiptUrl = receiptOpen ? resolvedReceiptUrl : null
 

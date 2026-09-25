@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, ArrowLeftRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useCardPayment } from '@/hooks/useCardPayment'
 import { useCycle } from '@/contexts/cycleState'
 import { useNotify } from '@/contexts/notificationState'
 import { useCategories } from '@/hooks/useCategories'
@@ -124,6 +125,7 @@ export default function TransactionsPage() {
     bulkUpdateCategory,
     bulkCreateTransactions,
   } = useTransactions()
+  const { createWithStatement } = useCardPayment(createTransaction)
 
   const notify = useNotify()
   const { categories } = useCategories()
@@ -260,7 +262,7 @@ export default function TransactionsPage() {
   // ── Handlers ───────────────────────────────────────────────
 
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error, errorDetail } = await createTransaction(values as Parameters<typeof createTransaction>[0])
+    const { error, errorDetail } = await createWithStatement(values as Parameters<typeof createTransaction>[0])
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setCreateOpen(false)

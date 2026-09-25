@@ -27,6 +27,7 @@ import type { FormErrorValue } from '@/lib/dataErrors'
 import { authErrorActionLabel } from '@/lib/authErrors'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useCardPayment } from '@/hooks/useCardPayment'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
 import { isSetupComplete } from '@/lib/firstRunChecklist'
@@ -81,6 +82,7 @@ function LayoutShell() {
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
   const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
+  const { createWithStatement } = useCardPayment(createTransaction)
   const { accounts, loading: accountsLoading } = useAccounts()
   // ⌘F in search scopes to the account page it opened over.
   const accountRouteId = useMatch('/accounts/:accountId')?.params.accountId
@@ -190,7 +192,7 @@ function LayoutShell() {
     }
   }, [generateDueRecurring])
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error, errorDetail } = await createTransaction(
+    const { error, errorDetail } = await createWithStatement(
       values as Parameters<typeof createTransaction>[0],
     )
     if (error) {

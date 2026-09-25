@@ -96,3 +96,80 @@ export function resolveInitialCardId(
   if (owing.length === 0 && cards.length === 1) return cards[0].id
   return null
 }
+
+/** The first account a card can be paid from: not a liability, same currency (a card payment moves no exchange rate). */
+export function defaultPaymentSource(
+  accounts: Pick<Account, 'id' | 'type' | 'currency' | 'is_active'>[],
+  card: Pick<Account, 'id' | 'currency'>,
+): string | null {
+  const source = accounts.find(
+    (account) =>
+      account.id !== card.id &&
+      account.is_active !== false &&
+      account.type !== 'loan' &&
+      account.type !== 'credit_card' &&
+      account.currency === card.currency,
+  )
+  return source?.id ?? null
+}
+
+interface CardPaymentShape {
+  type: 'income' | 'expense' | 'transfer'
+  to_account_id: string | null
+  category_id: string | null
+  subcategory_id: string | null
+  exchange_rate: number
+  transfer_fee: number | null
+  goal_id: string | null
+}
+
+/**
+ * A card payment is saved as a transfer from the paying account to the card: the database
+ * rejects an expense whose destination is not a loan, and only a transfer credits the card.
+ * Same currency on both sides, so the rate is 1 and there is no category.
+ */
+export function cardPaymentTransfer<T extends CardPaymentShape>(values: T): T {
+  return {
+    ...values,
+    type: 'transfer',
+    category_id: null,
+    subcategory_id: null,
+    exchange_rate: 1,
+    transfer_fee: null,
+    goal_id: null,
+  }
+}
+
+/** The card a saved transfer pays, or null when it is not a payment to a credit card. */
+export function transferCard<A extends Pick<Account, 'id' | 'type'>>(
+  values: Pick<CardPaymentShape, 'type' | 'to_account_id'>,
+  accounts: A[],
+): A | null {
+  if (values.type !== 'transfer' || !values.to_account_id) return null
+  const target = accounts.find((account) => account.id === values.to_account_id)
+  return target?.type === 'credit_card' ? target : null
+}
+
+/** What reaches the card: the amount, converted when the paying account is in another currency. */
+export function creditedAmount(values: { amount: number; exchange_rate?: number | null }): number {
+  return round2(values.amount * (values.exchange_rate ?? 1))
+}
+
+/**
+ * The statement fields after a payment of `amount` on `date`. The paid amount never exceeds
+ * the locked statement balance, and with no statement it is left alone ("Amount to pay" then
+ * follows the card's balance, which the transfer has already moved).
+ */
+export function planStatementPayment(
+  card: Pick<Account, 'statement_balance' | 'statement_paid_amount'>,
+  amount: number,
+  date: string,
+): Pick<Account, 'statement_paid_amount' | 'last_payment_amount' | 'last_payment_date'> {
+  const paid = card.statement_paid_amount ?? 0
+  return {
+    statement_paid_amount:
+      card.statement_balance == null ? paid : round2(Math.min(paid + amount, card.statement_balance)),
+    last_payment_amount: amount,
+    last_payment_date: date,
+  }
+}

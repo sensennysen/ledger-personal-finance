@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { getItemizationGap, getLoanEffect, getPurchaseCostPreview, labelAllocationInstallments, splitPurchaseProgress } from '../src/lib/loanSummary.ts'
+import { getItemizationGap, getLoanEffect, getPurchaseCostPreview, labelAllocationInstallments, splitPurchaseProgress, unitemisedLoanContext, unitemisedPrefill } from '../src/lib/loanSummary.ts'
 
 test('purchases that cover the loan leave no gap', () => {
   const r = getItemizationGap(8540, [{ total_payable: 23040, remaining_balance: 6720 }, { total_payable: 3120, remaining_balance: 1820 }])
@@ -119,4 +119,20 @@ test('a fully paid purchase adds nothing to the monthly obligation', () => {
   const preview = getPurchaseCostPreview({ ...warrantyCost, installmentsPaid: 24 })
   const r = getLoanEffect({ baseOwed: 1000, baseMonthly: 480, baseCount: 1, allocatedToThis: 0 }, preview, 130)
   assert.deepEqual(r, { owedAfter: 1000, monthlyAfter: 480, countAfter: 1 })
+})
+
+test('the unitemised purchase is prefilled with the whole gap, interest-free', () => {
+  assert.deepEqual(unitemisedPrefill(400), { name: 'Unitemized loan balance', principal_amount: 400, monthly_interest_rate: 0 })
+  assert.equal(unitemisedPrefill(400.004).principal_amount, 400)
+})
+
+// Figures observed from public.add_unitemised_purchase on the local database (loan owing 8,940
+// with purchases accounting for 8,540): the loan owes itemised + the new purchase's remaining balance.
+test('the form preview matches what add_unitemised_purchase leaves owed', () => {
+  const base = { baseOwed: 8940, baseMonthly: 0, baseCount: 0, allocatedToThis: 0 }
+  const context = unitemisedLoanContext(base, 400)
+  assert.equal(context.baseOwed, 8540)
+  const at = (installment, months) => getLoanEffect(context, getPurchaseCostPreview({ principal: 400, installment, termMonths: months, firstDueDate: '2026-10-01', installmentsPaid: 0 }), installment).owedAfter
+  assert.equal(at(100, 4), 8940) // interest-free: the loan still owes 8,940
+  assert.equal(at(110, 4), 8980) // 40 of interest: 8,540 + 440
 })

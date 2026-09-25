@@ -24,6 +24,19 @@ export function getItemizationGap(
   return { itemized, gap: Math.abs(gap) < 0.01 ? 0 : gap }
 }
 
+/** What "Add it as a purchase" fills in: the whole gap as the principal, interest-free until the user says otherwise. */
+export function unitemisedPrefill(gap: number) {
+  return { name: 'Unitemized loan balance', principal_amount: roundMoney(gap), monthly_interest_rate: 0 }
+}
+
+/**
+ * The loan as the unitemised-purchase function leaves it: the gap comes off what the loan owes as the
+ * purchase goes on, so the form's "owed after" starts from owed minus the gap.
+ */
+export function unitemisedLoanContext(context: LoanContext, gap: number): LoanContext {
+  return { ...context, baseOwed: roundMoney(context.baseOwed - gap) }
+}
+
 export interface PurchaseProgressSplit {
   /** Opening progress imported as already paid, as a percent of total payable. */
   importedPct: number

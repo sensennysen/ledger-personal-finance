@@ -20,5 +20,5 @@ Four write paths reported the wrong thing when part of a write succeeded. They c
 ## Backlog
 - Not verified live: force the adjustment insert to fail (for example by blocking the request in devtools), confirm the notification, then Fix. Also a failed signOut after deleting an account, and the profile banner with a cached profile while the profile request fails.
 - Undo while offline goes through `createTransaction`'s queue path; `buildOptimisticTransaction` was not checked for carrying `tags` and `goal_id` into the optimistic row.
-- After the Fix succeeds the notification is not replaced by a success message (the surface shows one notification at a time, and the failed one stays until dismissed). Same as the card-payment Fix; worth a decision if it confuses.
+- Clicking Fix dismisses the notification and reruns the step; on success nothing confirms it, the balance just updates. Same as the card-payment Fix. Worth a decision if a success toast is wanted.
 - The split write is LED-130.

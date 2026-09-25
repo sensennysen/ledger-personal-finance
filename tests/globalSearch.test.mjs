@@ -15,6 +15,12 @@ import {
   DESTINATIONS,
   buildDueSoon,
   summarizeLoans,
+  highlightParts,
+  groupChips,
+  resolveChip,
+  chipShows,
+  categoryActions,
+  budgetEditPath,
 } from '../src/lib/globalSearch.ts'
 
 const range = { start: '2026-09-01', end: '2026-09-30' }
@@ -188,16 +194,89 @@ test('categoryMatches buckets matched rows by category id', () => {
   assert.equal(byCategory.size, 2)
 })
 
-test('mergeCategoryResults puts name matches first, then containing categories by count', () => {
+test('mergeCategoryResults ranks by match count, with a name match breaking ties', () => {
   const categories = [
     { id: 'd', name: 'Dining' },
     { id: 't', name: 'Transport' },
     { id: 'g', name: 'Grab rewards' },
     { id: 'x', name: 'Rent' },
+    { id: 'n', name: 'Grab fees' },
   ]
-  const counts = new Map([['d', 3], ['t', 211], ['g', 1]])
-  assert.deepEqual(ids(mergeCategoryResults(categories, 'grab', counts)), ['g', 't', 'd'])
+  const counts = new Map([['d', 3], ['t', 211], ['g', 3]])
+  // Grab fees names the query but holds no matches, so it sorts last; Grab rewards
+  // ties Dining on count and wins the tie on its name.
+  assert.deepEqual(ids(mergeCategoryResults(categories, 'grab', counts)), ['t', 'g', 'd', 'n'])
   assert.deepEqual(mergeCategoryResults(categories, '', counts), [])
+})
+
+test('a heavy match is not hidden behind name-only matches under the group cap', () => {
+  const categories = [
+    { id: 'a', name: 'Grab one' },
+    { id: 'b', name: 'Grab two' },
+    { id: 'c', name: 'Grab three' },
+    { id: 't', name: 'Transport' },
+  ]
+  const ranked = mergeCategoryResults(categories, 'grab', new Map([['t', 40]]))
+  assert.equal(ranked[0].id, 't')
+  assert.ok(ids(capGroup(ranked).items).includes('t'))
+})
+
+test('highlightParts marks every case-insensitive occurrence and keeps the text whole', () => {
+  const parts = highlightParts('SM Supermarket — Groceries', 'gro')
+  assert.deepEqual(parts, [
+    { text: 'SM Supermarket — ', match: false },
+    { text: 'Gro', match: true },
+    { text: 'ceries', match: false },
+  ])
+  assert.equal(highlightParts('grab grab', 'grab').filter((part) => part.match).length, 2)
+  assert.equal(highlightParts('Anything', 'zzz').length, 1)
+})
+
+test('highlightParts treats regex characters literally and skips amount queries', () => {
+  assert.deepEqual(highlightParts('a.b (c)', '(c)'), [
+    { text: 'a.b ', match: false },
+    { text: '(c)', match: true },
+  ])
+  assert.equal(highlightParts('a.b', '.').filter((part) => part.match).length, 1)
+  assert.deepEqual(highlightParts('Order 86.40', '86.40'), [{ text: 'Order 86.40', match: false }])
+  assert.deepEqual(highlightParts('Grocery', '  '), [{ text: 'Grocery', match: false }])
+})
+
+test('groupChips lists All plus the groups with results, using the true totals', () => {
+  const chips = groupChips({ transactions: 23, accounts: 0, categories: 1, actions: 2 })
+  assert.deepEqual(
+    chips.map((chip) => [chip.id, chip.count]),
+    [['all', 26], ['transactions', 23], ['categories', 1], ['actions', 2]],
+  )
+  assert.deepEqual(groupChips({ transactions: 0, accounts: 0, categories: 0, actions: 0 }), [])
+})
+
+test('the chip totals are the capGroup totals, not the rows drawn', () => {
+  const group = capGroup(Array.from({ length: 23 }, (_, i) => i))
+  assert.equal(group.items.length, GROUP_CAP)
+  const chips = groupChips({ transactions: group.total, accounts: 0, categories: 0, actions: 0 })
+  assert.equal(chips[1].count, 23)
+})
+
+test('resolveChip falls back to All when the chosen group empties, and chipShows filters', () => {
+  const chips = groupChips({ transactions: 4, accounts: 0, categories: 0, actions: 0 })
+  assert.equal(resolveChip('transactions', chips), 'transactions')
+  assert.equal(resolveChip('categories', chips), 'all')
+  assert.equal(chipShows('all', 'accounts'), true)
+  assert.equal(chipShows('transactions', 'accounts'), false)
+  assert.equal(chipShows('transactions', 'transactions'), true)
+})
+
+test('categoryActions offers a new entry always and the budget editor only with a budget', () => {
+  const groceries = { name: 'Groceries', type: 'expense' }
+  assert.deepEqual(categoryActions(groceries, null), [
+    { id: 'new', kind: 'expense', label: 'New expense in Groceries' },
+  ])
+  const withBudget = categoryActions(groceries, 'b1')
+  assert.deepEqual(withBudget[1], { id: 'edit-budget', label: 'Edit the Groceries budget', budgetId: 'b1' })
+  assert.equal(categoryActions({ name: 'Salary', type: 'income' }, null)[0].kind, 'income')
+  assert.equal(categoryActions({ name: 'Gifts', type: 'both' }, null)[0].kind, 'expense')
+  assert.equal(budgetEditPath('a b'), '/budgets?edit=a%20b')
 })
 
 test('buildHandoff sends cycle searches to Activity with the query encoded', () => {

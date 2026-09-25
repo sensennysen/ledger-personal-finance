@@ -18,6 +18,7 @@ import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { BUDGET_TONE_BAR_CLASS, budgetTone, budgetUsage } from '@/lib/budgetUsage'
 import { goalPace } from '@/lib/goalPace'
 import { useCycle } from '@/contexts/cycleState'
+import { useNotify } from '@/contexts/notificationState'
 import { PageActions } from '@/components/layout/PageActions'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useSavingsGoals, type GoalWithContributions } from '@/hooks/useSavingsGoals'
@@ -1111,6 +1112,7 @@ function SavingsGoalCard({
 
 export default function BudgetsPage() {
   const { profile } = useAuth()
+  const notify = useNotify()
   const { selectedMonth, startDay } = useCycle()
   const { budgets, loading, refreshing: budgetsRefreshing, error: budgetError, errorDetail: budgetErrorDetail, refetch: refetchBudgets, createBudget, updateBudget, deleteBudget } = useBudgets({ selectedMonth, startDay })
   const budgetsLoadState = resolveLoadState({ loading, error: budgetError, hasData: budgets.length > 0 })
@@ -1193,6 +1195,22 @@ export default function BudgetsPage() {
   }
 
   const monthlyBudgets = budgets.filter((b) => b.period === 'monthly')
+
+  // Search's "Edit the <category> budget" lands here as ?edit=<id>: open that
+  // budget's editor once the list has loaded, then drop the param so a refresh
+  // does not reopen it. A budget that no longer exists is said so, not ignored.
+  const editParam = searchParams.get('edit')
+  React.useEffect(() => {
+    if (!editParam || budgetsLoadState === 'loading') return
+    const target = budgets.find((budget) => budget.id === editParam)
+    if (target) queueMicrotask(() => setEditBudget(target))
+    else if (budgetsLoadState !== 'error') notify({ severity: 'failure', title: "Couldn't find that budget", body: 'It may have been deleted.' })
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('edit')
+      return next
+    }, { replace: true })
+  }, [editParam, budgets, budgetsLoadState, notify, setSearchParams])
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">

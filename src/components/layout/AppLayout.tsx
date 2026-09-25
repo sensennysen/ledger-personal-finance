@@ -56,7 +56,8 @@ import type { Transaction } from '@/types'
 
 export type AppLayoutContext = {
   /** `targetAccountId` locks the card or loan for card-payment and loan-repayment. */
-  openAddTransactionModal: (kind: TransactionKind, options?: { targetAccountId?: string }) => void
+  /** `categoryId` opens the form with that category chosen (search: "New expense in Groceries"). */
+  openAddTransactionModal: (kind: TransactionKind, options?: { targetAccountId?: string; categoryId?: string }) => void
 }
 export default function AppLayout() {
   return (
@@ -99,6 +100,7 @@ function LayoutShell() {
   const [transactionKind, setTransactionKind] =
     useState<TransactionKind>('expense')
   const [targetAccountId, setTargetAccountId] = useState<string | undefined>()
+  const [prefillCategoryId, setPrefillCategoryId] = useState<string | undefined>()
   const [entry, setEntry] = useState<{
     transaction: Transaction
     actions?: EntryActions
@@ -162,11 +164,12 @@ function LayoutShell() {
     return () => observer.disconnect()
   }, [location.pathname])
   const touchStart = useRef<number | null>(null)
-  const openAddTransactionModal = (kind: TransactionKind, options?: { targetAccountId?: string }) => {
+  const openAddTransactionModal = (kind: TransactionKind, options?: { targetAccountId?: string; categoryId?: string }) => {
     rememberTrigger()
     setFormError(null)
     setTransactionKind(kind)
     setTargetAccountId(options?.targetAccountId)
+    setPrefillCategoryId(options?.categoryId)
     setSheet('add')
   }
   useEffect(() => {
@@ -439,6 +442,7 @@ function LayoutShell() {
                 entryKind={transactionKind}
                 lockedCardAccountId={transactionKind === 'card-payment' ? targetAccountId : undefined}
                 lockedLoanAccountId={transactionKind === 'loan-repayment' ? targetAccountId : undefined}
+                defaultValues={prefillCategoryId ? { category_id: prefillCategoryId } : undefined}
                 onSubmit={handleCreate}
                 onClose={() => setSheet(null)}
               />

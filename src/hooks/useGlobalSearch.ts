@@ -3,6 +3,7 @@ import { useCycle } from '@/contexts/cycleState'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
+import { useBudgetIndex } from '@/hooks/useBudgetIndex'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { getCustomMonthRange } from '@/lib/utils'
 import { resolveLoadState } from '@/lib/loadState'
@@ -43,6 +44,8 @@ export function useGlobalSearch(
   // Loans only feed the before-you-type state, so they load only while the query is empty.
   const emptyQuery = query.trim() === ''
   const loans = useLoanPurchases(undefined, emptyQuery)
+  // Budget ids only feed "Edit the budget" on category rows, so they load once someone types.
+  const budgets = useBudgetIndex(!emptyQuery)
 
   const range = useMemo(
     () => getCustomMonthRange(selectedMonth, startDay),
@@ -103,7 +106,7 @@ export function useGlobalSearch(
   }, [deadlines, loans.purchases])
   const loanSummary = useMemo(() => summarizeLoans(deadlines), [deadlines])
 
-  const error = transactions.error ?? accounts.error ?? categories.error ?? loans.error
+  const error = transactions.error ?? accounts.error ?? categories.error ?? loans.error ?? budgets.error
   const loadState = resolveLoadState({
     loading: transactions.loading || accounts.loading || categories.loading || loans.loading,
     error,
@@ -118,6 +121,7 @@ export function useGlobalSearch(
     void accounts.refetch()
     void categories.refetch()
     void loans.refetch()
+    void budgets.refetch()
   }
 
   return {
@@ -125,6 +129,7 @@ export function useGlobalSearch(
     range,
     dueSoon,
     loanSummary,
+    budgetByCategory: budgets.budgetByCategory,
     isAmountQuery: parseAmountQuery(query) !== null,
     loadState,
     error,

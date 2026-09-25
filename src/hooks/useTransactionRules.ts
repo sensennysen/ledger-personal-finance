@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Category } from '@/types'
-import { toResult, type MutationResult } from '@/lib/dataErrors'
+import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 export interface TransactionRule {
   id: string
@@ -20,6 +20,7 @@ export function useTransactionRules(enabled = false) {
   const { user } = useAuth()
   const [rules, setRules] = useState<TransactionRule[]>([])
   const [loading, setLoading] = useState(enabled)
+  const [failure, setFailure] = useState<DescribedError | null>(null)
 
   const fetchRules = useCallback(async () => {
     if (!user) {
@@ -34,12 +35,19 @@ export function useTransactionRules(enabled = false) {
     }
 
     setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('transaction_rules')
       .select('*, category:categories(id,name,icon,color,type,is_default,user_id,created_at,updated_at)')
       .eq('user_id', user.id)
       .order('priority', { ascending: false })
       .order('created_at', { ascending: true })
+    if (error) {
+      // A failed read keeps whatever was loaded and says so; it is not an empty rule list.
+      setFailure(describeDataError(error, { action: 'load', entity: 'rule' }))
+      setLoading(false)
+      return
+    }
+    setFailure(null)
     setRules((data as TransactionRule[]) ?? [])
     setLoading(false)
   }, [enabled, user])
@@ -105,5 +113,5 @@ export function useTransactionRules(enabled = false) {
     [rules],
   )
 
-  return { rules, loading, createRule, updateRule, deleteRule, matchRule }
+  return { rules, loading, error: failure?.message ?? null, refetch: fetchRules, createRule, updateRule, deleteRule, matchRule }
 }

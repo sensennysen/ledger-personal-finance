@@ -1,5 +1,13 @@
-import type { ReactElement } from 'react'
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, CreditCard, type LucideIcon } from 'lucide-react'
+import { useState, type ReactElement } from 'react'
+import {
+  ArrowDownLeft,
+  ArrowLeftRight,
+  ArrowUpRight,
+  ChevronRight,
+  CircleDollarSign,
+  CreditCard,
+  type LucideIcon,
+} from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -11,7 +19,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { kindMenuItems } from '@/lib/kindMenu'
 import { formatCurrency } from '@/lib/utils'
 
@@ -43,6 +53,10 @@ export function TransactionKindMenu({
   showCardPayment = true,
 }: TransactionKindMenuProps) {
   const { accounts } = useAccounts()
+  // One item list feeds both surfaces: the dropdown from md up, a bottom sheet
+  // below it (LED-109). Same breakpoint as AppLayout's `mobile`.
+  const compact = useMediaQuery('(max-width: 767px)')
+  const [sheetOpen, setSheetOpen] = useState(false)
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
   const items = kindMenuItems(accounts, {
@@ -66,6 +80,55 @@ export function TransactionKindMenu({
           <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{item.description}</span>
         </span>
       </DropdownMenuItem>
+    )
+  }
+
+  if (compact) {
+    const renderRow = (item: (typeof items)[number]) => {
+      const { icon: Icon, tile, color } = KIND_VISUALS[item.kind]
+      return (
+        <button
+          key={item.kind}
+          type="button"
+          onClick={() => {
+            setSheetOpen(false)
+            onSelect(item.kind)
+          }}
+          className="flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left outline-none focus-visible:bg-muted active:bg-muted"
+        >
+          <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${tile}`}>
+            <Icon className={color} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium leading-tight">{item.label}</span>
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.description}</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
+      )
+    }
+    return (
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetTrigger render={trigger} />
+        <SheetContent
+          side="bottom"
+          showCloseButton={false}
+          className="gap-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+        >
+          <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-border" aria-hidden />
+          <SheetTitle className="px-4 pt-3 pb-2 text-[17px]">What would you like to record?</SheetTitle>
+          <div>{primary.map(renderRow)}</div>
+          {liabilities.length > 0 && (
+            <>
+              <div className="h-2 bg-background" aria-hidden />
+              <div className="px-4 pt-3 pb-1 text-[11px] font-medium uppercase tracking-[.14em] text-muted-foreground">
+                Liabilities
+              </div>
+              <div>{liabilities.map(renderRow)}</div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     )
   }
 

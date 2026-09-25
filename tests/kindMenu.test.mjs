@@ -93,3 +93,15 @@ test('the loan tile uses the gold token, not the accent', () => {
   assert.match(source, /'loan-repayment':[^\n]*bg-gold\/15[^\n]*text-gold/)
   assert.ok(!/bg-primary|text-primary/.test(source))
 })
+
+test('below md the menu is a bottom sheet fed by the same list', () => {
+  const source = readFileSync(new URL('../src/components/transactions/TransactionKindMenu.tsx', import.meta.url), 'utf8')
+  assert.equal(source.match(/kindMenuItems\(/g).length, 1, 'both surfaces must share one call')
+  assert.match(source, /useMediaQuery\('\(max-width: 767px\)'\)/)
+  assert.match(source, /<SheetContent\s+side="bottom"/)
+  assert.match(source, /min-h-16/)
+  assert.match(source, /ChevronRight/)
+  // Both surfaces read the same `primary` and `liabilities` arrays.
+  assert.equal(source.match(/primary\.map\(/g).length, 2)
+  assert.equal(source.match(/liabilities\.map\(/g).length, 2)
+})

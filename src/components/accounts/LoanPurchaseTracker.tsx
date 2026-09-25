@@ -15,7 +15,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
-import { getItemizationGap, labelAllocationInstallments, splitPurchaseProgress, type LoanContext } from '@/lib/loanSummary'
+import { getItemizationGap, labelAllocationInstallments, splitPurchaseProgress, unitemisedLoanContext, unitemisedPrefill, type LoanContext } from '@/lib/loanSummary'
 import { daysUntilDate } from '@/lib/accountsOverview'
 import type { LoanDeadline } from '@/lib/loanInstallments'
 import type { Account, LoanPurchase } from '@/types'
@@ -41,7 +41,8 @@ function useIsOnline() {
 
 interface LoanPurchaseTrackerProps {
   account: Account
-  onAccountChanged: () => void
+  /** Refetches the account; the tracker waits for it so a stale balance never shows as a gap. */
+  onAccountChanged: () => void | Promise<void>
   loanData?: ReturnType<typeof useLoanPurchases>
   /** Sets what the loan owes; the page routes it through the balance-adjustment path. */
   onSetLoanAmount?: (owed: number) => Promise<MutationResult>
@@ -62,15 +63,20 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
   const [formError, setFormError] = useState<FormErrorValue>(null)
   const [expandedDeadline, setExpandedDeadline] = useState<string | null>(null)
   const [reconciling, setReconciling] = useState(false)
+  // Which purchase the Add dialog is for: a fresh one, or the loan's unitemized balance.
+  const [addMode, setAddMode] = useState<'purchase' | 'unitemized'>('purchase')
+  // True from saving a new purchase until the purchases and the account have both refetched.
+  const [settling, setSettling] = useState(false)
   const { categories } = useCategories()
   const isOnline = useIsOnline()
   const internalLoanData = useLoanPurchases(account.id, !loanData)
-  const { purchases, allocations, deadlines, loading, error, errorDetail, refetch, createPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
+  const { purchases, allocations, deadlines, loading, error, errorDetail, refetch, createPurchase, createUnitemizedPurchase, updatePurchase, deletePurchase } = loanData ?? internalLoanData
   const loadState = resolveLoadState({ loading, error, hasData: purchases.length > 0 })
   const owed = getLoanAmountOwed(account)
   const { itemized, gap } = getItemizationGap(owed, purchases)
   // Only a settled read can be reconciled: a stale or in-flight list would report a gap that isn't there.
-  const showReconciliation = !loading && (loadState === 'ready' || loadState === 'empty') && gap !== 0
+  // While a new purchase is settling, the two reads land at different times; wait for both.
+  const showReconciliation = !loading && !settling && (loadState === 'ready' || loadState === 'empty') && gap !== 0
   const expenseCategories = categories.filter((category) => category.type === 'expense' || category.type === 'both')
   const purchaseById = useMemo(() => new Map(purchases.map((purchase) => [purchase.id, purchase])), [purchases])
   const recentAllocations = useMemo(
@@ -100,7 +106,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
           <h2 id="financed-purchases-title" className="text-base font-semibold">Financed Purchases</h2>
           <p className="text-xs text-muted-foreground">Each purchase keeps its own term while shared deadlines are totaled.</p>
         </div>
-        <Button size="sm" className="gap-1.5" disabled={!isOnline} onClick={() => setCreateOpen(true)}>
+        <Button size="sm" className="gap-1.5" disabled={!isOnline} onClick={() => { setAddMode('purchase'); setCreateOpen(true) }}>
           <Plus className="h-3.5 w-3.5" />Add Purchase
         </Button>
       </div>
@@ -138,22 +144,34 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
                 </p>
               </>
             )}
-            {purchases.length > 0 && onSetLoanAmount && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 border-warning/40 bg-transparent text-xs"
-                disabled={!isOnline || reconciling}
-                onClick={async () => {
-                  setReconciling(true)
-                  const result = await onSetLoanAmount(itemized)
-                  setReconciling(false)
-                  setFormError(withDetail(result))
-                }}
-              >
-                {reconciling ? 'Saving...' : `Set the loan amount to ${formatCurrency(itemized, account.currency)}`}
-              </Button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {gap > 0 && (
+                <Button
+                  size="sm"
+                  className="h-7 text-xs"
+                  disabled={!isOnline || reconciling}
+                  onClick={() => { setFormError(null); setAddMode('unitemized'); setCreateOpen(true) }}
+                >
+                  <Plus className="h-3 w-3" />Add it as a purchase
+                </Button>
+              )}
+              {purchases.length > 0 && onSetLoanAmount && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 border-warning/40 bg-transparent text-xs"
+                  disabled={!isOnline || reconciling}
+                  onClick={async () => {
+                    setReconciling(true)
+                    const result = await onSetLoanAmount(itemized)
+                    setReconciling(false)
+                    setFormError(withDetail(result))
+                  }}
+                >
+                  {reconciling ? 'Saving...' : `Set the loan amount to ${formatCurrency(itemized, account.currency)}`}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -357,25 +375,41 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
 
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setFormError(null) }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4 lg:max-w-3xl">
-          <DialogHeader><DialogTitle>Add Financed Purchase</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{addMode === 'unitemized' ? 'Add Unitemized Balance as a Purchase' : 'Add Financed Purchase'}</DialogTitle>
+          </DialogHeader>
           <FormError error={formError} />
-          {showReconciliation && gap > 0 && (
+          {addMode === 'unitemized' ? (
             <p className="rounded-lg border border-warning/40 bg-warning-container px-3 py-2 text-xs text-warning">
-              This account already has {formatCurrency(gap, account.currency)} of unitemized debt. A financed purchase will be added on top; lower the account’s loan amount by {formatCurrency(gap, account.currency)} first if this purchase represents that same debt.
+              This itemizes the {formatCurrency(gap, account.currency)} the loan already owes, so the loan amount comes down by that much as the purchase goes on. Any interest you add to it is extra debt.
             </p>
+          ) : (
+            showReconciliation && gap > 0 && (
+              <p className="rounded-lg border border-warning/40 bg-warning-container px-3 py-2 text-xs text-warning">
+                This account already has {formatCurrency(gap, account.currency)} of unitemized debt. A financed purchase will be added on top; lower the account’s loan amount by {formatCurrency(gap, account.currency)} first if this purchase represents that same debt.
+              </p>
+            )
           )}
           <LoanPurchaseForm
             accountId={account.id}
             currency={account.currency}
             categories={expenseCategories}
-            loanContext={loanContextWithout(null)}
+            prefill={addMode === 'unitemized' ? unitemisedPrefill(gap) : undefined}
+            loanContext={addMode === 'unitemized' ? unitemisedLoanContext(loanContextWithout(null), gap) : loanContextWithout(null)}
             onClose={() => setCreateOpen(false)}
             onSubmit={async (values) => {
-              const result = await createPurchase(values)
-              if (result.error) { setFormError(withDetail(result)); return }
-              setFormError(null)
-              setCreateOpen(false)
-              onAccountChanged()
+              setSettling(true)
+              try {
+                const unitemized = addMode === 'unitemized'
+                const result = unitemized ? await createUnitemizedPurchase(values) : await createPurchase(values)
+                if (result.error) { setFormError(withDetail(result)); return }
+                setFormError(null)
+                setCreateOpen(false)
+                // createPurchase has already refetched the purchases; the rpc path has not.
+                await Promise.all([unitemized ? refetch() : undefined, onAccountChanged()])
+              } finally {
+                setSettling(false)
+              }
             }}
           />
         </DialogContent>

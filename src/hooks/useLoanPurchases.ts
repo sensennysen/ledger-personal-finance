@@ -110,6 +110,20 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
     return { error: null }
   }
 
+  /**
+   * Itemises the loan's unitemized debt as this purchase: one database call inserts the purchase and
+   * lowers what the loan owes by the gap. It does not refetch; the caller settles the purchases and the
+   * account together so no render sees one without the other.
+   */
+  const createUnitemizedPurchase = async (values: CreateLoanPurchaseValues): Promise<MutationResult> => {
+    if (!userId) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to add a financed purchase.' }
+
+    const { account_id: accountId, ...purchase } = values
+    const { error } = await supabase.rpc('add_unitemised_purchase', { p_account_id: accountId, p_purchase: purchase })
+    return toResult(error, { action: 'save', entity: 'purchase' })
+  }
+
   const updatePurchase = async (id: string, values: UpdateLoanPurchaseValues): Promise<MutationResult> => {
     if (!userId) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit a financed purchase.' }
@@ -169,6 +183,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
     errorDetail,
     refetch: fetch,
     createPurchase,
+    createUnitemizedPurchase,
     updatePurchase,
     deletePurchase,
   }

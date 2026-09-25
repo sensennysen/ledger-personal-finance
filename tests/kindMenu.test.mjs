@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { kindMenuItems } from '../src/lib/kindMenu.ts'
+import { canChangeKind, kindDialogSubtitle, kindMenuItems } from '../src/lib/kindMenu.ts'
 
 const money = (n) => `$${n.toFixed(2)}`
 const acct = (over) => ({ id: over.name, name: over.name, type: 'checking', currency: 'USD', balance: 0, ...over })
@@ -82,21 +82,23 @@ test('a loan in another currency is left out of the sentence, not summed', () =>
 
 test('the menu component renders the list and hard-codes no kind labels', () => {
   const source = readFileSync(new URL('../src/components/transactions/TransactionKindMenu.tsx', import.meta.url), 'utf8')
-  assert.match(source, /kindMenuItems\(/)
+  assert.match(source, /useKindMenuItems\(/)
   for (const label of ['Loan repayment', 'Card payment', 'Money spent from an account']) {
     assert.ok(!source.includes(label), `${label} should come from kindMenuItems`)
   }
 })
 
 test('the loan tile uses the gold token, not the accent', () => {
-  const source = readFileSync(new URL('../src/components/transactions/TransactionKindMenu.tsx', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../src/components/transactions/kindVisuals.ts', import.meta.url), 'utf8')
   assert.match(source, /'loan-repayment':[^\n]*bg-gold\/15[^\n]*text-gold/)
   assert.ok(!/bg-primary|text-primary/.test(source))
+  const menu = readFileSync(new URL('../src/components/transactions/TransactionKindMenu.tsx', import.meta.url), 'utf8')
+  assert.ok(!/bg-primary|text-primary/.test(menu))
 })
 
 test('below md the menu is a bottom sheet fed by the same list', () => {
   const source = readFileSync(new URL('../src/components/transactions/TransactionKindMenu.tsx', import.meta.url), 'utf8')
-  assert.equal(source.match(/kindMenuItems\(/g).length, 1, 'both surfaces must share one call')
+  assert.equal(source.match(/useKindMenuItems\(/g).length, 1, 'both surfaces must share one call')
   assert.match(source, /useMediaQuery\('\(max-width: 767px\)'\)/)
   assert.match(source, /<SheetContent\s+side="bottom"/)
   assert.match(source, /min-h-16/)
@@ -135,4 +137,47 @@ test('the search palette reads the shared mapping instead of its own letters', (
   const source = readFileSync(new URL('../src/components/search/SearchPalette.tsx', import.meta.url), 'utf8')
   assert.match(source, /import \{ KIND_SHORTCUTS \} from '@\/lib\/kindMenu'/)
   assert.ok(!/key: '[EIT]'/.test(source))
+})
+
+const loan = acct({ name: 'Car', type: 'loan', balance: -100 })
+const visa = acct({ name: 'Visa', type: 'credit_card', balance: -50 })
+
+test('the dialog subtitle for a primary kind is the menu\'s own description', () => {
+  const items = kindMenuItems([cash, loan, visa], opts)
+  for (const kind of ['expense', 'income', 'transfer']) {
+    assert.equal(kindDialogSubtitle(kind, items), items.find((i) => i.kind === kind).description)
+  }
+})
+
+test('a payment dialog states its kind with the design caption, not the aggregate line', () => {
+  const items = kindMenuItems([cash, loan, visa], opts)
+  assert.equal(kindDialogSubtitle('loan-repayment', items), 'Posts as an expense against the loan · type locked')
+  assert.equal(kindDialogSubtitle('card-payment', items), 'Posts as an expense against the card · type locked')
+})
+
+test('Change kind is offered from the three primary kinds only', () => {
+  assert.equal(canChangeKind('expense'), true)
+  assert.equal(canChangeKind('income'), true)
+  assert.equal(canChangeKind('transfer'), true)
+  assert.equal(canChangeKind('loan-repayment'), false)
+  assert.equal(canChangeKind('card-payment'), false)
+})
+
+test('the entry header takes its text from the shared list and hard-codes none', () => {
+  const source = readFileSync(new URL('../src/components/transactions/TransactionEntryHeader.tsx', import.meta.url), 'utf8')
+  assert.match(source, /useKindMenuItems\(/)
+  assert.match(source, /kindDialogSubtitle\(/)
+  for (const text of ['Money spent from an account', 'Money received into an account', 'Move money between accounts']) {
+    assert.ok(!source.includes(text), `${text} should come from kindMenuItems`)
+  }
+  assert.match(source, /Change kind/)
+})
+
+test('every create dialog renders the entry header and swaps kind without remounting the form', () => {
+  for (const file of ['components/layout/AppLayout.tsx', 'pages/TransactionsPage.tsx', 'pages/AccountTransactionsPage.tsx']) {
+    const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
+    assert.match(source, /<TransactionEntryHeader/, file)
+    assert.match(source, /onChangeKind=\{setTransactionKind\}/, file)
+    assert.ok(!/TRANSACTION_KIND_DIALOG_TITLES/.test(source), `${file} should not title its own dialog`)
+  }
 })

@@ -28,8 +28,9 @@ import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { useNotify } from '@/contexts/notificationState'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { defaultCardPaymentDescription } from '@/lib/cardPayment'
+import { TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
-import { TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
+import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
 import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
@@ -506,11 +507,17 @@ export default function AccountTransactionsPage() {
           )}
           <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setRepaymentPrefill(null) }}>
               <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-              <DialogHeader>
-                <DialogTitle>
-                  {account?.type === 'loan' ? `Pay ${account.name}` : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}
-                </DialogTitle>
-              </DialogHeader>
+              <TransactionEntryHeader
+                kind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
+                title={account?.type === 'loan' ? `Pay ${account.name}` : undefined}
+                onChangeKind={setTransactionKind}
+                showCardPayment={account?.type !== 'credit_card'}
+                showLoanRepayment={Boolean(
+                  account &&
+                  account.type !== 'credit_card' &&
+                  accounts.some((candidate) => candidate.type === 'loan' && candidate.currency === account.currency)
+                )}
+              />
               <FormError error={formError} />
               <TransactionForm
                 entryKind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}

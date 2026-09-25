@@ -44,10 +44,8 @@ import {
   TransactionForm,
   type TransactionFormValues,
 } from '@/components/transactions/TransactionForm'
-import {
-  TRANSACTION_KIND_DIALOG_TITLES,
-  type TransactionKind,
-} from '@/components/transactions/transactionKinds'
+import { TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
+import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import { SearchPalette } from '@/components/search/SearchPalette'
 import { EntryDetail } from '@/components/transactions/EntryDetail'
 import { X } from 'lucide-react'
@@ -229,10 +227,6 @@ function LayoutShell() {
       />
     </ErrorBoundary>
   )
-  const title =
-    sheet === 'account'
-      ? 'Your account'
-      : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]
   return (
     <EntryContext.Provider
       value={(transaction, actions) => {
@@ -428,9 +422,13 @@ function LayoutShell() {
                 <span className="h-1 w-8 rounded-full bg-muted-foreground/50" />
               </div>
             )}
-            <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
-            </DialogHeader>
+            {sheet === 'add' ? (
+              <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
+            ) : (
+              <DialogHeader>
+                <DialogTitle>Your account</DialogTitle>
+              </DialogHeader>
+            )}
             <FormError error={formError} className="px-0 mt-0" />
             {sheet === 'add' && (
               <TransactionForm

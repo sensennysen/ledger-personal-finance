@@ -102,3 +102,22 @@ export function kindMenuItems(accounts: Account[], options: KindMenuOptions): Ki
   }
   return items
 }
+
+// A payment dialog is already about one loan or card, so the menu's aggregate
+// line ("2 cards · $x due") would be wrong there. The designs (5b, 12a) draw
+// this caption instead (LED-111).
+const LIABILITY_DIALOG_SUBTITLES = {
+  'loan-repayment': 'Posts as an expense against the loan · type locked',
+  'card-payment': 'Posts as an expense against the card · type locked',
+} as const
+
+/** The line under a new-transaction dialog's title: the menu's own text for the three primary kinds. */
+export function kindDialogSubtitle(kind: TransactionKind, items: KindMenuItem[]): string {
+  if (kind === 'loan-repayment' || kind === 'card-payment') return LIABILITY_DIALOG_SUBTITLES[kind]
+  return items.find((item) => item.kind === kind)?.description ?? ''
+}
+
+/** Change kind is offered only from the three primary kinds; a payment's form cannot be swapped safely. */
+export function canChangeKind(kind: TransactionKind): boolean {
+  return kind !== 'loan-repayment' && kind !== 'card-payment'
+}

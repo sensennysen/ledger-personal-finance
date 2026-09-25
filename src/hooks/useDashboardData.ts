@@ -67,6 +67,8 @@ export type UpcomingBill = {
   detail: string | null
   nextDue: Date
   daysUntil: number | null
+  /** The loan this bill pays, with the amount and due date the form opens on (Pay now, LED-145). Only loan bills have one. */
+  payment: { accountId: string; amount: number; date: string } | null
 }
 
 export type CashFlowForecastItem = {
@@ -216,6 +218,7 @@ function buildUpcomingBills(
       detail: tx.recurrence_interval,
       nextDue,
       daysUntil: isCurrentMonth ? Math.round((nextDue.getTime() - today.getTime()) / 86400000) : null,
+      payment: null,
     })
   }
 
@@ -258,6 +261,7 @@ function buildUpcomingLoanBills(
         detail: formatLoanSchedule(account),
         nextDue,
         daysUntil: isCurrentMonth ? Math.round((nextDue.getTime() - today.getTime()) / 86400000) : null,
+        payment: { accountId: account.id, amount: nextDeadline.total, date: nextDeadline.dueDate },
       })
       continue
     }
@@ -278,6 +282,7 @@ function buildUpcomingLoanBills(
         detail: account.name,
         nextDue,
         daysUntil: isCurrentMonth ? Math.round((nextDue.getTime() - today.getTime()) / 86400000) : null,
+        payment: { accountId: account.id, amount: nextInstallment.remainingAmount, date: nextInstallment.dueDate },
       })
     }
   }

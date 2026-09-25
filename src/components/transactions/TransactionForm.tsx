@@ -310,20 +310,23 @@ export function TransactionForm({
     if (initialCardId) handleCardChange(initialCardId)
   }, [cardAccounts, handleCardChange, isCardPayment, lockedCardAccountId, selectedLoanId])
 
-  // A locked card already has its target, so the effect above never runs for it; Pay from
-  // still needs a compatible account, or the submit fails with "Account is required" (LED-146).
+  // A locked card or loan already has its target, so the effects above never run for it; Pay from and
+  // the description still need filling, or the submit fails with "Account is required" (LED-146).
   useEffect(() => {
-    if (!isCardPayment || isEditing || !selectedCard) return
+    if (!isLiabilityPayment || isEditing || !paymentTarget) return
     if (!form.getValues('description').trim()) {
-      form.setValue('description', defaultCardPaymentDescription(selectedCard.name))
+      form.setValue(
+        'description',
+        selectedCard ? defaultCardPaymentDescription(selectedCard.name) : `Loan payment - ${paymentTarget.name}`,
+      )
     }
     if (paymentSourceAccounts.some((account) => account.id === selectedAccount)) return
-    const source = defaultPaymentSource(accounts, selectedCard) ?? ''
+    const source = defaultPaymentSource(accounts, paymentTarget) ?? ''
     if (source === selectedAccount) return
     form.setValue('account_id', source)
-    form.setValue('currency', selectedCard.currency)
+    form.setValue('currency', paymentTarget.currency)
     form.clearErrors('account_id')
-  }, [accounts, form, isCardPayment, isEditing, paymentSourceAccounts, selectedAccount, selectedCard])
+  }, [accounts, form, isEditing, isLiabilityPayment, paymentSourceAccounts, paymentTarget, selectedAccount, selectedCard])
 
   useEffect(() => {
     if (!isLoanRepayment || selectedLoanId) return

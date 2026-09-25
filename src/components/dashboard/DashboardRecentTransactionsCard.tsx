@@ -1,4 +1,4 @@
-import { ArrowLeftRight } from 'lucide-react'
+import { ArrowLeftRight, Clock } from 'lucide-react'
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { useNavigate } from 'react-router-dom'
 import { EXPENSE, INCOME, TRANSFER } from '@/constants/colors'
@@ -80,6 +80,13 @@ export function DashboardRecentTransactionsCard({
                   {getTransactionPrefix(transaction.type)}
                   {formatCurrency(transaction.amount, transaction.currency)}
                 </span>
+              }
+              rightDetail={
+                transaction.queued ? (
+                  <span className="inline-flex items-center gap-1 text-[0.6875rem] text-primary">
+                    <Clock className="h-3 w-3" aria-hidden />Not synced yet
+                  </span>
+                ) : undefined
               }
             />
           ))}

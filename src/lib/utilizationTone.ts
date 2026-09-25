@@ -1,5 +1,5 @@
 // Credit utilisation colour as a scale (LED-77), not a snap from green to red:
-// income at 0%, gold (--primary, "liability due") at the card's target, expense at 100%.
+// income at 0%, gold (--gold, "liability due") at the card's target, expense at 100%.
 
 function mix(from: string, to: string, t: number): string {
   const pct = Math.round(Math.min(1, Math.max(0, t)) * 100)

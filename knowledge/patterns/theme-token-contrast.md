@@ -10,3 +10,4 @@ Colors live in the `index.css` `:root` / `.dark` token blocks and nowhere else (
 3. Stored user hues (categories, accounts, goals) go through `useCategoryInk()` where they are rendered. Dark steps each one a tint lighter. The data layer stays theme-agnostic, and nothing needs a migration.
 4. Before calling a theme change done, run the rendered scan (with [[browser-check-with-local-user]]). Walk every visible text node, blend the backgrounds of its ancestors, and compute the WCAG ratio at 1280 and 390 in both themes. In dark, also flag large opaque backgrounds with luminance > 0.3. Expect primary buttons and meter fills to show up there by design.
 5. A design value that fails gets the nearest design ink that passes, plus a comment in `index.css` naming the original value. Don't invent a new hue.
+6. A token that aliases another token is re-checked when its target is re-seeded. See [[semantic-token-aliases]].

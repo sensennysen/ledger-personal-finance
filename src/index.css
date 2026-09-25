@@ -55,6 +55,9 @@
   --transfer-container: #DCEAF2;
   --warning: #7A6430;
   --warning-container: #F0E7D2;
+  /* Design gold #9A7F3D is 2.84:1 on the page; this step of the same hue holds 3:1 on page and card.
+     For borders, fills, meters and icon tiles only. Text on gold tint uses --warning. */
+  --gold: #917738;
 
   /* Charts alias the semantics so Recharts needs no per-series colors */
   --chart-1: var(--primary);
@@ -122,6 +125,7 @@
   --transfer-container: #24323C;
   --warning: #E8CE92;
   --warning-container: #3C3320;
+  --gold: #C9AC6A;
 
   --chart-1: var(--primary);
   --chart-2: var(--income);
@@ -159,6 +163,7 @@
   --color-transfer-container: var(--transfer-container);
   --color-warning: var(--warning);
   --color-warning-container: var(--warning-container);
+  --color-gold: var(--gold);
 
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);

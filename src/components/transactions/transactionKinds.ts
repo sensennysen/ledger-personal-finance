@@ -31,3 +31,12 @@ export function inferTransactionKind(
   }
   return type ?? 'expense'
 }
+
+// The card payment modal is drawn at 720px (12a), inset 24px where the viewport is narrower;
+// every other kind keeps the compact width. Below `sm` all dialogs are the phone sheet.
+const CARD_PAYMENT_DIALOG_WIDTH = 'sm:max-w-[min(720px,calc(100vw-3rem))]'
+const COMPACT_DIALOG_WIDTH = 'max-w-md'
+
+export function entryDialogWidthClass(kind: TransactionKind): string {
+  return kind === 'card-payment' ? `${COMPACT_DIALOG_WIDTH} ${CARD_PAYMENT_DIALOG_WIDTH}` : COMPACT_DIALOG_WIDTH
+}

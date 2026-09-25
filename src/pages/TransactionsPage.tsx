@@ -28,7 +28,7 @@ import { TransactionForm, type TransactionFormValues } from '@/components/transa
 import { PageActions } from '@/components/layout/PageActions'
 import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
-import { inferTransactionKind, type TransactionKind } from '@/components/transactions/transactionKinds'
+import { entryDialogWidthClass, inferTransactionKind, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
 import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
@@ -454,7 +454,7 @@ export default function TransactionsPage() {
               }
             />
             <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
-              <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+              <DialogContent className={`max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
                 <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
                 <FormError error={formError} />
                 <TransactionForm

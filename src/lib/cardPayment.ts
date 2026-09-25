@@ -1,4 +1,5 @@
 import type { Account } from '@/types'
+import { daysUntilDayOfMonth, nextDayOfMonthDate } from './creditCards.ts'
 
 // Card balances are stored as liabilities: 0 = nothing owed, -1240 = owe 1,240,
 // positive = statement credit. Nothing here caps the amount; overpaying is allowed.
@@ -64,4 +65,34 @@ export function isAutoCardPaymentDescription(description: string, previousCardNa
   const current = description.trim()
   if (!current) return true
   return Boolean(previousCardName) && current === defaultCardPaymentDescription(previousCardName as string)
+}
+
+export interface CardDateInfo {
+  /** "Oct 1" - the design's month-and-day, no year. */
+  label: string
+  daysUntil: number
+}
+
+/** The next statement close or payment due date for a day-of-month, as the payment form words it (12a). */
+export function getCardDateInfo(day: number | null | undefined, today: Date = new Date()): CardDateInfo | null {
+  const next = nextDayOfMonthDate(day, today)
+  const daysUntil = daysUntilDayOfMonth(day, today)
+  if (!next || daysUntil == null) return null
+  return { label: next.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), daysUntil }
+}
+
+/**
+ * The card a payment form opens on, or null to leave the choice to the user. Only a locked card
+ * or the one card that owes money is picked for them; with two or more owing, an automatic pick
+ * would record a payment against an arbitrary debt (the loan rule, LED-104).
+ */
+export function resolveInitialCardId(
+  cards: { id: string; balance: number }[],
+  lockedCardAccountId: string | null | undefined,
+): string | null {
+  if (lockedCardAccountId) return lockedCardAccountId
+  const owing = cards.filter((card) => card.balance < 0)
+  if (owing.length === 1) return owing[0].id
+  if (owing.length === 0 && cards.length === 1) return cards[0].id
+  return null
 }

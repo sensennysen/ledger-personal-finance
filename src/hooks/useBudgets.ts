@@ -2,18 +2,29 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
-import type { Budget, BudgetHistoryEntry } from '@/types'
+import type { Budget } from '@/types'
+import type { BudgetSpendTx } from '@/lib/budgetSpend'
 import { getCurrentCycleMonthKey } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { sumBudgetSpend } from '@/lib/budgetSpend'
+import { shiftMonthKey } from '@/lib/overspending'
 import { readAllPages } from '@/lib/pagedRead'
-import { canRollover, nextRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
+import { canRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
+import { buildBudgetHistory, type PeriodSpend } from '@/lib/budgetHistory'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { resolveRefresh } from '@/lib/loadState'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 function localDateStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/** Last cycle's expense rows, for "Add from last cycle"; `forKey` ties them to the cycle they were read for. */
+export interface PreviousCycleSpend {
+  forKey: string
+  start: string
+  end: string
+  txs: BudgetSpendTx[]
 }
 
 export function useBudgets(
@@ -36,6 +47,7 @@ export function useBudgets(
   // key while a new cycle loads with the previous one still showing.
   const [dataKey, setDataKey] = useState<string | null>(null)
   const dataKeyRef = useRef<string | null>(null)
+  const [previousCycleRead, setPreviousCycleRead] = useState<PreviousCycleSpend | null>(null)
   const requestId = useRef(0)
   const requestedKey = selectedMonth ? `${selectedMonth}:${startDay}` : 'current'
 
@@ -149,8 +161,7 @@ export function useBudgets(
 
       // Compute monthly rollover and history
       const rolloverActive = b.rollover_enabled && canRollover(b.period)
-      let rolloverAmount = 0
-      const history: BudgetHistoryEntry[] = []
+      const periods: PeriodSpend[] = []
 
       if (canRollover(b.period)) {
         const budgetStartDate = new Date(b.start_date + 'T00:00:00')
@@ -166,30 +177,18 @@ export function useBudgets(
             new Date(d.getFullYear(), d.getMonth() + 1, startDay - 1),
           )
           const { spent: periodSpent } = computeSpent(periodStart, periodEnd)
-          const surplus = b.amount - periodSpent
-
-          history.push({
-            period_start: periodStart,
-            period_end: periodEnd,
-            budget_amount: b.amount,
-            spent_amount: periodSpent,
-            rollover_in: rolloverActive ? rolloverAmount : 0,
-            currency: b.currency,
-          })
-
-          if (rolloverActive) {
-            rolloverAmount = nextRollover(
-              rolloverAmount,
-              surplus,
-              b.amount,
-              deficitBehaviour,
-            )
-          }
-
+          periods.push({ period_start: periodStart, period_end: periodEnd, spent: periodSpent })
           d = new Date(d.getFullYear(), d.getMonth() + 1, startDay)
         }
       }
 
+      const { history, carriedIn: rolloverAmount } = buildBudgetHistory(
+        periods,
+        b.amount,
+        b.currency,
+        rolloverActive,
+        deficitBehaviour,
+      )
       const recentHistory = history.slice(-6)
       const effectiveAmount = Math.max(
         0,
@@ -203,9 +202,22 @@ export function useBudgets(
         rollover_amount: rolloverAmount,
         effective_amount: effectiveAmount,
         history: recentHistory,
+        // Every closed period's spend, so the form can replay Carried in for an edited amount.
+        period_spends: periods.map((period) => period.spent),
       }
     })
 
+    const previousRange = getBudgetCycleRange(
+      'monthly',
+      shiftMonthKey(selectedMonth ?? getCurrentCycleMonthKey(startDay), -1),
+      startDay,
+    )
+    setPreviousCycleRead({
+      forKey: key,
+      start: previousRange.start,
+      end: previousRange.end,
+      txs: allTx.filter((tx) => tx.date >= previousRange.start && tx.date <= previousRange.end),
+    })
     showBudgets(enriched, key)
     writeCache(cacheKey, enriched)
     setLoading(false)
@@ -230,6 +242,7 @@ export function useBudgets(
       | 'rollover_amount'
       | 'effective_amount'
       | 'history'
+      | 'period_spends'
     >,
   ): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
@@ -237,6 +250,20 @@ export function useBudgets(
     const { error } = await supabase
       .from('budgets')
       .insert({ ...values, user_id: user.id })
+    if (!error) await fetch()
+    return toResult(error, { action: 'save', entity: 'budget' })
+  }
+
+  /** Inserts every budget in one call: all of them are created or none. */
+  const createBudgets = async (
+    rows: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'spent' | 'unrated_currencies' | 'rollover_amount' | 'effective_amount' | 'history' | 'period_spends'>[],
+  ): Promise<MutationResult> => {
+    if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to add budgets.' }
+    if (rows.length === 0) return { error: null }
+    const { error } = await supabase
+      .from('budgets')
+      .insert(rows.map((row) => ({ ...row, user_id: user.id })))
     if (!error) await fetch()
     return toResult(error, { action: 'save', entity: 'budget' })
   }
@@ -282,7 +309,10 @@ export function useBudgets(
     error,
     errorDetail,
     refetch: fetch,
+    /** Null until this cycle's read finishes, and when the budgets came from the offline cache. */
+    previousCycle: previousCycleRead && previousCycleRead.forKey === requestedKey ? previousCycleRead : null,
     createBudget,
+    createBudgets,
     updateBudget,
     deleteBudget,
   }

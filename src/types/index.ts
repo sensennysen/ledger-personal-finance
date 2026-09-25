@@ -156,6 +156,8 @@ export interface Budget {
   rollover_amount?: number
   effective_amount?: number
   history?: BudgetHistoryEntry[]
+  /** Spend in every closed monthly period, oldest first; lets the form replay Carried in. */
+  period_spends?: number[]
 }
 
 export interface SavingsGoal {

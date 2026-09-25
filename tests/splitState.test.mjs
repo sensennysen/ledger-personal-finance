@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveSplit } from '../src/lib/splitState.ts'
+import { buildSplitRpcLines, resolveSplit } from '../src/lib/splitState.ts'
 
 const line = (description, amount) => ({ description, amount })
 
@@ -38,4 +38,15 @@ test('each disabled cause is named separately, with the lines it applies to', ()
 test('all three causes can apply at once', () => {
   const s = resolveSplit(100, [line('A', 40), line('', 0)])
   assert.deepEqual(s.blockers.map((b) => b.kind), ['unbalanced', 'blank-description', 'zero-amount'])
+})
+
+test('rpc lines are trimmed and rounded to cents, and keep their order and category', () => {
+  const lines = buildSplitRpcLines([
+    { description: '  Food ', category_id: 'c1', amount: 60.004 },
+    { description: 'Rest', category_id: null, amount: '39.996' },
+  ])
+  assert.deepEqual(lines, [
+    { description: 'Food', category_id: 'c1', amount: 60 },
+    { description: 'Rest', category_id: null, amount: 40 },
+  ])
 })

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, ArrowLeftRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCycle } from '@/contexts/cycleState'
+import { useNotify } from '@/contexts/notificationState'
 import { useCategories } from '@/hooks/useCategories'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
@@ -118,11 +119,13 @@ export default function TransactionsPage() {
     createTransaction,
     updateTransaction,
     deleteTransaction,
+    splitTransaction,
     bulkDeleteTransactions,
     bulkUpdateCategory,
     bulkCreateTransactions,
   } = useTransactions()
 
+  const notify = useNotify()
   const { categories } = useCategories()
   const loadState = resolveLoadState({ loading, error, hasData: transactions.length > 0 })
 
@@ -328,29 +331,22 @@ export default function TransactionsPage() {
 
   // ── Split handler ──────────────────────────────────────────
 
+  // The split is one database call. On failure the dialog closes and the notification's Retry
+  // repeats the same call with the same lines, so nothing typed is lost.
+  const runSplit = async (tx: Transaction, splits: SplitInput[]) => {
+    const { error } = await splitTransaction(tx.id, splits)
+    if (!error) return
+    notify({
+      severity: 'failure',
+      title: "Couldn't split that transaction",
+      body: error,
+      action: navigator.onLine ? { label: 'Retry', run: () => void runSplit(tx, splits) } : undefined,
+    })
+  }
+
   const handleSplitConfirm = async (splits: SplitInput[]) => {
     if (!splittingTx) return
-    for (const s of splits) {
-      await createTransaction({
-        type: splittingTx.type,
-        account_id: splittingTx.account_id,
-        to_account_id: null,
-        category_id: s.category_id,
-        subcategory_id: null,
-        amount: s.amount,
-        currency: splittingTx.currency,
-        exchange_rate: splittingTx.exchange_rate,
-        description: s.description,
-        notes: splittingTx.notes,
-        date: splittingTx.date,
-        transfer_fee: null,
-        is_recurring: false,
-        recurrence_interval: null,
-        recurrence_end_date: null,
-        receipt_url: null,
-      })
-    }
-    await deleteTransaction(splittingTx.id)
+    await runSplit(splittingTx, splits)
     setSplittingTx(null)
   }
 

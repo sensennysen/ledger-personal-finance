@@ -36,3 +36,20 @@ export function resolveSplit(total: number, lines: SplitLineInput[]): SplitState
     blockers,
   }
 }
+
+export const SPLIT_OFFLINE_MESSAGE = 'Connect to the internet to split a transaction.'
+
+export interface SplitRpcLine {
+  description: string
+  category_id: string | null
+  amount: number
+}
+
+/** The `lines` argument of the split_transaction function: trimmed, cents-rounded, in order. */
+export function buildSplitRpcLines(lines: SplitRpcLine[]): SplitRpcLine[] {
+  return lines.map((line) => ({
+    description: line.description.trim(),
+    category_id: line.category_id,
+    amount: Math.round(Number(line.amount) * 100) / 100,
+  }))
+}

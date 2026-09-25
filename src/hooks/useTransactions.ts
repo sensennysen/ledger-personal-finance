@@ -6,6 +6,7 @@ import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
 import { notifyAccountsRefresh, notifyLoanPurchasesRefresh } from '@/lib/cacheEvents'
+import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/lib/splitState'
 import { addRecurringIntervalToDateString } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
 import type { Transaction, Account, Category } from '@/types'
@@ -217,6 +218,18 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return toResult(error, { action: 'delete', entity: 'transaction' })
   }
 
+  /** Splits one transaction into lines in a single database call: every line is written and the original removed, or nothing changes. */
+  const splitTransaction = async (id: string, splits: SplitRpcLine[]): Promise<MutationResult> => {
+    if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: SPLIT_OFFLINE_MESSAGE }
+    const { error } = await supabase.rpc('split_transaction', { original_id: id, lines: buildSplitRpcLines(splits) })
+    if (!error) {
+      await fetch()
+      notifyLoanPurchasesRefresh()
+    }
+    return toResult(error, { action: 'save', entity: 'transaction' })
+  }
+
   const bulkDeleteTransactions = async (ids: string[]): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
@@ -358,6 +371,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     createTransaction,
     updateTransaction,
     deleteTransaction,
+    splitTransaction,
     bulkDeleteTransactions,
     bulkUpdateCategory,
     bulkCreateTransactions,

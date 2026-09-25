@@ -17,6 +17,8 @@ import {
 import { TransactionDescriptionField } from '@/components/transactions/TransactionDescriptionField'
 import { AccountCombobox } from '@/components/transactions/AccountCombobox'
 import { LoanPicker } from '@/components/transactions/LoanPicker'
+import { RepaymentAssist } from '@/components/transactions/RepaymentAssist'
+import { StatsBand } from '@/components/transactions/StatsBand'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionTagsField } from '@/components/transactions/TransactionTagsField'
 import { TransactionGoalField } from '@/components/transactions/TransactionGoalField'
@@ -29,6 +31,7 @@ import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
 import { resolveEditTarget } from '@/lib/editTarget'
 import { hasLoanPickerStep, resolveInitialLoanId } from '@/lib/loanPicker'
+import { exceedsOutstanding } from '@/lib/loanRepayment'
 import { daysUntilDayOfMonth } from '@/lib/creditCards'
 import {
   defaultCardPaymentDescription,
@@ -299,7 +302,7 @@ export function TransactionForm({
         form.setError('account_id', { message: 'Choose a different account to repay this loan' })
         return
       }
-      if (values.amount > getLoanAmountOwed(repaymentLoan)) {
+      if (exceedsOutstanding(values.amount, getLoanAmountOwed(repaymentLoan))) {
         form.setError('amount', { message: 'Payment cannot exceed the outstanding loan amount' })
         return
       }
@@ -379,6 +382,10 @@ export function TransactionForm({
           />
         )}
 
+        {isLoanRepayment && selectedLoan && !isEditing && (
+          <RepaymentAssist key={selectedLoan.id} loan={selectedLoan} form={form} />
+        )}
+
         {isCardPayment && (
           <FormField
             control={form.control}
@@ -413,29 +420,23 @@ export function TransactionForm({
         )}
 
         {cardSummary && (
-          <dl className="grid grid-cols-3 gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
-            <div>
-              <dt className="text-xs text-muted-foreground">Current balance</dt>
-              <dd className="font-semibold">{formatCurrency(cardSummary.owed, cardCurrency)}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Available credit</dt>
-              <dd className="font-semibold">
-                {cardSummary.available == null ? '—' : formatCurrency(cardSummary.available, cardCurrency)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">After this payment</dt>
-              <dd className="font-semibold">
-                {cardSummary.afterBalance > 0
-                  ? `+${formatCurrency(cardSummary.afterBalance, cardCurrency)}`
-                  : formatCurrency(Math.abs(cardSummary.afterBalance), cardCurrency)}
-              </dd>
-              {cardSummary.afterBalance > 0 && (
-                <dd className="text-xs text-muted-foreground">statement credit</dd>
-              )}
-            </div>
-          </dl>
+          <StatsBand
+            items={[
+              { label: 'Current balance', value: formatCurrency(cardSummary.owed, cardCurrency) },
+              {
+                label: 'Available credit',
+                value: cardSummary.available == null ? '—' : formatCurrency(cardSummary.available, cardCurrency),
+              },
+              {
+                label: 'After this payment',
+                value:
+                  cardSummary.afterBalance > 0
+                    ? `+${formatCurrency(cardSummary.afterBalance, cardCurrency)}`
+                    : formatCurrency(Math.abs(cardSummary.afterBalance), cardCurrency),
+                note: cardSummary.afterBalance > 0 ? 'statement credit' : undefined,
+              },
+            ]}
+          />
         )}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">

@@ -12,6 +12,8 @@ export interface KindMenuItem {
   label: string
   description: string
   group: KindMenuGroup
+  /** Key cap on the desktop dropdown; absent for kinds that open a second step. */
+  shortcut?: string
 }
 
 export interface KindMenuOptions {
@@ -21,10 +23,26 @@ export interface KindMenuOptions {
   formatMoney: (amount: number) => string
 }
 
+// E / I / T fire the three primary kinds (LED-110). Loan repayment and card
+// payment open a second step, so they get no letter. The search palette reads
+// this too, so the two surfaces agree.
+export const KIND_SHORTCUTS = {
+  expense: 'E',
+  income: 'I',
+  transfer: 'T',
+} as const
+
+export type ShortcutKind = keyof typeof KIND_SHORTCUTS
+
+export function kindForShortcut(key: string): ShortcutKind | null {
+  const upper = key.toUpperCase()
+  return (Object.keys(KIND_SHORTCUTS) as ShortcutKind[]).find((kind) => KIND_SHORTCUTS[kind] === upper) ?? null
+}
+
 const PRIMARY_ITEMS: KindMenuItem[] = [
-  { kind: 'expense', label: 'Expense', description: 'Money spent from an account', group: 'primary' },
-  { kind: 'income', label: 'Income', description: 'Money received into an account', group: 'primary' },
-  { kind: 'transfer', label: 'Transfer', description: 'Move money between accounts', group: 'primary' },
+  { kind: 'expense', label: 'Expense', description: 'Money spent from an account', group: 'primary', shortcut: KIND_SHORTCUTS.expense },
+  { kind: 'income', label: 'Income', description: 'Money received into an account', group: 'primary', shortcut: KIND_SHORTCUTS.income },
+  { kind: 'transfer', label: 'Transfer', description: 'Move money between accounts', group: 'primary', shortcut: KIND_SHORTCUTS.transfer },
 ]
 
 const LOAN_FALLBACK = 'Pay down a loan from another account'

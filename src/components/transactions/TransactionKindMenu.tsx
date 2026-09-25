@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, CreditCard } from 'lucide-react'
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, CreditCard, type LucideIcon } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,6 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
+import { kindMenuItems } from '@/lib/kindMenu'
+import { formatCurrency } from '@/lib/utils'
 
 interface TransactionKindMenuProps {
   trigger: ReactElement
@@ -21,29 +24,15 @@ interface TransactionKindMenuProps {
   showCardPayment?: boolean
 }
 
-const transactionKinds = [
-  {
-    kind: 'expense' as const,
-    label: 'Expense',
-    description: 'Money spent from an account',
-    icon: ArrowUpRight,
-    color: 'text-expense',
-  },
-  {
-    kind: 'income' as const,
-    label: 'Income',
-    description: 'Money received into an account',
-    icon: ArrowDownLeft,
-    color: 'text-income',
-  },
-  {
-    kind: 'transfer' as const,
-    label: 'Transfer',
-    description: 'Move money between accounts',
-    icon: ArrowLeftRight,
-    color: 'text-transfer',
-  },
-]
+// Gold is a fill here, never text: the loan tile is gold on a gold tint and
+// the icon is the tile's glyph (LED-115).
+const KIND_VISUALS: Record<TransactionKind, { icon: LucideIcon; tile: string; color: string }> = {
+  expense: { icon: ArrowUpRight, tile: 'bg-muted', color: 'text-expense' },
+  income: { icon: ArrowDownLeft, tile: 'bg-muted', color: 'text-income' },
+  transfer: { icon: ArrowLeftRight, tile: 'bg-muted', color: 'text-transfer' },
+  'loan-repayment': { icon: CircleDollarSign, tile: 'bg-gold/15', color: 'text-gold' },
+  'card-payment': { icon: CreditCard, tile: 'bg-muted', color: 'text-expense' },
+}
 
 export function TransactionKindMenu({
   trigger,
@@ -54,56 +43,48 @@ export function TransactionKindMenu({
   showCardPayment = true,
 }: TransactionKindMenuProps) {
   const { accounts } = useAccounts()
-  const hasLoans = showLoanRepayment && accounts.some((account) => account.type === 'loan')
-  const hasCardBalance =
-    showCardPayment && accounts.some((account) => account.type === 'credit_card' && account.balance !== 0)
+  const { profile } = useAuth()
+  const currency = profile?.default_currency ?? 'USD'
+  const items = kindMenuItems(accounts, {
+    baseCurrency: currency,
+    showLoanRepayment,
+    showCardPayment,
+    formatMoney: (amount) => formatCurrency(amount, currency),
+  })
+  const primary = items.filter((item) => item.group === 'primary')
+  const liabilities = items.filter((item) => item.group === 'liabilities')
+
+  const renderItem = (item: (typeof items)[number]) => {
+    const { icon: Icon, tile, color } = KIND_VISUALS[item.kind]
+    return (
+      <DropdownMenuItem key={item.kind} onClick={() => onSelect(item.kind)} className="items-start gap-3 px-2 py-2.5">
+        <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md ${tile}`}>
+          <Icon className={color} />
+        </span>
+        <span className="min-w-0">
+          <span className="block font-medium leading-tight">{item.label}</span>
+          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{item.description}</span>
+        </span>
+      </DropdownMenuItem>
+    )
+  }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger render={trigger} />
-      <DropdownMenuContent align={align} side={side} className="w-72 p-1.5">
+      <DropdownMenuContent align={align} side={side} className="w-80 p-1.5">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2 py-1.5">What would you like to record?</DropdownMenuLabel>
-          {transactionKinds.map(({ kind, label, description, icon: Icon, color }) => (
-            <DropdownMenuItem key={kind} onClick={() => onSelect(kind)} className="items-start gap-3 px-2 py-2.5">
-              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                <Icon className={color} />
-              </span>
-              <span className="min-w-0">
-                <span className="block font-medium leading-tight">{label}</span>
-                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{description}</span>
-              </span>
-            </DropdownMenuItem>
-          ))}
+          {primary.map(renderItem)}
         </DropdownMenuGroup>
-        {(hasLoans || hasCardBalance) && <DropdownMenuSeparator />}
-        {hasLoans && (
+        {liabilities.length > 0 && (
           <>
-            <DropdownMenuItem onClick={() => onSelect('loan-repayment')} className="items-start gap-3 px-2 py-2.5">
-              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
-                <CircleDollarSign className="text-primary" />
-              </span>
-              <span className="min-w-0">
-                <span className="block font-medium leading-tight">Loan repayment</span>
-                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                  Pay down a loan from another account
-                </span>
-              </span>
-            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="px-2 py-1.5">Liabilities</DropdownMenuLabel>
+              {liabilities.map(renderItem)}
+            </DropdownMenuGroup>
           </>
-        )}
-        {hasCardBalance && (
-          <DropdownMenuItem onClick={() => onSelect('card-payment')} className="items-start gap-3 px-2 py-2.5">
-            <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
-              <CreditCard className="text-expense" />
-            </span>
-            <span className="min-w-0">
-              <span className="block font-medium leading-tight">Card payment</span>
-              <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                Pay down a credit card from another account
-              </span>
-            </span>
-          </DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

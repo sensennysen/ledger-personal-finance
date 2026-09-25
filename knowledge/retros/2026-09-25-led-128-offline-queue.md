@@ -7,7 +7,7 @@
 - `NetworkStatusProvider` (`src/contexts/NetworkStatusContext.tsx`, mounted in `AppLayout`) owns the listeners and the drain trigger; `useNetworkStatus()` is a context read. The provider also sets one timer for the next expiry and re-checks on `visibilitychange`.
 - Review sheet: per-field "yours / theirs" for an edited conflict, "Deleted on another device" with Discard only, and Retry / Discard for a failed item. Banner says "couldn't be saved" when every flagged item is failed.
 - Reordering accounts or categories offline returns "Connect to the internet to change the order." and both pages show it on the notification surface (`AccountsPage` and `CategoriesPage` used to drop the result).
-- Tests: `tests/queueDrain.test.mjs` (24 cases) on a new harness in `tests/helpers/`, plus 7 cases in `tests/offlineQueue.test.mjs`.
+- Tests: `tests/queueDrain.test.mjs` (23 cases) on a new harness in `tests/helpers/`, plus 7 cases in `tests/offlineQueue.test.mjs`.
 
 ## Decisions
 - **The drain race was mostly already fixed.** `mergeDrainResult` re-reads the queue before writing, so within one tab nothing enqueued or resolved mid-drain is lost. What was still open was two drains at once (a stale `isSyncing` closure, a second hook instance). `singleFlight` plus a ref in the provider closes that; the tests cover both.

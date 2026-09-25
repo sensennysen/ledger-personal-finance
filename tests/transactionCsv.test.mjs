@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { escapeCsvCell, buildTransactionsCsv, TRANSACTION_CSV_HEADERS } from '../src/lib/transactionCsv.ts'
+import { escapeCsvCell, buildTransactionsCsv, buildReportCsv, TRANSACTION_CSV_HEADERS } from '../src/lib/transactionCsv.ts'
 
 const tx = (over = {}) => ({
   id: 't1',
@@ -52,4 +52,32 @@ test('formula-looking cells are neutralised', () => {
     assert.equal(escapeCsvCell(s)[0], "'", s)
   }
   assert.equal(escapeCsvCell('=HYPERLINK("x","y")'), `"'=HYPERLINK(""x"",""y"")"`)
+})
+
+test('buildReportCsv carries only the chosen columns, amount always with its currency', () => {
+  const csv = buildReportCsv([tx()], ['date', 'description', 'amount'])
+  assert.equal(csv, 'Date,Description,Amount,Currency\n2026-09-08,Salary — first half,3200,PHP')
+})
+
+test('buildReportCsv orders columns as given and fills Standing Balance from the map', () => {
+  const csv = buildReportCsv(
+    [tx(), tx({ id: 't2', description: 'No balance' })],
+    ['date', 'category', 'type', 'account', 'balance'],
+    new Map([['t1', 12480.2]]),
+  )
+  assert.deepEqual(csv.split('\n'), [
+    'Date,Category,Type,Account,Standing Balance',
+    '2026-09-08,Salary,income,BDO Savings,12480.2',
+    '2026-09-08,Salary,income,BDO Savings,',
+  ])
+})
+
+test('buildReportCsv escapes the same way as the full export', () => {
+  const csv = buildReportCsv([tx({ description: '=SUM(A1)' })], ['description'])
+  assert.equal(csv.split('\n')[1], "'=SUM(A1)")
+})
+
+test('the full export is unchanged: all twelve headers, in order', () => {
+  assert.equal(buildTransactionsCsv([tx()]).split('\n')[0], TRANSACTION_CSV_HEADERS.join(','))
+  assert.equal(TRANSACTION_CSV_HEADERS.length, 12)
 })

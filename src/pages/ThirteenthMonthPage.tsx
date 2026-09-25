@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { CalendarCheck, Info, CheckSquare, SquareMinus, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
@@ -142,6 +143,11 @@ export default function ThirteenthMonthPage() {
 
   return (
     <div className="p-4 md:p-6 lg:px-8 space-y-6">
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Link to="/reports" className="rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring">Reports</Link>
+        <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+        <span aria-current="page" className="truncate text-foreground">13th Month Pay</span>
+      </nav>
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold md:hidden">
           13th Month Pay Estimator

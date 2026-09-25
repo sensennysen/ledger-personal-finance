@@ -19,7 +19,7 @@ import { AccountCombobox } from '@/components/transactions/AccountCombobox'
 import { LoanPicker } from '@/components/transactions/LoanPicker'
 import { RepaymentAssist } from '@/components/transactions/RepaymentAssist'
 import { StatsBand } from '@/components/transactions/StatsBand'
-import type { TransactionKind } from '@/components/transactions/transactionKinds'
+import { TRANSACTION_KIND_LABELS, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionTagsField } from '@/components/transactions/TransactionTagsField'
 import { TransactionGoalField } from '@/components/transactions/TransactionGoalField'
 import { TransactionRecurringFields } from '@/components/transactions/TransactionRecurringFields'
@@ -29,7 +29,7 @@ import { CURRENCIES } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
-import { resolveEditTarget } from '@/lib/editTarget'
+import { canChangeSavedKind, resolveEditTarget } from '@/lib/editTarget'
 import { applyKindChange } from '@/lib/transactionKindChange'
 import { hasLoanPickerStep, resolveInitialLoanId } from '@/lib/loanPicker'
 import { exceedsOutstanding } from '@/lib/loanRepayment'
@@ -156,6 +156,7 @@ export function TransactionForm({
     accounts,
   )
   const editTargetMissing = editTarget === 'missing'
+  const canEditKind = isEditing && canChangeSavedKind(editTarget)
   const isCardPayment = entryKind === 'card-payment' || Boolean(lockedCardAccountId) || editTarget === 'card'
   const isLoanRepayment =
     !isCardPayment &&
@@ -371,6 +372,41 @@ export function TransactionForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmitWithUpload)} className="space-y-3 sm:space-y-4">
+        {canEditKind && (
+          <FormField
+            control={form.control}
+            name="type"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Kind</FormLabel>
+                <Select
+                  modal={false}
+                  value={field.value}
+                  onValueChange={(value) => {
+                    if (value === field.value) return
+                    // Keep the shared fields and clear those the new kind does not use, so the
+                    // schema never rejects something the user cannot see.
+                    form.reset(applyKindChange(form.getValues(), value as TransactionKind))
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue>{TRANSACTION_KIND_LABELS[field.value]}</SelectValue>
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent alignItemWithTrigger={false} align="start">
+                    {(['expense', 'income', 'transfer'] as const).map((kind) => (
+                      <SelectItem key={kind} value={kind}>
+                        {TRANSACTION_KIND_LABELS[kind]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
+        )}
+
         {editTargetMissing && (
           <p className="text-xs text-muted-foreground" role="status">
             The account this payment went to is not available, so it is shown as a plain expense. Its target is kept when you save.

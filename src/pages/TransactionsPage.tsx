@@ -26,7 +26,7 @@ import { resolveLoadState } from '@/lib/loadState'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { PageActions } from '@/components/layout/PageActions'
-import { TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
+import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { inferTransactionKind, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
@@ -763,7 +763,7 @@ export default function TransactionsPage() {
         {/* Edit dialog */}
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
           <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-            <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
+            <TransactionEditHeader type={editingTx?.type ?? 'expense'} toAccountId={editingTx?.to_account_id ?? null} />
             <FormError error={formError} />
             {editingTx && (
               <TransactionForm

@@ -181,3 +181,15 @@ test('every create dialog renders the entry header and swaps kind without remoun
     assert.ok(!/TRANSACTION_KIND_DIALOG_TITLES/.test(source), `${file} should not title its own dialog`)
   }
 })
+
+test('both edit dialogs use the edit header, and the form offers only the three plain kinds', () => {
+  for (const file of ['pages/TransactionsPage.tsx', 'pages/AccountTransactionsPage.tsx']) {
+    const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8')
+    assert.match(source, /<TransactionEditHeader/, file)
+    assert.ok(!source.includes('Edit Transaction'), `${file} should not title the edit dialog itself`)
+  }
+  const form = readFileSync(new URL('../src/components/transactions/TransactionForm.tsx', import.meta.url), 'utf8')
+  assert.match(form, /canChangeSavedKind\(editTarget\)/)
+  assert.match(form, /\['expense', 'income', 'transfer'\] as const/)
+  assert.match(form, /applyKindChange\(form\.getValues\(\), value as TransactionKind\)/)
+})

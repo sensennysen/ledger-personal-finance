@@ -28,7 +28,7 @@ import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { useNotify } from '@/contexts/notificationState'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { defaultCardPaymentDescription } from '@/lib/cardPayment'
-import { TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
+import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
@@ -904,7 +904,7 @@ export default function AccountTransactionsPage() {
         {/* Edit dialog */}
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
           <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-            <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
+            <TransactionEditHeader type={editingTx?.type ?? 'expense'} toAccountId={editingTx?.to_account_id ?? null} />
             <FormError error={formError} />
             {editingTx && (
               <TransactionForm

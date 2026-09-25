@@ -17,3 +17,12 @@ export function resolveEditTarget(
   if (target.type === 'credit_card') return 'card'
   return 'other'
 }
+
+/**
+ * Whether a saved row's Kind can be changed while editing. A loan or card payment keeps its
+ * kind (it is defined by its target), and while the target is unknown ('pending', 'missing')
+ * a change would silently drop it (LED-112).
+ */
+export function canChangeSavedKind(target: EditTargetKind): boolean {
+  return target === 'none' || target === 'other'
+}

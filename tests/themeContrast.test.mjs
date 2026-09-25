@@ -67,6 +67,16 @@ for (const [theme, map] of Object.entries(themes)) {
   }
 }
 
+// Disabled ink is UI chrome, so 3:1 applies. It can sit on the disabled fill or any surface a control lands on.
+for (const [theme, map] of Object.entries(themes)) {
+  for (const surface of ['--disabled', '--background', '--card', '--muted', '--popover']) {
+    test(`${theme}: --disabled-foreground on ${surface} holds 3:1`, () => {
+      const ratio = contrastRatio(resolve(map, '--disabled-foreground'), resolve(map, surface))
+      assert.ok(ratio >= 3, `${ratio.toFixed(2)}:1`)
+    })
+  }
+}
+
 test('dark on-primary is dark ink, not white', () => {
   assert.notEqual(resolve(themes.dark, '--primary-foreground').toUpperCase(), '#FFFFFF')
 })

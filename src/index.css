@@ -58,6 +58,11 @@
   /* Design gold #9A7F3D is 2.84:1 on the page; this step of the same hue holds 3:1 on page and card.
      For borders, fills, meters and icon tiles only. Text on gold tint uses --warning. */
   --gold: #917738;
+  /* Disabled controls: solid ink on a solid surface, never opacity. Design ink #8A8892 is
+     2.79:1 on its own #E7E5EA fill and 2.59:1 on the page; this step of the same hue holds 3:1
+     on page, card, muted and the disabled fill. */
+  --disabled: #E7E5EA;
+  --disabled-foreground: #7A7883;
 
   /* Charts alias the semantics so Recharts needs no per-series colors */
   --chart-1: var(--primary);
@@ -126,6 +131,8 @@
   --warning: #E8CE92;
   --warning-container: #3C3320;
   --gold: #C9AC6A;
+  --disabled: #34333C;
+  --disabled-foreground: #96949E;   /* design dark disabled ink */
 
   --chart-1: var(--primary);
   --chart-2: var(--income);
@@ -164,6 +171,8 @@
   --color-warning: var(--warning);
   --color-warning-container: var(--warning-container);
   --color-gold: var(--gold);
+  --color-disabled: var(--disabled);
+  --color-disabled-foreground: var(--disabled-foreground);
 
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);

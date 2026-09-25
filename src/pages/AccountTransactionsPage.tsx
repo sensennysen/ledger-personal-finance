@@ -30,7 +30,7 @@ import { TransactionForm, type TransactionFormValues } from '@/components/transa
 import { defaultCardPaymentDescription } from '@/lib/cardPayment'
 import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
-import type { TransactionKind } from '@/components/transactions/transactionKinds'
+import { entryDialogWidthClass, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
 import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
@@ -506,7 +506,7 @@ export default function AccountTransactionsPage() {
             </div>
           )}
           <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setRepaymentPrefill(null) }}>
-              <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+              <DialogContent className={`max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(account?.type === 'loan' ? 'loan-repayment' : transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
               <TransactionEntryHeader
                 kind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
                 title={account?.type === 'loan' ? `Pay ${account.name}` : undefined}

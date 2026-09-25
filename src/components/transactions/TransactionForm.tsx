@@ -33,12 +33,13 @@ import { canChangeSavedKind, resolveEditTarget } from '@/lib/editTarget'
 import { applyKindChange } from '@/lib/transactionKindChange'
 import { hasLoanPickerStep, resolveInitialLoanId } from '@/lib/loanPicker'
 import { exceedsOutstanding } from '@/lib/loanRepayment'
-import { daysUntilDayOfMonth } from '@/lib/creditCards'
 import {
   defaultCardPaymentDescription,
+  getCardDateInfo,
   getCardPaymentPresets,
   getCardPaymentSummary,
   isAutoCardPaymentDescription,
+  resolveInitialCardId,
 } from '@/lib/cardPayment'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -293,9 +294,11 @@ export function TransactionForm({
   }, [accounts, cardAccounts, form])
 
   useEffect(() => {
-    if (!isCardPayment || selectedLoanId || cardAccounts.length === 0) return
-    handleCardChange((cardAccounts.find((account) => account.balance < 0) ?? cardAccounts[0]).id)
-  }, [cardAccounts, handleCardChange, isCardPayment, selectedLoanId])
+    if (!isCardPayment || selectedLoanId) return
+    // Only a locked card or the one card that owes is picked; with two or more owing the user chooses (LED-113).
+    const initialCardId = resolveInitialCardId(cardAccounts, lockedCardAccountId)
+    if (initialCardId) handleCardChange(initialCardId)
+  }, [cardAccounts, handleCardChange, isCardPayment, lockedCardAccountId, selectedLoanId])
 
   useEffect(() => {
     if (!isLoanRepayment || selectedLoanId) return
@@ -336,7 +339,8 @@ export function TransactionForm({
       ? getCardPaymentSummary(selectedCard.balance, selectedCard.credit_limit, Number(amountValue))
       : null
   const cardPresets = cardSummary && selectedCard ? getCardPaymentPresets(selectedCard) : null
-  const cardDueIn = daysUntilDayOfMonth(selectedCard?.due_day)
+  const cardStatementDate = getCardDateInfo(selectedCard?.statement_day)
+  const cardDueDate = getCardDateInfo(selectedCard?.due_day)
   const cardCurrency = selectedCard?.currency ?? DEFAULT_CURRENCY
   const setCardAmount = (value: number) => form.setValue('amount', value, { shouldValidate: true })
 
@@ -347,6 +351,118 @@ export function TransactionForm({
     isRecurring ||
     hasReceipt(receiptReference)
   const effectiveSubmitLabel = isLiabilityPayment && submitLabel === 'Save Transaction' ? 'Record Payment' : submitLabel
+
+  // Amount, currency and the card presets. A card payment reads them right after the band (12a);
+  // every other kind keeps them below account and category.
+  const amountFields = (
+    <>
+    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <FormField
+        control={form.control}
+        name="amount"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Amount</FormLabel>
+            <FormControl>
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                name={field.name}
+                ref={field.ref}
+                onBlur={field.onBlur}
+                value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                onChange={(event) => field.onChange(event.target.value)}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="currency"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Currency</FormLabel>
+            <Select modal={false} onValueChange={field.onChange} value={field.value} disabled={isLiabilityPayment}>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent alignItemWithTrigger={false} align="start">
+                {CURRENCIES.map((currency) => (
+                  <SelectItem key={currency.code} value={currency.code}>
+                    {currency.code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormItem>
+        )}
+      />
+    </div>
+
+    {cardSummary && cardPresets && (
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={cardPresets.full <= 0}
+            onClick={() => setCardAmount(cardPresets.full)}
+          >
+            <span className="hidden sm:max-lg:inline">Full</span>
+            <span className="sm:max-lg:hidden">Full balance</span>
+          </Button>
+          {cardPresets.statement != null && cardPresets.statement > 0 && (
+            <Button type="button" size="sm" variant="outline" onClick={() => setCardAmount(cardPresets.statement ?? 0)}>
+              Statement balance
+            </Button>
+          )}
+          <span className="text-xs text-muted-foreground">or type a custom amount</span>
+        </div>
+        {selectedCard?.credit_limit ? (
+          <p className="text-xs text-muted-foreground">
+            Utilisation{' '}
+            <span className="sm:hidden">
+              {cardSummary.utilisationBefore.toFixed(0)}% → {cardSummary.utilisationAfter.toFixed(0)}%
+            </span>
+            <span className="hidden sm:inline">
+              {cardSummary.utilisationBefore.toFixed(1)}% → {cardSummary.utilisationAfter.toFixed(1)}%
+            </span>
+          </p>
+        ) : null}
+        {cardSummary.overpayment > 0 && (
+          <div
+            role="status"
+            className="rounded-lg border border-warning/40 bg-warning-container p-3 text-xs leading-snug"
+          >
+            This is {formatCurrency(cardSummary.overpayment, cardCurrency)} more than the card owes. The extra
+            becomes a statement credit and the card&apos;s balance goes positive, which is allowed but shows as an
+            asset on the Accounts page.{' '}
+            {cardSummary.owed > 0 && (
+              <button
+                type="button"
+                className="font-medium underline underline-offset-2"
+                onClick={() => setCardAmount(cardSummary.owed)}
+              >
+                Pay {formatCurrency(cardSummary.owed, cardCurrency)} instead
+              </button>
+            )}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Ledger tracks one running balance per card, not a statement balance. Full balance clears everything owed
+          today, including purchases made after the statement closed.
+        </p>
+      </div>
+    )}
+    </>
+  )
 
   if (hasPickerStep && !loanChosen) {
     return (
@@ -459,13 +575,11 @@ export function TransactionForm({
                     disabled={Boolean(lockedCardAccountId)}
                   />
                 </FormControl>
-                {selectedCard && (selectedCard.statement_day || selectedCard.due_day) && (
+                {selectedCard && (cardStatementDate || cardDueDate) && (
                   <p className="text-xs text-muted-foreground">
-                    {selectedCard.statement_day ? `Statement closes day ${selectedCard.statement_day}` : ''}
-                    {selectedCard.statement_day && selectedCard.due_day ? ' · ' : ''}
-                    {selectedCard.due_day
-                      ? `payment due day ${selectedCard.due_day}${cardDueIn != null ? ` (in ${cardDueIn}d)` : ''}`
-                      : ''}
+                    {cardStatementDate ? `Statement closes ${cardStatementDate.label}` : ''}
+                    {cardStatementDate && cardDueDate ? ' · ' : ''}
+                    {cardDueDate ? `payment due ${cardDueDate.label}` : ''}
                   </p>
                 )}
                 <FormMessage />
@@ -475,24 +589,55 @@ export function TransactionForm({
         )}
 
         {cardSummary && (
-          <StatsBand
-            items={[
-              { label: 'Current balance', value: formatCurrency(cardSummary.owed, cardCurrency) },
-              {
-                label: 'Available credit',
-                value: cardSummary.available == null ? '—' : formatCurrency(cardSummary.available, cardCurrency),
-              },
-              {
-                label: 'After this payment',
-                value:
-                  cardSummary.afterBalance > 0
-                    ? `+${formatCurrency(cardSummary.afterBalance, cardCurrency)}`
-                    : formatCurrency(Math.abs(cardSummary.afterBalance), cardCurrency),
-                note: cardSummary.afterBalance > 0 ? 'statement credit' : undefined,
-              },
-            ]}
-          />
+          <>
+            {/* Phone (12a): two cells, the balance and the due date. */}
+            <div className="sm:hidden">
+              <StatsBand
+                items={[
+                  { label: 'Owed now', value: formatCurrency(cardSummary.owed, cardCurrency) },
+                  cardDueDate
+                    ? { label: `Due ${cardDueDate.label}`, value: `in ${cardDueDate.daysUntil}d` }
+                    : {
+                        label: 'Available',
+                        value: cardSummary.available == null ? '—' : formatCurrency(cardSummary.available, cardCurrency),
+                      },
+                ]}
+              />
+            </div>
+            <div className="hidden sm:block">
+              <StatsBand
+                items={[
+                  { label: 'Current balance', value: formatCurrency(cardSummary.owed, cardCurrency) },
+                  {
+                    label: 'Available credit',
+                    shortLabel: 'Available',
+                    value: cardSummary.available == null ? '—' : formatCurrency(cardSummary.available, cardCurrency),
+                    note:
+                      selectedCard?.credit_limit
+                        ? <span className="max-lg:hidden">of {formatCurrency(selectedCard.credit_limit, cardCurrency)} limit</span>
+                        : undefined,
+                  },
+                  {
+                    label: 'After this payment',
+                    shortLabel: 'After payment',
+                    value:
+                      cardSummary.afterBalance > 0
+                        ? `+${formatCurrency(cardSummary.afterBalance, cardCurrency)}`
+                        : formatCurrency(Math.abs(cardSummary.afterBalance), cardCurrency),
+                    note:
+                      cardSummary.afterBalance > 0
+                        ? 'statement credit'
+                        : cardSummary.afterBalance === 0
+                          ? 'paid in full'
+                          : undefined,
+                  },
+                ]}
+              />
+            </div>
+          </>
         )}
+
+        {isCardPayment && amountFields}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           <FormField
@@ -644,104 +789,7 @@ export function TransactionForm({
           />
         )}
 
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          <FormField
-            control={form.control}
-            name="amount"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Amount</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    name={field.name}
-                    ref={field.ref}
-                    onBlur={field.onBlur}
-                    value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
-                    onChange={(event) => field.onChange(event.target.value)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Currency</FormLabel>
-                <Select modal={false} onValueChange={field.onChange} value={field.value} disabled={isLiabilityPayment}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent alignItemWithTrigger={false} align="start">
-                    {CURRENCIES.map((currency) => (
-                      <SelectItem key={currency.code} value={currency.code}>
-                        {currency.code}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormItem>
-            )}
-          />
-        </div>
-
-        {cardSummary && cardPresets && (
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={cardPresets.full <= 0}
-                onClick={() => setCardAmount(cardPresets.full)}
-              >
-                Full balance
-              </Button>
-              {cardPresets.statement != null && cardPresets.statement > 0 && (
-                <Button type="button" size="sm" variant="outline" onClick={() => setCardAmount(cardPresets.statement ?? 0)}>
-                  Statement balance
-                </Button>
-              )}
-              <span className="text-xs text-muted-foreground">or type a custom amount</span>
-            </div>
-            {selectedCard?.credit_limit ? (
-              <p className="text-xs text-muted-foreground">
-                Utilisation {cardSummary.utilisationBefore.toFixed(1)}% → {cardSummary.utilisationAfter.toFixed(1)}%
-              </p>
-            ) : null}
-            {cardSummary.overpayment > 0 && (
-              <div
-                role="status"
-                className="rounded-lg border border-warning/40 bg-warning-container p-3 text-xs leading-snug"
-              >
-                This is {formatCurrency(cardSummary.overpayment, cardCurrency)} more than the card owes. The extra
-                becomes a statement credit and the card&apos;s balance goes positive, which is allowed but shows as an
-                asset on the Accounts page.{' '}
-                {cardSummary.owed > 0 && (
-                  <button
-                    type="button"
-                    className="font-medium underline underline-offset-2"
-                    onClick={() => setCardAmount(cardSummary.owed)}
-                  >
-                    Pay {formatCurrency(cardSummary.owed, cardCurrency)} instead
-                  </button>
-                )}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Ledger tracks one running balance per card, not a statement balance. Full balance clears everything owed
-              today, including purchases made after the statement closed.
-            </p>
-          </div>
-        )}
+        {!isCardPayment && amountFields}
 
         {type === 'transfer' && (
           <FormField

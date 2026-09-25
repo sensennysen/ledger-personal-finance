@@ -45,7 +45,7 @@ import {
   type TransactionFormValues,
 } from '@/components/transactions/TransactionForm'
 import { TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
-import type { TransactionKind } from '@/components/transactions/transactionKinds'
+import { entryDialogWidthClass, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { SearchPalette } from '@/components/search/SearchPalette'
 import { EntryDetail } from '@/components/transactions/EntryDetail'
 import { X } from 'lucide-react'
@@ -399,7 +399,8 @@ function LayoutShell() {
           <DialogContent
             finalFocus={triggerFocus}
             className={cn(
-              'max-w-md max-h-[90dvh] overflow-y-auto',
+              'max-h-[90dvh] overflow-y-auto',
+              sheet === 'add' ? entryDialogWidthClass(transactionKind) : 'max-w-md',
               mobile && 'm3-bottom-sheet',
             )}
           >

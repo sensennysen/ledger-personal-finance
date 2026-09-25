@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarCheck, Info, CheckSquare, SquareMinus, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
+import { CalendarCheck, CheckSquare, SquareMinus, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
-import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, getLocalDateString, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,9 @@ import { InlineLoadError } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { INCOME } from '@/constants/colors'
-import { excludedByCategory, groupByMonth, monthKey, salaryOnlySelection } from '@/lib/thirteenthMonth'
+import { excludedByCategory, groupByMonth, monthCoverage, monthKey, pd851Checklist, salaryOnlySelection } from '@/lib/thirteenthMonth'
+import { CoverageStrip } from '@/components/thirteenth-month/CoverageStrip'
+import { Pd851Checklist } from '@/components/thirteenth-month/Pd851Checklist'
 import type { Transaction } from '@/types'
 
 // --- constants ---
@@ -135,6 +137,15 @@ export default function ThirteenthMonthPage() {
     })
   }
 
+  const coverage = useMemo(
+    () => monthCoverage(transactions, effectiveIncluded, year, getLocalDateString()),
+    [transactions, effectiveIncluded, year]
+  )
+  const checklist = useMemo(
+    () => pd851Checklist(transactions, effectiveIncluded),
+    [transactions, effectiveIncluded]
+  )
+
   const includedCount = transactions.filter((t) => effectiveIncluded.has(t.id)).length
   const excluded = useMemo(
     () => excludedByCategory(transactions, effectiveIncluded),
@@ -194,15 +205,8 @@ export default function ThirteenthMonthPage() {
         )}
       </section>
 
-      <div className="flex items-start gap-2.5 rounded-xl bg-transfer-container p-4 text-sm text-transfer">
-        <Info className="w-4 h-4 mt-0.5 shrink-0" />
-        <p className="max-w-prose">
-          All income transactions for the year are shown below. Check only the records that qualify
-          as <strong className="text-foreground">basic salary</strong> under PD 851 – exclude bonuses,
-          allowances, overtime, and non-covered sources. Your selection is saved on this device only
-          and never affects your account balances.
-        </p>
-      </div>
+      <CoverageStrip coverage={coverage} loading={loading} />
+      <Pd851Checklist rows={checklist} />
       </div>
 
       <Card className="xl:order-1">

@@ -1,15 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import {
-  ArrowDownLeft,
-  ArrowLeftRight,
-  ArrowUpRight,
-  ChevronRight,
-  CircleDollarSign,
-  CreditCard,
-  type LucideIcon,
-} from 'lucide-react'
-import { useAccounts } from '@/hooks/useAccounts'
-import { useAuth } from '@/contexts/AuthContext'
+import { Check, ChevronRight } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,9 +12,11 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
+import { KIND_VISUALS } from '@/components/transactions/kindVisuals'
+import { useKindMenuItems } from '@/hooks/useKindMenuItems'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { kindForShortcut, kindMenuItems } from '@/lib/kindMenu'
-import { formatCurrency } from '@/lib/utils'
+import { kindForShortcut } from '@/lib/kindMenu'
+import { cn } from '@/lib/utils'
 
 interface TransactionKindMenuProps {
   trigger: ReactElement
@@ -33,16 +25,8 @@ interface TransactionKindMenuProps {
   side?: 'top' | 'bottom' | 'left' | 'right' | 'inline-start' | 'inline-end'
   showLoanRepayment?: boolean
   showCardPayment?: boolean
-}
-
-// Gold is a fill here, never text: the loan tile is gold on a gold tint and
-// the icon is the tile's glyph (LED-115).
-const KIND_VISUALS: Record<TransactionKind, { icon: LucideIcon; tile: string; color: string }> = {
-  expense: { icon: ArrowUpRight, tile: 'bg-muted', color: 'text-expense' },
-  income: { icon: ArrowDownLeft, tile: 'bg-muted', color: 'text-income' },
-  transfer: { icon: ArrowLeftRight, tile: 'bg-muted', color: 'text-transfer' },
-  'loan-repayment': { icon: CircleDollarSign, tile: 'bg-gold/15', color: 'text-gold' },
-  'card-payment': { icon: CreditCard, tile: 'bg-muted', color: 'text-expense' },
+  /** The kind the caller is already on (Change kind); it is marked in the list. */
+  selectedKind?: TransactionKind
 }
 
 export function TransactionKindMenu({
@@ -52,28 +36,27 @@ export function TransactionKindMenu({
   side = 'bottom',
   showLoanRepayment = true,
   showCardPayment = true,
+  selectedKind,
 }: TransactionKindMenuProps) {
-  const { accounts } = useAccounts()
   // One item list feeds both surfaces: the dropdown from md up, a bottom sheet
   // below it (LED-109). Same breakpoint as AppLayout's `mobile`.
   const compact = useMediaQuery('(max-width: 767px)')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const { profile } = useAuth()
-  const currency = profile?.default_currency ?? 'USD'
-  const items = kindMenuItems(accounts, {
-    baseCurrency: currency,
-    showLoanRepayment,
-    showCardPayment,
-    formatMoney: (amount) => formatCurrency(amount, currency),
-  })
+  const items = useKindMenuItems({ showLoanRepayment, showCardPayment })
   const primary = items.filter((item) => item.group === 'primary')
   const liabilities = items.filter((item) => item.group === 'liabilities')
 
   const renderItem = (item: (typeof items)[number]) => {
     const { icon: Icon, tile, color } = KIND_VISUALS[item.kind]
+    const selected = item.kind === selectedKind
     return (
-      <DropdownMenuItem key={item.kind} onClick={() => onSelect(item.kind)} className="items-start gap-3 px-2 py-2.5">
+      <DropdownMenuItem
+        key={item.kind}
+        onClick={() => onSelect(item.kind)}
+        aria-current={selected || undefined}
+        className={cn('items-start gap-3 px-2 py-2.5', selected && 'bg-muted')}
+      >
         <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md ${tile}`}>
           <Icon className={color} />
         </span>
@@ -81,6 +64,7 @@ export function TransactionKindMenu({
           <span className="block font-medium leading-tight">{item.label}</span>
           <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{item.description}</span>
         </span>
+        {selected && <Check className="ml-auto mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden />}
         {item.shortcut && <DropdownMenuShortcut className="mt-0.5 tracking-normal">{item.shortcut}</DropdownMenuShortcut>}
       </DropdownMenuItem>
     )
@@ -89,15 +73,20 @@ export function TransactionKindMenu({
   if (compact) {
     const renderRow = (item: (typeof items)[number]) => {
       const { icon: Icon, tile, color } = KIND_VISUALS[item.kind]
+      const selected = item.kind === selectedKind
       return (
         <button
           key={item.kind}
           type="button"
+          aria-current={selected || undefined}
           onClick={() => {
             setSheetOpen(false)
             onSelect(item.kind)
           }}
-          className="flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left outline-none focus-visible:bg-muted active:bg-muted"
+          className={cn(
+            'flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left outline-none focus-visible:bg-muted active:bg-muted',
+            selected && 'bg-muted',
+          )}
         >
           <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${tile}`}>
             <Icon className={color} />
@@ -106,7 +95,11 @@ export function TransactionKindMenu({
             <span className="block font-medium leading-tight">{item.label}</span>
             <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.description}</span>
           </span>
-          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          {selected ? (
+            <Check className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          ) : (
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          )}
         </button>
       )
     }

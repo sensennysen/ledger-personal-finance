@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2, Tag, X } from 'lucide-react'
@@ -30,6 +30,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import { getLoanAmountOwed } from '@/lib/loans'
 import { resolveEditTarget } from '@/lib/editTarget'
+import { applyKindChange } from '@/lib/transactionKindChange'
 import { hasLoanPickerStep, resolveInitialLoanId } from '@/lib/loanPicker'
 import { exceedsOutstanding } from '@/lib/loanRepayment'
 import { daysUntilDayOfMonth } from '@/lib/creditCards'
@@ -115,6 +116,24 @@ export function TransactionForm({
       ...defaultValues,
     },
   })
+
+  // Change kind swaps entryKind while the dialog stays open (LED-111). The step
+  // state below belongs to the old kind, so it resets during render; the values
+  // keep what every kind shares and lose what no longer applies.
+  const [seenEntryKind, setSeenEntryKind] = useState(entryKind)
+  if (seenEntryKind !== entryKind) {
+    setSeenEntryKind(entryKind)
+    setLoanChosen(false)
+    setReturnedToPicker(false)
+    setAutoCatCategoryId(null)
+  }
+  const previousEntryKind = useRef(entryKind)
+  useEffect(() => {
+    if (previousEntryKind.current === entryKind) return
+    previousEntryKind.current = entryKind
+    if (!entryKind || isEditing) return
+    form.reset(applyKindChange(form.getValues(), entryKind))
+  }, [entryKind, form, isEditing])
 
   const receiptReference = useWatch({ control: form.control, name: 'receipt_url' })
   const type = useWatch({ control: form.control, name: 'type' })

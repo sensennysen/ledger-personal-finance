@@ -11,9 +11,9 @@ export const TRANSACTION_KIND_LABELS: Record<TransactionKind, string> = {
 }
 
 export const TRANSACTION_KIND_DIALOG_TITLES: Record<TransactionKind, string> = {
-  expense: 'Add expense',
-  income: 'Add income',
-  transfer: 'Record transfer',
+  expense: 'New expense',
+  income: 'New income',
+  transfer: 'New transfer',
   'loan-repayment': 'Record loan repayment',
   'card-payment': 'Record card payment',
 }

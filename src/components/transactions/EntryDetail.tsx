@@ -122,7 +122,7 @@ function ReceiptLink({ value }: { value: string }) {
     <span className="inline-flex flex-col items-end">
       <button
         type="button"
-        className="text-primary underline-offset-2 hover:underline disabled:opacity-60"
+        className="text-primary underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:no-underline"
         disabled={state === 'opening'}
         onClick={async () => {
           setState('opening')

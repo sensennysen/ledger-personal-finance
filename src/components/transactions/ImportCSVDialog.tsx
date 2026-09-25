@@ -16,7 +16,7 @@ import {
   isProblem,
   isSelectable,
   isSelected,
-  isSkipped,
+  skipReason,
   processFile,
   rowIssues,
   selectAll,
@@ -641,14 +641,12 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                           const categoryId = categoryOf(row.line)
                           const category = categoryId ? categoryById.get(categoryId) : undefined
                           const auto = Boolean(category) && !picks.has(row.line)
+                          const reason = skipReason(row, selection)
                           const fitting = categories.filter((item) => item.type === row.type || item.type === 'both')
                           return (
                             <tr
                               key={row.line}
-                              className={cn(
-                                'border-b last:border-0 hover:bg-muted/30',
-                                (isSkipped(row, selection) || (selectable && !selected)) && 'opacity-50',
-                              )}
+                              className="border-b last:border-0 hover:bg-muted/30"
                             >
                               <td className="px-2 py-2 text-center">
                                 {selectable && (
@@ -680,7 +678,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                       {EMPTY_DESCRIPTION}
                                     </span>
                                   ) : (
-                                    <span className="truncate">{row.description}</span>
+                                    <span className={cn('truncate', reason && 'line-through text-muted-foreground')}>{row.description}</span>
                                   )}
                                   {match && (
                                     <Badge variant="secondary" className="text-[10px] shrink-0">already in Ledger</Badge>
@@ -690,6 +688,9 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                   <span className="block text-xs text-muted-foreground truncate">
                                     Matches {describeMatch(match)}
                                   </span>
+                                )}
+                                {reason && (
+                                  <span className="block text-xs font-medium text-muted-foreground">{reason}</span>
                                 )}
                               </td>
                               <td className="px-3 py-2 whitespace-nowrap">

@@ -93,12 +93,7 @@ export default function LoginPage() {
           <button
             onClick={signInWithGoogle}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-5 h-12 rounded-full text-sm font-medium transition-all duration-(--dur-base) disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              background: 'var(--primary)',
-              border: '1px solid var(--primary)',
-              color: 'var(--primary-foreground)',
-            }}
+            className="w-full flex items-center justify-center gap-3 px-5 h-12 rounded-full text-sm font-medium border border-primary bg-primary text-primary-foreground transition-all duration-(--dur-base) disabled:cursor-not-allowed disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground"
           >
             {/* Google logo */}
             <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">

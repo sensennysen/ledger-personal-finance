@@ -49,6 +49,7 @@ import {
 } from '@/lib/reportLookback'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { buildReportCsv, downloadCsv } from '@/lib/transactionCsv'
+import { buildRunningBalanceMap } from '@/lib/runningBalance'
 import { abbreviateTick } from '@/lib/chartTicks'
 import { REPORT_COLUMNS, defaultColumns, exportColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
 import { Button } from '@/components/ui/button'
@@ -615,33 +616,8 @@ export default function ReportsPage() {
     (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)
   )
 
-  // Running balance per account, derived by unwinding all transactions newest→oldest
-  // starting from each account's current live balance.
-  const txBalanceMap = (() => {
-    // Build a mutable balance register from current account balances
-    const register = new Map<string, number>()
-    for (const acc of accounts) register.set(acc.id, acc.balance)
-
-    const map = new Map<string, number>()
-    for (const tx of allTransactionsSorted) {
-      // Record the account balance *after* this transaction
-      if (register.has(tx.account_id)) {
-        map.set(tx.id, register.get(tx.account_id)!)
-      }
-      // Undo the effect of this transaction to step backwards in time
-      if (tx.type === 'income') {
-        register.set(tx.account_id, (register.get(tx.account_id) ?? 0) - tx.amount)
-      } else if (tx.type === 'expense') {
-        register.set(tx.account_id, (register.get(tx.account_id) ?? 0) + tx.amount)
-      } else if (tx.type === 'transfer') {
-        register.set(tx.account_id, (register.get(tx.account_id) ?? 0) + tx.amount + (tx.transfer_fee ?? 0))
-        if (tx.to_account_id) {
-          register.set(tx.to_account_id, (register.get(tx.to_account_id) ?? 0) - tx.amount)
-        }
-      }
-    }
-    return map
-  })()
+  // Running balance per account, unwound from each account's live balance (src/lib/runningBalance.ts).
+  const txBalanceMap = buildRunningBalanceMap(accounts, transactions)
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 lg:px-8 pb-24 md:pb-6">

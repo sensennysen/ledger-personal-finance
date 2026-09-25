@@ -296,16 +296,21 @@ export function useTransactions(filters: TransactionFilters = {}) {
   const generateDueRecurring = useCallback(async (): Promise<number> => {
     if (!user || !navigator.onLine) return 0
     const today = getLocalDateString()
-    const { data: allRecurring } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_recurring', true)
-      .order('date', { ascending: false })
-    if (!allRecurring?.length) return 0
+    const { rows: allRecurring, error: recurringError } = await readAllPages<Transaction>((from, to) =>
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_recurring', true)
+        .order('date', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to),
+    )
+    // A failed read means nothing is known to be due, and a partial list would skip series.
+    if (recurringError || allRecurring.length === 0) return 0
 
     let generated = 0
-    for (const tx of allRecurring as Transaction[]) {
+    for (const tx of allRecurring) {
       if (!tx.recurrence_interval) continue
       const nextDate = addRecurringIntervalToDateString(tx.date, tx.recurrence_interval)
       if (nextDate > today) continue

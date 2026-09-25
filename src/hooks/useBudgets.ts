@@ -106,17 +106,20 @@ export function useBudgets(
       new Date(now.getFullYear() + 1, 0, Math.max(1, startDay - 1)),
     )
 
-    const { rows: spentData, error: spentError } = await readAllPages((from, to) =>
-      supabase
-        .from('transactions')
-        .select('category_id, amount, date, currency, exchange_rate')
-        .eq('user_id', user.id)
-        .eq('type', 'expense')
-        .gte('date', fetchStart)
-        .lte('date', fetchEnd)
-        .order('date', { ascending: true })
-        .order('id', { ascending: true })
-        .range(from, to),
+    const { rows: spentData, error: spentError } = await readAllPages(
+      (from, to) =>
+        supabase
+          .from('transactions')
+          .select('category_id, amount, date, currency, exchange_rate')
+          .eq('user_id', user.id)
+          .eq('type', 'expense')
+          .gte('date', fetchStart)
+          .lte('date', fetchEnd)
+          .order('date', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to),
+      undefined,
+      () => request !== requestId.current,
     )
 
     if (request !== requestId.current) return

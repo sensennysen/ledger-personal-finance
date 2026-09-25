@@ -4,8 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { OverspendingBudget } from '@/lib/overspending'
 import type { BudgetSpendTx } from '@/lib/budgetSpend'
 import { describeDataError, type DescribedError } from '@/lib/dataErrors'
-
-const PAGE = 1000
+import { readAllPages } from '@/lib/pagedRead'
 
 /**
  * Raw inputs for the Overspending report: active budgets and every expense
@@ -45,29 +44,31 @@ export function useOverspending(until: string) {
     }
     const activeBudgets = (budgetData ?? []) as OverspendingBudget[]
 
-    const all: BudgetSpendTx[] = []
+    let all: BudgetSpendTx[] = []
     if (activeBudgets.length > 0) {
       const earliest = activeBudgets.map((b) => b.start_date).sort()[0].slice(0, 7) + '-01'
-      for (let from = 0; ; from += PAGE) {
-        const { data, error: txError } = await supabase
-          .from('transactions')
-          .select('category_id, amount, date, currency, exchange_rate')
-          .eq('user_id', user.id)
-          .eq('type', 'expense')
-          .gte('date', earliest)
-          .lte('date', until)
-          .order('date', { ascending: true })
-          .order('id', { ascending: true })
-          .range(from, from + PAGE - 1)
-        if (request !== requestId.current) return
-        if (txError) {
-          setLoadFailure(describeDataError(txError, { action: 'load' }))
-          setLoading(false)
-          return
-        }
-        all.push(...((data ?? []) as BudgetSpendTx[]))
-        if (!data || data.length < PAGE) break
+      const { rows, error: txError } = await readAllPages<BudgetSpendTx>(
+        (from, to) =>
+          supabase
+            .from('transactions')
+            .select('category_id, amount, date, currency, exchange_rate')
+            .eq('user_id', user.id)
+            .eq('type', 'expense')
+            .gte('date', earliest)
+            .lte('date', until)
+            .order('date', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to),
+        undefined,
+        () => request !== requestId.current,
+      )
+      if (request !== requestId.current) return
+      if (txError) {
+        setLoadFailure(describeDataError(txError, { action: 'load' }))
+        setLoading(false)
+        return
       }
+      all = rows
     }
 
     setBudgets(activeBudgets)

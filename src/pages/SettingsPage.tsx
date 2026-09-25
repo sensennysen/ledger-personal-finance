@@ -113,6 +113,10 @@ export default function SettingsPage() {
     setDeleteError(null)
     try {
       await deleteAccount()
+      // The account is gone. Normally the sign-out unmounts this page; if it failed the
+      // user is still here, so free the dialog and let the sign-out banner show.
+      setDeleting(false)
+      setDeleteOpen(false)
     } catch (err) {
       setDeleteError(err instanceof Error ? describeDataError(err, { action: 'delete', entity: 'account' }) : 'Deletion failed. Please try again.')
       setDeleting(false)

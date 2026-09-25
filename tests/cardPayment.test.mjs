@@ -1,13 +1,19 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  cardPaymentTransfer,
+  creditedAmount,
   defaultCardPaymentDescription,
+  defaultPaymentSource,
+  planStatementPayment,
+  transferCard,
   getCardPaymentPresets,
   getCardDateInfo,
   getCardPaymentSummary,
   isAutoCardPaymentDescription,
   resolveInitialCardId,
 } from '../src/lib/cardPayment.ts'
+import { cardAmountDue } from '../src/lib/accountsOverview.ts'
 import { daysUntilDayOfMonth, nextDayOfMonthDate } from '../src/lib/creditCards.ts'
 
 test('paying the full balance clears the card', () => {
@@ -142,4 +148,66 @@ test('a single card with nothing owed is still picked, and no cards picks nothin
   assert.equal(resolveInitialCardId([empty], null), 'empty')
   assert.equal(resolveInitialCardId([empty, { id: 'e2', balance: 0 }], null), null)
   assert.equal(resolveInitialCardId([], null), null)
+})
+
+const accountsFixture = [
+  { id: 'card', type: 'credit_card', currency: 'PHP', is_active: true },
+  { id: 'usd', type: 'checking', currency: 'USD', is_active: true },
+  { id: 'loan', type: 'loan', currency: 'PHP', is_active: true },
+  { id: 'old', type: 'checking', currency: 'PHP', is_active: false },
+  { id: 'bank', type: 'checking', currency: 'PHP', is_active: true },
+]
+
+test('the payment source is the first active non-liability account in the card currency', () => {
+  assert.equal(defaultPaymentSource(accountsFixture, accountsFixture[0]), 'bank')
+  assert.equal(defaultPaymentSource([accountsFixture[0], accountsFixture[1]], accountsFixture[0]), null)
+})
+
+test('a card payment is a category-less transfer at rate 1', () => {
+  const saved = cardPaymentTransfer({
+    type: 'expense',
+    to_account_id: 'card',
+    category_id: 'c',
+    subcategory_id: 's',
+    exchange_rate: 2,
+    transfer_fee: 5,
+    goal_id: 'g',
+    amount: 500,
+  })
+  assert.deepEqual(saved, {
+    type: 'transfer',
+    to_account_id: 'card',
+    category_id: null,
+    subcategory_id: null,
+    exchange_rate: 1,
+    transfer_fee: null,
+    goal_id: null,
+    amount: 500,
+  })
+})
+
+test('only a transfer into a credit card counts as paying it', () => {
+  assert.equal(transferCard({ type: 'transfer', to_account_id: 'card' }, accountsFixture)?.id, 'card')
+  assert.equal(transferCard({ type: 'transfer', to_account_id: 'bank' }, accountsFixture), null)
+  assert.equal(transferCard({ type: 'expense', to_account_id: 'loan' }, accountsFixture), null)
+  assert.equal(transferCard({ type: 'transfer', to_account_id: null }, accountsFixture), null)
+})
+
+test('a cross-currency credit is converted', () => {
+  assert.equal(creditedAmount({ amount: 100, exchange_rate: 56.25 }), 5625)
+  assert.equal(creditedAmount({ amount: 100 }), 100)
+})
+
+test('a payment raises the paid amount up to the statement and lowers Amount to pay', () => {
+  const card = { balance: -1500, statement_balance: 1000, statement_paid_amount: 200 }
+  const patch = planStatementPayment(card, 300, '2026-09-25')
+  assert.deepEqual(patch, { statement_paid_amount: 500, last_payment_amount: 300, last_payment_date: '2026-09-25' })
+  assert.equal(cardAmountDue({ ...card, ...patch }), 500)
+  assert.equal(planStatementPayment(card, 5000, '2026-09-25').statement_paid_amount, 1000)
+})
+
+test('with no statement the paid amount is left alone', () => {
+  const patch = planStatementPayment({ statement_balance: null, statement_paid_amount: null }, 300, '2026-09-25')
+  assert.equal(patch.statement_paid_amount, 0)
+  assert.equal(patch.last_payment_amount, 300)
 })

@@ -10,6 +10,7 @@ import { useSavingsGoals } from '@/hooks/useSavingsGoals'
 import { useSubcategories } from '@/hooks/useSubcategories'
 import { useTransactionRules } from '@/hooks/useTransactionRules'
 import {
+  cardPaymentSchema,
   transactionSchema,
   type TransactionFormInput,
   type TransactionFormValues,
@@ -34,7 +35,9 @@ import { applyKindChange } from '@/lib/transactionKindChange'
 import { hasLoanPickerStep, resolveInitialLoanId } from '@/lib/loanPicker'
 import { exceedsOutstanding } from '@/lib/loanRepayment'
 import {
+  cardPaymentTransfer,
   defaultCardPaymentDescription,
+  defaultPaymentSource,
   getCardDateInfo,
   getCardPaymentPresets,
   getCardPaymentSummary,
@@ -90,8 +93,19 @@ export function TransactionForm({
   const [loanChosen, setLoanChosen] = useState(Boolean(defaultValues?.to_account_id))
   const [returnedToPicker, setReturnedToPicker] = useState(false)
 
+  // An edited expense with a target is a payment against a liability; the target's type says which.
+  // If the target is not in the loaded list (still loading, archived, filtered out) we do not
+  // guess: the form falls back to a plain expense and keeps to_account_id untouched.
+  const editTarget = resolveEditTarget(
+    isEditing && defaultValues?.type === 'expense' ? defaultValues.to_account_id : null,
+    accounts,
+  )
+  const isCardPayment = entryKind === 'card-payment' || Boolean(lockedCardAccountId) || editTarget === 'card'
+
   const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
-    resolver: zodResolver(transactionSchema),
+    // A card payment has no category (LED-146); every other kind keeps the full rules.
+    resolver: (values, context, options) =>
+      zodResolver(isCardPayment ? cardPaymentSchema : transactionSchema)(values, context, options),
     defaultValues: {
       type: entryKind && entryKind !== 'loan-repayment' && entryKind !== 'card-payment' ? entryKind : 'expense',
       account_id: lockedAccountId ?? accounts[0]?.id ?? '',
@@ -149,16 +163,8 @@ export function TransactionForm({
   const amountValue = useWatch({ control: form.control, name: 'amount' })
   const loanAccounts = useMemo(() => accounts.filter((account) => account.type === 'loan'), [accounts])
   const cardAccounts = useMemo(() => accounts.filter((account) => account.type === 'credit_card'), [accounts])
-  // An edited expense with a target is a payment against a liability; the target's type says which.
-  // If the target is not in the loaded list (still loading, archived, filtered out) we do not
-  // guess: the form falls back to a plain expense and keeps to_account_id untouched.
-  const editTarget = resolveEditTarget(
-    isEditing && defaultValues?.type === 'expense' ? defaultValues.to_account_id : null,
-    accounts,
-  )
   const editTargetMissing = editTarget === 'missing'
   const canEditKind = isEditing && canChangeSavedKind(editTarget)
-  const isCardPayment = entryKind === 'card-payment' || Boolean(lockedCardAccountId) || editTarget === 'card'
   const isLoanRepayment =
     !isCardPayment &&
     (entryKind === 'loan-repayment' || Boolean(lockedLoanAccountId) || editTarget === 'loan')
@@ -166,12 +172,16 @@ export function TransactionForm({
   const selectedLoan = loanAccounts.find((account) => account.id === selectedLoanId)
   const selectedCard = cardAccounts.find((account) => account.id === selectedLoanId)
   const paymentTarget = selectedLoan ?? selectedCard
-  const paymentSourceAccounts = accounts.filter(
-    (account) =>
-      account.type !== 'loan' &&
-      account.type !== 'credit_card' &&
-      account.id !== selectedLoan?.id &&
-      (!paymentTarget || account.currency === paymentTarget.currency)
+  const paymentSourceAccounts = useMemo(
+    () =>
+      accounts.filter(
+        (account) =>
+          account.type !== 'loan' &&
+          account.type !== 'credit_card' &&
+          account.id !== selectedLoan?.id &&
+          (!paymentTarget || account.currency === paymentTarget.currency)
+      ),
+    [accounts, selectedLoan?.id, paymentTarget]
   )
 
   const { subcategories } = useSubcategories(selectedCategoryId)
@@ -300,6 +310,21 @@ export function TransactionForm({
     if (initialCardId) handleCardChange(initialCardId)
   }, [cardAccounts, handleCardChange, isCardPayment, lockedCardAccountId, selectedLoanId])
 
+  // A locked card already has its target, so the effect above never runs for it; Pay from
+  // still needs a compatible account, or the submit fails with "Account is required" (LED-146).
+  useEffect(() => {
+    if (!isCardPayment || isEditing || !selectedCard) return
+    if (!form.getValues('description').trim()) {
+      form.setValue('description', defaultCardPaymentDescription(selectedCard.name))
+    }
+    if (paymentSourceAccounts.some((account) => account.id === selectedAccount)) return
+    const source = defaultPaymentSource(accounts, selectedCard) ?? ''
+    if (source === selectedAccount) return
+    form.setValue('account_id', source)
+    form.setValue('currency', selectedCard.currency)
+    form.clearErrors('account_id')
+  }, [accounts, form, isCardPayment, isEditing, paymentSourceAccounts, selectedAccount, selectedCard])
+
   useEffect(() => {
     if (!isLoanRepayment || selectedLoanId) return
     const initialLoanId = resolveInitialLoanId(loanAccounts, lockedLoanAccountId, editTarget)
@@ -331,7 +356,9 @@ export function TransactionForm({
       }
     }
     const receipt_url = await prepareReceiptForSubmit(values.receipt_url)
-    await onSubmit({ ...values, receipt_url })
+    // A new card payment is saved as a transfer into the card; see cardPaymentTransfer.
+    const submitted = { ...values, receipt_url }
+    await onSubmit(isCardPayment && !isEditing ? cardPaymentTransfer(submitted) : submitted)
   }
 
   const cardSummary =

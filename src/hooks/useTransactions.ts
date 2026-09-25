@@ -71,7 +71,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
         .select(`
           *,
           account:accounts!transactions_account_id_fkey(id, name, color, currency),
-          to_account:accounts!transactions_to_account_id_fkey(id, name, color, currency),
+          to_account:accounts!transactions_to_account_id_fkey(id, name, color, currency, type),
           category:categories(id, name, color, icon),
           subcategory:subcategories(id, name)
         `)

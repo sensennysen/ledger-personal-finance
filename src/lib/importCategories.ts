@@ -33,7 +33,7 @@ export interface Suggestion {
   source: 'rule' | 'history'
 }
 
-const payeeKey = (type: string, description: string | null) => `${type}|${normaliseDescription(description)}`
+export const payeeKey = (type: string, description: string | null) => `${type}|${normaliseDescription(description)}`
 
 /**
  * The most frequent category per payee and type. A tie goes to the category
@@ -98,4 +98,22 @@ export function suggestCategory(
   if (!normaliseDescription(row.description)) return null
   const remembered = memory.get(payeeKey(type, row.description))
   return fits(remembered) ? { categoryId: remembered, source: 'history' } : null
+}
+
+/**
+ * The other rows a category pick could also apply to (LED-147): the same payee and type as the row
+ * the user picked for. `isEligible` says whether a row may still be changed (no pick of its own,
+ * not a transfer, not left out), so a row the user already settled is never overwritten.
+ */
+export function similarRows(
+  rows: readonly { line: number; type: 'income' | 'expense' | null; description: string }[],
+  sourceLine: number,
+  isEligible: (line: number) => boolean,
+): number[] {
+  const source = rows.find((row) => row.line === sourceLine)
+  if (!source?.type || !normaliseDescription(source.description)) return []
+  const key = payeeKey(source.type, source.description)
+  return rows
+    .filter((row) => row.line !== sourceLine && row.type && payeeKey(row.type, row.description) === key && isEligible(row.line))
+    .map((row) => row.line)
 }

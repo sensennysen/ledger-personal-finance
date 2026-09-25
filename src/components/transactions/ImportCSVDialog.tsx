@@ -5,6 +5,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useImportCategoryMemory } from '@/hooks/useImportCategoryMemory'
 import { useImportDuplicates } from '@/hooks/useImportDuplicates'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
+import { similarRows } from '@/lib/importCategories'
 import { duplicateSpan, matchDuplicates, type ExistingTx } from '@/lib/importDuplicates'
 import {
   buildRows,
@@ -22,6 +23,7 @@ import {
   selectAll,
   sortProblemsFirst,
   summarise,
+  withAmbiguousDateIssues,
   withCategoryIssues,
   type BankFormat,
   type CauseId,
@@ -87,6 +89,27 @@ const SEVERITY_ICON: Record<Severity, { icon: typeof AlertCircle; className: str
 
 const ORDER_LABELS: Record<DateOrder, string> = { DMY: 'D/M/Y', MDY: 'M/D/Y' }
 
+function DateOrderToggle({ order, onChange }: { order: DateOrder; onChange: (order: DateOrder) => void }) {
+  return (
+    <div className="inline-flex rounded-full border p-0.5">
+      {(['DMY', 'MDY'] as DateOrder[]).map((option) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={order === option}
+          onClick={() => onChange(option)}
+          className={cn(
+            'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+            order === option ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {ORDER_LABELS[option]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const flip = <T,>(set: ReadonlySet<T>, value: T): Set<T> => {
   const next = new Set(set)
   if (next.has(value)) next.delete(value)
@@ -106,6 +129,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const [file, setFile] = useState<ParsedFile | null>(null)
   const [fileKey, setFileKey] = useState(0)
   const [dateOrder, setDateOrder] = useState<DateOrder>('MDY')
+  // Picking an order, even the default one, settles an ambiguous file (LED-147).
+  const [dateOrderConfirmed, setDateOrderConfirmed] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
   const [accountId, setAccountId] = useState<string>('')
   const [importing, setImporting] = useState(false)
@@ -120,6 +145,9 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const [rateInput, setRateInput] = useState('')
   const [activeCause, setActiveCause] = useState<CauseId | null>(null)
   const [onlyProblems, setOnlyProblems] = useState(false)
+  /** After a category pick: the same-payee rows it could also fill, then what was applied so it can be undone (LED-147). */
+  const [similarOffer, setSimilarOffer] = useState<{ categoryId: string; lines: number[] } | null>(null)
+  const [similarApplied, setSimilarApplied] = useState<{ categoryId: string; lines: number[] } | null>(null)
 
   const { categories } = useCategories()
   const categoryMemory = useImportCategoryMemory(file ? fileKey : null)
@@ -153,7 +181,10 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     if (suggestion) suggestions.set(row.line, suggestion)
     else if (!leftOut && !picks.has(row.line) && !categoryMemory.loading) uncategorised.add(row.line)
   }
-  const rows = withCategoryIssues(built.rows, uncategorised)
+  const rows = withCategoryIssues(
+    withAmbiguousDateIssues(built.rows, Boolean(file?.dateOrderAmbiguous) && !dateOrderConfirmed),
+    uncategorised,
+  )
   const categoryOf = (line: number): string | null => {
     const pick = picks.get(line)
     return pick !== undefined ? pick || null : (suggestions.get(line)?.categoryId ?? null)
@@ -172,6 +203,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     resetKey: `${fileKey}|${onlyProblems}|${dateOrder}`,
   })
 
+  const chooseDateOrder = (order: DateOrder) => {
+    setDateOrder(order)
+    setDateOrderConfirmed(true)
+  }
+
   const reset = () => {
     setFile(null)
     setParseError(null)
@@ -181,10 +217,13 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     setToggled(new Set())
     setTransfers(new Map())
     setPicks(new Map())
+    setDateOrderConfirmed(false)
     setPickedCurrency('')
     setRateInput('')
     setActiveCause(null)
     setOnlyProblems(false)
+    setSimilarOffer(null)
+    setSimilarApplied(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -216,6 +255,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         setFile(result)
         setFileKey((key) => key + 1)
         setDateOrder(result.dateOrder)
+        setDateOrderConfirmed(false)
         setParseError(null)
         setSkipped(new Set())
         setToggled(new Set())
@@ -223,6 +263,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         setPicks(new Map())
         setActiveCause(null)
         setOnlyProblems(false)
+        setSimilarOffer(null)
+        setSimilarApplied(null)
         // Only an unambiguous target is picked for the user (LED-75).
         if (!accountId && accounts.length === 1) {
           setAccountId(accounts[0].id)
@@ -249,6 +291,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     setAccountId(id)
     // Transfer counterparts depend on the account; its own rows can't be one.
     setTransfers(new Map())
+    setSimilarOffer(null)
+    setSimilarApplied(null)
   }
 
   const setKind = (line: number, value: string) => {
@@ -262,6 +306,45 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     if (!transferTo) {
       setPicks((current) => new Map(current).set(line, value.startsWith('cat:') ? value.slice(4) : ''))
     }
+    setSimilarApplied(null)
+    setSimilarOffer(null)
+    if (value.startsWith('cat:')) {
+      const categoryId = value.slice(4)
+      const lines = similarRows(rows, line, (other) => {
+        const row = rows.find((item) => item.line === other)
+        return (
+          Boolean(row) &&
+          !picks.has(other) &&
+          !transfers.has(other) &&
+          !hasError(row!.issues) &&
+          !(duplicates.has(other) && !toggled.has(other)) &&
+          categoryOf(other) !== categoryId
+        )
+      })
+      if (lines.length > 0) setSimilarOffer({ categoryId, lines })
+    }
+  }
+
+  const applySimilar = () => {
+    if (!similarOffer) return
+    setPicks((current) => {
+      const next = new Map(current)
+      for (const line of similarOffer.lines) next.set(line, similarOffer.categoryId)
+      return next
+    })
+    setSimilarApplied(similarOffer)
+    setSimilarOffer(null)
+  }
+
+  // Removing the picks returns those rows to what they had: a suggestion, or unmatched.
+  const undoSimilar = () => {
+    if (!similarApplied) return
+    setPicks((current) => {
+      const next = new Map(current)
+      for (const line of similarApplied.lines) next.delete(line)
+      return next
+    })
+    setSimilarApplied(null)
   }
 
   const needsRate = conversion.kind === 'needs-rate'
@@ -301,6 +384,10 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
       const inbound = match.account_id !== accountId
       const amount = Number(match.amount) * (inbound ? Number(match.exchange_rate ?? 1) : 1)
       return `${match.date} · transfer ${inbound ? `from ${accountName(match.account_id)}` : `to ${accountName(match.to_account_id)}`} · ${formatCurrency(amount, accountCurrency)}`
+    }
+    if (match.type === 'expense' && match.to_account_id) {
+      const inbound = match.account_id !== accountId
+      return `${match.date} · payment ${inbound ? `from ${accountName(match.account_id)}` : `to ${accountName(match.to_account_id)}`} · ${formatCurrency(Number(match.amount), accountCurrency)}`
     }
     return `${match.date} · ${match.description || EMPTY_DESCRIPTION} · ${formatCurrency(Number(match.amount), accountCurrency)}`
   }
@@ -549,27 +636,23 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                             Dates in these rows read <code className="text-foreground">{cause.sample || '(empty)'}</code>.
                             {' '}Parse every slash date in the file as
                           </p>
-                          <div className="inline-flex rounded-full border p-0.5">
-                            {(['DMY', 'MDY'] as DateOrder[]).map((order) => (
-                              <button
-                                key={order}
-                                type="button"
-                                aria-pressed={dateOrder === order}
-                                onClick={() => setDateOrder(order)}
-                                className={cn(
-                                  'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
-                                  dateOrder === order ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
-                                )}
-                              >
-                                {ORDER_LABELS[order]}
-                              </button>
-                            ))}
-                          </div>
+                          <DateOrderToggle order={dateOrder} onChange={chooseDateOrder} />
                           {fixableByOtherOrder(rows, dateOrder) === 0 && (
                             <p className="text-xs text-muted-foreground">
                               Switching the order won't fix these. Correct the dates in the file, or skip these rows.
                             </p>
                           )}
+                        </>
+                      )}
+
+                      {cause.id === 'ambiguous-date' && (
+                        <>
+                          <p className="text-muted-foreground">
+                            Every slash date in this file has a day and month at or below 12, so it reads either way
+                            (<code className="text-foreground">{cause.sample}</code> is a different day in each order).
+                            {' '}It is read as {ORDER_LABELS[dateOrder]}. Confirm the order the bank uses:
+                          </p>
+                          <DateOrderToggle order={dateOrder} onChange={chooseDateOrder} />
                         </>
                       )}
 
@@ -595,7 +678,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                         <p className="text-muted-foreground">
                           Skipped unless you tick a row below to import it anyway.
                         </p>
-                      ) : (
+                      ) : cause.id === 'ambiguous-date' ? null : (
                         <Button
                           variant="outline"
                           size="sm"
@@ -606,6 +689,27 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                         </Button>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {(similarOffer || similarApplied) && (
+                  <div role="status" className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                    {similarOffer ? (
+                      <>
+                        <span className="flex-1">
+                          Apply {categoryById.get(similarOffer.categoryId)?.name ?? 'this category'} to {plural(similarOffer.lines.length, 'similar row')} from the same payee?
+                        </span>
+                        <Button size="sm" className="h-7" onClick={applySimilar}>Apply</Button>
+                        <Button size="sm" variant="ghost" className="h-7" onClick={() => setSimilarOffer(null)}>Not now</Button>
+                      </>
+                    ) : similarApplied ? (
+                      <>
+                        <span className="flex-1">
+                          Applied {categoryById.get(similarApplied.categoryId)?.name ?? 'the category'} to {plural(similarApplied.lines.length, 'row')}.
+                        </span>
+                        <Button size="sm" variant="ghost" className="h-7" onClick={undoSimilar}>Undo</Button>
+                      </>
+                    ) : null}
                   </div>
                 )}
 

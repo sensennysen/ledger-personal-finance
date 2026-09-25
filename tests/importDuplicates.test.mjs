@@ -95,3 +95,31 @@ test('duplicateSpan covers the dated rows', () => {
   )
   assert.equal(duplicateSpan([{ date: null }]), null)
 })
+
+test('a loan repayment already recorded matches the loan statement credit (LED-147)', () => {
+  const repayment = existing('r', { account_id: 'bank', to_account_id: 'loan', description: 'Loan payment - Phone', amount: 1000, date: '2026-09-29' })
+  const credit = row(1, { date: '2026-09-29', amount: 1000, type: 'income', description: 'PAYMENT RECEIVED THANK YOU' })
+  const found = matchDuplicates([credit], [repayment], 'loan')
+  assert.equal(found.get(1)?.id, 'r')
+})
+
+test('the payer side matches too, whatever the bank calls the payment', () => {
+  const repayment = existing('r', { account_id: 'bank', to_account_id: 'loan', description: 'Loan payment - Phone', amount: 1000, date: '2026-09-29' })
+  const debit = row(1, { date: '2026-09-29', amount: 1000, type: 'expense', description: 'ONLINE BANKING PMT 55021' })
+  assert.equal(matchDuplicates([debit], [repayment], 'bank').get(1)?.id, 'r')
+})
+
+test('a repayment matches one credit only, and only in the same direction and amount', () => {
+  const repayment = existing('r', { account_id: 'bank', to_account_id: 'loan', amount: 1000, date: '2026-09-29' })
+  const twice = [
+    row(1, { date: '2026-09-29', amount: 1000, type: 'income' }),
+    row(2, { date: '2026-09-29', amount: 1000, type: 'income' }),
+  ]
+  assert.deepEqual([...matchDuplicates(twice, [repayment], 'loan').keys()], [1])
+  assert.equal(matchDuplicates([row(1, { date: '2026-09-29', amount: 900, type: 'income' })], [repayment], 'loan').size, 0)
+  assert.equal(matchDuplicates([row(1, { date: '2026-09-29', amount: 1000, type: 'expense' })], [repayment], 'loan').size, 0)
+})
+
+test('an expense with no target is still matched on description as before', () => {
+  assert.equal(match([row(1)], [existing('a')]).get(1)?.id, 'a')
+})

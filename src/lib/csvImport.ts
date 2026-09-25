@@ -6,7 +6,7 @@
 
 export type BankFormat = 'BDO' | 'BPI' | 'Metrobank' | 'Generic'
 export type DateOrder = 'MDY' | 'DMY'
-export type CauseId = 'bad-date' | 'bad-amount' | 'empty-description' | 'no-category' | 'duplicate'
+export type CauseId = 'bad-date' | 'ambiguous-date' | 'bad-amount' | 'empty-description' | 'no-category' | 'duplicate'
 export type Severity = 'error' | 'warning' | 'duplicate'
 
 export const MAX_IMPORT_ROWS = 5000
@@ -14,13 +14,14 @@ export const EMPTY_DESCRIPTION = 'No description'
 
 export const CAUSES: Record<CauseId, { label: string; severity: Severity }> = {
   'bad-date': { label: 'Unparseable date', severity: 'error' },
+  'ambiguous-date': { label: 'Ambiguous date order', severity: 'warning' },
   'bad-amount': { label: 'Amount not a number', severity: 'error' },
   'empty-description': { label: 'Description empty', severity: 'warning' },
   'no-category': { label: 'No category match', severity: 'warning' },
   duplicate: { label: 'Matches existing row', severity: 'duplicate' },
 }
 
-const CAUSE_ORDER: CauseId[] = ['bad-date', 'bad-amount', 'empty-description', 'no-category', 'duplicate']
+const CAUSE_ORDER: CauseId[] = ['bad-date', 'ambiguous-date', 'bad-amount', 'empty-description', 'no-category', 'duplicate']
 
 export interface ImportRow {
   /** 1-based data row number, counted from the row after the header. */
@@ -40,6 +41,8 @@ export interface ParsedFile {
   raw: string[][]
   headerIdx: number
   dateOrder: DateOrder
+  /** Every slash date reads either way, so `dateOrder` is a default the user has not confirmed (LED-147). */
+  dateOrderAmbiguous: boolean
 }
 
 export function parseCSVText(text: string): string[][] {
@@ -177,6 +180,30 @@ export function detectDateOrder(values: string[]): DateOrder | 'either' {
   return 'either'
 }
 
+/** A slash date whose day and month are both at or below 12 and differ, so D/M/Y and M/D/Y give two different dates. */
+export function isAmbiguousSlashDate(value: string): boolean {
+  const slash = value.trim().match(SLASH_DATE)
+  if (!slash) return false
+  const [first, second] = [Number(slash[1]), Number(slash[2])]
+  return first <= 12 && second <= 12 && first !== second
+}
+
+/**
+ * True when nothing in the file decides the slash-date order: at least one date could be read
+ * either way, and none has a part over 12 to settle it. A file that contradicts itself is not
+ * ambiguous; its bad dates are reported as unparseable instead.
+ */
+export function dateOrderIsAmbiguous(values: string[]): boolean {
+  let ambiguous = false
+  for (const value of values) {
+    const slash = value.trim().match(SLASH_DATE)
+    if (!slash) continue
+    if (Number(slash[1]) > 12 || Number(slash[2]) > 12) return false
+    if (isAmbiguousSlashDate(value)) ambiguous = true
+  }
+  return ambiguous
+}
+
 /** An amount cell as a number: empty or "-" is 0, anything non-numeric is null. */
 export function parseAmount(value: string): number | null {
   const cleaned = value.replace(/[,₱$\s]/g, '').replace(/^\((.+)\)$/, '-$1')
@@ -300,6 +327,8 @@ export function processFile(text: string): ParsedFile | { error: string } {
   const dateIdx = headers.findIndex((header) => ['transaction date', 'post date', 'date'].some((term) => header.includes(term)))
   const detected = dateIdx >= 0 ? detectDateOrder(raw.slice(headerIdx + 1).map((row) => row[dateIdx] ?? '')) : 'either'
   const dateOrder: DateOrder = detected === 'either' ? 'MDY' : detected
+  const dateOrderAmbiguous =
+    dateIdx >= 0 && dateOrderIsAmbiguous(raw.slice(headerIdx + 1).map((row) => row[dateIdx] ?? ''))
 
   const { rows } = buildRows(raw, headerIdx, format, dateOrder)
   if (rows.length === 0) {
@@ -311,13 +340,19 @@ export function processFile(text: string): ParsedFile | { error: string } {
     }
   }
 
-  return { format, raw, headerIdx, dateOrder }
+  return { format, raw, headerIdx, dateOrder, dateOrderAmbiguous }
 }
 
 /** The rows with `no-category` added to those in `uncategorised`. */
 export function withCategoryIssues(rows: ImportRow[], uncategorised: ReadonlySet<number>): ImportRow[] {
   if (uncategorised.size === 0) return rows
   return rows.map((row) => (uncategorised.has(row.line) ? { ...row, issues: [...row.issues, 'no-category'] } : row))
+}
+
+/** The rows with `ambiguous-date` added to those whose slash date reads either way, while the order is unconfirmed. */
+export function withAmbiguousDateIssues(rows: ImportRow[], ambiguous: boolean): ImportRow[] {
+  if (!ambiguous) return rows
+  return rows.map((row) => (isAmbiguousSlashDate(row.rawDate) ? { ...row, issues: [...row.issues, 'ambiguous-date'] } : row))
 }
 
 /** A row's parse issues plus `duplicate` when the check matched it. */
@@ -358,7 +393,7 @@ export function groupProblems(
       id,
       ...CAUSES[id],
       lines: affected.map((row) => row.line),
-      sample: id === 'bad-date' ? first.rawDate : id === 'bad-amount' ? first.rawAmount : first.description,
+      sample: id === 'bad-date' || id === 'ambiguous-date' ? first.rawDate : id === 'bad-amount' ? first.rawAmount : first.description,
     }
   })
 }

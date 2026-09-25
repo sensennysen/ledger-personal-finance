@@ -55,10 +55,17 @@ import { cn } from '@/lib/utils'
 import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
 import type { Transaction } from '@/types'
 
+export type AddTransactionOptions = {
+  targetAccountId?: string
+  categoryId?: string
+  prefill?: { amount: number; date: string }
+}
+
 export type AppLayoutContext = {
   /** `targetAccountId` locks the card or loan for card-payment and loan-repayment. */
   /** `categoryId` opens the form with that category chosen (search: "New expense in Groceries"). */
-  openAddTransactionModal: (kind: TransactionKind, options?: { targetAccountId?: string; categoryId?: string }) => void
+  /** `prefill` opens it with an amount and date (Home: Pay now on a loan bill). */
+  openAddTransactionModal: (kind: TransactionKind, options?: AddTransactionOptions) => void
 }
 export default function AppLayout() {
   return (
@@ -103,6 +110,7 @@ function LayoutShell() {
     useState<TransactionKind>('expense')
   const [targetAccountId, setTargetAccountId] = useState<string | undefined>()
   const [prefillCategoryId, setPrefillCategoryId] = useState<string | undefined>()
+  const [prefill, setPrefill] = useState<AddTransactionOptions['prefill']>()
   const [entry, setEntry] = useState<{
     transaction: Transaction
     actions?: EntryActions
@@ -166,12 +174,13 @@ function LayoutShell() {
     return () => observer.disconnect()
   }, [location.pathname])
   const touchStart = useRef<number | null>(null)
-  const openAddTransactionModal = (kind: TransactionKind, options?: { targetAccountId?: string; categoryId?: string }) => {
+  const openAddTransactionModal = (kind: TransactionKind, options?: AddTransactionOptions) => {
     rememberTrigger()
     setFormError(null)
     setTransactionKind(kind)
     setTargetAccountId(options?.targetAccountId)
     setPrefillCategoryId(options?.categoryId)
+    setPrefill(options?.prefill)
     setSheet('add')
   }
   useEffect(() => {
@@ -444,7 +453,7 @@ function LayoutShell() {
                 entryKind={transactionKind}
                 lockedCardAccountId={transactionKind === 'card-payment' ? targetAccountId : undefined}
                 lockedLoanAccountId={transactionKind === 'loan-repayment' ? targetAccountId : undefined}
-                defaultValues={prefillCategoryId ? { category_id: prefillCategoryId } : undefined}
+                defaultValues={prefillCategoryId || prefill ? { ...(prefillCategoryId ? { category_id: prefillCategoryId } : {}), ...prefill } : undefined}
                 onSubmit={handleCreate}
                 onClose={() => setSheet(null)}
               />

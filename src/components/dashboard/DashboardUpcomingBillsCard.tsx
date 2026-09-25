@@ -2,6 +2,7 @@ import { Bell, CircleDollarSign } from 'lucide-react'
 import { EXPENSE, WARNING_INK } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { UpcomingBill } from '@/hooks/useDashboardData'
+import { Button } from '@/components/ui/button'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -10,6 +11,8 @@ interface DashboardUpcomingBillsCardProps {
   isCurrentMonth: boolean
   monthLabel: string
   loading: boolean
+  /** Opens the loan repayment form for a bill; bills that pay nothing (recurring expenses) get no button. */
+  onPay?: (payment: NonNullable<UpcomingBill['payment']>) => void
   style?: React.CSSProperties
 }
 
@@ -33,6 +36,7 @@ export function DashboardUpcomingBillsCard({
   isCurrentMonth,
   monthLabel,
   loading,
+  onPay,
   style,
 }: DashboardUpcomingBillsCardProps) {
   const shown = bills.slice(0, STRIP_LIMIT)
@@ -54,7 +58,7 @@ export function DashboardUpcomingBillsCard({
         <p className="flex-1 text-sm text-muted-foreground">No upcoming bills this cycle</p>
       ) : (
         <ul className="flex min-w-0 flex-1 flex-col gap-1 md:flex-row md:flex-wrap md:gap-x-6">
-          {shown.map(({ key, source, title, icon, color, amount, currency, daysUntil, nextDue }) => (
+          {shown.map(({ key, source, title, icon, color, amount, currency, daysUntil, nextDue, payment }) => (
             <li key={key} className="flex min-w-0 items-center gap-2 text-sm">
               <span
                 className="flex size-6 shrink-0 items-center justify-center rounded-md text-xs"
@@ -68,6 +72,17 @@ export function DashboardUpcomingBillsCard({
               <span className="shrink-0 text-xs font-medium" style={{ color: daysUntil !== null ? getUpcomingBillDayColor(daysUntil) : undefined }}>
                 {daysUntil !== null ? formatDaysUntil(daysUntil) : nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </span>
+              {payment && onPay && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 shrink-0 px-2 text-xs"
+                  aria-label={`Pay now: ${title}`}
+                  onClick={() => onPay(payment)}
+                >
+                  Pay now
+                </Button>
+              )}
             </li>
           ))}
           {more > 0 && <li className="text-xs text-muted-foreground md:self-center">+{more} more</li>}

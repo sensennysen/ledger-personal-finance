@@ -10,7 +10,7 @@ so Activity goes first.
 
 - **Done before this plan:** LED-73 (shipped with Epic 5's import work).
 - **Dependencies met:** LED-30, LED-04, LED-06, LED-20, LED-21, LED-33, LED-60.
-- **Remaining:** 29 tickets, ~136 points.
+- **Remaining:** 0 tickets. Epic 6 is complete; the follow-ups the retros recorded are in `epics-8-13-build-order.md`.
 - **Branch:** `epic-6-per-screen`. One commit per LED-NN ticket.
 
 ## Phase 1 — Activity (left over from step 7)

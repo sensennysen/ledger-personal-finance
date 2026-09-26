@@ -30,6 +30,16 @@ export interface ExchangeRatesState {
 
 export const ExchangeRatesContext = createContext<ExchangeRatesState | null>(null)
 
+/**
+ * The rates when the app shell provides them, else null. For hooks that also run outside the shell:
+ * the Data deletion page's export card calls useBudgets on a public route, where fetching rates
+ * would be a side effect of reading a legal page. Without rates a foreign-currency amount is left
+ * out and named, as it is before any fetch.
+ */
+export function useOptionalExchangeRates(): ExchangeRatesState | null {
+  return useContext(ExchangeRatesContext)
+}
+
 export function useExchangeRates(): ExchangeRatesState {
   const context = useContext(ExchangeRatesContext)
   if (!context) throw new Error('useExchangeRates requires ExchangeRatesProvider')

@@ -109,9 +109,11 @@ export function MonthJumpBar({
 
   return (
     <>
-      {/* Sticky offsets ignore <main>'s padding, so clear the fixed BottomNav explicitly. */}
-      {/* data-month-jump-bar lets the add FAB lift itself clear of this bar (LED-149). */}
-      <div data-month-jump-bar className="sticky bottom-[calc(88px+env(safe-area-inset-bottom))] z-20 -mx-4 md:bottom-0 flex h-14 items-center gap-5 border-t border-border bg-muted px-4 md:-mx-6 md:px-6 lg:hidden">
+      {/* <main>'s bottom padding already clears the fixed BottomNav and a sticky offset is measured
+          inside that padding, so bottom-0 sits the bar on the nav. An extra 88px floated it 88px
+          above the nav (LED-149, measured at 390x844). data-month-jump-bar lets the add FAB lift
+          itself clear of the bar. */}
+      <div data-month-jump-bar className="sticky bottom-0 z-20 -mx-4 flex h-14 items-center gap-5 border-t border-border bg-muted px-4 md:-mx-6 md:px-6 lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}

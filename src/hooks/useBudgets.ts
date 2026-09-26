@@ -12,7 +12,7 @@ import { readAllPages } from '@/lib/pagedRead'
 import { canRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 import { buildBudgetHistory, type PeriodSpend } from '@/lib/budgetHistory'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
-import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { useOptionalExchangeRates } from '@/contexts/exchangeRatesState'
 import { resolveRefresh } from '@/lib/loadState'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
@@ -38,7 +38,9 @@ export function useBudgets(
   const { user } = useAuth()
   const profileDeficitBehaviour = useDeficitBehaviour()
   // Foreign-currency spend converts with these rates, so a read waits for them (LED-136).
-  const { table: rateTable, loading: ratesLoading } = useExchangeRates()
+  const rates = useOptionalExchangeRates()
+  const rateTable = rates?.table ?? null
+  const ratesLoading = rates?.loading ?? false
   // null = profile still loading; wait rather than computing rollover with a guessed setting.
   const deficitBehaviour = deficitOverride ?? profileDeficitBehaviour
   const selectedMonth = cycle?.selectedMonth

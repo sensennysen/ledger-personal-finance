@@ -182,3 +182,19 @@ test('typed rates are re-expressed when the base changes, and dropped when they 
   assert.ok(Math.abs(inPhp.JPY - 150 / 60) < 1e-9)
   assert.deepEqual(rebaseOverrides(t, 'CAD'), {}, 'no rate for the new base')
 })
+
+// The Data deletion page is outside the app shell, and its export card calls useBudgets there.
+// A hook that needs the rates provider would blank that page for a signed-in user (found live, LED-136).
+import { readFileSync } from 'node:fs'
+
+test('useBudgets reads the rates without requiring their provider', () => {
+  const source = readFileSync('src/hooks/useBudgets.ts', 'utf8')
+  assert.match(source, /useOptionalExchangeRates/)
+  assert.doesNotMatch(source, /[^l]useExchangeRates\(/, 'useExchangeRates() throws outside ExchangeRatesProvider')
+})
+
+test('the only hook that requires the rates provider lives in the app shell', () => {
+  const state = readFileSync('src/contexts/exchangeRatesState.ts', 'utf8')
+  assert.match(state, /requires ExchangeRatesProvider/)
+  assert.match(state, /export function useOptionalExchangeRates/)
+})

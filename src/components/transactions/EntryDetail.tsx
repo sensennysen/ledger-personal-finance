@@ -4,6 +4,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useCycle } from '@/contexts/cycleState'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { monthKeyOf } from '@/lib/monthJump'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { entryBudgetImpact } from '@/lib/budgetImpact'
@@ -151,9 +152,10 @@ function BudgetImpactBar({ transaction }: { transaction: Transaction }) {
   const { startDay } = useCycle()
   const month = monthKeyOf(transaction.date, startDay)
   const { budgets } = useBudgets({ selectedMonth: month, startDay })
+  const { table: rates } = useExchangeRates()
   const budget = budgets.find((b) => b.category_id === transaction.category_id)
   const impact = budget
-    ? entryBudgetImpact(transaction, budget, getBudgetCycleRange(budget.period, month, startDay))
+    ? entryBudgetImpact(transaction, budget, getBudgetCycleRange(budget.period, month, startDay), rates)
     : null
   if (!budget || !impact) return null
 

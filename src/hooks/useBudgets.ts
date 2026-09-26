@@ -12,6 +12,7 @@ import { readAllPages } from '@/lib/pagedRead'
 import { canRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 import { buildBudgetHistory, type PeriodSpend } from '@/lib/budgetHistory'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { resolveRefresh } from '@/lib/loadState'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
@@ -36,6 +37,8 @@ export function useBudgets(
 ) {
   const { user } = useAuth()
   const profileDeficitBehaviour = useDeficitBehaviour()
+  // Foreign-currency spend converts with these rates, so a read waits for them (LED-136).
+  const { table: rateTable, loading: ratesLoading } = useExchangeRates()
   // null = profile still loading; wait rather than computing rollover with a guessed setting.
   const deficitBehaviour = deficitOverride ?? profileDeficitBehaviour
   const selectedMonth = cycle?.selectedMonth
@@ -64,7 +67,7 @@ export function useBudgets(
       setLoading(false)
       return
     }
-    if (!deficitBehaviour) {
+    if (!deficitBehaviour || ratesLoading) {
       setLoading(true)
       return
     }
@@ -155,7 +158,7 @@ export function useBudgets(
       )
 
       const computeSpent = (rangeStart: string, rangeEnd: string) =>
-        sumBudgetSpend(allTx, b, rangeStart, rangeEnd)
+        sumBudgetSpend(allTx, b, rangeStart, rangeEnd, rateTable)
 
       const { spent, unrated } = computeSpent(start, end)
 
@@ -221,7 +224,7 @@ export function useBudgets(
     showBudgets(enriched, key)
     writeCache(cacheKey, enriched)
     setLoading(false)
-  }, [user, selectedMonth, startDay, deficitBehaviour, showBudgets])
+  }, [user, selectedMonth, startDay, deficitBehaviour, showBudgets, rateTable, ratesLoading])
 
   useEffect(() => {
     queueMicrotask(() => {

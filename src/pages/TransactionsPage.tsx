@@ -398,6 +398,8 @@ export default function TransactionsPage() {
       recurrence_interval: null as null,
       recurrence_end_date: null as string | null,
       receipt_url: null as string | null,
+      // A converted row keeps the statement's own amount and currency, so a re-import at another rate is still caught.
+      ...(t.original ? { original_amount: t.original.amount, original_currency: t.original.currency } : {}),
     }))
     const result = await bulkCreateTransactions(rows)
     return { imported: result.imported ?? 0, error: result.error ?? null }

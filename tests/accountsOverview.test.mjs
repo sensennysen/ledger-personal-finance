@@ -105,3 +105,68 @@ test('the caller decides which accounts count: inactive ones left out do not app
   assert.equal(summarizeBalances(active, 'USD').netWorth, 10)
   assert.equal(summarizeBalances(withInactive.filter((a) => a.is_active !== false), 'USD').netWorth, 10)
 })
+
+// ── With exchange rates (LED-136) ───────────────────────────
+// 1 EUR = 1.1 USD; JPY has no rate.
+const eurToUsd = (amount, from) => (from === 'EUR' ? amount * 1.1 : null)
+
+test('a converted account counts in every total, Accounts, Home and Reports alike', () => {
+  const accounts = [
+    acct({ name: 'Checking', balance: 1000 }),
+    acct({ name: 'Travel', balance: 1000, currency: 'EUR' }),
+    acct({ name: 'Euro card', type: 'credit_card', balance: -200, currency: 'EUR' }),
+  ]
+  const o = buildAccountsOverview(accounts, 'USD', undefined, today, eurToUsd)
+  assert.equal(o.totals.assets, 2100)
+  assert.equal(o.totals.liabilities, 220)
+  assert.equal(o.totals.netWorth, 1880)
+  assert.deepEqual(o.excludedCurrencies, [])
+  assert.deepEqual(o.convertedCurrencies, ['EUR'])
+  const home = summarizeBalances(accounts, 'USD', eurToUsd)
+  assert.equal(home.netWorth, o.totals.netWorth)
+  assert.equal(home.totalAssets, 2100)
+  assert.equal(home.totalCreditCardDebt, 220)
+})
+
+test('rows keep their own balance and gain the converted one; shares use converted values', () => {
+  const o = buildAccountsOverview([
+    acct({ name: 'Checking', balance: 1000 }),
+    acct({ name: 'Travel', balance: 1000, currency: 'EUR' }),
+  ], 'USD', undefined, today, eurToUsd)
+  assert.deepEqual(o.assets.map((r) => [r.balance, r.converted, r.excluded]), [[1000, null, false], [1000, 1100, false]])
+  assert.deepEqual(o.assets.map((r) => Math.round(r.sharePct)), [48, 52])
+})
+
+test('a currency with no rate is still left out and named, next to one that converted', () => {
+  const accounts = [
+    acct({ name: 'Checking', balance: 1000 }),
+    acct({ name: 'Travel', balance: 1000, currency: 'EUR' }),
+    acct({ name: 'Tokyo', balance: 90000, currency: 'JPY' }),
+  ]
+  const o = buildAccountsOverview(accounts, 'USD', undefined, today, eurToUsd)
+  assert.deepEqual(o.excludedCurrencies, ['JPY'])
+  assert.deepEqual(o.convertedCurrencies, ['EUR'])
+  assert.equal(o.assets[2].excluded, true)
+  assert.equal(o.assets[2].converted, null)
+  assert.equal(o.totals.netWorth, 2100)
+  const home = summarizeBalances(accounts, 'USD', eurToUsd)
+  assert.deepEqual(home.excludedCurrencies, ['JPY'])
+  assert.equal(home.netWorth, 2100)
+})
+
+test('without a converter nothing changes: other currencies stay out', () => {
+  const o = buildAccountsOverview([acct({ name: 'Travel', balance: 1000, currency: 'EUR' })], 'USD', undefined, today)
+  assert.deepEqual(o.excludedCurrencies, ['EUR'])
+  assert.deepEqual(o.convertedCurrencies, [])
+  assert.equal(o.totals.assets, 0)
+})
+
+test('a converted loan counts its owed amount in the base currency', () => {
+  const o = buildAccountsOverview([
+    acct({ name: 'Checking', balance: 1000 }),
+    acct({ name: 'Euro loan', type: 'loan', balance: -400, currency: 'EUR' }),
+  ], 'USD', undefined, today, eurToUsd)
+  assert.equal(o.liabilities[0].owed, 400)
+  assert.equal(o.liabilities[0].convertedOwed, 440)
+  assert.equal(o.totals.liabilities, 440)
+})

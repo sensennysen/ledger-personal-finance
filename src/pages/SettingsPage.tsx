@@ -18,6 +18,7 @@ import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { ExchangeRatesCard } from '@/components/settings/ExchangeRatesCard'
 import { FormError } from '@/components/ui/form-error'
 import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -570,6 +571,8 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      <ExchangeRatesCard />
 
       {/* Customization â€” visible on mobile where BottomNav omits Categories */}
       {/* Legal */}

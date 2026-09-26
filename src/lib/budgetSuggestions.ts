@@ -1,4 +1,5 @@
 import type { BudgetSpendTx } from './budgetSpend.ts'
+import { amountInCurrency, type RateTable } from './exchangeRates.ts'
 
 // "Add from last cycle" (LED-139). A budget here is one recurring row, so there
 // is no per-cycle copy to make; what last cycle can seed is a budget for a
@@ -17,14 +18,15 @@ export function spendByCategory(
   rangeStart: string,
   rangeEnd: string,
   currency: string,
+  rates: RateTable | null = null,
 ): CategorySpend[] {
   const byCategory = new Map<string, { spent: number; unrated: Set<string> }>()
   for (const tx of txs) {
     if (!tx.category_id || tx.date < rangeStart || tx.date > rangeEnd) continue
     const entry = byCategory.get(tx.category_id) ?? { spent: 0, unrated: new Set<string>() }
-    if (tx.currency === currency) entry.spent += tx.amount
-    else if (tx.exchange_rate == null) entry.unrated.add(tx.currency)
-    else entry.spent += tx.amount * tx.exchange_rate
+    const converted = amountInCurrency(tx, currency, rates)
+    if (converted === null) entry.unrated.add(tx.currency)
+    else entry.spent += converted
     byCategory.set(tx.category_id, entry)
   }
   return [...byCategory].map(([category_id, entry]) => ({

@@ -123,3 +123,35 @@ test('a repayment matches one credit only, and only in the same direction and am
 test('an expense with no target is still matched on description as before', () => {
   assert.equal(match([row(1)], [existing('a')]).get(1)?.id, 'a')
 })
+
+// ── A statement in another currency (LED-136) ───────────────
+// The account is in PHP; the statement is in USD. Rows are stored converted, with the original kept.
+const foreignRow = (line, atRate, overrides = {}) =>
+  row(line, { amount: Math.round(10 * atRate * 100) / 100, original: { amount: 10, currency: 'USD' }, ...overrides })
+const foreignExisting = (id, storedAmount, overrides = {}) =>
+  existing(id, { amount: storedAmount, original_amount: 10, original_currency: 'USD', ...overrides })
+
+test('the same statement imported again at a different rate is still a duplicate', () => {
+  const stored = [foreignExisting('a', 560)]
+  assert.equal(match([foreignRow(1, 56)], stored).get(1)?.id, 'a', 'same rate matches on amount and original')
+  assert.equal(match([foreignRow(1, 58)], stored).get(1)?.id, 'a', 'another rate matches on the original')
+})
+
+test('a row in another currency does not match a stored original in a different currency or amount', () => {
+  const stored = [foreignExisting('a', 560)]
+  assert.equal(match([foreignRow(1, 58, { original: { amount: 10, currency: 'EUR' } })], stored).size, 0)
+  assert.equal(match([foreignRow(1, 58, { original: { amount: 11, currency: 'USD' } })], stored).size, 0)
+})
+
+test('a stored original is used once, even when it also matches on the converted amount', () => {
+  const stored = [foreignExisting('a', 560)]
+  const rows = [foreignRow(1, 56), foreignRow(2, 56)]
+  const matches = match(rows, stored)
+  assert.equal(matches.size, 1)
+  assert.equal(matches.get(1)?.id, 'a')
+})
+
+test('rows without an original still match as before, whatever the stored rows carry', () => {
+  assert.equal(match([row(1)], [existing('a')]).get(1)?.id, 'a')
+  assert.equal(match([row(1)], [foreignExisting('a', 32.8)]).get(1)?.id, 'a')
+})

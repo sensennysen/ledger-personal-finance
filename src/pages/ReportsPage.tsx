@@ -30,6 +30,8 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { converterTo } from '@/lib/exchangeRates'
 import { useCycle } from '@/contexts/cycleState'
 import { getReportRange } from '@/lib/reportCycle'
 import {
@@ -407,6 +409,8 @@ export default function ReportsPage() {
   const { profile } = useAuth()
   const deficitBehaviour = useDeficitBehaviour()
   const currency = profile?.default_currency ?? 'USD'
+  const { table: rateTable } = useExchangeRates()
+  const convertToDefault = useMemo(() => converterTo(rateTable, currency), [rateTable, currency])
 
   const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
   const { accounts, loading: accLoading, error: accError, refetch: refetchAccounts } = useAccounts()
@@ -521,7 +525,7 @@ export default function ReportsPage() {
   // ── Net Worth Over Time (last 13 months) ──
   const netWorthData = useMemo(() => {
     const now = new Date()
-    const currentNetWorth = summarizeBalances(accounts, currency).netWorth
+    const currentNetWorth = summarizeBalances(accounts, currency, convertToDefault).netWorth
     const boundaries: { date: string; label: string }[] = []
     for (let i = 12; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -546,7 +550,7 @@ export default function ReportsPage() {
       data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
     }
     return data
-  }, [accounts, allTransactionsSorted, currency])
+  }, [accounts, allTransactionsSorted, convertToDefault, currency])
 
   // ── Income vs Expenses trend (own lookback, independent of the cycle) ──
   const [lookback, setLookback] = useState<Lookback>(DEFAULT_LOOKBACK)
@@ -608,7 +612,7 @@ export default function ReportsPage() {
       </tr>
     </thead>
   )
-  const balanceSummary = summarizeBalances(activeAccounts, currency)
+  const balanceSummary = summarizeBalances(activeAccounts, currency, convertToDefault)
   const totalBalance = balanceSummary.netWorth
 
   // Sorted transactions for table (newest first)

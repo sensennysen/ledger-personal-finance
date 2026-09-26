@@ -1,5 +1,5 @@
 import { WidgetDragContext } from '@/contexts/widgetDragState'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   ChevronRight,
@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { converterTo } from '@/lib/exchangeRates'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
@@ -151,6 +153,8 @@ export default function DashboardPage() {
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
   const currencySymbol = getCurrencySymbol(currency)
+  const { table: rateTable } = useExchangeRates()
+  const convertToDefault = useMemo(() => converterTo(rateTable, currency), [rateTable, currency])
   const { accounts, loading: accountsLoading, error: accountsError, refetch: refetchAccounts, updateAccount } = useAccounts()
   const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
   const { categories } = useCategories()
@@ -183,6 +187,7 @@ export default function DashboardPage() {
     selectedMonth,
     startDay,
     baseCurrency: currency,
+    convert: convertToDefault,
   })
 
   const monthLabel = formatMonthLabel(selectedMonth)

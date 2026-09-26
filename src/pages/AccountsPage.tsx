@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Wallet, MoreHorizontal, GripVertical, ArrowUp, ArrowDown, Check, LayoutList, AlignJustify, CreditCard, Banknote } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/contexts/notificationState'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { converterTo, ratesAsOfLabel } from '@/lib/exchangeRates'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { usePreferences } from '@/hooks/usePreferences'
@@ -63,7 +65,16 @@ export default function AccountsPage() {
   const { openAddTransactionModal } = useOutletContext<AppLayoutContext>()
   const { purchases: loanPurchases, allocations: loanAllocations, error: loansError, refetch: refetchLoans } = useLoanPurchases()
   const defaultCurrency = profile?.default_currency ?? 'USD'
-  const overview = buildAccountsOverview(accounts, defaultCurrency, { purchases: loanPurchases, allocations: loanAllocations })
+  const { table: rateTable } = useExchangeRates()
+  const convertToDefault = useMemo(() => converterTo(rateTable, defaultCurrency), [rateTable, defaultCurrency])
+  const overview = buildAccountsOverview(
+    accounts,
+    defaultCurrency,
+    { purchases: loanPurchases, allocations: loanAllocations },
+    new Date(),
+    convertToDefault,
+  )
+  const ratesAsOf = ratesAsOfLabel(rateTable)
   const defaultGroupOrder = useMemo(() => Object.keys(ACCOUNT_TYPE_LABELS) as AccountType[], [])
   const accountGroupOrder = useMemo(() => {
     const valid = new Set(defaultGroupOrder)
@@ -333,9 +344,14 @@ export default function AccountsPage() {
             </>
           )}
         </div>
-        <p className="money text-right text-sm font-semibold" style={{ color: account.balance < 0 ? 'var(--destructive)' : undefined }}>
-          {formatCurrency(row.balance, account.currency)}
-        </p>
+        <div className="text-right">
+          <p className="money text-sm font-semibold" style={{ color: account.balance < 0 ? 'var(--destructive)' : undefined }}>
+            {formatCurrency(row.balance, account.currency)}
+          </p>
+          {row.converted !== null && (
+            <p className="money text-xs text-muted-foreground">≈ {formatCurrency(row.converted, defaultCurrency)}</p>
+          )}
+        </div>
         {accountMenu(account)}
       </div>
     )
@@ -369,7 +385,12 @@ export default function AccountsPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <p className="money text-base font-bold">{row.owed > 0 ? '−' : ''}{formatCurrency(row.owed, account.currency)}</p>
+            <div className="text-right">
+              <p className="money text-base font-bold">{row.owed > 0 ? '−' : ''}{formatCurrency(row.owed, account.currency)}</p>
+              {row.convertedOwed !== null && (
+                <p className="money text-xs text-muted-foreground">≈ {row.convertedOwed > 0 ? '−' : ''}{formatCurrency(row.convertedOwed, defaultCurrency)}</p>
+              )}
+            </div>
             {accountMenu(account)}
           </div>
         </div>
@@ -659,9 +680,15 @@ export default function AccountsPage() {
             <div className="col-span-2 border-b border-border/60 p-4 lg:col-span-1 lg:border-b-0 lg:border-r">
               <p className="text-xs text-muted-foreground">Net Worth</p>
               <p className="money mt-1 text-lg font-bold">{formatCurrency(overview.totals.netWorth, defaultCurrency)}</p>
-              {overview.excludedCurrencies.length > 0 && (
-                <p className="text-xs text-muted-foreground">{defaultCurrency} accounts only</p>
-              )}
+              {overview.excludedCurrencies.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {overview.convertedCurrencies.length > 0
+                    ? `Leaves out ${overview.excludedCurrencies.join(', ')}`
+                    : `${defaultCurrency} accounts only`}
+                </p>
+              ) : overview.convertedCurrencies.length > 0 ? (
+                <p className="text-xs text-muted-foreground">Includes {overview.convertedCurrencies.join(', ')} converted</p>
+              ) : null}
             </div>
             <div className="col-span-2 p-4 lg:col-span-1">
               <p className="text-xs text-muted-foreground">Coming up</p>
@@ -698,9 +725,17 @@ export default function AccountsPage() {
                   </div>
                 )}
                 {renderColumn('assets')}
+                {overview.convertedCurrencies.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Totals are in {defaultCurrency}. {overview.convertedCurrencies.join(', ')} accounts are converted
+                    {ratesAsOf ? ` at rates as of ${ratesAsOf}` : ''}.{' '}
+                    <Link to="/settings" className="underline">Exchange rates</Link>
+                  </p>
+                )}
                 {overview.excludedCurrencies.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Totals are in {defaultCurrency} and leave out {overview.excludedCurrencies.join(', ')} accounts — Ledger has no exchange rate for them.
+                    Totals are in {defaultCurrency} and leave out {overview.excludedCurrencies.join(', ')} accounts — Ledger has no exchange rate for them.{' '}
+                    <Link to="/settings" className="underline">Add a rate</Link>
                   </p>
                 )}
               </section>

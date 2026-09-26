@@ -37,6 +37,7 @@ export interface Profile {
   default_currency: string
   month_start_day: number
   budget_deficit_behaviour?: 'carry' | 'reset' | null
+  exchange_rate_refresh?: 'open' | 'daily' | 'weekly' | 'manual' | null
   dashboard_widget_order?: string[] | null
   account_group_order?: AccountType[] | null
   account_view_mode?: 'all' | AccountType | null
@@ -117,6 +118,9 @@ export interface Transaction {
   receipt_url: string | null
   tags?: string[]
   goal_id?: string | null
+  /** The statement amount and currency of a converted CSV import row (LED-136). */
+  original_amount?: number | null
+  original_currency?: string | null
   created_at: string
   updated_at: string
   // joined

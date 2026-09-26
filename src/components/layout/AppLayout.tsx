@@ -33,6 +33,7 @@ import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
 import { isSetupComplete } from '@/lib/firstRunChecklist'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { NetworkStatusProvider } from '@/contexts/NetworkStatusContext'
+import { ExchangeRatesProvider } from '@/contexts/ExchangeRatesContext'
 import {
   Dialog,
   DialogContent,
@@ -72,7 +73,9 @@ export default function AppLayout() {
     <CycleProvider>
       <NotificationProvider>
         <NetworkStatusProvider>
-          <LayoutShell />
+          <ExchangeRatesProvider>
+            <LayoutShell />
+          </ExchangeRatesProvider>
         </NetworkStatusProvider>
       </NotificationProvider>
     </CycleProvider>

@@ -1,0 +1,11 @@
+# Run a live sweep and record it so nothing is dropped
+A sweep checks a list of "not verified live" items in a real browser. Its output is one retro plus a ticket for every failure.
+**Why:** 73 retro Backlogs said "not verified live". The phase 12 sweeps (LED-124 to LED-127) checked 155 items and found 24 failures that lint, build and 666 tests had passed: a top bar clipped at 1024, an empty chart on a tab, an import dialog three times wider than a phone, and a sign-out message that was false.
+**How:**
+1. **One seeded user per sweep**, created through the admin API and deleted at the end. Give it the volume the ticket names (2,000 rows on one account, two loan accounts, a legacy loan, a receipt in storage) and a second user with nothing for the empty states. Never touch the linked remote, the real account or the older validation users in the local database.
+2. **One driver per area**, with a small library: launch Chrome, open a page, evaluate, click by text, fill a React input, screenshot, hold or block requests. Keep the drivers and screenshots in the session scratchpad. See `browser-check-with-local-user.md` for the CDP tricks.
+3. **Record every item as it is checked**, one line each: result (PASS, FAIL, NC), the ticket it belongs to, the item, the evidence. Evidence is a measured value, a database row or a quoted string, never "looks fine". A FAIL also records what was expected. An item that cannot be checked is NC with the reason.
+4. **Compile the notes into the retro** (a script that groups by result and allocates the next LED ids to FAIL rows, stable across runs). The retro has Method, Results (FAIL, PASS, Not checkable, Notes), Backlog. Do not fix a failure inside the sweep.
+5. **Turn every FAIL into a row** in the next epic's CSV with the evidence, the file to look at, a suggested fix and acceptance criteria that name the re-check. Items that need a person (a device, a screen reader, a product answer) become their own tickets.
+6. **Check the result against the environment.** A number measured on a dev server, a fast desktop CPU or a headless browser is stated as such. Say what the sweep could not see.
+7. **Status:** the sweep ticket is Done when every item has a result and every FAIL has a ticket, even though the retro has FAIL rows. The fixed ticket is Done only when its sweep item passes again.

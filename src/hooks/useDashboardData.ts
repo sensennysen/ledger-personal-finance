@@ -447,7 +447,8 @@ export function useDashboardData({
   )
 
   const expensesByCategory = useMemo<DashboardExpenseCategoryBreakdown[]>(
-    () => groupExpensesByCategory(transactions, categories, monthStart, monthEnd),
+    // Uncapped: the pie card ranks and rolls the tail into Other itself above 12 categories (LED-149).
+    () => groupExpensesByCategory(transactions, categories, monthStart, monthEnd, Infinity),
     [transactions, categories, monthStart, monthEnd]
   )
 

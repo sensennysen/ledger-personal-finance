@@ -940,8 +940,7 @@ export default function CategoriesPage() {
                   </TabsTrigger>
                 ))}
               </TabsList>
-            </Tabs>
-            <div className="mt-4 space-y-2">
+              <div className="mt-4 space-y-2">
               {columnHeader}
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="overflow-hidden rounded-lg border bg-card">
@@ -960,7 +959,8 @@ export default function CategoriesPage() {
                   </div>
                 </div>
               ))}
-            </div>
+              </div>
+            </Tabs>
           </div>
           {paneMode && (
             <aside aria-hidden className="sticky top-6 overflow-hidden rounded-lg border bg-card">

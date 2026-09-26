@@ -357,7 +357,7 @@ export function highlightParts(text: string, query: string): TextPart[] {
   return parts.length > 0 ? parts : [{ text, match: false }]
 }
 
-export type SearchGroupId = 'transactions' | 'accounts' | 'categories' | 'actions'
+export type SearchGroupId = 'transactions' | 'accounts' | 'categories' | 'saved' | 'actions'
 export type SearchChip = 'all' | SearchGroupId
 
 export interface ChipCount {
@@ -370,6 +370,7 @@ const CHIP_LABELS: Record<SearchGroupId, string> = {
   transactions: 'Transactions',
   accounts: 'Accounts',
   categories: 'Categories',
+  saved: 'Saved filters',
   actions: 'Actions',
 }
 

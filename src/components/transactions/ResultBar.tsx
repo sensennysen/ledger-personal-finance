@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, Download, Rows3 } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Bookmark, Download, Rows3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatNet } from '@/lib/formatNet'
 import type { TxSort } from '@/lib/transactionWindow'
@@ -29,6 +29,7 @@ export function ResultBar({
   density,
   onDensityChange,
   onExport,
+  savedFilters,
   compact,
 }: {
   matchCount: number
@@ -42,6 +43,8 @@ export function ResultBar({
   onDensityChange: (density: Density) => void
   /** Downloads the matching rows as CSV (29a "Export match"). */
   onExport?: () => void
+  /** Saved filters (29a): "Save filter" while a filter narrows the list, else the saved list. */
+  savedFilters?: { count: number; canSave: boolean; onOpen: () => void }
   compact: boolean
 }) {
   const nextSort: TxSort = sort === 'newest' ? 'oldest' : 'newest'
@@ -87,6 +90,18 @@ export function ResultBar({
           >
             <Rows3 className="w-3.5 h-3.5" />
             <span>Compact</span>
+          </Button>
+        )}
+        {savedFilters && (savedFilters.canSave || savedFilters.count > 0) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs text-primary"
+            onClick={savedFilters.onOpen}
+            aria-label={savedFilters.canSave ? 'Save this filter' : `Saved filters, ${savedFilters.count}`}
+          >
+            <Bookmark className="w-3.5 h-3.5" />
+            {!compact && <span>{savedFilters.canSave ? 'Save filter' : `Saved filters · ${savedFilters.count}`}</span>}
           </Button>
         )}
         {onExport && (

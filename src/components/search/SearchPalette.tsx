@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  Bookmark,
   CalendarClock,
   Landmark,
   PiggyBank,
@@ -31,6 +32,7 @@ import {
 import { InlineLoadError } from '@/components/ui/error-state'
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { useGlobalSearch } from '@/hooks/useGlobalSearch'
+import { useSavedFilters } from '@/hooks/useSavedFilters'
 import { KIND_SHORTCUTS } from '@/lib/kindMenu'
 import {
   DESTINATIONS,
@@ -44,6 +46,7 @@ import {
   type SearchChip,
   type SearchScope,
 } from '@/lib/globalSearch'
+import { activityFilterPath, describeFilter, matchSavedFilters, type SavedFilter } from '@/lib/savedFilters'
 import { cn, formatCurrency, formatDateShort } from '@/lib/utils'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import type { Transaction } from '@/types'
@@ -160,6 +163,9 @@ function SearchBody({
     scopedAccount,
   )
   const actions = results.actions as typeof ACTIONS
+  // Saved filters (29a): matched by name or description; all of them before anything is typed.
+  const savedFilters = useSavedFilters()
+  const savedMatches = matchSavedFilters(savedFilters.filters, query)
   const trimmed = query.trim()
   const isEmptyQuery = trimmed === ''
 
@@ -199,12 +205,13 @@ function SearchBody({
     : [{ id: 'text', heading: 'Transactions', group: results.text }]
 
   const transactionTotal = results.transactionTotal
-  const overallTotal = transactionTotal + results.accounts.total + results.categories.total
+  const overallTotal = transactionTotal + results.accounts.total + results.categories.total + savedMatches.length
   const anyResult = overallTotal + actionTotal > 0
   const chips = groupChips({
     transactions: transactionTotal,
     accounts: results.accounts.total,
     categories: results.categories.total,
+    saved: savedMatches.length,
     actions: actionTotal,
   })
   const chip = resolveChip(activeChip, chips)
@@ -366,6 +373,14 @@ function SearchBody({
           <InlineLoadError message={`Search data failed to load. ${error}`} onRetry={refetch} />
         </div>
       )}
+      {savedFilters.error && !savedFilters.loading && (
+        <div className="px-1 pb-1">
+          <InlineLoadError
+            message={`Saved filters failed to load. ${savedFilters.error}`}
+            onRetry={() => void savedFilters.refetch()}
+          />
+        </div>
+      )}
       <CommandList className={mobile ? 'max-h-none min-h-0 flex-1' : 'max-h-96'}>
         {loadState === 'loading' && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading…</p>
@@ -418,6 +433,13 @@ function SearchBody({
                     </div>
                     <span className="shrink-0 tabular-nums">{formatCurrency(row.amount)}</span>
                   </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {savedMatches.length > 0 && (
+              <CommandGroup heading={`Saved filters · ${savedMatches.length}`}>
+                {savedMatches.map((saved) => (
+                  <SavedFilterItem key={saved.id} saved={saved} query="" onSelect={() => go(activityFilterPath(saved.filter))} />
                 ))}
               </CommandGroup>
             )}
@@ -560,6 +582,13 @@ function SearchBody({
             )}
           </CommandGroup>
         )}
+        {showResults && !isEmptyQuery && chipShows(chip, 'saved') && savedMatches.length > 0 && (
+          <CommandGroup heading={`Saved filters · ${savedMatches.length}`}>
+            {savedMatches.map((saved) => (
+              <SavedFilterItem key={saved.id} saved={saved} query={trimmed} onSelect={() => go(activityFilterPath(saved.filter))} />
+            ))}
+          </CommandGroup>
+        )}
         {!isEmptyQuery && chipShows(chip, 'actions') && actionTotal > 0 && (
           <CommandGroup heading={`Actions · ${actionTotal}`}>
             {categoryActionRows.map((row) => (
@@ -614,6 +643,20 @@ function SearchBody({
         {isAmountQuery && <span className="basis-full sm:basis-auto">Numbers match amounts within ±5%.</span>}
       </div>
     </Command>
+  )
+}
+
+function SavedFilterItem({ saved, query, onSelect }: { saved: SavedFilter; query: string; onSelect: () => void }) {
+  return (
+    <CommandItem value={`saved-filter:${saved.id}`} onSelect={onSelect}>
+      <Tile>
+        <Bookmark className="size-4 text-muted-foreground" />
+      </Tile>
+      <span className="min-w-0 flex-1 truncate">
+        <Highlight text={saved.name} query={query} />
+      </span>
+      <span className="max-w-[50%] shrink-0 truncate text-xs text-muted-foreground">{describeFilter(saved.filter)}</span>
+    </CommandItem>
   )
 }
 

@@ -224,3 +224,7 @@ Items the retros recorded that need a product answer or a design that does not e
 | Theme leftovers | LED-32, 100, 56 retros | LED-151 |
 | Categories has no desktop screen; width caps remain | LED-33, LED-31 retros; design 8a | LED-152 |
 | QuickEntry conveniences lost with the keypad | LED-103 retro | LED-153 (OD-6) |
+
+## Phase 12 outcome
+
+The four live sweeps (LED-124 to LED-127) ran on 2026-09-26 and recorded 121 PASS, 24 FAIL and 10 not checkable. The FAILs and the backlog that needs prioritising are epic 14: `epic-14-live-sweep-findings-tasks.csv` and `epic-14-build-order.md` (28 tickets, LED-154 to LED-181).

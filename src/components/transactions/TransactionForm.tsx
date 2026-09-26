@@ -718,6 +718,15 @@ export function TransactionForm({
                 )
               }}
             />
+          ) : isCardPayment ? (
+            <div className="space-y-2">
+              <p className="text-sm leading-none font-medium">Category</p>
+              <div className="flex w-full items-center gap-2 rounded-xl border border-input bg-muted/40 py-2 pr-2 pl-2.5 text-sm">
+                <span aria-hidden="true">💳</span>
+                <span className="font-medium">Card payments</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Excluded from spending reports</p>
+            </div>
           ) : (
             <FormField
               control={form.control}

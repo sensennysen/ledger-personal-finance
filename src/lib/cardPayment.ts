@@ -150,6 +150,18 @@ export function transferCard<A extends Pick<Account, 'id' | 'type'>>(
   return target?.type === 'credit_card' ? target : null
 }
 
+/**
+ * Whether a saved transaction is a payment to a credit card. Card payments are not spending
+ * (the spending happened when the card was used), and they stay out of every spending total
+ * because those all count only `type === 'expense'` and a card payment is a transfer.
+ */
+export function isCardPaymentTransaction<A extends Pick<Account, 'id' | 'type'>>(
+  tx: Pick<CardPaymentShape, 'type' | 'to_account_id'>,
+  accounts: A[],
+): boolean {
+  return transferCard(tx, accounts) !== null
+}
+
 /** What reaches the card: the amount, converted when the paying account is in another currency. */
 export function creditedAmount(values: { amount: number; exchange_rate?: number | null }): number {
   return round2(values.amount * (values.exchange_rate ?? 1))

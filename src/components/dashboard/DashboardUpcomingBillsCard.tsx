@@ -4,7 +4,7 @@ import { formatCurrency } from '@/lib/utils'
 import type { UpcomingBill } from '@/hooks/useDashboardData'
 import { Button } from '@/components/ui/button'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
-import { Skeleton } from '@/components/ui/skeleton'
+import { SkeletonText } from '@/components/ui/skeleton'
 
 interface DashboardUpcomingBillsCardProps {
   bills: UpcomingBill[]
@@ -53,7 +53,16 @@ export function DashboardUpcomingBillsCard({
         className="mb-0 shrink-0 md:w-40"
       />
       {loading ? (
-        <div className="flex flex-1 gap-3"><Skeleton className="h-5 flex-1" /><Skeleton className="h-5 flex-1" /></div>
+        <ul className="flex min-w-0 flex-1 flex-col gap-1 md:flex-row md:flex-wrap md:gap-x-6" aria-busy="true">
+          {[0, 1, 2].map((item) => (
+            <li key={item} className="flex min-w-0 items-center gap-2 text-sm">
+              <span className="size-6 shrink-0 rounded-md bg-muted" aria-hidden />
+              <SkeletonText className="w-24" />
+              <SkeletonText className="w-14" />
+              <SkeletonText className="w-12" />
+            </li>
+          ))}
+        </ul>
       ) : bills.length === 0 ? (
         <p className="flex-1 text-sm text-muted-foreground">No upcoming bills this cycle</p>
       ) : (

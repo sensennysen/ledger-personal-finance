@@ -8,8 +8,7 @@ import type { Transaction } from '@/types'
 import { Button } from '@/components/ui/button'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Skeleton } from '@/components/ui/skeleton'
-import { DashboardTransactionRow } from '@/components/dashboard/DashboardTransactionRow'
+import { DashboardTransactionRow, DashboardTransactionRowSkeleton } from '@/components/dashboard/DashboardTransactionRow'
 
 interface DashboardRecentTransactionsCardProps {
   recentTransactions: Transaction[]
@@ -58,7 +57,7 @@ export function DashboardRecentTransactionsCard({
         )}
       />
       {loading ? (
-        <div className="space-y-3">{[...Array(4)].map((_, index) => <Skeleton key={index} className="h-11" />)}</div>
+        <div className="space-y-0.5" aria-busy="true">{[...Array(5)].map((_, index) => <DashboardTransactionRowSkeleton key={index} />)}</div>
       ) : recentTransactions.length === 0 ? (
         <EmptyState
           icon={ArrowLeftRight}

@@ -5,7 +5,7 @@ import { formatCurrency } from '@/lib/utils'
 import type { DashboardExpenseCategoryBreakdown } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
 import { InteractiveRow } from '@/components/ui/interactive-row'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { DASHBOARD_CHART_TOOLTIP_STYLE } from '@/components/dashboard/chartTooltipStyle'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 import { rollupBreakdown, type CategorySlice } from '@/lib/categoryBreakdown'
@@ -79,7 +79,23 @@ export function DashboardCategoryPieCard({
     >
       {header}
       {loading ? (
-        <Skeleton className="h-56 w-full" />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center" aria-busy="true">
+          <div className="flex h-[200px] justify-center sm:w-[50%] sm:block 2xl:h-[168px]">
+            <div className="flex h-full items-center justify-center">
+              <Skeleton className="size-[156px] rounded-full" />
+            </div>
+          </div>
+          <div className="flex-1 space-y-1.5 min-w-0">
+            {[...Array(5)].map((_, index) => (
+              <div key={index} className="flex items-center gap-2 text-sm">
+                <span className="w-2 h-2 rounded-full shrink-0 bg-muted" aria-hidden />
+                <span className="text-base leading-normal">&nbsp;</span>
+                <span className="flex-1 text-xs"><SkeletonText className="w-24" /></span>
+                <span className="text-xs"><SkeletonText className="w-14" /></span>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : expensesByCategory.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-12">No expenses for {monthLabel}</p>
       ) : (

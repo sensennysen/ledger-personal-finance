@@ -24,7 +24,7 @@ import { useFlipReorder } from '@/hooks/useFlipReorder'
 import { formatCurrency, getCurrencySymbol, getLocalDateString, cn } from '@/lib/utils'
 import { useCycle } from '@/contexts/cycleState'
 import { INCOME, EXPENSE } from '@/constants/colors'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { RefreshingRegion } from '@/components/ui/refreshing-region'
@@ -107,7 +107,10 @@ function StatCard({
       </div>
 
       {loading ? (
-        <Skeleton className="h-9 w-32" />
+        <>
+          <div className="mb-2 flex h-[1.75rem] items-center"><Skeleton className="h-6 w-32" /></div>
+          {sub !== undefined && <div className="text-[0.6875rem]"><SkeletonText className="w-24" /></div>}
+        </>
       ) : (
         <>
           <p

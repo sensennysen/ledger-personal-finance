@@ -46,7 +46,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ColorPicker } from '@/components/ui/color-picker'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -357,7 +357,14 @@ function SubcategoryPanel({
         )}
       </div>
       {loading ? (
-        <div className="space-y-1">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-8" />)}</div>
+        <div className="space-y-1" aria-busy="true">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="flex min-h-8 items-center gap-2 rounded-md px-1 py-1">
+              <span className="flex-1 pl-1 text-sm"><SkeletonText className="w-28" /></span>
+              <span className="text-xs"><SkeletonText className="w-12" /></span>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="space-y-1">
           {subcategories.map((sub, idx) => (
@@ -557,7 +564,12 @@ function CategoryPane({
         {rulesError ? (
           <p className="text-xs text-destructive">{rulesError}</p>
         ) : rulesLoading ? (
-          <Skeleton className="h-8" />
+          <ul className="space-y-1" aria-busy="true">
+            <li className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2.5 py-1.5 text-sm">
+              <SkeletonText className="w-24" />
+              <SkeletonText className="w-6" />
+            </li>
+          </ul>
         ) : own.length === 0 ? (
           <p className="text-xs text-muted-foreground">No rules assign transactions to {category.name}.</p>
         ) : (
@@ -921,7 +933,45 @@ export default function CategoriesPage() {
       {loadState === 'error' ? (
         <ErrorState title="Couldn't load your categories" description={error} detail={errorDetail} onRetry={() => void refetch()} />
       ) : loading ? (
-        <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+        <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start xl:gap-6" aria-busy="true" aria-label="Loading categories">
+          <div>
+            <Tabs value="expense">
+              <TabsList className="w-full">
+                {['Expenses', 'Income', 'Unused'].map((label) => (
+                  <TabsTrigger key={label} value={label === 'Expenses' ? 'expense' : label.toLowerCase()} disabled className="flex-1">
+                    {label}
+                    <Badge variant="secondary" className="ml-2 text-xs">…</Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <div className="mt-4 space-y-2">
+              {columnHeader}
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="overflow-hidden rounded-lg border bg-card">
+                  <div className="flex items-center gap-3 p-3">
+                    <span className="h-9 w-9 shrink-0 rounded-lg bg-muted" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium"><SkeletonText className="w-32" /></p>
+                      <div className="flex h-5 items-center"><Skeleton className="h-3 w-20 rounded-full" /></div>
+                    </div>
+                    <div className="hidden shrink-0 items-center gap-3 text-sm md:flex">
+                      {['w-24', 'w-24', 'w-16', 'w-24'].map((w, cell) => (
+                        <span key={cell} className={cn('text-right', w)}><SkeletonText className="w-10" /></span>
+                      ))}
+                    </div>
+                    <span className="hidden h-7 shrink-0 md:block md:w-16" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {paneMode && (
+            <aside aria-hidden className="sticky top-6 overflow-hidden rounded-lg border bg-card">
+              <p className="p-6 text-center text-sm"><SkeletonText className="w-48" /></p>
+            </aside>
+          )}
+        </div>
       ) : (
         <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start xl:gap-6">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'expense' | 'income' | 'unused')}>
@@ -958,7 +1008,15 @@ export default function CategoriesPage() {
           <TabsContent value="unused" className="mt-4">
             {!unusedIds ? (
               usageData.loading ? (
-                <Skeleton className="h-16" />
+                <div className="overflow-hidden rounded-lg border bg-card" aria-busy="true">
+                  <div className="flex items-center gap-3 p-3">
+                    <span className="h-9 w-9 shrink-0 rounded-lg bg-muted" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium"><SkeletonText className="w-32" /></p>
+                      <div className="flex h-5 items-center"><Skeleton className="h-3 w-20 rounded-full" /></div>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <Card><CardContent className="text-center py-8 text-sm text-muted-foreground">Usage didn't load, so unused categories can't be listed.</CardContent></Card>
               )
@@ -1036,7 +1094,9 @@ export default function CategoriesPage() {
           </DialogHeader>
           <div className="space-y-3">
             {rulesLoading ? (
-              <Skeleton className="h-10" />
+              <div className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-3 py-2" aria-busy="true">
+                <span className="text-sm"><SkeletonText className="w-40" /></span>
+              </div>
             ) : rules.length === 0 ? (
               <p className="text-sm text-muted-foreground">No rules yet. Add a rule to auto-assign categories when entering transactions.</p>
             ) : (

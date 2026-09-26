@@ -8,6 +8,7 @@ import { useNotify } from '@/contexts/notificationState'
 import { useCategories } from '@/hooks/useCategories'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
+import { useSavedFilters } from '@/hooks/useSavedFilters'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { usePreferences } from '@/hooks/usePreferences'
@@ -44,6 +45,8 @@ import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
 import { FilterTopCategories } from '@/components/transactions/FilterTopCategories'
 import { buildMonthNets } from '@/lib/monthJump'
 import { searchMatcher } from '@/lib/globalSearch'
+import { filterFromParams, isFilterActive, type ActivityFilter, type FilterType } from '@/lib/savedFilters'
+import { SavedFiltersDialog } from '@/components/transactions/SavedFiltersDialog'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
 import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
@@ -86,29 +89,47 @@ export default function TransactionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Search handoff (LED-64): "See all" from the palette arrives as ?q=. Take it
-  // while rendering, clear filters that would hide matches, then drop the param.
-  const handoffQuery = searchParams.get('q')
-  const [takenQuery, setTakenQuery] = useState<string | null>(null)
-  if (handoffQuery !== takenQuery) {
-    setTakenQuery(handoffQuery)
-    if (handoffQuery !== null) {
-      setSearch(handoffQuery)
-      setFilterType('all')
-      setActiveTagFilter(null)
+  // Search handoff (LED-64, LED-138): "See all" from the palette arrives as ?q=, and a saved
+  // filter as ?q=&type=&tag=. Take it while rendering, replacing whatever filters were set so
+  // none hides a match, then drop the params.
+  const handoffFilter = filterFromParams(searchParams)
+  const handoffKey = handoffFilter ? JSON.stringify(handoffFilter) : null
+  const [takenKey, setTakenKey] = useState<string | null>(null)
+  if (handoffKey !== takenKey) {
+    setTakenKey(handoffKey)
+    if (handoffFilter) {
+      setSearch(handoffFilter.search)
+      setFilterType(handoffFilter.type)
+      setActiveTagFilter(handoffFilter.tag)
     }
   }
   useEffect(() => {
-    if (handoffQuery === null) return
+    if (handoffKey === null) return
     setSearchParams((params) => {
       params.delete('q')
+      params.delete('type')
+      params.delete('tag')
       return params
     }, { replace: true })
-  }, [handoffQuery, setSearchParams])
+  }, [handoffKey, setSearchParams])
 
   // ── Templates ─────────────────────────────────────────────
   const { templates, addTemplate, removeTemplate } = useTransactionTemplates()
   const { accounts } = useAccounts()
+
+  // ── Saved filters (LED-138) ───────────────────────────────
+  const savedFilters = useSavedFilters()
+  const [savedFiltersOpen, setSavedFiltersOpen] = useState(false)
+  const currentFilter = useMemo<ActivityFilter>(
+    () => ({ type: filterType as FilterType, search, tag: activeTagFilter }),
+    [filterType, search, activeTagFilter]
+  )
+  const applySavedFilter = (filter: ActivityFilter) => {
+    setSearch(filter.search)
+    setFilterType(filter.type)
+    setActiveTagFilter(filter.tag)
+  }
+
   // tx pending "save as template" name input
   const [templateSourceTx, setTemplateSourceTx] = useState<Transaction | null>(null)
   const [templateName, setTemplateName] = useState('')
@@ -423,6 +444,11 @@ export default function TransactionsPage() {
       density={density}
       onDensityChange={(next) => setPref('txDensity', next)}
       onExport={exportMatch}
+      savedFilters={{
+        count: savedFilters.filters.length,
+        canSave: isFilterActive(currentFilter),
+        onOpen: () => setSavedFiltersOpen(true),
+      }}
       compact={compactList}
     />
   )
@@ -870,6 +896,22 @@ export default function TransactionsPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <SavedFiltersDialog
+          open={savedFiltersOpen}
+          onOpenChange={setSavedFiltersOpen}
+          current={currentFilter}
+          filters={savedFilters.filters}
+          loading={savedFilters.loading}
+          error={savedFilters.error}
+          errorDetail={savedFilters.errorDetail}
+          skipped={savedFilters.skipped}
+          onRetry={() => void savedFilters.refetch()}
+          onSave={(name) => savedFilters.save(name, currentFilter)}
+          onRename={savedFilters.rename}
+          onDelete={savedFilters.remove}
+          onApply={applySavedFilter}
+        />
 
         {/* Split transaction dialog */}
         {splittingTx && (

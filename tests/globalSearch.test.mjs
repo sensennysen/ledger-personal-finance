@@ -251,6 +251,16 @@ test('groupChips lists All plus the groups with results, using the true totals',
   assert.deepEqual(groupChips({ transactions: 0, accounts: 0, categories: 0, actions: 0 }), [])
 })
 
+test('groupChips gives saved filters their own chip, between categories and actions (LED-138)', () => {
+  const chips = groupChips({ transactions: 0, accounts: 0, categories: 1, saved: 2, actions: 3 })
+  assert.deepEqual(
+    chips.map((chip) => [chip.id, chip.label, chip.count]),
+    [['all', 'All', 6], ['categories', 'Categories', 1], ['saved', 'Saved filters', 2], ['actions', 'Actions', 3]],
+  )
+  assert.equal(chipShows('saved', 'saved'), true)
+  assert.equal(chipShows('transactions', 'saved'), false)
+})
+
 test('the chip totals are the capGroup totals, not the rows drawn', () => {
   const group = capGroup(Array.from({ length: 23 }, (_, i) => i))
   assert.equal(group.items.length, GROUP_CAP)

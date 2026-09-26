@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from '@/components/ui/progress'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Skeleton } from '@/components/ui/skeleton'
+import { SkeletonText } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
@@ -594,11 +594,47 @@ export default function AccountsPage() {
       {loadState === 'error' ? (
         <ErrorState title="Couldn't load your accounts" description={error} detail={errorDetail} onRetry={() => void refetch()} />
       ) : loading ? (
-        <div className="space-y-6">
-          <Skeleton className="h-24 rounded-xl" />
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Skeleton className="h-64 rounded-xl" />
-            <Skeleton className="h-64 rounded-xl" />
+        <div className="space-y-6" aria-busy="true" aria-label="Loading accounts">
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[1fr_1fr_1fr_1.4fr]">
+            {['Assets', 'Liabilities', 'Net Worth', 'Coming up'].map((label, index) => (
+              <div
+                key={label}
+                className={cn(
+                  'p-4',
+                  index < 2 && 'border-b border-border/60 lg:border-b-0',
+                  index === 0 && 'border-r',
+                  index === 2 && 'col-span-2 border-b border-border/60 lg:col-span-1 lg:border-b-0 lg:border-r',
+                  index === 3 && 'col-span-2 lg:col-span-1',
+                  index === 1 && 'lg:border-r',
+                )}
+              >
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1 text-lg"><SkeletonText className="w-24" /></p>
+                <p className="text-xs"><SkeletonText className="w-16" /></p>
+              </div>
+            ))}
+          </div>
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            {['Assets', 'Liabilities'].map((heading) => (
+              <section key={heading} className="min-w-0 space-y-3">
+                <div className="flex items-baseline justify-between">
+                  <h2 className="text-sm font-semibold">{heading}</h2>
+                  <p className="text-sm"><SkeletonText className="w-20" /></p>
+                </div>
+                <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border bg-card">
+                  {[0, 1, 2].map((row) => (
+                    <div key={row} className="flex items-center gap-2.5 px-4 py-2.5">
+                      <span className="size-8 shrink-0 rounded-lg bg-muted" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm"><SkeletonText className="w-32" /></p>
+                        <p className="text-xs"><SkeletonText className="w-20" /></p>
+                      </div>
+                      <span className="text-sm"><SkeletonText className="w-20" /></span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         </div>
       ) : accounts.length === 0 ? (

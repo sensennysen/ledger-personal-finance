@@ -40,11 +40,31 @@ function describe(month: MonthCoverage): string {
 // explain an estimate that looks low. Every bar has a text alternative and the legend
 // names the four states, so colour is never the only signal.
 export function CoverageStrip({ coverage, loading }: { coverage: MonthCoverage[]; loading: boolean }) {
+  const legend = (
+    <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      {LEGEND.map(({ status, label }) => (
+        <li key={status} className="flex items-center gap-1.5">
+          <span aria-hidden className={cn('inline-block w-3 rounded-sm', BAR[status].replace(/h-\S+/, 'h-3'))} />
+          {label}
+        </li>
+      ))}
+    </ul>
+  )
   return (
     <section aria-labelledby="coverage-heading" className="rounded-xl border border-border bg-card p-4">
       <h2 id="coverage-heading" className="text-sm font-semibold">Included by month</h2>
       {loading ? (
-        <Skeleton className="mt-3 h-16 w-full" />
+        <>
+          <ol className="mt-3 flex h-16 items-end gap-1.5" aria-busy="true">
+            {MONTH_NAMES.map((name) => (
+              <li key={name} className="flex flex-1 flex-col items-center justify-end gap-1">
+                <Skeleton className="h-8 w-full rounded-sm" />
+                <span aria-hidden className="text-[0.6875rem] text-muted-foreground">{name[0]}</span>
+              </li>
+            ))}
+          </ol>
+          {legend}
+        </>
       ) : (
         <>
           <ol className="mt-3 flex h-16 items-end gap-1.5">
@@ -60,14 +80,7 @@ export function CoverageStrip({ coverage, loading }: { coverage: MonthCoverage[]
               </li>
             ))}
           </ol>
-          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            {LEGEND.map(({ status, label }) => (
-              <li key={status} className="flex items-center gap-1.5">
-                <span aria-hidden className={cn('inline-block w-3 rounded-sm', BAR[status].replace(/h-\S+/, 'h-3'))} />
-                {label}
-              </li>
-            ))}
-          </ul>
+          {legend}
         </>
       )}
     </section>

@@ -10,7 +10,7 @@ import { resolveLoadState } from '@/lib/loadState'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Skeleton } from '@/components/ui/skeleton'
+import { SkeletonText } from '@/components/ui/skeleton'
 import { useCategories } from '@/hooks/useCategories'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -180,7 +180,25 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
         <ErrorState title="Couldn't load your financed purchases" description={error} detail={errorDetail} onRetry={() => void refetch()} />
       ) : loading ? (
         <div className="space-y-2" aria-busy="true" aria-label="Loading financed purchases">
-          {[0, 1].map((item) => <Skeleton key={item} className="h-24 rounded-xl" />)}
+          {[0, 1].map((item) => (
+            <article key={item} className="rounded-xl border bg-card p-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold"><SkeletonText className="w-32" /></h3>
+                  <div className="mt-1 text-xs"><SkeletonText className="w-40" /></div>
+                </div>
+                <div className="mr-1 text-right">
+                  <p className="text-sm font-semibold"><SkeletonText className="w-20" /></p>
+                  <p className="text-[0.6875rem]"><SkeletonText className="w-16" /></p>
+                </div>
+              </div>
+              <div className="mt-3 h-1.5 rounded-full bg-muted" />
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <SkeletonText className="w-20" />
+                <SkeletonText className="w-24" />
+              </div>
+            </article>
+          ))}
         </div>
       ) : purchases.length === 0 ? (
         <div className="rounded-xl border border-dashed px-4 py-8 text-center">

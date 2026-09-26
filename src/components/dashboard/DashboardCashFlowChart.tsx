@@ -58,7 +58,7 @@ export function DashboardCashFlowChart({
       </div>
       <div className="px-2 pb-4">
         {loading ? (
-          <Skeleton className="h-60 w-full 2xl:h-48" />
+          <Skeleton className="h-60 w-full rounded-xl 2xl:h-48" aria-busy="true" />
         ) : (
           <div className="h-60 2xl:h-48">
           <ResponsiveContainer width="100%" height="100%">

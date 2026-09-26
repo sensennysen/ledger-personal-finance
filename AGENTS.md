@@ -26,6 +26,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on push to `main`: a `verif
 - One schema and one form per entity (see `AccountForm` + `accountSchema`).
 - Access data through Supabase with RLS; never bypass it client-side.
 - Match surrounding code style; no unrelated refactors.
+- `--ease-out` in `src/index.css` shadows Tailwind's built-in `--ease-out`. Use `var(--ease-out)` (or the `animate-*` utilities); a bare `ease-out` class would also pick up the branded curve.
 
 ## Workflow (E→P→A→V)
 1. `/evaluate` — orient, check graphify (`graphify-out/`), and grep the design handoff for the ticket's screen.

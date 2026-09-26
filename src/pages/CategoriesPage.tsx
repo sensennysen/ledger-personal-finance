@@ -65,12 +65,8 @@ import type { FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
 import type { Category, Subcategory } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
+import { SWATCHES } from '@/lib/swatches'
 
-const CATEGORY_COLORS = [
-  '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
-  '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#06b6d4',
-  '#a855f7', '#f43f5e', '#84cc16', '#f59e0b', '#10b981',
-]
 const DEFAULT_CATEGORY_ICON = '\u{1F3F7}\uFE0F'
 const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
 
@@ -126,7 +122,7 @@ function CategoryForm({
     defaultValues: {
       name: '',
       type: 'expense',
-      color: CATEGORY_COLORS[0],
+      color: SWATCHES[0],
       icon: DEFAULT_CATEGORY_ICON,
       ...defaultValues,
     },
@@ -230,7 +226,7 @@ function CategoryForm({
                 <ColorPicker
                   value={field.value}
                   onChange={field.onChange}
-                  palette={CATEGORY_COLORS}
+                  palette={SWATCHES}
                 />
               </FormControl>
             </FormItem>

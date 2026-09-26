@@ -1,3 +1,5 @@
+import { SWATCHES } from '../lib/swatches.ts'
+
 export type AccountType =
   | 'cash'
   | 'digital_wallet'
@@ -255,15 +257,5 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   other: 'Other',
 }
 
-export const ACCOUNT_COLORS = [
-  '#6366f1',
-  '#8b5cf6',
-  '#ec4899',
-  '#ef4444',
-  '#f97316',
-  '#eab308',
-  '#22c55e',
-  '#14b8a6',
-  '#3b82f6',
-  '#06b6d4',
-]
+/** The shared swatch list (src/lib/swatches.ts): accounts, budgets, categories and the accent all pick from it. */
+export const ACCOUNT_COLORS: readonly string[] = SWATCHES

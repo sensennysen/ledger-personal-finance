@@ -10,6 +10,8 @@ import {
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { amountInCurrency } from '@/lib/exchangeRates'
 import { useBudgets } from '@/hooks/useBudgets'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { budgetAllowance, canRollover, nextCycleOpensAt } from '@/lib/budgetRollover'
@@ -847,12 +849,11 @@ function BudgetTransactionsDialog({
   onRetry: () => void
   periodRange: { start: string; end: string }
 }) {
-  const total = transactions.reduce((sum, tx) => {
-    const txAmount = tx.currency === budget.currency
-      ? tx.amount
-      : tx.amount * (tx.exchange_rate ?? 1)
-    return sum + txAmount
-  }, 0)
+  const { table: rateTable } = useExchangeRates()
+  const total = transactions.reduce((sum, tx) => sum + (amountInCurrency(tx, budget.currency, rateTable) ?? 0), 0)
+  const unrated = [
+    ...new Set(transactions.filter((tx) => amountInCurrency(tx, budget.currency, rateTable) === null).map((tx) => tx.currency)),
+  ].sort()
   const effective = budget.effective_amount ?? budget.amount
   const remaining = effective - total
   const loadState = resolveLoadState({ loading, error, hasData: transactions.length > 0 })
@@ -897,6 +898,9 @@ function BudgetTransactionsDialog({
             </p>
           </div>
         </div>
+        <div className="mt-2">
+          <UnratedCurrencyNotice currencies={unrated} />
+        </div>
       </div>
 
       {loadState === 'loading' ? (
@@ -914,9 +918,7 @@ function BudgetTransactionsDialog({
         <ScrollArea className="max-h-[50vh] pr-3">
           <div className="space-y-2">
             {transactions.map((tx) => {
-              const converted = tx.currency === budget.currency
-                ? tx.amount
-                : tx.amount * (tx.exchange_rate ?? 1)
+              const converted = amountInCurrency(tx, budget.currency, rateTable)
 
               return (
                 <div key={tx.id} className="rounded-lg border bg-card p-3">
@@ -929,9 +931,13 @@ function BudgetTransactionsDialog({
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-semibold text-destructive">
-                        -{formatCurrency(converted, budget.currency)}
-                      </p>
+                      {converted === null ? (
+                        <p className="text-sm font-semibold text-muted-foreground">No {tx.currency} rate</p>
+                      ) : (
+                        <p className="text-sm font-semibold text-destructive">
+                          -{formatCurrency(converted, budget.currency)}
+                        </p>
+                      )}
                       {tx.currency !== budget.currency && (
                         <p className="text-xs text-muted-foreground">
                           {formatCurrency(tx.amount, tx.currency)}
@@ -1157,6 +1163,7 @@ export default function BudgetsPage() {
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null)
 
   const defaultCurrency = profile?.default_currency ?? 'USD'
+  const { table: rateTable } = useExchangeRates()
   const selectedBudgetRange = React.useMemo(
     () => selectedBudget ? getBudgetCycleRange(selectedBudget.period, selectedMonth, startDay) : null,
     [selectedBudget, selectedMonth, startDay]
@@ -1224,7 +1231,7 @@ export default function BudgetsPage() {
   const { categories: allCategories } = useCategories()
   const [addFromLastOpen, setAddFromLastOpen] = useState(false)
   const lastCycleSpend = previousCycle
-    ? spendByCategory(previousCycle.txs, previousCycle.start, previousCycle.end, defaultCurrency)
+    ? spendByCategory(previousCycle.txs, previousCycle.start, previousCycle.end, defaultCurrency, rateTable)
     : null
   const categoryById = new Map(allCategories.map((category) => [category.id, category]))
   const suggestions = lastCycleSpend

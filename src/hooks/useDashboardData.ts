@@ -12,6 +12,7 @@ import {
   daysUntilDayOfMonth,
 } from '@/lib/creditCards'
 import { summarizeBalances } from '@/lib/accountsOverview'
+import type { ConvertFn } from '@/lib/exchangeRates'
 import { getLoanDeadlines, getPurchaseInstallments } from '@/lib/loanInstallments'
 import { formatLoanSchedule } from '@/lib/loans'
 import type { Account, Category, LoanPaymentAllocation, LoanPurchase, Transaction } from '@/types'
@@ -343,6 +344,7 @@ export function useDashboardData({
   selectedMonth,
   startDay,
   baseCurrency,
+  convert,
 }: {
   accounts: Account[]
   categories: Category[]
@@ -353,6 +355,8 @@ export function useDashboardData({
   selectedMonth: string
   startDay: number
   baseCurrency: string
+  /** Converts an amount in another currency into `baseCurrency`, or null when no rate does (LED-136). */
+  convert?: ConvertFn
 }) {
   const { start: monthStart, end: monthEnd } = useMemo(
     () => getCustomMonthRange(selectedMonth, startDay),
@@ -402,7 +406,7 @@ export function useDashboardData({
   }, [monthTransactions])
 
   const stats = useMemo<DashboardStatsSummary>(() => {
-    const balanceSummary = summarizeBalances(accounts, baseCurrency)
+    const balanceSummary = summarizeBalances(accounts, baseCurrency, convert)
     const income = sumTransactionsByType(monthTransactions, 'income')
     const expenses = sumTransactionsByType(monthTransactions, 'expense')
 
@@ -413,7 +417,7 @@ export function useDashboardData({
       expenses,
       net: income - expenses,
     }
-  }, [accounts, baseCurrency, monthTransactions])
+  }, [accounts, baseCurrency, convert, monthTransactions])
 
   const cashFlowData = useMemo<DashboardCashFlowPoint[]>(() => {
     const periods = getCashFlowPeriods(chartPeriod, selectedMonth, monthStart, monthEnd, startDay)

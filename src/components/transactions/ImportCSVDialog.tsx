@@ -32,7 +32,9 @@ import {
   type Severity,
 } from '@/lib/csvImport'
 import { suggestCategory, type Suggestion } from '@/lib/importCategories'
-import { convertAmount, currencyState, effectiveRate } from '@/lib/importCurrency'
+import { convertAmount, currencyState, effectiveRate, formatSuggestedRate, rateInputValue } from '@/lib/importCurrency'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { lookupRate, ratesAsOfLabel } from '@/lib/exchangeRates'
 import { looksLikeTransfer, transferCandidates, transferLegs } from '@/lib/importTransfer'
 import { WINDOW_STEP } from '@/lib/transactionWindow'
 import { CURRENCIES } from '@/types'
@@ -60,6 +62,8 @@ export interface ImportTx {
   description: string
   /** In the account's currency, converted when the statement's differs. */
   amount: number
+  /** The statement's own amount and currency, kept when it was converted (LED-136). */
+  original?: { amount: number; currency: string } | null
   type: 'income' | 'expense' | 'transfer'
   account_id: string
   to_account_id: string | null
@@ -143,7 +147,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   /** Categories the user chose; '' means they chose none. */
   const [picks, setPicks] = useState<Map<number, string>>(new Map())
   const [pickedCurrency, setPickedCurrency] = useState('')
-  const [rateInput, setRateInput] = useState('')
+  // null until the user types: the input then shows the exchange-rate table's rate (LED-136).
+  const [rateInput, setRateInput] = useState<string | null>(null)
   const [activeCause, setActiveCause] = useState<CauseId | null>(null)
   const [onlyProblems, setOnlyProblems] = useState(false)
   /** After a category pick: the same-payee rows it could also fill, then what was applied so it can be undone (LED-147). */
@@ -156,7 +161,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const selectedAccount = accounts.find((account) => account.id === accountId)
   const accountCurrency = selectedAccount?.currency ?? ''
   const statementCurrency = pickedCurrency || accountCurrency
-  const conversion = currencyState(statementCurrency, accountCurrency, rateInput)
+  const { table: rateTable } = useExchangeRates()
+  const tableRate = lookupRate(rateTable, statementCurrency, accountCurrency)
+  const suggestedRate = formatSuggestedRate(tableRate.kind === 'rate' ? tableRate.rate : null)
+  const rateText = rateInputValue(rateInput, suggestedRate)
+  const conversion = currencyState(statementCurrency, accountCurrency, rateText)
   const rate = effectiveRate(conversion)
   const candidates = selectedAccount ? transferCandidates(accounts, selectedAccount) : []
 
@@ -168,7 +177,15 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const dupeCheck = useImportDuplicates(accountId, span)
   // Compare in the account's currency: that's what the existing rows are in.
   const duplicates = matchDuplicates(
-    built.rows.map((row) => (row.amount === null ? row : { ...row, amount: convertAmount(row.amount, rate) })),
+    built.rows.map((row) =>
+      row.amount === null
+        ? row
+        : {
+            ...row,
+            amount: convertAmount(row.amount, rate),
+            original: conversion.kind === 'ok' ? { amount: row.amount, currency: statementCurrency } : null,
+          },
+    ),
     dupeCheck.existing,
     accountId,
   )
@@ -220,7 +237,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     setPicks(new Map())
     setDateOrderConfirmed(false)
     setPickedCurrency('')
-    setRateInput('')
+    setRateInput(null)
     setActiveCause(null)
     setOnlyProblems(false)
     setSimilarOffer(null)
@@ -363,6 +380,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         description: row.description || EMPTY_DESCRIPTION,
         amount: convertAmount(row.amount!, rate),
         currency: selectedAccount.currency,
+        original: conversion.kind === 'ok' ? { amount: row.amount!, currency: statementCurrency } : null,
       }
       const other = transfers.get(row.line)
       return other
@@ -536,16 +554,29 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                     <AlertTriangle className="w-4 h-4 shrink-0 text-warning" />
                     <span className="flex-1 min-w-48">
                       Statement is in {statementCurrency}; {selectedAccount?.name} is in {accountCurrency}. Amounts
-                      convert at the rate you enter.
+                      convert at the rate below.
+                      {rateInput === null && suggestedRate && (
+                        <span className="block text-xs text-muted-foreground">
+                          {tableRate.kind === 'rate' && tableRate.source === 'override'
+                            ? 'Filled in from your rate in Settings.'
+                            : `Filled in from the exchange-rate feed${ratesAsOfLabel(rateTable) ? `, as of ${ratesAsOfLabel(rateTable)}` : ''}.`}{' '}
+                          Change it if your bank used another.
+                        </span>
+                      )}
+                      {rateInput === null && !suggestedRate && (
+                        <span className="block text-xs text-muted-foreground">
+                          No rate found for this pair. Enter the one your bank used.
+                        </span>
+                      )}
                     </span>
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       1 {statementCurrency} =
                       <Input
                         inputMode="decimal"
-                        value={rateInput}
+                        value={rateText}
                         onChange={(event) => setRateInput(event.target.value)}
                         aria-label={`${accountCurrency} per ${statementCurrency}`}
-                        aria-invalid={needsRate && rateInput !== ''}
+                        aria-invalid={needsRate && rateText !== ''}
                         placeholder="Rate"
                         className="h-7 w-24 text-right tabular-nums"
                       />

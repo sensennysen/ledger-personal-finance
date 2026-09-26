@@ -34,7 +34,7 @@ export function useImportDuplicates(accountId: string, span: { start: string; en
         (from, to) =>
           supabase
             .from('transactions')
-            .select('id, date, amount, type, description, account_id, to_account_id, exchange_rate')
+            .select('id, date, amount, type, description, account_id, to_account_id, exchange_rate, original_amount, original_currency')
             .eq('user_id', user.id)
             .or(`account_id.eq.${accountId},to_account_id.eq.${accountId}`)
             .gte('date', span.start)

@@ -5,6 +5,7 @@ import { monthCycleRange } from '@/lib/cycleRange'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { computeOverspending, shiftMonthKey } from '@/lib/overspending'
 import type { DeficitBehaviour } from '@/lib/budgetRollover'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
 
 /**
  * The Overspending report for the selected cycle and the one before it, from one
@@ -24,6 +25,7 @@ export function useOverspendingReport({
   const behaviour: DeficitBehaviour = deficitBehaviour ?? 'carry'
   const range = monthCycleRange(month, startDay)
   const { budgets, txs, loading, error, refetch } = useOverspending(range.end)
+  const { table: rates, loading: ratesLoading } = useExchangeRates()
 
   const compute = (forMonth: string) =>
     computeOverspending({
@@ -33,14 +35,15 @@ export function useOverspendingReport({
       startDay,
       behaviour,
       rangeFor: (period) => getBudgetCycleRange(period, forMonth, startDay),
+      rates,
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `compute` only closes over the listed inputs
-  const result = useMemo(() => compute(month), [budgets, txs, month, startDay, behaviour])
+  const result = useMemo(() => compute(month), [budgets, txs, month, startDay, behaviour, rates])
   // eslint-disable-next-line react-hooks/exhaustive-deps -- as above
-  const previous = useMemo(() => compute(shiftMonthKey(month, -1)), [budgets, txs, month, startDay, behaviour])
+  const previous = useMemo(() => compute(shiftMonthKey(month, -1)), [budgets, txs, month, startDay, behaviour, rates])
 
   const state = resolveLoadState({
-    loading: loading || !deficitBehaviour,
+    loading: loading || ratesLoading || !deficitBehaviour,
     error,
     hasData: budgets.length > 0 && Boolean(deficitBehaviour),
   })

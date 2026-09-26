@@ -131,18 +131,20 @@ three kinds of gap, and each became an epic:
 
 A sweep records PASS, FAIL or "not checkable, reason" for every item. A FAIL becomes a new ticket; it is not fixed inside the sweep.
 
-## Phase 13 — Decision-gated (`Blocked`)
+## Phase 13 — Decision-gated (decided 2026-09-26)
 
-| # | Ticket | Summary | Pts | Blocked on |
+All six decisions were answered on 2026-09-26. Build order: 134, 142, 114, 138, 136 (LED-136 last: it changes totals on four screens).
+
+| # | Ticket | Summary | Pts | Decision |
 |---|---|---|---|---|
-| 45 | LED-114 | Card payments category, excluded from spending reports (migration) | 8 | OD-2 |
-| 46 | LED-134 | Widget-order default for new profiles (migration) | 2 | OD-1 |
-| 47 | LED-136 | Exchange-rate source, prefill and original amount (migration) | 8 | OD-3 |
-| 48 | LED-138 | Saved filters (migration) | 8 | OD-4 |
-| 49 | LED-142 | Data-deletion copy 24a and reading time | 2 | OD-5 |
-| 50 | LED-153 | Restore QuickEntry conveniences in the full form | 5 | OD-6 |
+| 45 | LED-114 | Card payments are not spending: shared predicate, regression test, hide the Category control (no migration) | 2 | OD-2 (b) |
+| 46 | LED-134 | Widget-order default for new profiles (migration) | 2 | OD-1 (b) |
+| 47 | LED-136 | Live exchange-rate feed with a user-set refresh frequency, prefill and original amount (migration) | 8 | OD-3 (b) |
+| 48 | LED-138 | Saved filters (migration) | 8 | OD-4 (a) |
+| 49 | LED-142 | Data-deletion copy 24a and reading time | 2 | OD-5 (a) |
+| 50 | LED-153 | Restore QuickEntry conveniences: closed, Won't Do | 0 | OD-6 (c) |
 
-Phase totals in points: 1 = 16, 2 = 6, 3 = 17, 4 = 13, 5 = 18, 6 = 12, 7 = 18, 8 = 24, 9 = 31, 10 = 25, 11 = 20, 12 = 23, 13 = 33. Sum 256.
+Phase totals in points: 1 = 16, 2 = 6, 3 = 17, 4 = 13, 5 = 18, 6 = 12, 7 = 18, 8 = 24, 9 = 31, 10 = 25, 11 = 20, 12 = 23, 13 = 22 (was 33 before the decisions: LED-114 8 to 2, LED-153 5 to 0). Sum 245.
 
 ## Decision register
 
@@ -156,6 +158,17 @@ Each row is a question only the product owner can answer. Until it is answered t
 | OD-4 | Where do saved filters live? | (a) a `saved_filters` table with RLS, works across devices; (b) local storage, per browser | (a) | LED-138 |
 | OD-5 | Who signs off the legal copy rewrite? | A named reviewer, or accept the developer's wording | You, before any edit (the text is legal text) | LED-142 |
 | OD-6 | Restore the QuickEntry conveniences the keypad sheet had? | (a) all three (last-used account, frequent-category chips, fallback description); (b) last-used account only; (c) none | (b) | LED-153 |
+
+### Answers (2026-09-26)
+
+| ID | Answer | Effect |
+|---|---|---|
+| OD-1 | (b) | LED-134 sets the new default and updates only rows that exactly equal the old default. |
+| OD-2 | (b) | No category and no migration. Card payments are already transfers (LED-146) and every spending predicate filters `type = 'expense'`, so LED-114 shrinks to a shared predicate, a regression test and hiding the Category control on the card form. |
+| OD-3 | (b), with a user-set refresh frequency | Rates come from a live feed into the existing `exchange_rates` row. The user picks how often they refresh (every open, daily, weekly, manual). Overrides win over fetched rates. |
+| OD-4 | (a) | `saved_filters` table with RLS. |
+| OD-5 | (a) | The product owner approves the wording before it is committed. |
+| OD-6 | (c) | None restored. LED-153 is closed as Won't Do. |
 
 ## Parked (no ticket yet)
 

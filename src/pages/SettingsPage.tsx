@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
+import { ChevronRight, Sun, Moon, Monitor, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
@@ -12,6 +12,7 @@ import { usePreferences, type DateFormat, type NumberLocale, type Preferences } 
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
 import { cn, formatCurrency } from '@/lib/utils'
+import { DEFAULT_ACCENT, SWATCHES } from '@/lib/swatches'
 import { deficitOutcome, type DeficitBehaviour } from '@/lib/budgetRollover'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { INCOME } from '@/constants/colors'
@@ -69,9 +70,15 @@ const ACCOUNT_VIEW_LABELS: Record<Preferences['accView'], string> = {
   flat: 'Flat Grid',
 }
 
+const THEME_CHOICES = [
+  { value: 'light', label: 'Light', Icon: Sun },
+  { value: 'dark', label: 'Dark', Icon: Moon },
+  { value: 'system', label: 'System', Icon: Monitor },
+] as const
+
 export default function SettingsPage() {
   const { user, profile, signOut, deleteAccount, refreshProfile } = useAuth()
-  const { theme, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
+  const { themePreference, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
   const { confirmCycle } = useFirstRunChecklist()
   const { prefs, set: setPref } = usePreferences()
@@ -270,32 +277,29 @@ export default function SettingsPage() {
           <div className="space-y-5">
           <div>
             <p className="text-sm font-medium mb-2 flex items-center gap-2"><Sun className="w-4 h-4" /> Colour Scheme</p>
-            <div className="flex gap-3">
-            <button
-              onClick={() => setTheme('light')}
-              className={cn(
-                'flex items-center gap-2 rounded-full border px-5 h-11 transition-all cursor-pointer',
-                theme === 'light'
-                  ? 'border-primary bg-accent'
-                  : 'border-border hover:border-primary/40 hover:bg-accent'
-              )}
-            >
-              <Sun className={cn('w-5 h-5', theme === 'light' ? 'text-primary' : 'text-muted-foreground')} />
-              <span className={cn('text-sm font-medium', theme === 'light' ? 'text-primary' : 'text-muted-foreground')}>Light</span>
-            </button>
-            <button
-              onClick={() => setTheme('dark')}
-              className={cn(
-                'flex items-center gap-2 rounded-full border px-5 h-11 transition-all cursor-pointer',
-                theme === 'dark'
-                  ? 'border-primary bg-accent'
-                  : 'border-border hover:border-primary/40 hover:bg-accent'
-              )}
-            >
-              <Moon className={cn('w-5 h-5', theme === 'dark' ? 'text-primary' : 'text-muted-foreground')} />
-              <span className={cn('text-sm font-medium', theme === 'dark' ? 'text-primary' : 'text-muted-foreground')}>Dark</span>
-            </button>
-          </div>
+            <div className="flex flex-wrap gap-3" role="group" aria-label="Colour scheme">
+              {THEME_CHOICES.map(({ value, label, Icon }) => {
+                const active = themePreference === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setTheme(value)}
+                    className={cn(
+                      'flex items-center gap-2 rounded-full border px-5 h-11 transition-all cursor-pointer',
+                      active
+                        ? 'border-primary bg-accent'
+                        : 'border-border hover:border-primary/40 hover:bg-accent'
+                    )}
+                  >
+                    <Icon className={cn('w-5 h-5', active ? 'text-primary' : 'text-muted-foreground')} />
+                    <span className={cn('text-sm font-medium', active ? 'text-primary' : 'text-muted-foreground')}>{label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">System follows your device and changes with it.</p>
           </div>
 
           <div>
@@ -325,7 +329,7 @@ export default function SettingsPage() {
             <ColorPicker
                 value={accentColor}
                 onChange={setAccentColor}
-                palette={['#55659a','#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#06b6d4']}
+                palette={[DEFAULT_ACCENT, ...SWATCHES]}
               />
             <p className="text-xs text-muted-foreground mt-2">Customizes the primary action color throughout the app.</p>
           </div>

@@ -9,7 +9,7 @@ export interface AuthError {
 const MESSAGES: Record<AuthErrorKind, string> = {
   profile: "Couldn't load your profile. Some details may be out of date.",
   session: "Couldn't check your sign-in. Reload to try again.",
-  signout: "Sign-out failed. You're still signed in on this device.",
+  signout: "Signed out on this device. We couldn't reach the server, so your session may stay open elsewhere until it expires.",
 }
 
 const ACTION_LABELS: Record<AuthErrorKind, string> = {

@@ -511,7 +511,13 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                     <Label htmlFor="import-account">Import to</Label>
                     <Select value={accountId} onValueChange={(value) => changeAccount(value ?? '')}>
                       <SelectTrigger id="import-account" className="w-full">
-                        <SelectValue placeholder="Choose an account" />
+                        <SelectValue placeholder="Choose an account">
+                          {() =>
+                            selectedAccount
+                              ? `${selectedAccount.name} (${selectedAccount.currency})`
+                              : 'Choose an account'
+                          }
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {accounts.map((account) => (

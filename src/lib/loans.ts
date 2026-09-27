@@ -25,6 +25,19 @@ export function getLoanAmountOwed(account: Account): number {
   return Math.max(0, -account.balance)
 }
 
+/**
+ * Loan accounts that still owe something: the one definition of "how many loans", shared by
+ * the search palette and the Add Transaction kind menu so the count cannot drift again
+ * (LED-156). A loan repaid to zero does not count. Pass `currency` to also restrict to one
+ * currency (the kind menu totals only the base currency, LED-135); omit it to count every
+ * loan account regardless of currency.
+ */
+export function loansOwed(accounts: Account[], currency?: string): Account[] {
+  return accounts.filter(
+    (account) => account.type === 'loan' && (currency === undefined || account.currency === currency) && getLoanAmountOwed(account) > 0,
+  )
+}
+
 export function normalizeLiabilityBalanceForStorage<T extends { type: string; balance: number }>(values: T): T {
   if ((values.type !== 'credit_card' && values.type !== 'loan') || values.balance <= 0) return values
   return { ...values, balance: -values.balance }

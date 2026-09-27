@@ -318,19 +318,6 @@ export function buildDueSoon(
   return rows.sort((a, b) => a.daysAway - b.daysAway || a.label.localeCompare(b.label))
 }
 
-// How many loan purchases still owe something, and how much in total.
-export function summarizeLoans(deadlines: DeadlineLike[]): { count: number; owed: number } {
-  const purchases = new Set<string>()
-  let owed = 0
-  for (const deadline of deadlines) {
-    for (const item of deadline.items) {
-      purchases.add(item.purchaseId)
-      owed += item.remainingAmount
-    }
-  }
-  return { count: purchases.size, owed: Math.round((owed + Number.EPSILON) * 100) / 100 }
-}
-
 export interface TextPart {
   text: string
   match: boolean

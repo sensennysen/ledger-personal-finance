@@ -33,6 +33,14 @@ test('loan repayment shows the count and total owed, pluralised', () => {
   assert.equal(two.find((i) => i.kind === 'loan-repayment').description, '2 loans · $8500.00 owed')
 })
 
+test('a repaid loan does not count, whether alone or alongside one still owed (LED-156)', () => {
+  const repaid = acct({ name: 'Old car', type: 'loan', balance: 0 })
+  const alone = kindMenuItems([cash, repaid], opts)
+  assert.equal(alone.find((i) => i.kind === 'loan-repayment').description, 'Pay down a loan from another account')
+  const mixed = kindMenuItems([cash, repaid, acct({ name: 'Phone', type: 'loan', balance: -500 })], opts)
+  assert.equal(mixed.find((i) => i.kind === 'loan-repayment').description, '1 loan · $500.00 owed')
+})
+
 test('loan and card items sit in the liabilities group after the primary kinds', () => {
   const items = kindMenuItems(
     [cash, acct({ name: 'Car', type: 'loan', balance: -100 }), acct({ name: 'Visa', type: 'credit_card', balance: -50 })],

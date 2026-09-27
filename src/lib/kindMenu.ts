@@ -1,6 +1,7 @@
 import type { Account } from '@/types'
 import type { TransactionKind } from '../components/transactions/transactionKinds.ts'
 import { summarizeBalances } from './accountsOverview.ts'
+import { loansOwed } from './loans.ts'
 
 // The add-transaction kind menu as data, so the desktop dropdown and the phone
 // bottom sheet render one list and cannot drift (LED-108, LED-109).
@@ -57,7 +58,7 @@ export function loanRepaymentDescription(
 ): string {
   // Totals only count the base currency (LED-135); a loan in another currency
   // has no rate to convert with, so it is left out of the sentence.
-  const loans = accounts.filter((account) => account.type === 'loan' && account.currency === baseCurrency)
+  const loans = loansOwed(accounts, baseCurrency)
   if (loans.length === 0) return LOAN_FALLBACK
   const { totalLoanDebt } = summarizeBalances(loans, baseCurrency)
   return `${plural(loans.length, 'loan')} · ${formatMoney(totalLoanDebt)} owed`

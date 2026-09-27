@@ -101,7 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async (): Promise<boolean> => {
-    // A failed sign-out leaves the user signed in, so local data must stay intact.
+    // supabase-js clears the local session even when the server call fails (2.116.0), so
+    // local data is cleared either way; the return value says whether the server confirmed it.
     let failure: string | null = null
     try {
       const { error } = await supabase.auth.signOut()
@@ -109,12 +110,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       failure = err instanceof Error ? err.message : String(err)
     }
-    if (failure !== null) {
-      console.error('Sign out failed:', failure)
-      setAuthError(makeAuthError('signout', failure))
-      return false
-    }
-    setAuthError(null)
 
     if (user) clearCacheByPrefix(user.id)
     clearOfflineQueue()
@@ -123,6 +118,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (receiptError) {
       console.error('Failed to clear pending receipts:', receiptError)
     }
+
+    if (failure !== null) {
+      console.error('Sign out could not reach the server:', failure)
+      setAuthError(makeAuthError('signout', failure))
+      return false
+    }
+    setAuthError(null)
     return true
   }
 

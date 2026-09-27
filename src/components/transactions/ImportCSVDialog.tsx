@@ -421,7 +421,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         onOpenChange(isOpen)
       }}
     >
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] grid-cols-[minmax(0,1fr)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-4 h-4" />

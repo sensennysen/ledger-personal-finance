@@ -51,3 +51,16 @@ test('entry detail below lg is its own sheet, not the add/edit modal', () => {
   const dialog = layout.slice(layout.indexOf("open={sheet === 'add' || sheet === 'account'}"))
   assert.doesNotMatch(dialog, /<EntryDetail/)
 })
+
+test('desktop header stays icon-only until xl so its tools fit at 1024 to 1279 (LED-154)', () => {
+  const top = read('components/layout/TopBar.tsx')
+  // The desktop header is the one above the `md:hidden` mobile header.
+  const desktop = top.slice(top.indexOf('<header className="hidden md:flex'), top.indexOf('<header className="md:hidden'))
+  assert.ok(desktop.length > 0)
+  // Tab labels, the wordmark and the 240px search field made the row 1168px wide at
+  // lg (1024), pushing the theme toggle, Settings and the account menu off-screen.
+  assert.doesNotMatch(desktop, /\blg:(?:not-sr-only|inline|block|w-60|px-4|px-3\.5|justify-start)/)
+  assert.match(desktop, /sr-only xl:not-sr-only/)
+  assert.match(desktop, /hidden xl:inline/)
+  assert.match(desktop, /xl:w-60/)
+})

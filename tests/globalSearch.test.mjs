@@ -14,7 +14,6 @@ import {
   buildHandoff,
   DESTINATIONS,
   buildDueSoon,
-  summarizeLoans,
   highlightParts,
   groupChips,
   resolveChip,
@@ -357,11 +356,3 @@ test('buildDueSoon is empty with no deadlines and crosses month ends', () => {
   assert.equal(buildDueSoon([deadline('2026-10-02', ['a', 'Car', 1])], '2026-09-30')[0].daysAway, 2)
 })
 
-test('summarizeLoans counts distinct purchases and totals what is owed', () => {
-  const summary = summarizeLoans([
-    deadline('2026-09-20', ['a', 'Car', 100.1], ['b', 'Phone', 50.2]),
-    deadline('2026-10-20', ['a', 'Car', 100.1]),
-  ])
-  assert.deepEqual(summary, { count: 2, owed: 250.4 })
-  assert.deepEqual(summarizeLoans([]), { count: 0, owed: 0 })
-})

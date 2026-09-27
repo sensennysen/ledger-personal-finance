@@ -8,6 +8,8 @@ import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { getCustomMonthRange } from '@/lib/utils'
 import { resolveLoadState } from '@/lib/loadState'
 import { sumByCurrency } from '@/lib/transactionWindow'
+import { getLoanAmountOwed, loansOwed } from '@/lib/loans'
+import { roundMoney } from '@/lib/loanInstallments'
 import {
   buildDueSoon,
   buildHandoff,
@@ -20,7 +22,6 @@ import {
   searchMatcher,
   searchNamed,
   searchTransactions,
-  summarizeLoans,
   type SearchAction,
   type SearchScope,
 } from '@/lib/globalSearch'
@@ -104,7 +105,16 @@ export function useGlobalSearch(
       accountId: accountByPurchase.get(row.purchaseId) ?? null,
     }))
   }, [deadlines, loans.purchases])
-  const loanSummary = useMemo(() => summarizeLoans(deadlines), [deadlines])
+  // The count is loan accounts that still owe something, the same definition the Add
+  // Transaction kind menu uses (LED-156), not distinct purchases: a loan can hold several
+  // purchases and still be one loan to pay down.
+  const loanSummary = useMemo(() => {
+    const owedAccounts = loansOwed(accounts.accounts)
+    return {
+      count: owedAccounts.length,
+      owed: roundMoney(owedAccounts.reduce((sum, account) => sum + getLoanAmountOwed(account), 0)),
+    }
+  }, [accounts.accounts])
 
   const error = transactions.error ?? accounts.error ?? categories.error ?? loans.error ?? budgets.error
   const loadState = resolveLoadState({

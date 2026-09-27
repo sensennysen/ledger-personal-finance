@@ -17,12 +17,13 @@ interface DashboardUpcomingBillsCardProps {
 }
 
 function getUpcomingBillDayColor(daysUntil: number) {
-  if (daysUntil === 0) return EXPENSE
+  if (daysUntil <= 0) return EXPENSE
   if (daysUntil <= 3) return WARNING_INK
   return 'var(--muted-foreground)'
 }
 
 function formatDaysUntil(daysUntil: number) {
+  if (daysUntil < 0) return daysUntil === -1 ? '1 day overdue' : `${-daysUntil} days overdue`
   if (daysUntil === 0) return 'today'
   if (daysUntil === 1) return 'tomorrow'
   return `in ${daysUntil} days`

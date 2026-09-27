@@ -19,9 +19,9 @@ Bars are for 12 months, 30 days, YTD and 90 days. The Overview chart at 390 is 3
 ## Acceptance
 - (a) Bars and axes for 30 days, 90 days, YTD and 12 months at 1280 and 390: PASS (bar counts above; 390 Analytics screenshot checked).
 - (b) Container at least 240px: PASS (288 at 1280, 240 at 390).
-- (c) Selection shared with Overview: PASS by code (both cards take the same `lookback` state); not clicked across tabs.
+- (c) Selection shared with Overview: PASS live (validate): 30 days set on Overview read `30d` on Analytics, and YTD set on Analytics read `ytd` on Overview.
 - (d) No chart card measures 0 height: PASS for both Reports tabs at 1280 and 390 (every `.recharts-responsive-container`).
 
 ## Backlog
 - Only Reports was swept for 0-height charts; other pages' charts were not re-measured.
-- Dark theme not re-screenshotted (no colour change).
+- Dark theme: the Analytics chart measured 288px with 18 bars (validate); not screenshotted.

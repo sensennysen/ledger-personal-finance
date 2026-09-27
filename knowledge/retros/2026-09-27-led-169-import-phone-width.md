@@ -21,5 +21,5 @@ Dialog `scrollWidth / clientWidth`:
 - (d) 768 and 1280 unchanged: PASS (identical numbers).
 
 ## Backlog
-- Not tried: a 320px viewport, landscape phones, and a CSV with a very long single description.
+- 320px was measured in validate: dialog 284/284, both selects inside it, nothing wider than the dialog. Not tried: landscape phones, and a CSV with a very long single description.
 - The 390 "Import 153 rows" measurement returned a `top` of 3461 (scroll position after `scrollIntoView`); horizontal position was inside the dialog. Not chased.

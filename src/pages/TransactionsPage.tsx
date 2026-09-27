@@ -302,15 +302,17 @@ export default function TransactionsPage() {
     setEditingTx(null)
   }
 
-  const handleDelete = async (id: string) => {
+  // useCallback (LED-164): stable across a scroll/window-growth render so a
+  // memoised TransactionRow's onDelete prop doesn't change identity every render.
+  const handleDelete = useCallback(async function attempt(id: string) {
     const snapshot = transactions.find((t) => t.id === id)
     const { error } = await deleteTransaction(id)
     if (error) {
-      announceDeleteFailed("Couldn't delete that transaction", () => void handleDelete(id))
+      announceDeleteFailed("Couldn't delete that transaction", () => void attempt(id))
       return
     }
     if (snapshot) announceDeleted([snapshot], `"${snapshot.description}" deleted`)
-  }
+  }, [transactions, deleteTransaction, announceDeleteFailed, announceDeleted])
 
   const deleteMany = async (ids: string[], snapshots: Transaction[]) => {
     const label = `${ids.length} transaction${ids.length !== 1 ? 's' : ''}`
@@ -340,14 +342,16 @@ export default function TransactionsPage() {
     setRecategorizeCategoryId(UNCATEGORIZED_VALUE)
   }
 
-  const toggleSelect = (id: string) => {
+  // useCallback (LED-164): stable across a scroll/window-growth render so a
+  // memoised TransactionRow's onSelect prop doesn't change identity every render.
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }
+  }, [])
 
   const selectAll = () => setSelectedIds(new Set(filtered.map((t) => t.id)))
   const deselectAll = () => setSelectedIds(new Set())
@@ -412,6 +416,13 @@ export default function TransactionsPage() {
 
   // ── Render ─────────────────────────────────────────────────
 
+  // useCallback (LED-164): stable across a scroll/window-growth render so a
+  // memoised TransactionRow's onSaveTemplate prop doesn't change identity every render.
+  const handleSaveTemplate = useCallback((t: Transaction) => {
+    setTemplateSourceTx(t)
+    setTemplateName(t.description)
+  }, [])
+
   const renderRow = (tx: Transaction) => (
     <TransactionRow
       key={tx.id}
@@ -419,7 +430,7 @@ export default function TransactionsPage() {
       onEdit={setEditingTx}
       onDelete={handleDelete}
       onSplit={setSplittingTx}
-      onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
+      onSaveTemplate={handleSaveTemplate}
       selectable={selectMode}
       selected={selectedIds.has(tx.id)}
       onSelect={toggleSelect}

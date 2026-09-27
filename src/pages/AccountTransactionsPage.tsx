@@ -292,16 +292,18 @@ export default function AccountTransactionsPage() {
     setEditingTx(null)
   }
 
-  const handleDelete = async (id: string) => {
+  // useCallback (LED-164): stable across a scroll/window-growth render so a
+  // memoised TransactionRow's onDelete prop doesn't change identity every render.
+  const handleDelete = useCallback(async function attempt(id: string) {
     const snapshot = transactions.find((t) => t.id === id)
     const { error } = await deleteTransaction(id)
     if (error) {
-      announceDeleteFailed("Couldn't delete that transaction", () => void handleDelete(id))
+      announceDeleteFailed("Couldn't delete that transaction", () => void attempt(id))
       return
     }
     refetchAccounts()
     if (snapshot) announceDeleted([snapshot], `"${snapshot.description}" deleted`)
-  }
+  }, [transactions, deleteTransaction, refetchAccounts, announceDeleteFailed, announceDeleted])
 
   useEffect(() => {
     const fetchPaymentHistory = async () => {

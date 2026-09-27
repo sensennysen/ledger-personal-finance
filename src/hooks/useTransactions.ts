@@ -214,7 +214,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return toResult(error, { action: 'save', entity: 'transaction' })
   }
 
-  const deleteTransaction = async (id: string): Promise<MutationResult & { queued?: boolean }> => {
+  // useCallback (stable across a scroll/window-growth render) so a memoised
+  // TransactionRow's onDelete prop doesn't change identity every render.
+  const deleteTransaction = useCallback(async (id: string): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const existing = transactions.find((t) => t.id === id)
@@ -231,7 +233,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       notifyLoanPurchasesRefresh()
     }
     return toResult(error, { action: 'delete', entity: 'transaction' })
-  }
+  }, [user, transactions, updateTransactionCache, optimisticAccountDelta, fetch])
 
   /** Splits one transaction into lines in a single database call: every line is written and the original removed, or nothing changes. */
   const splitTransaction = async (id: string, splits: SplitRpcLine[]): Promise<MutationResult> => {

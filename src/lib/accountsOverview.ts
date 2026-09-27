@@ -154,7 +154,11 @@ export function buildAccountsOverview(
   const liabilityAccounts = accounts.filter(isLiability)
 
   const baseBalance = (account: Account) => (inBase.get(account.id) as Account).balance
-  const totalAssets = roundMoney(
+  // The Assets tile is the real sum, so an overdrawn asset lowers it and Assets - Liabilities
+  // still equals Net Worth (LED-172). Shares stay percentages of the positive total, so an
+  // overdrawn row (share 0%) does not shrink every other row's share.
+  const totalAssets = roundMoney(assetAccounts.filter(counted).reduce((sum, account) => sum + baseBalance(account), 0))
+  const positiveAssets = roundMoney(
     assetAccounts.filter(counted).reduce((sum, account) => sum + Math.max(0, baseBalance(account)), 0),
   )
   const assets = assetAccounts.map((account) => ({
@@ -162,7 +166,7 @@ export function buildAccountsOverview(
     balance: account.balance,
     converted: convertedBalance(account),
     excluded: !counted(account),
-    sharePct: counted(account) && totalAssets > 0 ? (Math.max(0, baseBalance(account)) / totalAssets) * 100 : counted(account) ? 0 : null,
+    sharePct: counted(account) && positiveAssets > 0 ? (Math.max(0, baseBalance(account)) / positiveAssets) * 100 : counted(account) ? 0 : null,
   }))
 
   const comingUp: ComingUpItem[] = []

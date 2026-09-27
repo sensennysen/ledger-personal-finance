@@ -13,8 +13,7 @@ import {
 } from '@/lib/creditCards'
 import { summarizeBalances } from '@/lib/accountsOverview'
 import type { ConvertFn } from '@/lib/exchangeRates'
-import { getLoanDeadlines, getPurchaseInstallments } from '@/lib/loanInstallments'
-import { formatLoanSchedule } from '@/lib/loans'
+import { buildUpcomingLoanBills } from '@/lib/loanInstallments'
 import type { Account, Category, LoanPaymentAllocation, LoanPurchase, Transaction } from '@/types'
 
 export type DashboardChartPeriod = 'week' | 'month' | 'quarterly' | 'yearly'
@@ -226,71 +225,6 @@ function buildUpcomingBills(
   return bills.sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
 }
 
-function buildUpcomingLoanBills(
-  accounts: Account[],
-  purchases: LoanPurchase[],
-  allocations: LoanPaymentAllocation[],
-  cycleStart: Date,
-  cycleEnd: Date,
-  floor: Date,
-  isCurrentMonth: boolean,
-  today: Date,
-): UpcomingBill[] {
-  const bills: UpcomingBill[] = []
-  const dateIsInCycle = (date: string) => {
-    const value = createDateAtLocalMidnight(date)
-    return value >= cycleStart && value <= cycleEnd && value >= floor
-  }
-
-  for (const account of accounts) {
-    if (account.type !== 'loan') continue
-    const accountPurchases = purchases.filter((purchase) => purchase.account_id === account.id)
-    if (accountPurchases.length === 0) continue
-
-    if (account.loan_pay_period) {
-      const nextDeadline = getLoanDeadlines(accountPurchases, allocations).find((deadline) => dateIsInCycle(deadline.dueDate))
-      if (!nextDeadline) continue
-      const nextDue = createDateAtLocalMidnight(nextDeadline.dueDate)
-      bills.push({
-        key: `loan-account:${account.id}:${nextDeadline.dueDate}`,
-        source: 'loan',
-        title: account.name,
-        icon: account.icon,
-        color: account.color,
-        amount: nextDeadline.total,
-        currency: account.currency,
-        detail: formatLoanSchedule(account),
-        nextDue,
-        daysUntil: isCurrentMonth ? Math.round((nextDue.getTime() - today.getTime()) / 86400000) : null,
-        payment: { accountId: account.id, amount: nextDeadline.total, date: nextDeadline.dueDate },
-      })
-      continue
-    }
-
-    for (const purchase of accountPurchases) {
-      const nextInstallment = getPurchaseInstallments(purchase, allocations)
-        .find((installment) => installment.remainingAmount > 0 && dateIsInCycle(installment.dueDate))
-      if (!nextInstallment) continue
-      const nextDue = createDateAtLocalMidnight(nextInstallment.dueDate)
-      bills.push({
-        key: `loan-purchase:${purchase.id}:${nextInstallment.dueDate}`,
-        source: 'loan',
-        title: purchase.name,
-        icon: purchase.category?.icon ?? account.icon,
-        color: purchase.category?.color ?? account.color,
-        amount: nextInstallment.remainingAmount,
-        currency: account.currency,
-        detail: account.name,
-        nextDue,
-        daysUntil: isCurrentMonth ? Math.round((nextDue.getTime() - today.getTime()) / 86400000) : null,
-        payment: { accountId: account.id, amount: nextInstallment.remainingAmount, date: nextInstallment.dueDate },
-      })
-    }
-  }
-
-  return bills
-}
-
 function buildCashFlowForecast(
   recurringSeries: RecurringSeriesItem[],
   cycleStart: Date,
@@ -492,7 +426,6 @@ export function useDashboardData({
       loanAllocations,
       cycleStart,
       cycleEnd,
-      floor,
       isCurrentMonth,
       today,
     )

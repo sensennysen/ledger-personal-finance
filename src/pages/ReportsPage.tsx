@@ -349,9 +349,12 @@ function IncomeExpenseCard({
         </select>
       </div>
   {loading ? (
-        <div className="flex-1 min-h-52 lg:min-h-72"><Skeleton className="h-full w-full rounded-lg" /></div>
+        <div className="relative flex-1 min-h-60 lg:min-h-72"><Skeleton className="absolute inset-0 rounded-lg" /></div>
       ) : (
-        <div className="flex-1 min-h-52 lg:min-h-72">
+        // The chart fills an absolutely placed box: a percentage height has no parent to
+        // resolve against in Analytics' flex column, which measured 0px (LED-168).
+        <div className="relative flex-1 min-h-60 lg:min-h-72">
+          <div className="absolute inset-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -383,6 +386,7 @@ function IncomeExpenseCard({
               <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
       )}
     </div>

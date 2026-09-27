@@ -94,6 +94,23 @@ test('an overdrawn asset lowers net worth, and Accounts agrees with Home and Rep
   assert.deepEqual(overview.excludedCurrencies, summary.excludedCurrencies)
 })
 
+test('an overdrawn asset: the Assets tile is the real sum and still equals Assets - Liabilities = Net Worth (LED-172)', () => {
+  const accounts = [
+    acct({ name: 'Checking', balance: 1000 }),
+    acct({ name: 'Cash Wallet', balance: -200 }),
+    acct({ name: 'Visa', type: 'credit_card', balance: -300, credit_limit: 1000 }),
+  ]
+  const o = buildAccountsOverview(accounts, 'USD', undefined, today)
+  assert.equal(o.totals.assets, 800)
+  assert.equal(o.totals.liabilities, 300)
+  assert.equal(o.totals.assets - o.totals.liabilities, o.totals.netWorth)
+  // The overdrawn row's share stays 0%, and the positive rows still sum their shares to 100%.
+  const wallet = o.assets.find((r) => r.account.name === 'Cash Wallet')
+  assert.equal(wallet.sharePct, 0)
+  const positiveShareSum = o.assets.filter((r) => r.sharePct !== null && r.sharePct > 0).reduce((sum, r) => sum + r.sharePct, 0)
+  assert.equal(positiveShareSum, 100)
+})
+
 test('net worth is rounded to cents', () => {
   const s = summarizeBalances([acct({ name: 'A', balance: 0.1 }), acct({ name: 'B', balance: 0.2 })], 'USD')
   assert.equal(s.netWorth, 0.3)

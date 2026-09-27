@@ -1,5 +1,5 @@
 import { useEntryDetail } from '@/contexts/EntryContext'
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal, Clock } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
@@ -46,7 +46,10 @@ interface TransactionRowProps {
   dense?: boolean
 }
 
-export function TransactionRow({
+// Memoised (LED-164): a load step in the windowed list only mounts new rows,
+// so an already-rendered row must not re-render when the props callers pass
+// it are unchanged (tx, and stable callbacks — see the callers' useCallback wraps).
+function TransactionRowImpl({
   tx,
   onEdit,
   onDelete,
@@ -309,3 +312,5 @@ export function TransactionRow({
     </div>
   )
 }
+
+export const TransactionRow = memo(TransactionRowImpl)

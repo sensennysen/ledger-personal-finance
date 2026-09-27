@@ -1,3 +1,5 @@
+import { EMPTY_DESCRIPTION } from './csvImport.ts'
+
 // Import duplicate detection (LED-73): a CSV row that matches a transaction
 // already in the account on date + amount + type + normalised description is
 // flagged before the write, so a re-imported or overlapping statement doesn't
@@ -124,11 +126,14 @@ export function matchDuplicates<T extends ImportCandidate>(
   const matches = new Map<number, ExistingTx>()
   for (const row of rows) {
     if (row.date === null || row.amount === null || row.type === null) continue
+    // A description-less row is saved as EMPTY_DESCRIPTION (ImportCSVDialog), so it must be
+    // matched on that same text, not the empty string the file actually has (LED-171).
+    const description = row.description || EMPTY_DESCRIPTION
     const match =
       (row.original
-        ? take(originals.get(originalKey(row.date, row.original.amount, row.original.currency, row.type, row.description)))
+        ? take(originals.get(originalKey(row.date, row.original.amount, row.original.currency, row.type, description)))
         : undefined) ??
-      take(buckets.get(matchKey(row.date, row.amount, row.type, row.description))) ??
+      take(buckets.get(matchKey(row.date, row.amount, row.type, description))) ??
       take(transfers.get(transferKey(row.date, row.amount, row.type)))
     if (match) matches.set(row.line, match)
   }

@@ -55,7 +55,7 @@ export function QueueReviewSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md">
+      <SheetContent side="right" className="data-[side=right]:w-full">
         <SheetHeader>
           <SheetTitle>Waiting to sync</SheetTitle>
           <SheetDescription>
@@ -70,7 +70,7 @@ export function QueueReviewSheet({
           {items.map((item) => {
             const Icon = item.status ? AlertTriangle : item.operation === 'insert' ? Plus : Pencil
             return (
-              <li key={item.id} className="flex items-center gap-3 border-t py-3">
+              <li key={item.id} className="flex items-center gap-3 border-t py-3 max-sm:flex-wrap max-sm:gap-y-2">
                 <span
                   className="flex size-8 shrink-0 items-center justify-center rounded-lg"
                   style={
@@ -81,7 +81,7 @@ export function QueueReviewSheet({
                 >
                   <Icon className="size-4" />
                 </span>
-                <span className="min-w-0 flex-1">
+                <span className="min-w-0 flex-1 max-sm:basis-[calc(100%-2.75rem)]">
                   <span className="block truncate text-sm font-medium">{itemTitle(item)}</span>
                   <span className="block text-xs text-muted-foreground">
                     {itemNote(item)} · {age(item.timestamp)}
@@ -96,7 +96,7 @@ export function QueueReviewSheet({
                   ))}
                 </span>
                 {item.status === 'failed' && (
-                  <span className="flex shrink-0 gap-2">
+                  <span className="flex shrink-0 gap-2 max-sm:ml-11">
                     <Button size="sm" variant="outline" disabled={isSyncing} onClick={() => resolve(item.id, 'theirs')}>
                       Discard
                     </Button>
@@ -106,7 +106,7 @@ export function QueueReviewSheet({
                   </span>
                 )}
                 {item.status && item.status !== 'failed' && (
-                  <span className="flex shrink-0 gap-2">
+                  <span className="flex shrink-0 gap-2 max-sm:ml-11">
                     <Button size="sm" variant="outline" disabled={isSyncing} onClick={() => resolve(item.id, 'theirs')}>
                       {canKeepMine(item) ? 'Keep theirs' : 'Discard'}
                     </Button>
@@ -126,10 +126,10 @@ export function QueueReviewSheet({
           <p className="text-xs text-muted-foreground">
             Queued items that wait more than 30 days need your review before they sync.
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
-              className="flex-1"
+              className="min-w-fit flex-1"
               disabled={isSyncing || flaggedCount === 0}
               onClick={async () => {
                 await keepTheirs()
@@ -138,7 +138,7 @@ export function QueueReviewSheet({
             >
               <Trash2 className="size-4" /> Discard flagged
             </Button>
-            <Button className="flex-1" disabled={isSyncing || pendingCount === 0} onClick={() => syncNow()}>
+            <Button className="min-w-fit flex-1" disabled={isSyncing || pendingCount === 0} onClick={() => syncNow()}>
               <RefreshCw className="size-4" /> Sync now
             </Button>
           </div>

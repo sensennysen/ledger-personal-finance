@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normaliseDescription, matchDuplicates, duplicateSpan } from '../src/lib/importDuplicates.ts'
+import { EMPTY_DESCRIPTION } from '../src/lib/csvImport.ts'
 
 const row = (line, overrides = {}) => ({
   line,
@@ -118,6 +119,11 @@ test('a repayment matches one credit only, and only in the same direction and am
   assert.deepEqual([...matchDuplicates(twice, [repayment], 'loan').keys()], [1])
   assert.equal(matchDuplicates([row(1, { date: '2026-09-29', amount: 900, type: 'income' })], [repayment], 'loan').size, 0)
   assert.equal(matchDuplicates([row(1, { date: '2026-09-29', amount: 1000, type: 'expense' })], [repayment], 'loan').size, 0)
+})
+
+test('a description-less row is still a duplicate on re-import, matched against its saved EMPTY_DESCRIPTION (LED-171)', () => {
+  const saved = existing('a', { description: EMPTY_DESCRIPTION })
+  assert.equal(match([row(1, { description: '' })], [saved]).get(1)?.id, 'a')
 })
 
 test('an expense with no target is still matched on description as before', () => {

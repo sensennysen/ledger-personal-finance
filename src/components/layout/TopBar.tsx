@@ -84,7 +84,7 @@ export function TopBar({
       <NavLink to="/" tabIndex={-1} aria-label="Ledger home" className="flex items-center gap-2.5 shrink-0">
         <LedgerMark decorative className="size-8 text-foreground" />
         <span
-          className="hidden lg:inline text-sm font-semibold tracking-[0.08em] uppercase text-foreground/80"
+          className="hidden xl:inline text-sm font-semibold tracking-[0.08em] uppercase text-foreground/80"
           style={{ fontFamily: '"Roboto", sans-serif' }}
         >
           Ledger
@@ -112,7 +112,7 @@ export function TopBar({
               tabIndex={index === tabStop ? 0 : -1}
               title={locked ? `${tab.label} (finish setup to unlock)` : tab.label}
               className={cn(
-                'flex h-10 items-center gap-2 rounded-full px-3 lg:px-4 text-[0.8125rem] font-medium transition-colors press-scale focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
+                'flex h-10 items-center gap-2 rounded-full px-3 xl:px-4 text-[0.8125rem] font-medium transition-colors press-scale focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
                 locked
                   ? 'text-muted-foreground hover:text-foreground hover:bg-foreground/4'
                   : active
@@ -121,7 +121,7 @@ export function TopBar({
               )}
             >
               <Icon className="size-4 shrink-0" />
-              <span className="sr-only lg:not-sr-only">{tab.label}</span>
+              <span className="sr-only xl:not-sr-only">{tab.label}</span>
             </NavLink>
           )
         })}
@@ -132,11 +132,11 @@ export function TopBar({
         type="button"
         onClick={onSearch}
         aria-label="Search"
-        className="flex h-10 w-10 lg:w-60 items-center justify-center lg:justify-start gap-2.5 rounded-full border border-border bg-background lg:px-3.5 text-[0.8125rem] text-muted-foreground hover:bg-muted"
+        className="flex h-10 w-10 xl:w-60 items-center justify-center xl:justify-start gap-2.5 rounded-full border border-border bg-background xl:px-3.5 text-[0.8125rem] text-muted-foreground hover:bg-muted"
       >
         <Search className="size-4" />
-        <span className="hidden lg:block flex-1 text-left">Search…</span>
-        <kbd className="hidden lg:block rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold">
+        <span className="hidden xl:block flex-1 text-left">Search…</span>
+        <kbd className="hidden xl:block rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold">
           ⌘K
         </kbd>
       </button>

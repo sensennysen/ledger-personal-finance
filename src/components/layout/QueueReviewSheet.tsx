@@ -1,7 +1,8 @@
 import { AlertTriangle, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import type { useNetworkStatus } from '@/hooks/useNetworkStatus'
-import { keepTheirs, listQueue, type QueueItem } from '@/lib/offlineQueue'
-import { MAX_ATTEMPTS, canKeepMine, describeConflict } from '@/lib/queueState'
+import { keepTheirs, listQueue } from '@/lib/offlineQueue'
+import { canKeepMine, describeConflict } from '@/lib/queueState'
+import { itemTitle, itemNote } from '@/lib/queueItemTitle'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -11,24 +12,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-
-const OPERATION_LABEL = { insert: 'New', update: 'Edit', delete: 'Delete' } as const
-
-function itemTitle(item: QueueItem) {
-  const p = item.payload
-  const name = p.description ?? p.name ?? p.title
-  return typeof name === 'string' && name ? name : item.table.replace(/_/g, ' ')
-}
-
-function itemNote(item: QueueItem) {
-  if (item.status === 'conflict') {
-    if (item.conflictKind === 'deleted') return 'Deleted on another device since you queued this'
-    return `Edited on another device since you queued this${item.operation === 'delete' ? ' delete' : ''}`
-  }
-  if (item.status === 'failed') return `Couldn't save after ${MAX_ATTEMPTS} tries${item.lastError ? `: ${item.lastError}` : ''}`
-  if (item.status === 'expired') return 'Waited more than 30 days to sync'
-  return `${OPERATION_LABEL[item.operation]} · ${item.table.replace(/_/g, ' ')}`
-}
 
 const fieldLabel = (field: string) => field.replace(/_/g, ' ')
 const showValue = (value: unknown) =>

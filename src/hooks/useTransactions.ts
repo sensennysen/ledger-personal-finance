@@ -208,7 +208,16 @@ export function useTransactions(filters: TransactionFilters = {}) {
           applyTxDelta(reverseTxDelta(accounts, existing), merged)
         )
       }
-      enqueue({ table: 'transactions', operation: 'update', payload: values as Record<string, unknown>, rowId: id, userId: user.id })
+      enqueue({
+        table: 'transactions',
+        operation: 'update',
+        payload: values as Record<string, unknown>,
+        rowId: id,
+        userId: user.id,
+        // The edit may not touch description (e.g. a category-only change), so
+        // the queue sheet title still has a name to show (LED-160).
+        label: existing?.description,
+      })
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').update(values).eq('id', id).eq('user_id', user.id)
@@ -229,7 +238,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
         updateTransactionCache(transactions.filter((t) => t.id !== id))
         optimisticAccountDelta((accounts) => reverseTxDelta(accounts, existing))
       }
-      enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: id, userId: user.id })
+      enqueue({
+        table: 'transactions',
+        operation: 'delete',
+        payload: {},
+        rowId: id,
+        userId: user.id,
+        // A delete's payload carries nothing to title the queue sheet with (LED-160).
+        label: existing?.description,
+      })
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
@@ -259,7 +276,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       updateTransactionCache(transactions.filter((t) => !ids.includes(t.id)))
       toDelete.forEach((tx) => {
         optimisticAccountDelta((accounts) => reverseTxDelta(accounts, tx))
-        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, userId: user.id })
+        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, userId: user.id, label: tx.description })
       })
       return { error: null, queued: true }
     }
@@ -284,12 +301,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
           : t
       ))
       ids.forEach((id) => {
+        const existing = transactions.find((t) => t.id === id)
         enqueue({
           table: 'transactions',
           operation: 'update',
           payload: { category_id: categoryId },
           rowId: id,
           userId: user.id,
+          // A category-only change doesn't touch description (LED-160).
+          label: existing?.description,
         })
       })
       return { error: null, queued: true }

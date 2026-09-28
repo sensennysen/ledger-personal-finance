@@ -77,6 +77,11 @@ function dayInDaysLabel(days: number | null) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+// A month jump's ensure() can leave the render window's own auto-grow sentinel
+// in view, so it grows again right after the jump lands (LED-165). Re-scroll
+// on every further growth and only give up once none arrives for this long.
+const SETTLE_DEBOUNCE_MS = 500
+
 export default function AccountTransactionsPage() {
   const ink = useCategoryInk()
   const { accountId } = useParams<{ accountId: string }>()
@@ -204,14 +209,20 @@ export default function AccountTransactionsPage() {
     scrollTargetRef.current = target.date
     setJumpCount((n) => n + 1)
   }
-  // Scrolls once the target day is rendered; the window may need a render to grow first.
+  // Scrolls once the target day is rendered. `rendered` growing again (the
+  // window's own IntersectionObserver can fire right after the jump lands,
+  // LED-165) re-runs this and re-scrolls; only once no further growth arrives
+  // within SETTLE_DEBOUNCE_MS does the target get left alone.
   useEffect(() => {
     const day = scrollTargetRef.current
     if (!day) return
     const node = document.querySelector(`[data-day="${day}"]`)
     if (!node) return
-    scrollTargetRef.current = null
     node.scrollIntoView({ block: 'start' })
+    const timer = window.setTimeout(() => {
+      scrollTargetRef.current = null
+    }, SETTLE_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
   }, [jumpCount, rendered, grouped])
 
   // Result bar (LED-61): the sum is relative to this account, the range spans its history.

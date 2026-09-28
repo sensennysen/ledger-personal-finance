@@ -70,9 +70,20 @@ export function TopBar({
   const { pathname } = useLocation()
   const tabStrip = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    tabStrip.current
-      ?.querySelector('[aria-current="page"]')
-      ?.scrollIntoView({ inline: 'center', block: 'nearest' })
+    // Keep the active tab visible without Element.scrollIntoView: in Chrome it
+    // moves the page's sequential-focus starting point to wherever it scrolled,
+    // which put a fresh Tab press after the header instead of at the skip link
+    // (LED-155). A manual scrollLeft has no such side effect.
+    const strip = tabStrip.current
+    const active = strip?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!strip || !active) return
+    const activeLeft = active.offsetLeft - strip.offsetLeft
+    const activeRight = activeLeft + active.offsetWidth
+    if (activeLeft < strip.scrollLeft) {
+      strip.scrollLeft = activeLeft
+    } else if (activeRight > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollLeft = activeRight - strip.clientWidth
+    }
   }, [pathname])
   const { theme, toggleTheme } = useTheme()
   const tabStop = rovingTabStop(NAV_TABS, pathname)

@@ -83,7 +83,7 @@ export function DashboardRecentTransactionsCard({
               }
               rightDetail={
                 transaction.queued ? (
-                  <span className="inline-flex items-center gap-1 text-[0.6875rem] text-primary">
+                  <span className="inline-flex items-center gap-1 text-[0.6875rem] text-warning">
                     <Clock className="h-3 w-3" aria-hidden />Not synced yet
                   </span>
                 ) : undefined

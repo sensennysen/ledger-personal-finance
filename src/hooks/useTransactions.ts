@@ -5,6 +5,7 @@ import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
+import { dedupeAsync } from '@/lib/inFlightRequest'
 import {
   notifyAccountsRefresh,
   notifyLoanPurchasesRefresh,
@@ -104,11 +105,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
     }
 
     // An explicit limit is one request; otherwise page past PostgREST's 1,000-row cap.
-    const { rows, error } = filters.limit
-      ? await buildQuery()
-          .limit(filters.limit)
-          .then(({ data, error }) => ({ rows: (data ?? []) as Transaction[], error: error?.message ?? null }))
-      : await readAllPages<Transaction>((from, to) => buildQuery().range(from, to))
+    // Shared per cache key: AppLayout, the page, palette hooks and dashboard
+    // cards mounting with the same filters in the same tick read the table once (LED-166).
+    const { rows, error } = await dedupeAsync(cacheKey, async () => {
+      if (filters.limit) {
+        const { data, error } = await buildQuery().limit(filters.limit)
+        return { rows: (data ?? []) as Transaction[], error: error?.message ?? null }
+      }
+      return readAllPages<Transaction>((from, to) => buildQuery().range(from, to))
+    })
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load' }))
     } else {

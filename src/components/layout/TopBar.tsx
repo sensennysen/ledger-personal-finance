@@ -143,7 +143,7 @@ export function TopBar({
         type="button"
         onClick={onSearch}
         aria-label="Search"
-        className="flex h-10 w-10 xl:w-60 items-center justify-center xl:justify-start gap-2.5 rounded-full border border-border bg-background xl:px-3.5 text-[0.8125rem] text-muted-foreground hover:bg-muted"
+        className="flex h-10 w-10 xl:w-60 items-center justify-center xl:justify-start gap-2.5 rounded-full border border-border bg-background xl:px-3.5 text-[0.8125rem] text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
       >
         <Search className="size-4" />
         <span className="hidden xl:block flex-1 text-left">Search…</span>
@@ -165,7 +165,7 @@ export function TopBar({
           aria-label={SETTINGS_DESTINATION.label}
           className={({ isActive }) =>
             cn(
-              'flex size-9 items-center justify-center rounded-full transition-colors hover:bg-foreground/4',
+              'flex size-9 items-center justify-center rounded-full transition-colors hover:bg-foreground/4 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
               isActive ? 'text-foreground' : 'text-muted-foreground',
             )
           }

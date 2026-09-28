@@ -353,6 +353,7 @@ export default function DashboardPage() {
                 type="button"
                 aria-label="Dismiss warning"
                 onClick={() => setDismissedAlerts((state) => new Set([...state, alert.id]))}
+                className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
               >
                 <X className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
               </button>

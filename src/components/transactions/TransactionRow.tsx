@@ -140,7 +140,7 @@ function TransactionRowImpl({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
             {tx.queued && (
-              <span className="inline-flex items-center gap-1 text-xs text-primary">
+              <span className="inline-flex items-center gap-1 text-xs text-warning">
                 <Clock className="w-3 h-3" />Not synced yet
               </span>
             )}

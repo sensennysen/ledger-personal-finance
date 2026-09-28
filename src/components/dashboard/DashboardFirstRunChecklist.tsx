@@ -91,7 +91,9 @@ export function DashboardFirstRunChecklist({
                 </Button>
               )}
               {!step.done && step.id === 'transaction' && (
-                <span className="flex shrink-0 items-center gap-2">
+                // Full-width below sm forces this onto its own line instead of
+                // squeezing the text column down to a few characters (LED-158).
+                <span className="flex w-full basis-full shrink-0 items-center gap-2 sm:w-auto sm:basis-auto">
                   <Button variant="outline" size="sm" onClick={() => navigate('/transactions')}>
                     <Upload className="size-3.5" />
                     Import

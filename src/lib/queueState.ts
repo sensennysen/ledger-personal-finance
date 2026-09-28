@@ -12,6 +12,8 @@ export interface QueueItem {
   payload: Record<string, unknown>
   /** For update/delete: the row id to target */
   rowId?: string
+  /** Display name captured at enqueue time, for the queue sheet. Never sent to the database. */
+  label?: string
   userId: string
   timestamp: number
   /** Absent = pending. Flagged items are retained until the user resolves them. */

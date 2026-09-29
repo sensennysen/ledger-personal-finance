@@ -172,7 +172,7 @@ Each row is a question only the product owner can answer. Until it is answered t
 
 ## Parked (no ticket yet)
 
-Items the retros recorded that need a product answer or a design that does not exist. They are listed so they are not lost. Turn one into a ticket when its question is answered.
+Items the retros recorded that need a product answer or a design that does not exist. They are listed so they are not lost. Turn one into a ticket when its question is answered. **As of 2026-09-27 these are held by LED-214 (epics 15 to 19, decision OD-13), with a Fallback for each.**
 
 | Item | Source | Why parked |
 |---|---|---|

@@ -53,11 +53,11 @@ import { AccountForm, type AccountFormValues } from '@/components/accounts/Accou
 import type { CreditCardPayment, Transaction } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 
-function bandCell(label: string, value: string, sub?: string, money = true) {
+function bandCell(label: string, value: string, sub?: string, money = true, wrapValue = false) {
   return (
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`${money ? 'money ' : ''}mt-1 truncate text-lg font-semibold`}>{value}</p>
+      <p className={`${money ? 'money ' : ''}mt-1 ${wrapValue ? 'break-words' : 'truncate'} text-lg font-semibold`}>{value}</p>
       {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
     </div>
   )
@@ -574,7 +574,7 @@ export default function AccountTransactionsPage() {
                     nextLoanDeadline ? formatCurrency(nextLoanDeadline.total, currency) : 'None due',
                     nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : undefined,
                   )}
-                  {bandCell('Schedule', formatLoanSchedule(account) ?? 'Per purchase', 'Subtracted from net worth', false)}
+                  {bandCell('Schedule', formatLoanSchedule(account) ?? 'Per purchase', 'Subtracted from net worth', false, true)}
                 </>
               ) : (
                 <>

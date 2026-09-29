@@ -15,6 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DASHBOARD_CHART_TOOLTIP_STYLE } from '@/components/dashboard/chartTooltipStyle'
+import { abbreviateTick } from '@/lib/chartTicks'
 
 interface DashboardCashFlowChartProps {
   chartPeriod: DashboardChartPeriod
@@ -75,7 +76,7 @@ export function DashboardCashFlowChart({
                 tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                 axisLine={false}
                 tickLine={false}
-                tickFormatter={(value) => `${currencySymbol}${(value / 1000).toFixed(0)}k`}
+                tickFormatter={(value) => `${currencySymbol}${abbreviateTick(value)}`}
               />
               <Tooltip
                 formatter={(value) => formatCurrency(value as number, currency)}

@@ -93,83 +93,91 @@ function SignedInExport() {
   const save = (kind: ExportKind, csv: string) => downloadCsv(csv, exportFileName(kind, getLocalDateString()))
 
   return (
-    <ul className="space-y-2">
-      <ExportRow
-        label="Transactions"
-        count={transactions.transactions.length}
-        state={transactionsState}
-        onRetry={() => { void transactions.refetch(); void accounts.refetch() }}
-        onExport={() =>
-          save('transactions', buildTransactionsCsv(transactions.transactions, buildRunningBalanceMap(accounts.accounts, transactions.transactions)))
-        }
-      />
-      <ExportRow
-        label="Accounts"
-        count={accounts.accounts.length}
-        state={accountsState}
-        onRetry={() => void accounts.refetch()}
-        onExport={() => save('accounts', buildAccountsCsv(accounts.accounts))}
-      />
-      <ExportRow
-        label="Categories"
-        count={categories.categories.length}
-        state={categoriesState}
-        onRetry={() => void categories.refetch()}
-        onExport={() => save('categories', buildCategoriesCsv(categories.categories))}
-      />
-      <ExportRow
-        label="Budgets"
-        count={budgets.budgets.length}
-        state={budgetsState}
-        onRetry={() => void budgets.refetch()}
-        onExport={() => save('budgets', buildBudgetsCsv(budgets.budgets))}
-      />
-      <ExportRow
-        label="Savings goals"
-        count={savingsGoals.goals.length}
-        state={savingsGoalsState}
-        onRetry={() => void savingsGoals.refetch()}
-        onExport={() => save('savings-goals', buildSavingsGoalsCsv(savingsGoals.goals))}
-      />
-      <ExportRow
-        label="Loan purchases"
-        count={loanPurchases.purchases.length}
-        state={loanPurchasesState}
-        onRetry={() => void loanPurchases.refetch()}
-        onExport={() =>
-          save(
-            'loan-purchases',
-            buildLoanPurchasesCsv(
-              loanPurchases.purchases.map((p) => ({ ...p, account: accounts.accounts.find((a) => a.id === p.account_id) })),
-            ),
-          )
-        }
-      />
-      <ExportRow
-        label="Loan payment allocations"
-        count={loanPurchases.allocations.length}
-        state={loanAllocationsState}
-        onRetry={() => void loanPurchases.refetch()}
-        onExport={() =>
-          save(
-            'loan-allocations',
-            buildLoanAllocationsCsv(
-              loanPurchases.allocations.map((a) => ({
-                ...a,
-                loanPurchase: loanPurchases.purchases.find((p) => p.id === a.loan_purchase_id),
-              })),
-            ),
-          )
-        }
-      />
-      <ExportRow
-        label="Auto-categorisation rules"
-        count={transactionRules.rules.length}
-        state={transactionRulesState}
-        onRetry={() => void transactionRules.refetch()}
-        onExport={() => save('transaction-rules', buildTransactionRulesCsv(transactionRules.rules))}
-      />
-    </ul>
+    <>
+      <ul className="space-y-2">
+        <ExportRow
+          label="Transactions"
+          count={transactions.transactions.length}
+          state={transactionsState}
+          onRetry={() => { void transactions.refetch(); void accounts.refetch() }}
+          onExport={() =>
+            save('transactions', buildTransactionsCsv(transactions.transactions, buildRunningBalanceMap(accounts.accounts, transactions.transactions)))
+          }
+        />
+        <ExportRow
+          label="Accounts"
+          count={accounts.accounts.length}
+          state={accountsState}
+          onRetry={() => void accounts.refetch()}
+          onExport={() => save('accounts', buildAccountsCsv(accounts.accounts))}
+        />
+        <ExportRow
+          label="Categories"
+          count={categories.categories.length}
+          state={categoriesState}
+          onRetry={() => void categories.refetch()}
+          onExport={() => save('categories', buildCategoriesCsv(categories.categories))}
+        />
+        <ExportRow
+          label="Budgets"
+          count={budgets.budgets.length}
+          state={budgetsState}
+          onRetry={() => void budgets.refetch()}
+          onExport={() => save('budgets', buildBudgetsCsv(budgets.budgets))}
+        />
+        <ExportRow
+          label="Savings goals"
+          count={savingsGoals.goals.length}
+          state={savingsGoalsState}
+          onRetry={() => void savingsGoals.refetch()}
+          onExport={() => save('savings-goals', buildSavingsGoalsCsv(savingsGoals.goals))}
+        />
+        <ExportRow
+          label="Loan purchases"
+          count={loanPurchases.purchases.length}
+          state={loanPurchasesState}
+          onRetry={() => void loanPurchases.refetch()}
+          onExport={() =>
+            save(
+              'loan-purchases',
+              buildLoanPurchasesCsv(
+                loanPurchases.purchases.map((p) => ({ ...p, account: accounts.accounts.find((a) => a.id === p.account_id) })),
+              ),
+            )
+          }
+        />
+        <ExportRow
+          label="Loan payment allocations"
+          count={loanPurchases.allocations.length}
+          state={loanAllocationsState}
+          onRetry={() => void loanPurchases.refetch()}
+          onExport={() =>
+            save(
+              'loan-allocations',
+              buildLoanAllocationsCsv(
+                loanPurchases.allocations.map((a) => ({
+                  ...a,
+                  loanPurchase: loanPurchases.purchases.find((p) => p.id === a.loan_purchase_id),
+                })),
+              ),
+            )
+          }
+        />
+        <ExportRow
+          label="Auto-categorisation rules"
+          count={transactionRules.rules.length}
+          state={transactionRulesState}
+          onRetry={() => void transactionRules.refetch()}
+          onExport={() => save('transaction-rules', buildTransactionRulesCsv(transactionRules.rules))}
+        />
+      </ul>
+      {/* Held (and deleted) per "Data we hold" above, but not downloadable yet: no public-page-safe
+          "read everything for this user" query exists for these three (LED-180 backlog). */}
+      <p className="mt-2 text-xs text-muted-foreground">
+        Credit card payments, subcategories and exchange rate overrides aren't downloadable here yet,
+        but deleting your account removes them along with everything else.
+      </p>
+    </>
   )
 }
 

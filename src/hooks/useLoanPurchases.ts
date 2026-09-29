@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { registerLoanPurchasesListener } from '@/lib/cacheEvents'
+import { readAllPages } from '@/lib/pagedRead'
 import { enrichLoanPurchase, getLoanDeadlines, roundMoney } from '@/lib/loanInstallments'
 import { supabase } from '@/lib/supabase'
 import type { LoanPaymentAllocation, LoanPurchase } from '@/types'
@@ -61,19 +62,24 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
     let nextAllocations: LoanPaymentAllocation[] = []
 
     if (purchaseIds.length > 0) {
-      const { data: allocationRows, error: allocationError } = await supabase
-        .from('loan_payment_allocations')
-        .select('*, transaction:transactions(id, date, description)')
-        .eq('user_id', userId)
-        .in('loan_purchase_id', purchaseIds)
-        .order('created_at', { ascending: true })
+      // A read across every loan can pass PostgREST's 1,000-row cap, so page it.
+      const { rows: allocationRows, error: allocationError } = await readAllPages(
+        (from, to) => supabase
+          .from('loan_payment_allocations')
+          .select('*, transaction:transactions(id, date, description)')
+          .eq('user_id', userId)
+          .in('loan_purchase_id', purchaseIds)
+          .order('created_at', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, to),
+      )
 
       if (allocationError) {
         setLoadFailure(describeDataError(allocationError, { action: 'load' }))
         setLoading(false)
         return
       }
-      nextAllocations = (allocationRows as LoanPaymentAllocation[]) ?? []
+      nextAllocations = allocationRows as LoanPaymentAllocation[]
     }
 
     setPurchases(nextPurchases)
@@ -102,6 +108,20 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
 
     await fetch()
     return { error: null }
+  }
+
+  /**
+   * Itemises the loan's unitemized debt as this purchase: one database call inserts the purchase and
+   * lowers what the loan owes by the gap. It does not refetch; the caller settles the purchases and the
+   * account together so no render sees one without the other.
+   */
+  const createUnitemizedPurchase = async (values: CreateLoanPurchaseValues): Promise<MutationResult> => {
+    if (!userId) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to add a financed purchase.' }
+
+    const { account_id: accountId, ...purchase } = values
+    const { error } = await supabase.rpc('add_unitemised_purchase', { p_account_id: accountId, p_purchase: purchase })
+    return toResult(error, { action: 'save', entity: 'purchase' })
   }
 
   const updatePurchase = async (id: string, values: UpdateLoanPurchaseValues): Promise<MutationResult> => {
@@ -163,6 +183,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
     errorDetail,
     refetch: fetch,
     createPurchase,
+    createUnitemizedPurchase,
     updatePurchase,
     deletePurchase,
   }

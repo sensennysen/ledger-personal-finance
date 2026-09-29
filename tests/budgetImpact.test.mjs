@@ -42,3 +42,13 @@ test('a zero allowance has no share to show', () => {
 test('spent never reads lower than the entry itself (stale cache)', () => {
   assert.equal(entryBudgetImpact(tx, { ...budget, spent: 0 }, range).spent, 86.4)
 })
+
+test('a foreign entry converts with the exchange-rate table (LED-136)', async () => {
+  const { entryBudgetImpact } = await import('../src/lib/budgetImpact.ts')
+  const rates = { base: 'PHP', rates: { USD: 1 / 56 }, overrides: {}, asOf: null, fetchedAt: null }
+  const foreign = { type: 'expense', category_id: 'c1', amount: 10, date: '2026-09-10', currency: 'USD', exchange_rate: 1 }
+  const budget = { category_id: 'c1', currency: 'PHP', amount: 1000 }
+  const range = { start: '2026-09-01', end: '2026-09-30' }
+  assert.equal(entryBudgetImpact(foreign, budget, range), null)
+  assert.ok(Math.abs(entryBudgetImpact(foreign, budget, range, rates).entry - 560) < 1e-9)
+})

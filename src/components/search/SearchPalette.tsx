@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Activity,
@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
+  Bookmark,
   CalendarClock,
   Landmark,
   PiggyBank,
@@ -31,15 +32,29 @@ import {
 import { InlineLoadError } from '@/components/ui/error-state'
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { useGlobalSearch } from '@/hooks/useGlobalSearch'
-import { DESTINATIONS, type SearchAction, type SearchScope } from '@/lib/globalSearch'
+import { useSavedFilters } from '@/hooks/useSavedFilters'
+import { KIND_SHORTCUTS } from '@/lib/kindMenu'
+import {
+  DESTINATIONS,
+  budgetEditPath,
+  categoryActions,
+  chipShows,
+  groupChips,
+  highlightParts,
+  resolveChip,
+  type SearchAction,
+  type SearchChip,
+  type SearchScope,
+} from '@/lib/globalSearch'
+import { activityFilterPath, describeFilter, matchSavedFilters, type SavedFilter } from '@/lib/savedFilters'
 import { cn, formatCurrency, formatDateShort } from '@/lib/utils'
 import type { TransactionKind } from '@/components/transactions/transactionKinds'
 import type { Transaction } from '@/types'
 
 const ACTIONS: (SearchAction & { kind: TransactionKind; icon: typeof ArrowUpRight })[] = [
-  { id: 'expense', kind: 'expense', label: 'New expense', keywords: ['add', 'spend', 'record'], key: 'E', icon: ArrowUpRight },
-  { id: 'income', kind: 'income', label: 'New income', keywords: ['add', 'earn', 'record'], key: 'I', icon: ArrowDownLeft },
-  { id: 'transfer', kind: 'transfer', label: 'New transfer', keywords: ['add', 'move', 'record'], key: 'T', icon: ArrowLeftRight },
+  { id: 'expense', kind: 'expense', label: 'New expense', keywords: ['add', 'spend', 'record'], key: KIND_SHORTCUTS.expense, icon: ArrowUpRight },
+  { id: 'income', kind: 'income', label: 'New income', keywords: ['add', 'earn', 'record'], key: KIND_SHORTCUTS.income, icon: ArrowDownLeft },
+  { id: 'transfer', kind: 'transfer', label: 'New transfer', keywords: ['add', 'move', 'record'], key: KIND_SHORTCUTS.transfer, icon: ArrowLeftRight },
 ]
 
 const DESTINATION_ICONS: Record<string, LucideIcon> = {
@@ -55,7 +70,7 @@ const DESTINATION_ICONS: Record<string, LucideIcon> = {
 interface SearchPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAddTransaction: (kind: TransactionKind) => void
+  onAddTransaction: (kind: TransactionKind, options?: { categoryId?: string }) => void
   mobile?: boolean
   /** The account page the palette opened over, if any; ⌘F scopes to it. */
   currentAccount?: { id: string; name: string } | null
@@ -125,7 +140,7 @@ function SearchBody({
   currentAccount,
 }: {
   close: () => void
-  onAddTransaction: (kind: TransactionKind) => void
+  onAddTransaction: (kind: TransactionKind, options?: { categoryId?: string }) => void
   mobile: boolean
   currentAccount: { id: string; name: string } | null
 }) {
@@ -133,6 +148,7 @@ function SearchBody({
   const openEntry = useEntryDetail()
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<SearchScope>('cycle')
+  const [activeChip, setActiveChip] = useState<SearchChip>('all')
   const [accountScoped, setAccountScoped] = useState(false)
   const scopedAccount = accountScoped ? currentAccount : null
   const [highlighted, setHighlighted] = useState('')
@@ -140,15 +156,28 @@ function SearchBody({
   // search that starts with one of those letters is never hijacked.
   const [navigated, setNavigated] = useState(false)
 
-  const { results, range, isAmountQuery, loadState, error, refetch, dueSoon, loanSummary } = useGlobalSearch(
+  const { results, range, isAmountQuery, loadState, error, refetch, dueSoon, loanSummary, budgetByCategory } = useGlobalSearch(
     query,
     scope,
     ACTIONS,
     scopedAccount,
   )
   const actions = results.actions as typeof ACTIONS
+  // Saved filters (29a): matched by name or description; all of them before anything is typed.
+  const savedFilters = useSavedFilters()
+  const savedMatches = matchSavedFilters(savedFilters.filters, query)
   const trimmed = query.trim()
   const isEmptyQuery = trimmed === ''
+
+  // Per-category actions (16a): drawn for the category rows on screen, listed with the other actions.
+  const categoryActionRows = results.categories.items.flatMap((category) =>
+    categoryActions(category, budgetByCategory.get(category.id) ?? null).map((action) => ({
+      ...action,
+      value: `category-action:${category.id}:${action.id}`,
+      categoryId: category.id,
+    })),
+  )
+  const actionTotal = actions.length + categoryActionRows.length
 
   const go = (path: string) => {
     close()
@@ -158,9 +187,9 @@ function SearchBody({
     // phantom search entry before reaching the real previous page.
     navigate(path, { replace: mobile })
   }
-  const runAction = (kind: TransactionKind) => {
+  const runAction = (kind: TransactionKind, categoryId?: string) => {
     close()
-    onAddTransaction(kind)
+    onAddTransaction(kind, categoryId ? { categoryId } : undefined)
   }
   const openTransaction = (transaction: Transaction) => {
     close()
@@ -176,8 +205,16 @@ function SearchBody({
     : [{ id: 'text', heading: 'Transactions', group: results.text }]
 
   const transactionTotal = results.transactionTotal
-  const overallTotal = transactionTotal + results.accounts.total + results.categories.total
-  const anyResult = overallTotal + actions.length > 0
+  const overallTotal = transactionTotal + results.accounts.total + results.categories.total + savedMatches.length
+  const anyResult = overallTotal + actionTotal > 0
+  const chips = groupChips({
+    transactions: transactionTotal,
+    accounts: results.accounts.total,
+    categories: results.categories.total,
+    saved: savedMatches.length,
+    actions: actionTotal,
+  })
+  const chip = resolveChip(activeChip, chips)
   const showResults = loadState !== 'loading' && !(loadState === 'error')
   const { handoff } = results
   // An all-time search can match nothing in the cycle Activity shows; then there
@@ -209,14 +246,17 @@ function SearchBody({
           return
         }
         if (event.metaKey || event.ctrlKey || event.altKey || !navigated) return
+        const pressed = event.key.toLowerCase()
         const action = actions.find(
-          (candidate) =>
-            `action:${candidate.id}` === highlighted &&
-            candidate.key?.toLowerCase() === event.key.toLowerCase(),
+          (candidate) => `action:${candidate.id}` === highlighted && candidate.key?.toLowerCase() === pressed,
         )
-        if (!action) return
+        const categoryNew = categoryActionRows.find(
+          (row) => row.id === 'new' && row.value === highlighted && KIND_SHORTCUTS[row.kind].toLowerCase() === pressed,
+        )
+        if (!action && !categoryNew) return
         event.preventDefault()
-        runAction(action.kind)
+        if (action) runAction(action.kind)
+        else if (categoryNew?.id === 'new') runAction(categoryNew.kind, categoryNew.categoryId)
       }}
     >
       {mobile ? (
@@ -261,7 +301,7 @@ function SearchBody({
         />
       )}
       {!isEmptyQuery && (
-        <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             {showResults && (
               <span className="font-medium text-foreground tabular-nums">
@@ -273,23 +313,56 @@ function SearchBody({
                 ? `This cycle · ${formatDateShort(range.start)} – ${formatDateShort(range.end)}`
                 : 'Searching all time'}
             </span>
-            {scopedAccount && (
+            {currentAccount && (
               <button
                 type="button"
-                aria-label={`Stop filtering to ${scopedAccount.name}`}
-                onClick={() => setAccountScoped(false)}
-                className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground hover:bg-muted/70"
+                aria-pressed={accountScoped}
+                aria-label={accountScoped ? `Stop filtering to ${currentAccount.name}` : `Only search ${currentAccount.name}`}
+                onClick={() => setAccountScoped((current) => !current)}
+                className={cn(
+                  'inline-flex min-h-7 items-center gap-1 rounded-md px-1.5 py-0.5 font-medium hover:bg-muted',
+                  accountScoped ? 'bg-muted text-foreground' : 'border border-border text-foreground',
+                )}
               >
-                {scopedAccount.name} only
-                <X className="size-3" />
+                {accountScoped ? (
+                  <>
+                    {currentAccount.name} only
+                    <X className="size-3" />
+                  </>
+                ) : (
+                  <>Only in {currentAccount.name}</>
+                )}
               </button>
             )}
           </span>
+        </div>
+      )}
+      {!isEmptyQuery && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2 pb-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5" role="group" aria-label="Filter results">
+            {chips.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                aria-pressed={chip === option.id}
+                onClick={() => setActiveChip(option.id)}
+                className={cn(
+                  'inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full border px-2.5 text-xs font-medium',
+                  chip === option.id
+                    ? 'border-transparent bg-foreground text-background'
+                    : 'border-border text-foreground hover:bg-muted',
+                )}
+              >
+                {option.label}
+                <span className="tabular-nums">{option.count}</span>
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             aria-pressed={scope === 'all'}
             onClick={() => setScope((current) => (current === 'cycle' ? 'all' : 'cycle'))}
-            className="rounded-md px-2 py-1 font-medium text-foreground hover:bg-muted"
+            className="ml-auto min-h-8 shrink-0 rounded-md px-2 text-xs font-medium text-foreground hover:bg-muted"
           >
             {scope === 'cycle' ? 'Search all time' : 'Limit to this cycle'}
           </button>
@@ -298,6 +371,14 @@ function SearchBody({
       {error && loadState !== 'loading' && (
         <div className="px-1 pb-1">
           <InlineLoadError message={`Search data failed to load. ${error}`} onRetry={refetch} />
+        </div>
+      )}
+      {savedFilters.error && !savedFilters.loading && (
+        <div className="px-1 pb-1">
+          <InlineLoadError
+            message={`Saved filters failed to load. ${savedFilters.error}`}
+            onRetry={() => void savedFilters.refetch()}
+          />
         </div>
       )}
       <CommandList className={mobile ? 'max-h-none min-h-0 flex-1' : 'max-h-96'}>
@@ -355,6 +436,13 @@ function SearchBody({
                 ))}
               </CommandGroup>
             )}
+            {savedMatches.length > 0 && (
+              <CommandGroup heading={`Saved filters · ${savedMatches.length}`}>
+                {savedMatches.map((saved) => (
+                  <SavedFilterItem key={saved.id} saved={saved} query="" onSelect={() => go(activityFilterPath(saved.filter))} />
+                ))}
+              </CommandGroup>
+            )}
             <CommandGroup heading="Jump to">
               {DESTINATIONS.map((destination) => {
                 const Icon = DESTINATION_ICONS[destination.id] ?? ArrowRight
@@ -379,6 +467,7 @@ function SearchBody({
           </p>
         )}
         {showResults &&
+          chipShows(chip, 'transactions') &&
           transactionGroups.map(({ id, heading, group }) =>
             group.total === 0 ? null : (
               <CommandGroup
@@ -407,7 +496,7 @@ function SearchBody({
                     value={`tx:${transaction.id}`}
                     onSelect={() => openTransaction(transaction as Transaction)}
                   >
-                    <TransactionRow transaction={transaction as Transaction} />
+                    <TransactionRow transaction={transaction as Transaction} query={trimmed} />
                   </CommandItem>
                 ))}
                 {group.total > group.items.length &&
@@ -428,7 +517,7 @@ function SearchBody({
               </CommandGroup>
             ),
           )}
-        {showResults && results.accounts.total > 0 && (
+        {showResults && chipShows(chip, 'accounts') && results.accounts.total > 0 && (
           <CommandGroup heading={`Accounts · ${results.accounts.total}`}>
             {results.accounts.items.map((account) => (
               <CommandItem
@@ -436,8 +525,12 @@ function SearchBody({
                 value={`account:${account.id}`}
                 onSelect={() => go(`/accounts/${account.id}`)}
               >
-                <Wallet className="size-4 text-muted-foreground" />
-                <span className="truncate">{account.name}</span>
+                <Tile>
+                  <Wallet className="size-4 text-muted-foreground" />
+                </Tile>
+                <span className="truncate">
+                  <Highlight text={account.name} query={trimmed} />
+                </span>
               </CommandItem>
             ))}
             {results.accounts.total > results.accounts.items.length && (
@@ -450,7 +543,7 @@ function SearchBody({
             )}
           </CommandGroup>
         )}
-        {showResults && results.categories.total > 0 && (
+        {showResults && chipShows(chip, 'categories') && results.categories.total > 0 && (
           <CommandGroup heading={`Categories · ${results.categories.total}`}>
             {results.categories.items.map((category) => (
               <CommandItem
@@ -458,9 +551,11 @@ function SearchBody({
                 value={`category:${category.id}`}
                 onSelect={() => go('/categories')}
               >
-                <Tag className="size-4 shrink-0 text-muted-foreground" />
+                <Tile>{category.icon || <Tag className="size-4 text-muted-foreground" />}</Tile>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate">{category.name}</p>
+                  <p className="truncate">
+                    <Highlight text={category.name} query={trimmed} />
+                  </p>
                   {category.matchCount > 0 && (
                     <p className="truncate text-xs text-muted-foreground">
                       contains {category.matchCount} “{trimmed}”{' '}
@@ -487,8 +582,30 @@ function SearchBody({
             )}
           </CommandGroup>
         )}
-        {!isEmptyQuery && actions.length > 0 && (
-          <CommandGroup heading="Actions">
+        {showResults && !isEmptyQuery && chipShows(chip, 'saved') && savedMatches.length > 0 && (
+          <CommandGroup heading={`Saved filters · ${savedMatches.length}`}>
+            {savedMatches.map((saved) => (
+              <SavedFilterItem key={saved.id} saved={saved} query={trimmed} onSelect={() => go(activityFilterPath(saved.filter))} />
+            ))}
+          </CommandGroup>
+        )}
+        {!isEmptyQuery && chipShows(chip, 'actions') && actionTotal > 0 && (
+          <CommandGroup heading={`Actions · ${actionTotal}`}>
+            {categoryActionRows.map((row) => (
+              <CommandItem
+                key={row.value}
+                value={row.value}
+                onSelect={() => (row.id === 'new' ? runAction(row.kind, row.categoryId) : go(budgetEditPath(row.budgetId)))}
+              >
+                {row.id === 'new' ? (
+                  <ArrowUpRight className="size-4 text-muted-foreground" />
+                ) : (
+                  <PiggyBank className="size-4 text-muted-foreground" />
+                )}
+                <span className="truncate">{row.label}</span>
+                {row.id === 'new' && !mobile && <CommandShortcut>{KIND_SHORTCUTS[row.kind]}</CommandShortcut>}
+              </CommandItem>
+            ))}
             {actions.map((action) => {
               const Icon = action.icon
               return (
@@ -529,17 +646,62 @@ function SearchBody({
   )
 }
 
-function TransactionRow({ transaction }: { transaction: Transaction }) {
-  const signed = transaction.type === 'expense' ? -transaction.amount : transaction.amount
+function SavedFilterItem({ saved, query, onSelect }: { saved: SavedFilter; query: string; onSelect: () => void }) {
+  return (
+    <CommandItem value={`saved-filter:${saved.id}`} onSelect={onSelect}>
+      <Tile>
+        <Bookmark className="size-4 text-muted-foreground" />
+      </Tile>
+      <span className="min-w-0 flex-1 truncate">
+        <Highlight text={saved.name} query={query} />
+      </span>
+      <span className="max-w-[50%] shrink-0 truncate text-xs text-muted-foreground">{describeFilter(saved.filter)}</span>
+    </CommandItem>
+  )
+}
+
+function Tile({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      aria-hidden
+      className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-muted text-base leading-none"
+    >
+      {children}
+    </span>
+  )
+}
+
+// Matched text in the warning ink on its tint: a pair themeContrast holds to 4.5:1 in both themes.
+function Highlight({ text, query }: { text: string; query: string }) {
   return (
     <>
-      <Receipt className="size-4 shrink-0 text-muted-foreground" />
+      {highlightParts(text, query).map((part, index) =>
+        part.match ? (
+          <mark key={index} className="rounded-sm bg-warning-container font-medium text-warning">
+            {part.text}
+          </mark>
+        ) : (
+          <Fragment key={index}>{part.text}</Fragment>
+        ),
+      )}
+    </>
+  )
+}
+
+function TransactionRow({ transaction, query }: { transaction: Transaction; query: string }) {
+  const signed = transaction.type === 'expense' ? -transaction.amount : transaction.amount
+  const meta = [formatDateShort(transaction.date), transaction.category?.name, transaction.account?.name]
+    .filter(Boolean)
+    .join(' · ')
+  return (
+    <>
+      <Tile>{transaction.category?.icon || <Receipt className="size-4 text-muted-foreground" />}</Tile>
       <div className="min-w-0 flex-1">
-        <p className="truncate">{transaction.description || 'Untitled'}</p>
+        <p className="truncate">
+          <Highlight text={transaction.description || 'Untitled'} query={query} />
+        </p>
         <p className="truncate text-xs text-muted-foreground">
-          {[formatDateShort(transaction.date), transaction.category?.name, transaction.account?.name]
-            .filter(Boolean)
-            .join(' · ')}
+          <Highlight text={meta} query={query} />
         </p>
       </div>
       <span

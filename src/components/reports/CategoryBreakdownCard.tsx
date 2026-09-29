@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, TrendingDown } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Treemap, type TreemapNode } from 'recharts'
 import { formatCurrency, cn } from '@/lib/utils'
+import { readableInk } from '@/lib/contrast'
 import {
   previewOther,
   rollupBreakdown,
@@ -88,7 +89,7 @@ function OtherRow({ other, max, currency }: { other: OtherSlice; max: number; cu
           <ChevronDown
             className={cn('w-3.5 h-3.5 shrink-0 text-muted-foreground transition-transform duration-(--dur-base)', open ? '' : '-rotate-90')}
           />
-          <span className="text-xs font-medium truncate">Other · {other.count} categories</span>
+          <span className="text-xs font-medium leading-tight">Other · {other.count} categories</span>
         </span>
         <Meter value={other.amount} max={max} color={OTHER_COLOR} />
         <span className="text-xs tabular-nums">{formatCurrency(other.amount, currency)}</span>
@@ -121,16 +122,19 @@ function OtherRow({ other, max, currency }: { other: OtherSlice; max: number; cu
   )
 }
 
-function RankedBars({
+/** Ranked bars with an expandable Other row. `resetKey` closes that row when it changes (e.g. the cycle). */
+export function RankedBars({
   top,
   other,
   currency,
   grouped,
+  resetKey,
 }: {
   top: CategorySlice[]
   other: OtherSlice | null
   currency: string
   grouped: boolean
+  resetKey?: string
 }) {
   const max = Math.max(top[0]?.amount ?? 0, other?.amount ?? 0)
   return (
@@ -141,7 +145,7 @@ function RankedBars({
           {grouped && <SubcategoryRows slice={slice} currency={currency} />}
         </div>
       ))}
-      {other && <OtherRow other={other} max={max} currency={currency} />}
+      {other && <OtherRow key={resetKey} other={other} max={max} currency={currency} />}
     </div>
   )
 }
@@ -160,10 +164,7 @@ function TreemapCell(node: TreemapNode) {
           y={y + 16}
           fontSize={11}
           fontWeight={500}
-          fill="white"
-          stroke="rgba(0,0,0,0.35)"
-          strokeWidth={2}
-          paintOrder="stroke"
+          fill={readableInk(color) ?? 'var(--card)'}
         >
           {name.length > width / 7 ? `${name.slice(0, Math.max(1, Math.floor(width / 7) - 1))}…` : name}
         </text>
@@ -179,15 +180,19 @@ function CategoryTreemap({ rows, currency }: { rows: CategorySlice[]; currency: 
     .map((r) => `${r.name} ${formatShare(r.share)}`)
     .join(', ')
   return (
-    <div className="h-72" role="img" aria-label={`Treemap of ${rows.length} categories. Largest: ${summary}.`}>
-      <ResponsiveContainer width="100%" height="100%">
-        <Treemap data={data} dataKey="value" nameKey="name" content={TreemapCell} isAnimationActive={false}>
-          <Tooltip
-            formatter={(value) => formatCurrency(value as number, currency)}
-            contentStyle={DASHBOARD_CHART_TOOLTIP_STYLE}
-          />
-        </Treemap>
-      </ResponsiveContainer>
+    <div className="flex flex-col gap-2">
+      <div className="h-72" role="img" aria-label={`Treemap of ${rows.length} categories. Largest: ${summary}. The Ranked view lists every category.`}>
+        <ResponsiveContainer width="100%" height="100%">
+          <Treemap data={data} dataKey="value" nameKey="name" content={TreemapCell} isAnimationActive={false}>
+            <Tooltip
+              formatter={(value) => formatCurrency(value as number, currency)}
+              contentStyle={DASHBOARD_CHART_TOOLTIP_STYLE}
+            />
+          </Treemap>
+        </ResponsiveContainer>
+      </div>
+      {/* The cells cannot be reached by keyboard; Ranked is the accessible equivalent (LED-148). */}
+      <p className="text-xs text-muted-foreground">Switch to Ranked for the full list, with keyboard access.</p>
     </div>
   )
 }

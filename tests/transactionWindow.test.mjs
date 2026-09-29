@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import {
   WINDOW_STEP,
   signedAmount,
+  amountDisplay,
+  effectiveDensity,
   groupByDay,
   sliceGroups,
   nextRowCount,
@@ -131,4 +133,57 @@ test('the date span covers the earliest and latest rows, or is null when empty',
   const rows = [tx({ date: '2026-03-02' }), tx({ date: '2025-09-14' }), tx({ date: '2026-09-17' })]
   assert.deepEqual(dateSpan(rows), { start: '2025-09-14', end: '2026-09-17' })
   assert.equal(dateSpan([]), null)
+})
+
+test('amountDisplay follows signedAmount and prints the U+2212 minus', () => {
+  assert.deepEqual(amountDisplay(tx({ type: 'expense', amount: 10 })), { sign: '−', value: 10, currency: 'USD' })
+  assert.deepEqual(amountDisplay(tx({ type: 'income', amount: 10 })), { sign: '+', value: 10, currency: 'USD' })
+})
+
+test('amountDisplay shows a transfer without a context unsigned, at its own amount', () => {
+  assert.deepEqual(amountDisplay(tx({ type: 'transfer', amount: 25, to_account_id: 'b' })), { sign: '', value: 25, currency: 'USD' })
+})
+
+test('amountDisplay inside an account: outgoing transfer unsigned, incoming at the rate', () => {
+  assert.deepEqual(
+    amountDisplay(tx({ type: 'transfer', amount: 25, account_id: 'a', to_account_id: 'b' }), 'a'),
+    { sign: '', value: 25, currency: 'USD' },
+  )
+  assert.deepEqual(
+    amountDisplay(tx({ type: 'transfer', amount: 10, exchange_rate: 1.5, to_account_id: 'b' }), 'b'),
+    { sign: '+', value: 15, currency: 'USD' },
+  )
+})
+
+test('amountDisplay: a loan repayment into the account is money in, an expense out of it is money out', () => {
+  assert.deepEqual(amountDisplay(tx({ type: 'expense', amount: 40, to_account_id: 'loan' }), 'loan'), { sign: '+', value: 40, currency: 'USD' })
+  assert.deepEqual(amountDisplay(tx({ type: 'expense', amount: 40, to_account_id: 'loan' }), 'checking'), { sign: '−', value: 40, currency: 'USD' })
+})
+
+test('the value amountDisplay prints is the value signedAmount nets', () => {
+  for (const [type, to] of [['income', null], ['expense', null], ['transfer', 'b'], ['expense', 'b']]) {
+    for (const ctx of [undefined, 'a', 'b']) {
+      const t = tx({ type, amount: 12.5, exchange_rate: 2, to_account_id: to })
+      const { sign, value } = amountDisplay(t, ctx)
+      const signed = signedAmount(t, ctx)
+      if (sign === '+') assert.equal(value, signed)
+      if (sign === '−') assert.equal(-value, signed)
+    }
+  }
+})
+
+test('Compact density is ignored on a phone and kept elsewhere', () => {
+  assert.equal(effectiveDensity('compact', true), 'comfortable')
+  assert.equal(effectiveDensity('compact', false), 'compact')
+  assert.equal(effectiveDensity('comfortable', false), 'comfortable')
+})
+
+test('an incoming cross-currency transfer is labelled and netted in the destination currency (LED-149)', () => {
+  const t = tx({ type: 'transfer', amount: 100, currency: 'USD', exchange_rate: 56, to_account_id: 'php', to_account: { currency: 'PHP' } })
+  assert.deepEqual(amountDisplay(t, 'php'), { sign: '+', value: 5600, currency: 'PHP' })
+  assert.deepEqual(sumByCurrency([t], 'php'), { PHP: 5600 })
+  assert.equal(groupByDay([t], 'php')[0].net.PHP, 5600)
+  // From the source account it is still money out, in the source currency.
+  assert.deepEqual(amountDisplay(t, 'usd'), { sign: '', value: 100, currency: 'USD' })
+  assert.deepEqual(sumByCurrency([t], 'usd'), { USD: -100 })
 })

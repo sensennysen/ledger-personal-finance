@@ -5,7 +5,14 @@ import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
-import { notifyAccountsRefresh, notifyLoanPurchasesRefresh } from '@/lib/cacheEvents'
+import { dedupeAsync } from '@/lib/inFlightRequest'
+import {
+  notifyAccountsRefresh,
+  notifyLoanPurchasesRefresh,
+  notifyTransactionsRefresh,
+  registerTransactionsListener,
+} from '@/lib/cacheEvents'
+import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/lib/splitState'
 import { addRecurringIntervalToDateString } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
 import type { Transaction, Account, Category } from '@/types'
@@ -48,7 +55,17 @@ export function useTransactions(filters: TransactionFilters = {}) {
   const updateTransactionCache = useCallback((next: Transaction[]) => {
     setTransactions(next)
     writeCache(buildCacheKey(), next)
+    // Another mounted instance (Home beside the layout's add form) has its own copy of this list.
+    notifyTransactionsRefresh()
   }, [buildCacheKey])
+
+  const reloadFromCache = useCallback(() => {
+    if (!user) return
+    const cached = readCache<Transaction[]>(buildCacheKey())
+    if (cached) setTransactions(cached)
+  }, [user, buildCacheKey])
+
+  useEffect(() => registerTransactionsListener(reloadFromCache), [reloadFromCache])
 
   const fetch = useCallback(async () => {
     if (!user) {
@@ -70,7 +87,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
         .select(`
           *,
           account:accounts!transactions_account_id_fkey(id, name, color, currency),
-          to_account:accounts!transactions_to_account_id_fkey(id, name, color, currency),
+          to_account:accounts!transactions_to_account_id_fkey(id, name, color, currency, type),
           category:categories(id, name, color, icon),
           subcategory:subcategories(id, name)
         `)
@@ -88,11 +105,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
     }
 
     // An explicit limit is one request; otherwise page past PostgREST's 1,000-row cap.
-    const { rows, error } = filters.limit
-      ? await buildQuery()
-          .limit(filters.limit)
-          .then(({ data, error }) => ({ rows: (data ?? []) as Transaction[], error: error?.message ?? null }))
-      : await readAllPages<Transaction>((from, to) => buildQuery().range(from, to))
+    // Shared per cache key: AppLayout, the page, palette hooks and dashboard
+    // cards mounting with the same filters in the same tick read the table once (LED-166).
+    const { rows, error } = await dedupeAsync(cacheKey, async () => {
+      if (filters.limit) {
+        const { data, error } = await buildQuery().limit(filters.limit)
+        return { rows: (data ?? []) as Transaction[], error: error?.message ?? null }
+      }
+      return readAllPages<Transaction>((from, to) => buildQuery().range(from, to))
+    })
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load' }))
     } else {
@@ -187,7 +208,16 @@ export function useTransactions(filters: TransactionFilters = {}) {
           applyTxDelta(reverseTxDelta(accounts, existing), merged)
         )
       }
-      enqueue({ table: 'transactions', operation: 'update', payload: values as Record<string, unknown>, rowId: id, userId: user.id })
+      enqueue({
+        table: 'transactions',
+        operation: 'update',
+        payload: values as Record<string, unknown>,
+        rowId: id,
+        userId: user.id,
+        // The edit may not touch description (e.g. a category-only change), so
+        // the queue sheet title still has a name to show (LED-160).
+        label: existing?.description,
+      })
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').update(values).eq('id', id).eq('user_id', user.id)
@@ -198,7 +228,9 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return toResult(error, { action: 'save', entity: 'transaction' })
   }
 
-  const deleteTransaction = async (id: string): Promise<MutationResult & { queued?: boolean }> => {
+  // useCallback (stable across a scroll/window-growth render) so a memoised
+  // TransactionRow's onDelete prop doesn't change identity every render.
+  const deleteTransaction = useCallback(async (id: string): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const existing = transactions.find((t) => t.id === id)
@@ -206,7 +238,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
         updateTransactionCache(transactions.filter((t) => t.id !== id))
         optimisticAccountDelta((accounts) => reverseTxDelta(accounts, existing))
       }
-      enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: id, userId: user.id })
+      enqueue({
+        table: 'transactions',
+        operation: 'delete',
+        payload: {},
+        rowId: id,
+        userId: user.id,
+        // A delete's payload carries nothing to title the queue sheet with (LED-160).
+        label: existing?.description,
+      })
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
@@ -215,6 +255,18 @@ export function useTransactions(filters: TransactionFilters = {}) {
       notifyLoanPurchasesRefresh()
     }
     return toResult(error, { action: 'delete', entity: 'transaction' })
+  }, [user, transactions, updateTransactionCache, optimisticAccountDelta, fetch])
+
+  /** Splits one transaction into lines in a single database call: every line is written and the original removed, or nothing changes. */
+  const splitTransaction = async (id: string, splits: SplitRpcLine[]): Promise<MutationResult> => {
+    if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: SPLIT_OFFLINE_MESSAGE }
+    const { error } = await supabase.rpc('split_transaction', { original_id: id, lines: buildSplitRpcLines(splits) })
+    if (!error) {
+      await fetch()
+      notifyLoanPurchasesRefresh()
+    }
+    return toResult(error, { action: 'save', entity: 'transaction' })
   }
 
   const bulkDeleteTransactions = async (ids: string[]): Promise<MutationResult & { queued?: boolean }> => {
@@ -224,7 +276,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       updateTransactionCache(transactions.filter((t) => !ids.includes(t.id)))
       toDelete.forEach((tx) => {
         optimisticAccountDelta((accounts) => reverseTxDelta(accounts, tx))
-        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, userId: user.id })
+        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, userId: user.id, label: tx.description })
       })
       return { error: null, queued: true }
     }
@@ -249,12 +301,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
           : t
       ))
       ids.forEach((id) => {
+        const existing = transactions.find((t) => t.id === id)
         enqueue({
           table: 'transactions',
           operation: 'update',
           payload: { category_id: categoryId },
           rowId: id,
           userId: user.id,
+          // A category-only change doesn't touch description (LED-160).
+          label: existing?.description,
         })
       })
       return { error: null, queued: true }
@@ -296,16 +351,21 @@ export function useTransactions(filters: TransactionFilters = {}) {
   const generateDueRecurring = useCallback(async (): Promise<number> => {
     if (!user || !navigator.onLine) return 0
     const today = getLocalDateString()
-    const { data: allRecurring } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_recurring', true)
-      .order('date', { ascending: false })
-    if (!allRecurring?.length) return 0
+    const { rows: allRecurring, error: recurringError } = await readAllPages<Transaction>((from, to) =>
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_recurring', true)
+        .order('date', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to),
+    )
+    // A failed read means nothing is known to be due, and a partial list would skip series.
+    if (recurringError || allRecurring.length === 0) return 0
 
     let generated = 0
-    for (const tx of allRecurring as Transaction[]) {
+    for (const tx of allRecurring) {
       if (!tx.recurrence_interval) continue
       const nextDate = addRecurringIntervalToDateString(tx.date, tx.recurrence_interval)
       if (nextDate > today) continue
@@ -353,6 +413,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     createTransaction,
     updateTransaction,
     deleteTransaction,
+    splitTransaction,
     bulkDeleteTransactions,
     bulkUpdateCategory,
     bulkCreateTransactions,

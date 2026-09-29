@@ -40,6 +40,8 @@ interface LoanPurchaseFormProps {
   currency: string
   categories: Category[]
   initialValues?: LoanPurchase
+  /** Starting values for a new purchase, e.g. the unitemized gap. Ignored when editing. */
+  prefill?: { name: string; principal_amount: number; monthly_interest_rate: number }
   /** The parent loan without this purchase, for the "adds to this loan" figures. */
   loanContext?: LoanContext
   onSubmit: (values: CreateLoanPurchaseValues) => Promise<void>
@@ -50,7 +52,7 @@ function formatPct(pct: number) {
   return `${pct >= 10 ? Math.round(pct) : Math.round(pct * 10) / 10}%`
 }
 
-export function LoanPurchaseForm({ accountId, currency, categories, initialValues, loanContext, onSubmit, onClose }: LoanPurchaseFormProps) {
+export function LoanPurchaseForm({ accountId, currency, categories, initialValues, prefill, loanContext, onSubmit, onClose }: LoanPurchaseFormProps) {
   // Below sm the form stays a two-step wizard; wider, it is one form with its cost panel.
   const isWide = useMediaQuery('(min-width: 640px)')
   const [step, setStep] = useState<PurchaseFormStep>(1)
@@ -58,11 +60,11 @@ export function LoanPurchaseForm({ accountId, currency, categories, initialValue
   const form = useForm<PurchaseFormInput, unknown, PurchaseFormValues>({
     resolver: zodResolver(purchaseSchema),
     defaultValues: {
-      name: initialValues?.name ?? '',
+      name: initialValues?.name ?? prefill?.name ?? '',
       category_id: initialValues?.category_id ?? '',
-      principal_amount: initialValues?.principal_amount ?? '',
+      principal_amount: initialValues?.principal_amount ?? prefill?.principal_amount ?? '',
       term_months: initialValues?.term_months ?? 3,
-      monthly_interest_rate: initialValues?.monthly_interest_rate ?? '',
+      monthly_interest_rate: initialValues?.monthly_interest_rate ?? prefill?.monthly_interest_rate ?? '',
       monthly_installment: initialValues?.monthly_installment ?? '',
       opening_installments_paid: initialValues?.opening_installments_paid ?? '',
       first_due_date: initialValues?.first_due_date ?? getLocalDateString(),

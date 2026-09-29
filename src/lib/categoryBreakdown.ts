@@ -71,7 +71,7 @@ export function buildCategoryBreakdown(
     let entry = map.get(key)
     if (!entry) {
       const cat = t.category_id ? categoryById.get(t.category_id) : undefined
-      entry = { name: cat?.name ?? 'Uncategorized', color: cat?.color ?? '#888', amount: 0, subs: new Map() }
+      entry = { name: cat?.name ?? 'Uncategorized', color: cat?.color ?? 'var(--muted-foreground)', amount: 0, subs: new Map() }
       map.set(key, entry)
     }
     entry.amount += amount
@@ -119,4 +119,15 @@ export function previewOther(other: OtherSlice): { shown: CategorySlice[]; more:
   const rest = other.rows.slice(OTHER_PREVIEW)
   if (rest.length === 0) return { shown, more: null }
   return { shown, more: { count: rest.length, amount: rest.reduce((sum, r) => sum + r.amount, 0) } }
+}
+
+/** The rail's "Top categories, this filter" (29a): the biggest few, the rest as one "Other" line. */
+export function topCategories(
+  rows: CategorySlice[],
+  count = 4,
+): { top: CategorySlice[]; other: { count: number; amount: number } | null } {
+  const top = rows.slice(0, count)
+  const tail = rows.slice(count)
+  if (tail.length === 0) return { top, other: null }
+  return { top, other: { count: tail.length, amount: tail.reduce((sum, r) => sum + r.amount, 0) } }
 }

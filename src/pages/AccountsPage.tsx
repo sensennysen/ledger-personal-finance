@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Wallet, MoreHorizontal, GripVertical, ArrowUp, ArrowDown, Check, LayoutList, AlignJustify, CreditCard, Banknote } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotify } from '@/contexts/notificationState'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { converterTo, ratesAsOfLabel } from '@/lib/exchangeRates'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { usePreferences } from '@/hooks/usePreferences'
@@ -15,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from '@/components/ui/progress'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Skeleton } from '@/components/ui/skeleton'
+import { SkeletonText } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
@@ -25,7 +28,7 @@ import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import { normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
-import { formatLoanSchedule } from '@/lib/loans'
+import { formatLoanSchedule, loansOwed } from '@/lib/loans'
 import { buildAccountsOverview, formatShare, isLiability, type AssetRow, type LiabilityRow } from '@/lib/accountsOverview'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
 import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
@@ -43,6 +46,7 @@ export default function AccountsPage() {
   const { accounts, loading, error, errorDetail, refetch, createAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder } = useAccounts()
   const loadState = resolveLoadState({ loading, error, hasData: accounts.length > 0 })
   const { prefs, set: setPref } = usePreferences()
+  const notify = useNotify()
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
@@ -61,7 +65,16 @@ export default function AccountsPage() {
   const { openAddTransactionModal } = useOutletContext<AppLayoutContext>()
   const { purchases: loanPurchases, allocations: loanAllocations, error: loansError, refetch: refetchLoans } = useLoanPurchases()
   const defaultCurrency = profile?.default_currency ?? 'USD'
-  const overview = buildAccountsOverview(accounts, defaultCurrency, { purchases: loanPurchases, allocations: loanAllocations })
+  const { table: rateTable } = useExchangeRates()
+  const convertToDefault = useMemo(() => converterTo(rateTable, defaultCurrency), [rateTable, defaultCurrency])
+  const overview = buildAccountsOverview(
+    accounts,
+    defaultCurrency,
+    { purchases: loanPurchases, allocations: loanAllocations },
+    new Date(),
+    convertToDefault,
+  )
+  const ratesAsOf = ratesAsOfLabel(rateTable)
   const defaultGroupOrder = useMemo(() => Object.keys(ACCOUNT_TYPE_LABELS) as AccountType[], [])
   const accountGroupOrder = useMemo(() => {
     const valid = new Set(defaultGroupOrder)
@@ -132,6 +145,11 @@ export default function AccountsPage() {
       })
   }
 
+  const saveAccountOrder = async (next: string[]) => {
+    const { error: orderError } = await updateAccountOrder(next)
+    if (orderError) notify({ severity: 'failure', title: "Couldn't change the order", body: orderError })
+  }
+
   const reorderAccount = (fromId: string, toId: string) => {
     const base = accounts.map((account) => account.id)
     const from = base.indexOf(fromId)
@@ -140,7 +158,7 @@ export default function AccountsPage() {
     const next = [...base]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    updateAccountOrder(next)
+    void saveAccountOrder(next)
   }
 
   // Arrows swap with the neighbour in the same column, not in the whole list.
@@ -152,7 +170,7 @@ export default function AccountsPage() {
     const to = next.indexOf(neighbour)
     next[from] = neighbour
     next[to] = id
-    updateAccountOrder(next)
+    void saveAccountOrder(next)
   }
 
   const moveGroup = (type: AccountType, direction: -1 | 1, columnTypes: AccountType[]) => {
@@ -326,9 +344,14 @@ export default function AccountsPage() {
             </>
           )}
         </div>
-        <p className="money text-right text-sm font-semibold" style={{ color: account.balance < 0 ? 'var(--destructive)' : undefined }}>
-          {formatCurrency(row.balance, account.currency)}
-        </p>
+        <div className="text-right">
+          <p className="money text-sm font-semibold" style={{ color: account.balance < 0 ? 'var(--destructive)' : undefined }}>
+            {formatCurrency(row.balance, account.currency)}
+          </p>
+          {row.converted !== null && (
+            <p className="money text-xs text-muted-foreground">≈ {formatCurrency(row.converted, defaultCurrency)}</p>
+          )}
+        </div>
         {accountMenu(account)}
       </div>
     )
@@ -362,7 +385,12 @@ export default function AccountsPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <p className="money text-base font-bold">{row.owed > 0 ? '−' : ''}{formatCurrency(row.owed, account.currency)}</p>
+            <div className="text-right">
+              <p className="money text-base font-bold">{row.owed > 0 ? '−' : ''}{formatCurrency(row.owed, account.currency)}</p>
+              {row.convertedOwed !== null && (
+                <p className="money text-xs text-muted-foreground">≈ {row.convertedOwed > 0 ? '−' : ''}{formatCurrency(row.convertedOwed, defaultCurrency)}</p>
+              )}
+            </div>
             {accountMenu(account)}
           </div>
         </div>
@@ -517,7 +545,9 @@ export default function AccountsPage() {
   }
 
   const cardCount = accounts.filter((account) => account.type === 'credit_card').length
-  const loanCount = accounts.filter((account) => account.type === 'loan').length
+  // A fully repaid loan does not count (LED-181 item, OD-8), matching the search palette
+  // and the Add Transaction kind menu's shared loansOwed() definition (LED-156).
+  const loanCount = loansOwed(accounts).length
   const liabilityMix = [
     cardCount > 0 && `${cardCount} card${cardCount > 1 ? 's' : ''}`,
     loanCount > 0 && `${loanCount} loan${loanCount > 1 ? 's' : ''}`,
@@ -587,11 +617,47 @@ export default function AccountsPage() {
       {loadState === 'error' ? (
         <ErrorState title="Couldn't load your accounts" description={error} detail={errorDetail} onRetry={() => void refetch()} />
       ) : loading ? (
-        <div className="space-y-6">
-          <Skeleton className="h-24 rounded-xl" />
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Skeleton className="h-64 rounded-xl" />
-            <Skeleton className="h-64 rounded-xl" />
+        <div className="space-y-6" aria-busy="true" aria-label="Loading accounts">
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[1fr_1fr_1fr_1.4fr]">
+            {['Assets', 'Liabilities', 'Net Worth', 'Coming up'].map((label, index) => (
+              <div
+                key={label}
+                className={cn(
+                  'p-4',
+                  index < 2 && 'border-b border-border/60 lg:border-b-0',
+                  index === 0 && 'border-r',
+                  index === 2 && 'col-span-2 border-b border-border/60 lg:col-span-1 lg:border-b-0 lg:border-r',
+                  index === 3 && 'col-span-2 lg:col-span-1',
+                  index === 1 && 'lg:border-r',
+                )}
+              >
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1 text-lg"><SkeletonText className="w-24" /></p>
+                <p className="text-xs"><SkeletonText className="w-16" /></p>
+              </div>
+            ))}
+          </div>
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            {['Assets', 'Liabilities'].map((heading) => (
+              <section key={heading} className="min-w-0 space-y-3">
+                <div className="flex items-baseline justify-between">
+                  <h2 className="text-sm font-semibold">{heading}</h2>
+                  <p className="text-sm"><SkeletonText className="w-20" /></p>
+                </div>
+                <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border bg-card">
+                  {[0, 1, 2].map((row) => (
+                    <div key={row} className="flex items-center gap-2.5 px-4 py-2.5">
+                      <span className="size-8 shrink-0 rounded-lg bg-muted" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm"><SkeletonText className="w-32" /></p>
+                        <p className="text-xs"><SkeletonText className="w-20" /></p>
+                      </div>
+                      <span className="text-sm"><SkeletonText className="w-20" /></span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         </div>
       ) : accounts.length === 0 ? (
@@ -616,9 +682,15 @@ export default function AccountsPage() {
             <div className="col-span-2 border-b border-border/60 p-4 lg:col-span-1 lg:border-b-0 lg:border-r">
               <p className="text-xs text-muted-foreground">Net Worth</p>
               <p className="money mt-1 text-lg font-bold">{formatCurrency(overview.totals.netWorth, defaultCurrency)}</p>
-              {overview.excludedCurrencies.length > 0 && (
-                <p className="text-xs text-muted-foreground">{defaultCurrency} accounts only</p>
-              )}
+              {overview.excludedCurrencies.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {overview.convertedCurrencies.length > 0
+                    ? `Leaves out ${overview.excludedCurrencies.join(', ')}`
+                    : `${defaultCurrency} accounts only`}
+                </p>
+              ) : overview.convertedCurrencies.length > 0 ? (
+                <p className="text-xs text-muted-foreground">Includes {overview.convertedCurrencies.join(', ')} converted</p>
+              ) : null}
             </div>
             <div className="col-span-2 p-4 lg:col-span-1">
               <p className="text-xs text-muted-foreground">Coming up</p>
@@ -655,9 +727,17 @@ export default function AccountsPage() {
                   </div>
                 )}
                 {renderColumn('assets')}
+                {overview.convertedCurrencies.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Totals are in {defaultCurrency}. {overview.convertedCurrencies.join(', ')} accounts are converted
+                    {ratesAsOf ? ` at rates as of ${ratesAsOf}` : ''}.{' '}
+                    <Link to="/settings" className="underline">Exchange rates</Link>
+                  </p>
+                )}
                 {overview.excludedCurrencies.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Totals are in {defaultCurrency} and leave out {overview.excludedCurrencies.join(', ')} accounts — Ledger has no exchange rate for them.
+                    Totals are in {defaultCurrency} and leave out {overview.excludedCurrencies.join(', ')} accounts — Ledger has no exchange rate for them.{' '}
+                    <Link to="/settings" className="underline">Add a rate</Link>
                   </p>
                 )}
               </section>

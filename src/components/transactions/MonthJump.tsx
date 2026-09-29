@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { CalendarRange } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { CalendarRange, CheckSquare, Square } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { formatNet } from '@/lib/formatNet'
 import type { MonthNet } from '@/lib/monthJump'
@@ -53,10 +53,13 @@ export function MonthRail({
   months,
   activeKey,
   onPick,
+  footer,
 }: {
   months: MonthNet[]
   activeKey: string | null
   onPick: (key: string) => void
+  /** Sits under the month list, e.g. "Top categories, this filter". */
+  footer?: ReactNode
 }) {
   const [expanded, setExpanded] = useState(false)
   const activeIndex = activeKey ? months.findIndex((m) => m.key === activeKey) : -1
@@ -82,6 +85,7 @@ export function MonthRail({
           </button>
         )}
       </div>
+      {footer}
     </aside>
   )
 }
@@ -91,17 +95,25 @@ export function MonthJumpBar({
   months,
   activeKey,
   onPick,
+  onSelect,
+  selecting,
 }: {
   months: MonthNet[]
   activeKey: string | null
   onPick: (key: string) => void
+  /** Phone-only bulk select (29a): the toolbar's Select is hidden below sm. */
+  onSelect?: () => void
+  selecting?: boolean
 }) {
   const [open, setOpen] = useState(false)
 
   return (
     <>
-      {/* Sticky offsets ignore <main>'s padding, so clear the fixed BottomNav explicitly. */}
-      <div className="sticky bottom-[calc(88px+env(safe-area-inset-bottom))] z-20 -mx-4 md:bottom-0 flex h-14 items-center border-t border-border bg-muted px-4 md:-mx-6 md:px-6 lg:hidden">
+      {/* <main>'s bottom padding already clears the fixed BottomNav and a sticky offset is measured
+          inside that padding, so bottom-0 sits the bar on the nav. An extra 88px floated it 88px
+          above the nav (LED-149, measured at 390x844). data-month-jump-bar lets the add FAB lift
+          itself clear of the bar. */}
+      <div data-month-jump-bar className="sticky bottom-0 z-20 -mx-4 flex h-14 items-center gap-5 border-t border-border bg-muted px-4 md:-mx-6 md:px-6 lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -110,6 +122,17 @@ export function MonthJumpBar({
           <CalendarRange className="size-4" />
           Jump to month
         </button>
+        {onSelect && (
+          <button
+            type="button"
+            onClick={onSelect}
+            aria-pressed={selecting}
+            className="flex items-center gap-2 text-xs font-semibold text-muted-foreground aria-pressed:text-primary sm:hidden"
+          >
+            {selecting ? <CheckSquare className="size-4" /> : <Square className="size-4" />}
+            Select
+          </button>
+        )}
       </div>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom" className="max-h-[80dvh] pb-[env(safe-area-inset-bottom)]">

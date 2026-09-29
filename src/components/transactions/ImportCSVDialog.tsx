@@ -5,6 +5,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useImportCategoryMemory } from '@/hooks/useImportCategoryMemory'
 import { useImportDuplicates } from '@/hooks/useImportDuplicates'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
+import { similarRows } from '@/lib/importCategories'
 import { duplicateSpan, matchDuplicates, type ExistingTx } from '@/lib/importDuplicates'
 import {
   buildRows,
@@ -16,12 +17,13 @@ import {
   isProblem,
   isSelectable,
   isSelected,
-  isSkipped,
+  skipReason,
   processFile,
   rowIssues,
   selectAll,
   sortProblemsFirst,
   summarise,
+  withAmbiguousDateIssues,
   withCategoryIssues,
   type BankFormat,
   type CauseId,
@@ -30,11 +32,14 @@ import {
   type Severity,
 } from '@/lib/csvImport'
 import { suggestCategory, type Suggestion } from '@/lib/importCategories'
-import { convertAmount, currencyState, effectiveRate } from '@/lib/importCurrency'
+import { convertAmount, currencyState, effectiveRate, formatSuggestedRate, rateInputValue } from '@/lib/importCurrency'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { lookupRate, ratesAsOfLabel } from '@/lib/exchangeRates'
 import { looksLikeTransfer, transferCandidates, transferLegs } from '@/lib/importTransfer'
 import { WINDOW_STEP } from '@/lib/transactionWindow'
 import { CURRENCIES } from '@/types'
 import { cn, formatCurrency } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -57,6 +62,8 @@ export interface ImportTx {
   description: string
   /** In the account's currency, converted when the statement's differs. */
   amount: number
+  /** The statement's own amount and currency, kept when it was converted (LED-136). */
+  original?: { amount: number; currency: string } | null
   type: 'income' | 'expense' | 'transfer'
   account_id: string
   to_account_id: string | null
@@ -87,6 +94,27 @@ const SEVERITY_ICON: Record<Severity, { icon: typeof AlertCircle; className: str
 
 const ORDER_LABELS: Record<DateOrder, string> = { DMY: 'D/M/Y', MDY: 'M/D/Y' }
 
+function DateOrderToggle({ order, onChange }: { order: DateOrder; onChange: (order: DateOrder) => void }) {
+  return (
+    <div className="inline-flex rounded-full border p-0.5">
+      {(['DMY', 'MDY'] as DateOrder[]).map((option) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={order === option}
+          onClick={() => onChange(option)}
+          className={cn(
+            'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+            order === option ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {ORDER_LABELS[option]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const flip = <T,>(set: ReadonlySet<T>, value: T): Set<T> => {
   const next = new Set(set)
   if (next.has(value)) next.delete(value)
@@ -106,6 +134,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const [file, setFile] = useState<ParsedFile | null>(null)
   const [fileKey, setFileKey] = useState(0)
   const [dateOrder, setDateOrder] = useState<DateOrder>('MDY')
+  // Picking an order, even the default one, settles an ambiguous file (LED-147).
+  const [dateOrderConfirmed, setDateOrderConfirmed] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
   const [accountId, setAccountId] = useState<string>('')
   const [importing, setImporting] = useState(false)
@@ -117,9 +147,13 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   /** Categories the user chose; '' means they chose none. */
   const [picks, setPicks] = useState<Map<number, string>>(new Map())
   const [pickedCurrency, setPickedCurrency] = useState('')
-  const [rateInput, setRateInput] = useState('')
+  // null until the user types: the input then shows the exchange-rate table's rate (LED-136).
+  const [rateInput, setRateInput] = useState<string | null>(null)
   const [activeCause, setActiveCause] = useState<CauseId | null>(null)
   const [onlyProblems, setOnlyProblems] = useState(false)
+  /** After a category pick: the same-payee rows it could also fill, then what was applied so it can be undone (LED-147). */
+  const [similarOffer, setSimilarOffer] = useState<{ categoryId: string; lines: number[] } | null>(null)
+  const [similarApplied, setSimilarApplied] = useState<{ categoryId: string; lines: number[] } | null>(null)
 
   const { categories } = useCategories()
   const categoryMemory = useImportCategoryMemory(file ? fileKey : null)
@@ -127,7 +161,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const selectedAccount = accounts.find((account) => account.id === accountId)
   const accountCurrency = selectedAccount?.currency ?? ''
   const statementCurrency = pickedCurrency || accountCurrency
-  const conversion = currencyState(statementCurrency, accountCurrency, rateInput)
+  const { table: rateTable } = useExchangeRates()
+  const tableRate = lookupRate(rateTable, statementCurrency, accountCurrency)
+  const suggestedRate = formatSuggestedRate(tableRate.kind === 'rate' ? tableRate.rate : null)
+  const rateText = rateInputValue(rateInput, suggestedRate)
+  const conversion = currencyState(statementCurrency, accountCurrency, rateText)
   const rate = effectiveRate(conversion)
   const candidates = selectedAccount ? transferCandidates(accounts, selectedAccount) : []
 
@@ -139,7 +177,15 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const dupeCheck = useImportDuplicates(accountId, span)
   // Compare in the account's currency: that's what the existing rows are in.
   const duplicates = matchDuplicates(
-    built.rows.map((row) => (row.amount === null ? row : { ...row, amount: convertAmount(row.amount, rate) })),
+    built.rows.map((row) =>
+      row.amount === null
+        ? row
+        : {
+            ...row,
+            amount: convertAmount(row.amount, rate),
+            original: conversion.kind === 'ok' ? { amount: row.amount, currency: statementCurrency } : null,
+          },
+    ),
     dupeCheck.existing,
     accountId,
   )
@@ -153,7 +199,10 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     if (suggestion) suggestions.set(row.line, suggestion)
     else if (!leftOut && !picks.has(row.line) && !categoryMemory.loading) uncategorised.add(row.line)
   }
-  const rows = withCategoryIssues(built.rows, uncategorised)
+  const rows = withCategoryIssues(
+    withAmbiguousDateIssues(built.rows, Boolean(file?.dateOrderAmbiguous) && !dateOrderConfirmed),
+    uncategorised,
+  )
   const categoryOf = (line: number): string | null => {
     const pick = picks.get(line)
     return pick !== undefined ? pick || null : (suggestions.get(line)?.categoryId ?? null)
@@ -172,6 +221,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     resetKey: `${fileKey}|${onlyProblems}|${dateOrder}`,
   })
 
+  const chooseDateOrder = (order: DateOrder) => {
+    setDateOrder(order)
+    setDateOrderConfirmed(true)
+  }
+
   const reset = () => {
     setFile(null)
     setParseError(null)
@@ -181,10 +235,13 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     setToggled(new Set())
     setTransfers(new Map())
     setPicks(new Map())
+    setDateOrderConfirmed(false)
     setPickedCurrency('')
-    setRateInput('')
+    setRateInput(null)
     setActiveCause(null)
     setOnlyProblems(false)
+    setSimilarOffer(null)
+    setSimilarApplied(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -216,6 +273,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         setFile(result)
         setFileKey((key) => key + 1)
         setDateOrder(result.dateOrder)
+        setDateOrderConfirmed(false)
         setParseError(null)
         setSkipped(new Set())
         setToggled(new Set())
@@ -223,6 +281,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         setPicks(new Map())
         setActiveCause(null)
         setOnlyProblems(false)
+        setSimilarOffer(null)
+        setSimilarApplied(null)
         // Only an unambiguous target is picked for the user (LED-75).
         if (!accountId && accounts.length === 1) {
           setAccountId(accounts[0].id)
@@ -249,6 +309,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     setAccountId(id)
     // Transfer counterparts depend on the account; its own rows can't be one.
     setTransfers(new Map())
+    setSimilarOffer(null)
+    setSimilarApplied(null)
   }
 
   const setKind = (line: number, value: string) => {
@@ -262,6 +324,45 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     if (!transferTo) {
       setPicks((current) => new Map(current).set(line, value.startsWith('cat:') ? value.slice(4) : ''))
     }
+    setSimilarApplied(null)
+    setSimilarOffer(null)
+    if (value.startsWith('cat:')) {
+      const categoryId = value.slice(4)
+      const lines = similarRows(rows, line, (other) => {
+        const row = rows.find((item) => item.line === other)
+        return (
+          Boolean(row) &&
+          !picks.has(other) &&
+          !transfers.has(other) &&
+          !hasError(row!.issues) &&
+          !(duplicates.has(other) && !toggled.has(other)) &&
+          categoryOf(other) !== categoryId
+        )
+      })
+      if (lines.length > 0) setSimilarOffer({ categoryId, lines })
+    }
+  }
+
+  const applySimilar = () => {
+    if (!similarOffer) return
+    setPicks((current) => {
+      const next = new Map(current)
+      for (const line of similarOffer.lines) next.set(line, similarOffer.categoryId)
+      return next
+    })
+    setSimilarApplied(similarOffer)
+    setSimilarOffer(null)
+  }
+
+  // Removing the picks returns those rows to what they had: a suggestion, or unmatched.
+  const undoSimilar = () => {
+    if (!similarApplied) return
+    setPicks((current) => {
+      const next = new Map(current)
+      for (const line of similarApplied.lines) next.delete(line)
+      return next
+    })
+    setSimilarApplied(null)
   }
 
   const needsRate = conversion.kind === 'needs-rate'
@@ -279,6 +380,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         description: row.description || EMPTY_DESCRIPTION,
         amount: convertAmount(row.amount!, rate),
         currency: selectedAccount.currency,
+        original: conversion.kind === 'ok' ? { amount: row.amount!, currency: statementCurrency } : null,
       }
       const other = transfers.get(row.line)
       return other
@@ -302,6 +404,10 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
       const amount = Number(match.amount) * (inbound ? Number(match.exchange_rate ?? 1) : 1)
       return `${match.date} · transfer ${inbound ? `from ${accountName(match.account_id)}` : `to ${accountName(match.to_account_id)}`} · ${formatCurrency(amount, accountCurrency)}`
     }
+    if (match.type === 'expense' && match.to_account_id) {
+      const inbound = match.account_id !== accountId
+      return `${match.date} · payment ${inbound ? `from ${accountName(match.account_id)}` : `to ${accountName(match.to_account_id)}`} · ${formatCurrency(Number(match.amount), accountCurrency)}`
+    }
     return `${match.date} · ${match.description || EMPTY_DESCRIPTION} · ${formatCurrency(Number(match.amount), accountCurrency)}`
   }
 
@@ -315,7 +421,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         onOpenChange(isOpen)
       }}
     >
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] grid-cols-[minmax(0,1fr)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-4 h-4" />
@@ -405,7 +511,13 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                     <Label htmlFor="import-account">Import to</Label>
                     <Select value={accountId} onValueChange={(value) => changeAccount(value ?? '')}>
                       <SelectTrigger id="import-account" className="w-full">
-                        <SelectValue placeholder="Choose an account" />
+                        <SelectValue placeholder="Choose an account">
+                          {() =>
+                            selectedAccount
+                              ? `${selectedAccount.name} (${selectedAccount.currency})`
+                              : 'Choose an account'
+                          }
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {accounts.map((account) => (
@@ -448,16 +560,29 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                     <AlertTriangle className="w-4 h-4 shrink-0 text-warning" />
                     <span className="flex-1 min-w-48">
                       Statement is in {statementCurrency}; {selectedAccount?.name} is in {accountCurrency}. Amounts
-                      convert at the rate you enter.
+                      convert at the rate below.
+                      {rateInput === null && suggestedRate && (
+                        <span className="block text-xs text-muted-foreground">
+                          {tableRate.kind === 'rate' && tableRate.source === 'override'
+                            ? 'Filled in from your rate in Settings.'
+                            : `Filled in from the exchange-rate feed${ratesAsOfLabel(rateTable) ? `, as of ${ratesAsOfLabel(rateTable)}` : ''}.`}{' '}
+                          Change it if your bank used another.
+                        </span>
+                      )}
+                      {rateInput === null && !suggestedRate && (
+                        <span className="block text-xs text-muted-foreground">
+                          No rate found for this pair. Enter the one your bank used.
+                        </span>
+                      )}
                     </span>
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       1 {statementCurrency} =
                       <Input
                         inputMode="decimal"
-                        value={rateInput}
+                        value={rateText}
                         onChange={(event) => setRateInput(event.target.value)}
                         aria-label={`${accountCurrency} per ${statementCurrency}`}
-                        aria-invalid={needsRate && rateInput !== ''}
+                        aria-invalid={needsRate && rateText !== ''}
                         placeholder="Rate"
                         className="h-7 w-24 text-right tabular-nums"
                       />
@@ -549,27 +674,23 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                             Dates in these rows read <code className="text-foreground">{cause.sample || '(empty)'}</code>.
                             {' '}Parse every slash date in the file as
                           </p>
-                          <div className="inline-flex rounded-full border p-0.5">
-                            {(['DMY', 'MDY'] as DateOrder[]).map((order) => (
-                              <button
-                                key={order}
-                                type="button"
-                                aria-pressed={dateOrder === order}
-                                onClick={() => setDateOrder(order)}
-                                className={cn(
-                                  'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
-                                  dateOrder === order ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
-                                )}
-                              >
-                                {ORDER_LABELS[order]}
-                              </button>
-                            ))}
-                          </div>
+                          <DateOrderToggle order={dateOrder} onChange={chooseDateOrder} />
                           {fixableByOtherOrder(rows, dateOrder) === 0 && (
                             <p className="text-xs text-muted-foreground">
                               Switching the order won't fix these. Correct the dates in the file, or skip these rows.
                             </p>
                           )}
+                        </>
+                      )}
+
+                      {cause.id === 'ambiguous-date' && (
+                        <>
+                          <p className="text-muted-foreground">
+                            Every slash date in this file has a day and month at or below 12, so it reads either way
+                            (<code className="text-foreground">{cause.sample}</code> is a different day in each order).
+                            {' '}It is read as {ORDER_LABELS[dateOrder]}. Confirm the order the bank uses:
+                          </p>
+                          <DateOrderToggle order={dateOrder} onChange={chooseDateOrder} />
                         </>
                       )}
 
@@ -595,7 +716,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                         <p className="text-muted-foreground">
                           Skipped unless you tick a row below to import it anyway.
                         </p>
-                      ) : (
+                      ) : cause.id === 'ambiguous-date' ? null : (
                         <Button
                           variant="outline"
                           size="sm"
@@ -606,6 +727,27 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                         </Button>
                       )}
                     </div>
+                  </div>
+                )}
+
+                {(similarOffer || similarApplied) && (
+                  <div role="status" className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                    {similarOffer ? (
+                      <>
+                        <span className="flex-1">
+                          Apply {categoryById.get(similarOffer.categoryId)?.name ?? 'this category'} to {plural(similarOffer.lines.length, 'similar row')} from the same payee?
+                        </span>
+                        <Button size="sm" className="h-7" onClick={applySimilar}>Apply</Button>
+                        <Button size="sm" variant="ghost" className="h-7" onClick={() => setSimilarOffer(null)}>Not now</Button>
+                      </>
+                    ) : similarApplied ? (
+                      <>
+                        <span className="flex-1">
+                          Applied {categoryById.get(similarApplied.categoryId)?.name ?? 'the category'} to {plural(similarApplied.lines.length, 'row')}.
+                        </span>
+                        <Button size="sm" variant="ghost" className="h-7" onClick={undoSimilar}>Undo</Button>
+                      </>
+                    ) : null}
                   </div>
                 )}
 
@@ -641,14 +783,12 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                           const categoryId = categoryOf(row.line)
                           const category = categoryId ? categoryById.get(categoryId) : undefined
                           const auto = Boolean(category) && !picks.has(row.line)
+                          const reason = skipReason(row, selection)
                           const fitting = categories.filter((item) => item.type === row.type || item.type === 'both')
                           return (
                             <tr
                               key={row.line}
-                              className={cn(
-                                'border-b last:border-0 hover:bg-muted/30',
-                                (isSkipped(row, selection) || (selectable && !selected)) && 'opacity-50',
-                              )}
+                              className="border-b last:border-0 hover:bg-muted/30"
                             >
                               <td className="px-2 py-2 text-center">
                                 {selectable && (
@@ -680,7 +820,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                       {EMPTY_DESCRIPTION}
                                     </span>
                                   ) : (
-                                    <span className="truncate">{row.description}</span>
+                                    <span className={cn('truncate', reason && 'line-through text-muted-foreground')}>{row.description}</span>
                                   )}
                                   {match && (
                                     <Badge variant="secondary" className="text-[10px] shrink-0">already in Ledger</Badge>
@@ -690,6 +830,9 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                   <span className="block text-xs text-muted-foreground truncate">
                                     Matches {describeMatch(match)}
                                   </span>
+                                )}
+                                {reason && (
+                                  <span className="block text-xs font-medium text-muted-foreground">{reason}</span>
                                 )}
                               </td>
                               <td className="px-3 py-2 whitespace-nowrap">
@@ -766,7 +909,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                 ) : (
                                   <>
                                     <span className={cn('block', transferTo ? 'text-foreground' : row.type === 'expense' ? 'text-expense' : 'text-income')}>
-                                      {row.type === 'expense' ? '-' : '+'}
+                                      {row.type === 'expense' ? MINUS : '+'}
                                       {statementCurrency
                                         ? formatCurrency(row.amount ?? 0, statementCurrency)
                                         : (row.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

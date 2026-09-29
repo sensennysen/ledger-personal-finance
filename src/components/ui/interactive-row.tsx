@@ -7,6 +7,10 @@ interface InteractiveRowProps extends Omit<React.ComponentPropsWithoutRef<"butto
   onActivate: () => void
 }
 
+// LED-157: every row/card built on this primitive must show a focus ring —
+// baked in here so a caller can't ship one that forgets it.
+const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+
 /**
  * One row component for every clickable row/card. Defaults to a real
  * `<button>` (native Enter/Space handling, no role/tabIndex needed). Pass
@@ -17,7 +21,7 @@ interface InteractiveRowProps extends Omit<React.ComponentPropsWithoutRef<"butto
  */
 export function InteractiveRow({ as: Component = "button", onActivate, className, ...props }: InteractiveRowProps) {
   if (Component === "button") {
-    return <button type="button" onClick={onActivate} className={cn(className)} {...props} />
+    return <button type="button" onClick={onActivate} className={cn(FOCUS_RING, className)} {...props} />
   }
 
   return (
@@ -31,7 +35,7 @@ export function InteractiveRow({ as: Component = "button", onActivate, className
           onActivate()
         }
       }}
-      className={className}
+      className={cn(FOCUS_RING, className)}
       {...props}
     />
   )

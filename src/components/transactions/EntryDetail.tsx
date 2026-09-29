@@ -4,6 +4,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useCycle } from '@/contexts/cycleState'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { monthKeyOf } from '@/lib/monthJump'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { entryBudgetImpact } from '@/lib/budgetImpact'
@@ -122,7 +123,7 @@ function ReceiptLink({ value }: { value: string }) {
     <span className="inline-flex flex-col items-end">
       <button
         type="button"
-        className="text-primary underline-offset-2 hover:underline disabled:opacity-60"
+        className="text-primary underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:no-underline"
         disabled={state === 'opening'}
         onClick={async () => {
           setState('opening')
@@ -151,9 +152,10 @@ function BudgetImpactBar({ transaction }: { transaction: Transaction }) {
   const { startDay } = useCycle()
   const month = monthKeyOf(transaction.date, startDay)
   const { budgets } = useBudgets({ selectedMonth: month, startDay })
+  const { table: rates } = useExchangeRates()
   const budget = budgets.find((b) => b.category_id === transaction.category_id)
   const impact = budget
-    ? entryBudgetImpact(transaction, budget, getBudgetCycleRange(budget.period, month, startDay))
+    ? entryBudgetImpact(transaction, budget, getBudgetCycleRange(budget.period, month, startDay), rates)
     : null
   if (!budget || !impact) return null
 

@@ -16,7 +16,7 @@ create table if not exists public.profiles (
   avatar_url      text,
   default_currency text not null default 'USD',
   month_start_day  integer not null default 1 check (month_start_day between 1 and 28),
-  dashboard_widget_order jsonb not null default '["stats","creditCards","cashflowChart","categoryPie","budgets","upcomingBills","cashflowForecast"]'::jsonb,
+  dashboard_widget_order jsonb not null default '["upcomingBills","stats","creditCards","budgets","recentTransactions","cashflowChart","categoryPie","cashflowForecast"]'::jsonb,
   account_group_order jsonb not null default '["cash","digital_wallet","credit_card","savings","checking","investment","loan","other"]'::jsonb,
   account_view_mode text not null default 'all'
     check (account_view_mode in ('all','cash','digital_wallet','credit_card','savings','checking','investment','loan','other')),

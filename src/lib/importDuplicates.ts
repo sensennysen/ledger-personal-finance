@@ -1,11 +1,18 @@
+import { EMPTY_DESCRIPTION } from './csvImport.ts'
+
 // Import duplicate detection (LED-73): a CSV row that matches a transaction
 // already in the account on date + amount + type + normalised description is
 // flagged before the write, so a re-imported or overlapping statement doesn't
 // silently add every row twice.
 //
-// Transfers (LED-75) match on date + amount + direction only: the other bank
+// Transfers and loan repayments (LED-75, LED-147) match on date + amount + direction only: the other bank
 // words the same movement differently, so once one statement's side is
 // imported as a transfer, the other statement's side is flagged too.
+//
+// A row imported from a statement in another currency is stored converted, at the rate of the
+// day (LED-136), together with the statement's own amount and currency. Importing the same
+// statement again at a different rate converts to different amounts, so those rows also match on
+// the original amount and currency: the same statement is caught whatever the rate.
 
 export interface ImportCandidate {
   /** 1-based data row number in the file. */
@@ -14,6 +21,8 @@ export interface ImportCandidate {
   amount: number | null
   type: 'income' | 'expense' | null
   description: string
+  /** The statement's own amount and currency, when the statement is not in the account's currency. */
+  original?: { amount: number; currency: string } | null
 }
 
 export interface ExistingTx {
@@ -25,6 +34,9 @@ export interface ExistingTx {
   account_id: string
   to_account_id: string | null
   exchange_rate: number | null
+  /** Set on a row imported from a statement in another currency. */
+  original_amount?: number | null
+  original_currency?: string | null
 }
 
 /**
@@ -45,8 +57,17 @@ function matchKey(date: string, amount: number, type: string, description: strin
   return `${date}|${Math.round(amount * 100)}|${type}|${normaliseDescription(description)}`
 }
 
+function originalKey(date: string, amount: number, currency: string, type: string, description: string | null): string {
+  return `${currency}|${matchKey(date, amount, type, description)}`
+}
+
 function transferKey(date: string, amount: number, direction: 'income' | 'expense'): string {
   return `${date}|${Math.round(amount * 100)}|${direction}`
+}
+
+/** Money moved between two of the user's accounts: a transfer, or an expense paid to a loan. */
+function isMovement(tx: ExistingTx): boolean {
+  return tx.type === 'transfer' || (tx.type === 'expense' && tx.to_account_id !== null)
 }
 
 function push<T>(buckets: Map<string, T[]>, key: string, value: T) {
@@ -68,26 +89,52 @@ export function matchDuplicates<T extends ImportCandidate>(
   importAccountId: string,
 ): Map<number, ExistingTx> {
   const buckets = new Map<string, ExistingTx[]>()
+  const originals = new Map<string, ExistingTx[]>()
   const transfers = new Map<string, ExistingTx[]>()
   for (const tx of existing) {
-    if (tx.type === 'transfer') {
+    // A loan repayment is an expense with a target account (LED-147); the loan's statement words it
+    // differently from the payer's, so it matches like a transfer: date, amount and direction.
+    if (isMovement(tx)) {
       if (tx.account_id === importAccountId) {
         push(transfers, transferKey(tx.date, Number(tx.amount), 'expense'), tx)
       } else if (tx.to_account_id === importAccountId) {
-        push(transfers, transferKey(tx.date, Number(tx.amount) * Number(tx.exchange_rate ?? 1), 'income'), tx)
+        const received = tx.type === 'transfer' ? Number(tx.amount) * Number(tx.exchange_rate ?? 1) : Number(tx.amount)
+        push(transfers, transferKey(tx.date, received, 'income'), tx)
       }
       continue
     }
     if (tx.account_id !== importAccountId) continue
     push(buckets, matchKey(tx.date, Number(tx.amount), tx.type, tx.description), tx)
+    if (tx.original_amount != null && tx.original_currency) {
+      push(originals, originalKey(tx.date, Number(tx.original_amount), tx.original_currency, tx.type, tx.description), tx)
+    }
+  }
+
+  // Each existing row is used once, whichever way it was found.
+  const used = new Set<string>()
+  const take = (bucket: ExistingTx[] | undefined) => {
+    while (bucket && bucket.length > 0) {
+      const next = bucket.shift() as ExistingTx
+      if (!used.has(next.id)) {
+        used.add(next.id)
+        return next
+      }
+    }
+    return undefined
   }
 
   const matches = new Map<number, ExistingTx>()
   for (const row of rows) {
     if (row.date === null || row.amount === null || row.type === null) continue
+    // A description-less row is saved as EMPTY_DESCRIPTION (ImportCSVDialog), so it must be
+    // matched on that same text, not the empty string the file actually has (LED-171).
+    const description = row.description || EMPTY_DESCRIPTION
     const match =
-      buckets.get(matchKey(row.date, row.amount, row.type, row.description))?.shift() ??
-      transfers.get(transferKey(row.date, row.amount, row.type))?.shift()
+      (row.original
+        ? take(originals.get(originalKey(row.date, row.original.amount, row.original.currency, row.type, description)))
+        : undefined) ??
+      take(buckets.get(matchKey(row.date, row.amount, row.type, description))) ??
+      take(transfers.get(transferKey(row.date, row.amount, row.type)))
     if (match) matches.set(row.line, match)
   }
   return matches

@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { normaliseDescription, matchDuplicates, duplicateSpan } from '../src/lib/importDuplicates.ts'
+import { EMPTY_DESCRIPTION } from '../src/lib/csvImport.ts'
 
 const row = (line, overrides = {}) => ({
   line,
@@ -94,4 +95,69 @@ test('duplicateSpan covers the dated rows', () => {
     { start: '2026-08-29', end: '2026-09-14' },
   )
   assert.equal(duplicateSpan([{ date: null }]), null)
+})
+
+test('a loan repayment already recorded matches the loan statement credit (LED-147)', () => {
+  const repayment = existing('r', { account_id: 'bank', to_account_id: 'loan', description: 'Loan payment - Phone', amount: 1000, date: '2026-09-29' })
+  const credit = row(1, { date: '2026-09-29', amount: 1000, type: 'income', description: 'PAYMENT RECEIVED THANK YOU' })
+  const found = matchDuplicates([credit], [repayment], 'loan')
+  assert.equal(found.get(1)?.id, 'r')
+})
+
+test('the payer side matches too, whatever the bank calls the payment', () => {
+  const repayment = existing('r', { account_id: 'bank', to_account_id: 'loan', description: 'Loan payment - Phone', amount: 1000, date: '2026-09-29' })
+  const debit = row(1, { date: '2026-09-29', amount: 1000, type: 'expense', description: 'ONLINE BANKING PMT 55021' })
+  assert.equal(matchDuplicates([debit], [repayment], 'bank').get(1)?.id, 'r')
+})
+
+test('a repayment matches one credit only, and only in the same direction and amount', () => {
+  const repayment = existing('r', { account_id: 'bank', to_account_id: 'loan', amount: 1000, date: '2026-09-29' })
+  const twice = [
+    row(1, { date: '2026-09-29', amount: 1000, type: 'income' }),
+    row(2, { date: '2026-09-29', amount: 1000, type: 'income' }),
+  ]
+  assert.deepEqual([...matchDuplicates(twice, [repayment], 'loan').keys()], [1])
+  assert.equal(matchDuplicates([row(1, { date: '2026-09-29', amount: 900, type: 'income' })], [repayment], 'loan').size, 0)
+  assert.equal(matchDuplicates([row(1, { date: '2026-09-29', amount: 1000, type: 'expense' })], [repayment], 'loan').size, 0)
+})
+
+test('a description-less row is still a duplicate on re-import, matched against its saved EMPTY_DESCRIPTION (LED-171)', () => {
+  const saved = existing('a', { description: EMPTY_DESCRIPTION })
+  assert.equal(match([row(1, { description: '' })], [saved]).get(1)?.id, 'a')
+})
+
+test('an expense with no target is still matched on description as before', () => {
+  assert.equal(match([row(1)], [existing('a')]).get(1)?.id, 'a')
+})
+
+// ── A statement in another currency (LED-136) ───────────────
+// The account is in PHP; the statement is in USD. Rows are stored converted, with the original kept.
+const foreignRow = (line, atRate, overrides = {}) =>
+  row(line, { amount: Math.round(10 * atRate * 100) / 100, original: { amount: 10, currency: 'USD' }, ...overrides })
+const foreignExisting = (id, storedAmount, overrides = {}) =>
+  existing(id, { amount: storedAmount, original_amount: 10, original_currency: 'USD', ...overrides })
+
+test('the same statement imported again at a different rate is still a duplicate', () => {
+  const stored = [foreignExisting('a', 560)]
+  assert.equal(match([foreignRow(1, 56)], stored).get(1)?.id, 'a', 'same rate matches on amount and original')
+  assert.equal(match([foreignRow(1, 58)], stored).get(1)?.id, 'a', 'another rate matches on the original')
+})
+
+test('a row in another currency does not match a stored original in a different currency or amount', () => {
+  const stored = [foreignExisting('a', 560)]
+  assert.equal(match([foreignRow(1, 58, { original: { amount: 10, currency: 'EUR' } })], stored).size, 0)
+  assert.equal(match([foreignRow(1, 58, { original: { amount: 11, currency: 'USD' } })], stored).size, 0)
+})
+
+test('a stored original is used once, even when it also matches on the converted amount', () => {
+  const stored = [foreignExisting('a', 560)]
+  const rows = [foreignRow(1, 56), foreignRow(2, 56)]
+  const matches = match(rows, stored)
+  assert.equal(matches.size, 1)
+  assert.equal(matches.get(1)?.id, 'a')
+})
+
+test('rows without an original still match as before, whatever the stored rows carry', () => {
+  assert.equal(match([row(1)], [existing('a')]).get(1)?.id, 'a')
+  assert.equal(match([row(1)], [foreignExisting('a', 32.8)]).get(1)?.id, 'a')
 })

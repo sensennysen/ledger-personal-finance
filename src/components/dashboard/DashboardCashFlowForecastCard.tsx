@@ -1,9 +1,10 @@
 import { ArrowRight, BarChart3, Repeat, TrendingDown, TrendingUp } from 'lucide-react'
 import { EXPENSE, INCOME } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import type { DashboardCashFlowForecast } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
-import { Skeleton } from '@/components/ui/skeleton'
+import { SkeletonText } from '@/components/ui/skeleton'
 
 interface DashboardCashFlowForecastCardProps {
   forecast: DashboardCashFlowForecast
@@ -34,7 +35,32 @@ export function DashboardCashFlowForecastCard({
         icon={<BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />}
       />
       {loading ? (
-        <div className="space-y-3">{[...Array(4)].map((_, index) => <Skeleton key={index} className="h-8" />)}</div>
+        <div className="space-y-4" aria-busy="true">
+          <div className="flex items-center justify-between gap-2">
+            {['Current', 'Projected'].map((label, index) => (
+              <div key={label} className="contents">
+                {index === 1 && <ArrowRight className="w-4 h-4 text-muted-foreground/40 shrink-0" />}
+                <div className="flex-1 rounded-lg bg-muted/40 border border-border/40 px-3 py-2.5 text-center">
+                  <p className="text-[0.625rem] text-muted-foreground uppercase tracking-wider mb-1">{label}</p>
+                  <p className="text-[0.9375rem]"><SkeletonText className="w-20" /></p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2">
+            {['Expected income', 'Expected expenses'].map((label) => (
+              <div key={label} className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">{label}</span>
+                <SkeletonText className="w-16" />
+              </div>
+            ))}
+            <div className="h-px bg-border/40" />
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Net change</span>
+              <SkeletonText className="w-16" />
+            </div>
+          </div>
+        </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2">
@@ -70,7 +96,7 @@ export function DashboardCashFlowForecastCard({
                 Expected expenses
               </span>
               <span className="money font-medium" style={{ color: EXPENSE }}>
-                -{formatCurrency(forecast.projectedExpenses, currency)}
+                {MINUS}{formatCurrency(forecast.projectedExpenses, currency)}
               </span>
             </div>
             <div className="h-px bg-border/40" />
@@ -99,7 +125,7 @@ export function DashboardCashFlowForecastCard({
                     className="money font-medium shrink-0"
                     style={{ color: item.tx.type === 'income' ? INCOME : EXPENSE }}
                   >
-                    {item.tx.type === 'income' ? '+' : '-'}
+                    {item.tx.type === 'income' ? '+' : MINUS}
                     {formatCurrency(item.total, currency)}
                   </span>
                 </div>

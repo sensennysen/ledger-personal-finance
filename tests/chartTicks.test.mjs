@@ -24,3 +24,10 @@ test('negatives keep a minus sign and never show "-0"', () => {
   assert.equal(abbreviateTick(-4000), '−4k')
   assert.equal(abbreviateTick(-0.2), '0')
 })
+
+test('distinguishes ticks across a 0 to 2,250 domain (LED-174)', () => {
+  const ticks = [0, 750, 1500, 2250]
+  const labels = ticks.map(abbreviateTick)
+  assert.deepEqual(labels, ['0', '750', '1.5k', '2.3k'])
+  assert.equal(new Set(labels).size, labels.length)
+})

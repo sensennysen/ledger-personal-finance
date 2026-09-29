@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 interface ColorPickerProps {
   value: string
   onChange: (color: string) => void
-  palette: string[]
+  palette: readonly string[]
   className?: string
 }
 

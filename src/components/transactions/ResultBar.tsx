@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, Rows3 } from 'lucide-react'
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, Bookmark, Download, Rows3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatNet } from '@/lib/formatNet'
 import type { TxSort } from '@/lib/transactionWindow'
@@ -28,6 +28,8 @@ export function ResultBar({
   onSortChange,
   density,
   onDensityChange,
+  onExport,
+  savedFilters,
   compact,
 }: {
   matchCount: number
@@ -39,6 +41,10 @@ export function ResultBar({
   onSortChange: (sort: TxSort) => void
   density: Density
   onDensityChange: (density: Density) => void
+  /** Downloads the matching rows as CSV (29a "Export match"). */
+  onExport?: () => void
+  /** Saved filters (29a): "Save filter" while a filter narrows the list, else the saved list. */
+  savedFilters?: { count: number; canSave: boolean; onOpen: () => void }
   compact: boolean
 }) {
   const nextSort: TxSort = sort === 'newest' ? 'oldest' : 'newest'
@@ -50,7 +56,8 @@ export function ResultBar({
       <span aria-hidden className="absolute inset-x-0 -top-px h-0.5 bg-primary" />
       <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-0.5">
         <span className="text-sm font-bold">
-          <span className="money">{matchCount.toLocaleString()}</span> {compact ? 'match' : `transaction${matchCount === 1 ? '' : 's'} match`}
+          <span className="money">{matchCount.toLocaleString()}</span>{' '}
+          {compact ? (matchCount === 1 ? 'match' : 'matches') : `transaction${matchCount === 1 ? '' : 's'} match`}
         </span>
         {!compact && (
           <span className="text-xs text-muted-foreground">
@@ -84,6 +91,31 @@ export function ResultBar({
           >
             <Rows3 className="w-3.5 h-3.5" />
             <span>Compact</span>
+          </Button>
+        )}
+        {savedFilters && (savedFilters.canSave || savedFilters.count > 0) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs text-primary"
+            onClick={savedFilters.onOpen}
+            aria-label={savedFilters.canSave ? 'Save this filter' : `Saved filters, ${savedFilters.count}`}
+          >
+            <Bookmark className="w-3.5 h-3.5" />
+            {!compact && <span>{savedFilters.canSave ? 'Save filter' : `Saved filters · ${savedFilters.count}`}</span>}
+          </Button>
+        )}
+        {onExport && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs text-primary"
+            onClick={onExport}
+            disabled={matchCount === 0}
+            aria-label={`Export ${matchCount.toLocaleString()} matching transactions as CSV`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            {!compact && <span>Export match</span>}
           </Button>
         )}
       </div>

@@ -31,6 +31,13 @@ test('unique violation names the record when it can', () => {
   assert.equal(classifyDataError('duplicate key value violates unique constraint'), 'unique')
 })
 
+test('unique violation picks "An" before a vowel-starting entity (LED-176)', () => {
+  const err = { code: '23505', message: 'duplicate key value violates unique constraint' }
+  assert.equal(describeDataError(err, { action: 'save', entity: 'account' }).message, 'An account with that name already exists.')
+  assert.equal(describeDataError(err, { action: 'save', entity: 'exchange rate' }).message, 'An exchange rate with that name already exists.')
+  assert.equal(describeDataError(err, { action: 'save', entity: 'budget' }).message, 'A budget with that name already exists.')
+})
+
 test('RLS denial by code and by message', () => {
   assert.equal(classifyDataError({ code: '42501', message: 'new row violates row-level security policy' }), 'permission')
   assert.equal(classifyDataError('new row violates row-level security policy for table "accounts"'), 'permission')

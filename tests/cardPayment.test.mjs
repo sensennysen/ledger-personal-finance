@@ -1,11 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  cardPaymentTransfer,
+  creditedAmount,
   defaultCardPaymentDescription,
+  defaultPaymentSource,
+  planStatementPayment,
+  transferCard,
   getCardPaymentPresets,
+  getCardDateInfo,
   getCardPaymentSummary,
   isAutoCardPaymentDescription,
+  resolveInitialCardId,
 } from '../src/lib/cardPayment.ts'
+import { cardAmountDue } from '../src/lib/accountsOverview.ts'
+import { daysUntilDayOfMonth, nextDayOfMonthDate } from '../src/lib/creditCards.ts'
 
 test('paying the full balance clears the card', () => {
   const s = getCardPaymentSummary(-1240, 4000, 1240)
@@ -82,4 +91,123 @@ test('description is replaceable only when empty or the generated one for the pr
   assert.equal(isAutoCardPaymentDescription('Card payment - March top-up', 'Visa'), false)
   assert.equal(isAutoCardPaymentDescription('Card payment - Visa'), false)
   assert.equal(isAutoCardPaymentDescription('Groceries', 'Visa'), false)
+})
+
+const at = (y, m, d) => new Date(y, m - 1, d)
+
+test('the design example: on Sep 10 the statement closes Sep 16 and payment is due Oct 1', () => {
+  const today = at(2026, 9, 10)
+  assert.deepEqual(getCardDateInfo(16, today), { label: 'Sep 16', daysUntil: 6 })
+  assert.deepEqual(getCardDateInfo(1, today), { label: 'Oct 1', daysUntil: 21 })
+})
+
+test('a day that is today counts as today, and one that has passed rolls to next month', () => {
+  assert.deepEqual(getCardDateInfo(10, at(2026, 9, 10)), { label: 'Sep 10', daysUntil: 0 })
+  assert.deepEqual(getCardDateInfo(9, at(2026, 9, 10)), { label: 'Oct 9', daysUntil: 29 })
+})
+
+test('December rolls into January and a short month clamps the day', () => {
+  assert.equal(getCardDateInfo(5, at(2026, 12, 20)).label, 'Jan 5')
+  assert.equal(nextDayOfMonthDate(31, at(2026, 2, 10)).getDate(), 28)
+  assert.equal(nextDayOfMonthDate(31, at(2026, 3, 1)).getDate(), 31)
+})
+
+test('an unset or out-of-range day has no date', () => {
+  for (const day of [null, undefined, 0, 32]) {
+    assert.equal(getCardDateInfo(day, at(2026, 9, 10)), null)
+    assert.equal(nextDayOfMonthDate(day, at(2026, 9, 10)), null)
+  }
+})
+
+test('daysUntilDayOfMonth still counts the same days', () => {
+  assert.equal(daysUntilDayOfMonth(16, at(2026, 9, 10)), 6)
+  assert.equal(daysUntilDayOfMonth(1, at(2026, 9, 10)), 21)
+  assert.equal(daysUntilDayOfMonth(31, at(2026, 2, 10)), 18)
+  assert.equal(daysUntilDayOfMonth(null, at(2026, 9, 10)), null)
+})
+
+const visa = { id: 'visa', balance: -1240 }
+const mc = { id: 'mc', balance: -300 }
+const empty = { id: 'empty', balance: 0 }
+
+test('a locked card is always the one picked', () => {
+  assert.equal(resolveInitialCardId([visa, mc], 'mc'), 'mc')
+})
+
+test('with two cards owing nothing is picked for the user', () => {
+  assert.equal(resolveInitialCardId([visa, mc], null), null)
+  assert.equal(resolveInitialCardId([visa, mc, empty], null), null)
+})
+
+test('the one card that owes is picked, even beside a paid-off card', () => {
+  assert.equal(resolveInitialCardId([visa, empty], null), 'visa')
+  assert.equal(resolveInitialCardId([visa], null), 'visa')
+})
+
+test('a single card with nothing owed is still picked, and no cards picks nothing', () => {
+  assert.equal(resolveInitialCardId([empty], null), 'empty')
+  assert.equal(resolveInitialCardId([empty, { id: 'e2', balance: 0 }], null), null)
+  assert.equal(resolveInitialCardId([], null), null)
+})
+
+const accountsFixture = [
+  { id: 'card', type: 'credit_card', currency: 'PHP', is_active: true },
+  { id: 'usd', type: 'checking', currency: 'USD', is_active: true },
+  { id: 'loan', type: 'loan', currency: 'PHP', is_active: true },
+  { id: 'old', type: 'checking', currency: 'PHP', is_active: false },
+  { id: 'bank', type: 'checking', currency: 'PHP', is_active: true },
+]
+
+test('the payment source is the first active non-liability account in the card currency', () => {
+  assert.equal(defaultPaymentSource(accountsFixture, accountsFixture[0]), 'bank')
+  assert.equal(defaultPaymentSource([accountsFixture[0], accountsFixture[1]], accountsFixture[0]), null)
+})
+
+test('a card payment is a category-less transfer at rate 1', () => {
+  const saved = cardPaymentTransfer({
+    type: 'expense',
+    to_account_id: 'card',
+    category_id: 'c',
+    subcategory_id: 's',
+    exchange_rate: 2,
+    transfer_fee: 5,
+    goal_id: 'g',
+    amount: 500,
+  })
+  assert.deepEqual(saved, {
+    type: 'transfer',
+    to_account_id: 'card',
+    category_id: null,
+    subcategory_id: null,
+    exchange_rate: 1,
+    transfer_fee: null,
+    goal_id: null,
+    amount: 500,
+  })
+})
+
+test('only a transfer into a credit card counts as paying it', () => {
+  assert.equal(transferCard({ type: 'transfer', to_account_id: 'card' }, accountsFixture)?.id, 'card')
+  assert.equal(transferCard({ type: 'transfer', to_account_id: 'bank' }, accountsFixture), null)
+  assert.equal(transferCard({ type: 'expense', to_account_id: 'loan' }, accountsFixture), null)
+  assert.equal(transferCard({ type: 'transfer', to_account_id: null }, accountsFixture), null)
+})
+
+test('a cross-currency credit is converted', () => {
+  assert.equal(creditedAmount({ amount: 100, exchange_rate: 56.25 }), 5625)
+  assert.equal(creditedAmount({ amount: 100 }), 100)
+})
+
+test('a payment raises the paid amount up to the statement and lowers Amount to pay', () => {
+  const card = { balance: -1500, statement_balance: 1000, statement_paid_amount: 200 }
+  const patch = planStatementPayment(card, 300, '2026-09-25')
+  assert.deepEqual(patch, { statement_paid_amount: 500, last_payment_amount: 300, last_payment_date: '2026-09-25' })
+  assert.equal(cardAmountDue({ ...card, ...patch }), 500)
+  assert.equal(planStatementPayment(card, 5000, '2026-09-25').statement_paid_amount, 1000)
+})
+
+test('with no statement the paid amount is left alone', () => {
+  const patch = planStatementPayment({ statement_balance: null, statement_paid_amount: null }, 300, '2026-09-25')
+  assert.equal(patch.statement_paid_amount, 0)
+  assert.equal(patch.last_payment_amount, 300)
 })

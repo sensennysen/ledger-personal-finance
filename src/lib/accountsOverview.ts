@@ -1,11 +1,15 @@
 import type { Account, LoanPaymentAllocation, LoanPurchase } from '@/types'
-import { daysUntilDayOfMonth, getCreditCardSpending, getCreditUtilizationPct } from './creditCards.ts'
+import { daysUntilDayOfMonth, getBalanceSummary, getCreditCardSpending, getCreditUtilizationPct, type BalanceSummary } from './creditCards.ts'
 import { getLoanAmountOwed } from './loans.ts'
 import { getLoanDeadlines, getPurchaseInstallments, roundMoney } from './loanInstallments.ts'
+import type { ConvertFn } from './exchangeRates.ts'
 
-// The Accounts page compares assets with liabilities (LED-76). There is no
-// exchange-rate table, so totals only count accounts in the base currency and
-// every other account is marked excluded on its own row.
+// The Accounts page compares assets with liabilities (LED-76). Totals are in the base
+// currency. An account in another currency is converted with the `convert` function the
+// caller passes (LED-136: the rates from Settings); one it cannot convert is marked excluded
+// on its own row and named in `excludedCurrencies`. Without `convert`, only base-currency
+// accounts count. Home and Reports use `summarizeBalances` so all three screens show the
+// same net worth.
 
 export interface LoanProgress {
   paidInstallments: number
@@ -17,7 +21,10 @@ export interface LoanProgress {
 
 export interface AssetRow {
   account: Account
+  /** In the account's own currency. */
   balance: number
+  /** The balance in the base currency when the account is in another one and was converted. */
+  converted: number | null
   /** Share of the asset total, 0–100; null when the account is excluded. */
   sharePct: number | null
   excluded: boolean
@@ -26,6 +33,8 @@ export interface AssetRow {
 export interface LiabilityRow {
   account: Account
   owed: number
+  /** What is owed in the base currency when the account is in another one and was converted. */
+  convertedOwed: number | null
   excluded: boolean
   utilizationPct: number | null
   loanProgress: LoanProgress | null
@@ -44,7 +53,50 @@ export interface AccountsOverview {
   liabilities: LiabilityRow[]
   totals: { assets: number; liabilities: number; netWorth: number }
   excludedCurrencies: string[]
+  /** Currencies counted in the totals at a converted rate. */
+  convertedCurrencies: string[]
   comingUp: ComingUpItem[]
+}
+
+export interface BalancesSummary extends BalanceSummary {
+  /** Currencies left out of every figure because no exchange rate converts them. */
+  excludedCurrencies: string[]
+  /** Currencies counted at a converted rate. */
+  convertedCurrencies: string[]
+}
+
+/** The account as it counts in the base currency: as is, converted, or null when no rate converts it. */
+function inBaseCurrency(account: Account, baseCurrency: string, convert?: ConvertFn): Account | null {
+  if (account.currency === baseCurrency) return account
+  const balance = convert?.(account.balance, account.currency)
+  return balance == null ? null : { ...account, balance: roundMoney(balance), currency: baseCurrency }
+}
+
+/** Balance totals in `baseCurrency`, converting what `convert` can and naming the currencies left out. */
+export function summarizeBalances(accounts: Account[], baseCurrency: string, convert?: ConvertFn): BalancesSummary {
+  const counted: Account[] = []
+  const excluded = new Set<string>()
+  const converted = new Set<string>()
+  for (const account of accounts) {
+    const value = inBaseCurrency(account, baseCurrency, convert)
+    if (value) {
+      counted.push(value)
+      if (account.currency !== baseCurrency) converted.add(account.currency)
+    } else {
+      excluded.add(account.currency)
+    }
+  }
+  const summary = getBalanceSummary(counted)
+  return {
+    // Converted balances are rounded to cents one by one, so the sums only need their float dust removed.
+    totalAssets: roundMoney(summary.totalAssets),
+    totalCreditCardDebt: roundMoney(summary.totalCreditCardDebt),
+    totalLoanDebt: roundMoney(summary.totalLoanDebt),
+    // Net worth sums signed balances, so a card in credit adds to it (see creditCards.ts).
+    netWorth: roundMoney(summary.netWorth),
+    excludedCurrencies: [...excluded].sort(),
+    convertedCurrencies: [...converted].sort(),
+  }
 }
 
 export function isLiability(account: Pick<Account, 'type'>): boolean {
@@ -92,19 +144,29 @@ export function buildAccountsOverview(
   baseCurrency: string,
   loans: { purchases: LoanPurchase[]; allocations: LoanPaymentAllocation[] } = { purchases: [], allocations: [] },
   today: Date = new Date(),
+  convert?: ConvertFn,
 ): AccountsOverview {
-  const counted = (account: Account) => account.currency === baseCurrency
+  const inBase = new Map(accounts.map((account) => [account.id, inBaseCurrency(account, baseCurrency, convert)]))
+  const counted = (account: Account) => inBase.get(account.id) != null
+  const convertedBalance = (account: Account) =>
+    account.currency !== baseCurrency && counted(account) ? (inBase.get(account.id) as Account).balance : null
   const assetAccounts = accounts.filter((account) => !isLiability(account))
   const liabilityAccounts = accounts.filter(isLiability)
 
-  const totalAssets = roundMoney(
-    assetAccounts.filter(counted).reduce((sum, account) => sum + Math.max(0, account.balance), 0),
+  const baseBalance = (account: Account) => (inBase.get(account.id) as Account).balance
+  // The Assets tile is the real sum, so an overdrawn asset lowers it and Assets - Liabilities
+  // still equals Net Worth (LED-172). Shares stay percentages of the positive total, so an
+  // overdrawn row (share 0%) does not shrink every other row's share.
+  const totalAssets = roundMoney(assetAccounts.filter(counted).reduce((sum, account) => sum + baseBalance(account), 0))
+  const positiveAssets = roundMoney(
+    assetAccounts.filter(counted).reduce((sum, account) => sum + Math.max(0, baseBalance(account)), 0),
   )
   const assets = assetAccounts.map((account) => ({
     account,
     balance: account.balance,
+    converted: convertedBalance(account),
     excluded: !counted(account),
-    sharePct: counted(account) && totalAssets > 0 ? (Math.max(0, account.balance) / totalAssets) * 100 : counted(account) ? 0 : null,
+    sharePct: counted(account) && positiveAssets > 0 ? (Math.max(0, baseBalance(account)) / positiveAssets) * 100 : counted(account) ? 0 : null,
   }))
 
   const comingUp: ComingUpItem[] = []
@@ -116,6 +178,7 @@ export function buildAccountsOverview(
       return {
         account,
         owed: getCreditCardSpending(account),
+        convertedOwed: counted(account) && account.currency !== baseCurrency ? getCreditCardSpending(inBase.get(account.id) as Account) : null,
         excluded: !counted(account),
         utilizationPct: account.credit_limit ? getCreditUtilizationPct(account) : null,
         loanProgress: null,
@@ -127,6 +190,7 @@ export function buildAccountsOverview(
     return {
       account,
       owed: getLoanAmountOwed(account),
+      convertedOwed: counted(account) && account.currency !== baseCurrency ? getLoanAmountOwed(inBase.get(account.id) as Account) : null,
       excluded: !counted(account),
       utilizationPct: null,
       loanProgress: loanProgress(purchases, loans.allocations),
@@ -134,16 +198,16 @@ export function buildAccountsOverview(
   })
 
   const totalLiabilities = roundMoney(
-    liabilities.filter((row) => !row.excluded).reduce((sum, row) => sum + row.owed, 0),
+    liabilities.filter((row) => !row.excluded).reduce((sum, row) => sum + (row.convertedOwed ?? row.owed), 0),
   )
-  // Net worth sums signed balances, so a card in credit adds to it (see creditCards.ts).
-  const netWorth = roundMoney(accounts.filter(counted).reduce((sum, account) => sum + account.balance, 0))
+  const { netWorth, excludedCurrencies, convertedCurrencies } = summarizeBalances(accounts, baseCurrency, convert)
 
   return {
     assets,
     liabilities,
     totals: { assets: totalAssets, liabilities: totalLiabilities, netWorth },
-    excludedCurrencies: [...new Set(accounts.filter((account) => !counted(account)).map((account) => account.currency))].sort(),
+    excludedCurrencies,
+    convertedCurrencies,
     comingUp: comingUp.sort((left, right) => left.days - right.days),
   }
 }

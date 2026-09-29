@@ -44,7 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .single()
     if (error) {
       console.error('Failed to fetch profile:', error.message)
-      setAuthError(makeAuthError('profile', error.message))
+      // With a cached profile on screen nothing is missing, so there is nothing to warn about.
+      if (!cached) setAuthError(makeAuthError('profile', error.message))
       return
     }
     setAuthError((prev) => (prev?.kind === 'profile' ? null : prev))
@@ -100,7 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async (): Promise<boolean> => {
-    // A failed sign-out leaves the user signed in, so local data must stay intact.
+    // supabase-js clears the local session even when the server call fails (2.116.0), so
+    // local data is cleared either way; the return value says whether the server confirmed it.
     let failure: string | null = null
     try {
       const { error } = await supabase.auth.signOut()
@@ -108,12 +110,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       failure = err instanceof Error ? err.message : String(err)
     }
-    if (failure !== null) {
-      console.error('Sign out failed:', failure)
-      setAuthError(makeAuthError('signout', failure))
-      return false
-    }
-    setAuthError(null)
 
     if (user) clearCacheByPrefix(user.id)
     clearOfflineQueue()
@@ -122,6 +118,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (receiptError) {
       console.error('Failed to clear pending receipts:', receiptError)
     }
+
+    if (failure !== null) {
+      console.error('Sign out could not reach the server:', failure)
+      setAuthError(makeAuthError('signout', failure))
+      return false
+    }
+    setAuthError(null)
     return true
   }
 
@@ -136,8 +139,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (receiptError) {
       console.error('Failed to clear pending receipts:', receiptError)
     }
-    // Invalidate the local session (auth row is already gone)
-    await supabase.auth.signOut()
+    // Invalidate the local session (auth row is already gone). The deletion has already
+    // happened, so a failure here is shown as a sign-out failure rather than thrown.
+    try {
+      const { error: signOutError } = await supabase.auth.signOut()
+      if (signOutError) {
+        console.error('Sign out after deletion failed:', signOutError.message)
+        setAuthError(makeAuthError('signout', signOutError.message))
+      }
+    } catch (err) {
+      console.error('Sign out after deletion failed:', err)
+      setAuthError(makeAuthError('signout', err instanceof Error ? err.message : String(err)))
+    }
   }
 
   return (

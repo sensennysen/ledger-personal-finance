@@ -59,3 +59,29 @@ test('rows with no type or no description get nothing', () => {
   assert.equal(suggestCategory({ description: '', type: 'expense' }, [], memory, categories), null)
   assert.equal(suggestCategory({ description: 'GRAB', type: null }, [], memory, categories), null)
 })
+
+test('similarRows finds the same payee and type, skipping rows already settled (LED-147)', async () => {
+  const { similarRows } = await import('../src/lib/importCategories.ts')
+  const rows = [
+    { line: 1, type: 'expense', description: 'GRAB *TRIP 8842' },
+    { line: 2, type: 'expense', description: 'Grab Trip 1190' },
+    { line: 3, type: 'income', description: 'Grab Trip 1190' },
+    { line: 4, type: 'expense', description: 'Jollibee' },
+    { line: 5, type: 'expense', description: 'grab trip' },
+    { line: 6, type: null, description: 'Grab Trip' },
+  ]
+  assert.deepEqual(similarRows(rows, 1, () => true), [2, 5])
+  assert.deepEqual(similarRows(rows, 1, (line) => line !== 5), [2])
+  assert.deepEqual(similarRows(rows, 4, () => true), [])
+})
+
+test('similarRows offers nothing for a row with no type or no payee', async () => {
+  const { similarRows } = await import('../src/lib/importCategories.ts')
+  const rows = [
+    { line: 1, type: null, description: 'Grab' },
+    { line: 2, type: 'expense', description: '' },
+    { line: 3, type: 'expense', description: '' },
+  ]
+  assert.deepEqual(similarRows(rows, 1, () => true), [])
+  assert.deepEqual(similarRows(rows, 2, () => true), [])
+})

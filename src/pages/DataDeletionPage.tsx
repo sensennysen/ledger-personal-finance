@@ -8,7 +8,9 @@ const LAST_UPDATED = 'May 2, 2026'
 const dataItems = [
   'Your name, email address, and profile picture (received from Google OAuth at sign-in).',
   'All financial accounts you created in Ledger.',
-  'All transactions, categories, and budgets you entered.',
+  'All transactions, categories, subcategories, and budgets you entered.',
+  'Savings goals, financed loan purchases and their payment allocations, and credit card payments.',
+  'Auto-categorisation rules and any exchange rates you typed in.',
   'Your application preferences such as default currency and colour scheme.',
   'Authentication session tokens used to keep you signed in.',
 ]
@@ -122,10 +124,12 @@ export default function DataDeletionPage() {
             <h2 className="text-sm font-semibold text-foreground">There is no grace period</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Deletion is <span className="font-medium text-foreground">immediate and permanent</span>.
-              The moment you confirm, your profile, accounts, transactions, categories, and budgets are
-              erased from our database in a single operation. There is no grace period and no way to
-              undo or recover the data. Anonymised, aggregated data that cannot identify you
-              (e.g., total number of active users) may be retained for analytics.
+              The moment you confirm, your profile and everything listed above — accounts, transactions,
+              categories, subcategories, budgets, savings goals, loan purchases and allocations, card
+              payments, auto-categorisation rules, and exchange rates — are erased from our database in
+              a single operation. There is no grace period and no way to undo or recover the data.
+              Anonymised, aggregated data that cannot identify you (e.g., total number of active users)
+              may be retained for analytics.
             </p>
           </div>
         </section>

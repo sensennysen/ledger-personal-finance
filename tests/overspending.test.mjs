@@ -99,3 +99,14 @@ test('helpers', () => {
   assert.equal(streakLabel(3), '3 in a row')
   assert.equal(shiftMonthKey('2026-01', -1), '2025-12')
 })
+
+test('a foreign expense is converted with the exchange-rate table before it is compared with the limit (LED-136)', () => {
+  const rates = { base: 'PHP', rates: { USD: 1 / 56 }, overrides: {}, asOf: '2026-09-25', fetchedAt: '2026-09-26T08:00:00' }
+  const txs = [tx('2026-09-05', 10, { currency: 'USD', exchange_rate: 1 })]
+  assert.deepEqual(run({ txs }).rows, [], 'no rates: left out, not counted as 10 PHP')
+  assert.deepEqual(run({ txs }).unrated, ['USD'])
+  const converted = run({ txs, rates, budgets: [budget({ amount: 500 })] })
+  assert.ok(Math.abs(converted.rows[0].spent - 560) < 1e-9)
+  assert.ok(Math.abs(converted.rows[0].over - 60) < 1e-9)
+  assert.deepEqual(converted.unrated, [])
+})

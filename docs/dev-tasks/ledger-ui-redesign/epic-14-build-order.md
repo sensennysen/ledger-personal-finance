@@ -79,10 +79,26 @@ Phase totals in points: 1 = 16, 2 = 11, 3 = 19, 4 = 10, 5 = 6, 6 = 16. Sum 78.
 
 Decisions inside a ticket (not blocking): LED-162 (behaviour after a failed sign-out), LED-172 (how an overdrawn asset shows), LED-173 (overdue rows on Home). Each ticket states a recommendation.
 
+### OD-8 answers (phase 6)
+
+1. **Repaid loan in the picker/count** — fix: `loansOwed()` (LED-156) adopted in the repayment picker and the Accounts loan count. → LED-215, Done.
+2. **Report file prefixes** — fix: unified on `ledger-report_`. → LED-216, Done.
+3. **Income budgets in totals** — fix: excluded into a new `otherType` bucket in `summarizeBudgets()`, shown the same way as `otherCurrency`/`otherPeriod`. → LED-217, Done.
+4. **Freelance in the 13th Month default** — no change. `Pd851Checklist` already renders a warning ("N selected records look like this. Untick them to follow PD 851.") whenever a non-salary record is ticked, so the "select all" default plus that warning is the intended UX, not a copy bug. Closed, no ticket.
+5. **Loan dialog titles** — no change. `TransactionEntryHeader`'s `title` prop is documented as an intentional override "on the loan's own page" (`AccountTransactionsPage.tsx`); "Record loan repayment" elsewhere is the correct generic title for a flow that hasn't fixed a loan yet. Closed, no ticket.
+6. **Two headings on Home** — fix: `DashboardPage.tsx`'s h1 fallback now reads "Home", matching the nav title in `App.tsx`. → LED-220, Done.
+7. **AlertDialog default focus** — deferred to LED-179's real screen-reader pass, per that ticket's own AC ("gets an answer from someone who used it"). Not answered here.
+8. **Phone description rule** — out of scope for OD-8; owned by LED-153/OD-6.
+9. **Empty-queue banner copy** — fix: reads "Offline — you're not connected" when `pendingCount` is 0. → LED-221, Done.
+10. **Result-bar copy** — fix: the compact "N match" branch now pluralizes like the full one. → LED-222, Done.
+11. **Overdue flag on loan detail** — fix: `daysUntilDue()`/`formatOverdue()` added to `src/lib/loans.ts` and wired into the "Next payment" section. → LED-223, Done.
+
+LED-180 (OD-7) shipped items 1–4 of the recommended (a): savings goals, loan purchases + allocations, and auto-categorisation rule CSVs, plus the accounts export's missing loan-due-days column. Credit card payments, subcategories and exchange rates still have no "read everything for this user" hook to build the CSV from — left open rather than rushed; see the retro for phase 6.
+
 ## Things to watch
 
 - **LED-154, LED-155 and LED-157 edit `TopBar.tsx`.** Merge in phase order and keep each diff to its own concern.
 - **LED-166 changes how every list reads.** Totals must still equal SQL past 1,000 rows (`rules/page-reads-past-1000-rows.md`); re-run the LED-125 network-log check.
 - **LED-164 and LED-165 share the render window.** The oldest-month landing is only reproducible with the window growing in several steps, so test it after LED-164.
 - **A ticket is Done only with its sweep item re-run.** Record the before and after numbers in its retro.
-- **Not in this epic:** the parked items in `epics-8-13-build-order.md`, and the blocked tickets LED-114, 134, 136, 138, 142, 153 still wait on their decisions (OD-1 to OD-6).
+- **Not in this epic:** the parked items in `epics-8-13-build-order.md`, and the blocked tickets LED-114, 134, 136, 138, 142, 153 still wait on their decisions (OD-1 to OD-6). Backlog items from the phase 10 to 13 retros that no ticket owned are in `epics-15-19-build-order.md` (LED-182 to LED-214).

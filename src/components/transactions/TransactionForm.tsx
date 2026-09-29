@@ -29,7 +29,7 @@ import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { CURRENCIES } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
-import { getLoanAmountOwed } from '@/lib/loans'
+import { getLoanAmountOwed, loansOwed } from '@/lib/loans'
 import { canChangeSavedKind, resolveEditTarget } from '@/lib/editTarget'
 import { applyKindChange } from '@/lib/transactionKindChange'
 import { hasLoanPickerStep, resolveInitialLoanId } from '@/lib/loanPicker'
@@ -162,6 +162,9 @@ export function TransactionForm({
   const goalId = useWatch({ control: form.control, name: 'goal_id' })
   const amountValue = useWatch({ control: form.control, name: 'amount' })
   const loanAccounts = useMemo(() => accounts.filter((account) => account.type === 'loan'), [accounts])
+  // Only loans that still owe something are offered when picking a new repayment (LED-181 item, OD-8);
+  // `loanAccounts` stays the full list so editing an old repayment against a now-repaid loan still resolves it.
+  const loanAccountsOwed = useMemo(() => loansOwed(accounts), [accounts])
   const cardAccounts = useMemo(() => accounts.filter((account) => account.type === 'credit_card'), [accounts])
   const editTargetMissing = editTarget === 'missing'
   const canEditKind = isEditing && canChangeSavedKind(editTarget)
@@ -336,7 +339,7 @@ export function TransactionForm({
 
   const hasPickerStep =
     isLoanRepayment &&
-    hasLoanPickerStep({ loanCount: loanAccounts.length, lockedLoanAccountId, isEditing })
+    hasLoanPickerStep({ loanCount: loanAccountsOwed.length, lockedLoanAccountId, isEditing })
 
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
     const repaymentLoan = loanAccounts.find((account) => account.id === values.to_account_id)
@@ -498,7 +501,7 @@ export function TransactionForm({
     return (
       <div className="space-y-4">
         <LoanPicker
-          loans={loanAccounts}
+          loans={loanAccountsOwed}
           selectedLoanId={selectedLoanId}
           restoreFocus={returnedToPicker}
           onChoose={(loanId) => {

@@ -97,7 +97,7 @@ export function useBudgets(
 
     const { data: budgetData, error: budgetError } = await supabase
       .from('budgets')
-      .select('*, category:categories(id, name, color, icon)')
+      .select('*, category:categories(id, name, color, icon, type)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: true })

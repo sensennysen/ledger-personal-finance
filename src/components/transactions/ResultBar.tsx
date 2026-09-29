@@ -56,7 +56,8 @@ export function ResultBar({
       <span aria-hidden className="absolute inset-x-0 -top-px h-0.5 bg-primary" />
       <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-0.5">
         <span className="text-sm font-bold">
-          <span className="money">{matchCount.toLocaleString()}</span> {compact ? 'match' : `transaction${matchCount === 1 ? '' : 's'} match`}
+          <span className="money">{matchCount.toLocaleString()}</span>{' '}
+          {compact ? (matchCount === 1 ? 'match' : 'matches') : `transaction${matchCount === 1 ? '' : 's'} match`}
         </span>
         {!compact && (
           <span className="text-xs text-muted-foreground">

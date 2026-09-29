@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { getLoanAmountOwed, loansOwed } from '../src/lib/loans.ts'
+import { daysUntilDue, formatOverdue, getLoanAmountOwed, loansOwed } from '../src/lib/loans.ts'
 
 const acct = (over) => ({ id: over.name, name: over.name, type: 'checking', currency: 'USD', balance: 0, ...over })
 
@@ -33,4 +33,17 @@ test('loansOwed can restrict to one currency (the kind menu totals only the base
 test('with no loans, or none still owing, loansOwed is empty', () => {
   assert.deepEqual(loansOwed([acct({ name: 'Checking', balance: 500 })]), [])
   assert.deepEqual(loansOwed([acct({ name: 'Repaid', type: 'loan', balance: 0 })]), [])
+})
+
+test('daysUntilDue is parsed at local midnight, immune to a UTC offset shifting the day', () => {
+  assert.equal(daysUntilDue('2026-10-01', '2026-09-29'), 2)
+  assert.equal(daysUntilDue('2026-09-29', '2026-09-29'), 0)
+  assert.equal(daysUntilDue('2026-09-27', '2026-09-29'), -2)
+})
+
+test('formatOverdue flags the loan detail "Next payment" the same way Home\'s Upcoming Bills does (LED-181 item, OD-8)', () => {
+  assert.equal(formatOverdue(2), null)
+  assert.equal(formatOverdue(0), null)
+  assert.equal(formatOverdue(-1), '1 day overdue')
+  assert.equal(formatOverdue(-5), '5 days overdue')
 })

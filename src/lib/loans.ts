@@ -43,6 +43,22 @@ export function normalizeLiabilityBalanceForStorage<T extends { type: string; ba
   return { ...values, balance: -values.balance }
 }
 
+/** Days from `today` to `dueDate` (both YYYY-MM-DD), parsed at local midnight so a UTC offset cannot shift it by a day. */
+export function daysUntilDue(dueDate: string, today: string): number {
+  const atLocalMidnight = (date: string) => {
+    const [year, month, day] = date.split('-').map(Number)
+    return new Date(year, month - 1, day).getTime()
+  }
+  return Math.round((atLocalMidnight(dueDate) - atLocalMidnight(today)) / 86400000)
+}
+
+/** "1 day overdue" / "N days overdue", or null when `daysUntil` is not negative (LED-181 item, OD-8: the loan
+ * detail page's "Next payment" had no overdue flag, unlike Home's Upcoming Bills). */
+export function formatOverdue(daysUntil: number): string | null {
+  if (daysUntil >= 0) return null
+  return daysUntil === -1 ? '1 day overdue' : `${-daysUntil} days overdue`
+}
+
 export function formatLoanSchedule(account: Pick<Account, 'type' | 'loan_pay_period' | 'loan_due_days' | 'loan_due_weekday'>): string | null {
   if (account.type !== 'loan' || !account.loan_pay_period) return null
 

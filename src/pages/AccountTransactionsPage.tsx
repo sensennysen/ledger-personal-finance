@@ -8,9 +8,9 @@ import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCycle } from '@/contexts/cycleState'
 import { ACCOUNT_TYPE_LABELS } from '@/types'
-import { formatCurrency, formatDate, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange } from '@/lib/utils'
+import { formatCurrency, formatDate, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange, getLocalDateString } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
-import { formatLoanSchedule, getLoanAmountOwed } from '@/lib/loans'
+import { daysUntilDue, formatLoanSchedule, formatOverdue, getLoanAmountOwed } from '@/lib/loans'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -143,6 +143,10 @@ export default function AccountTransactionsPage() {
 
   const loanRepayment = loanProgress(loanData.purchases, loanData.allocations)
   const nextLoanDeadline = loanData.deadlines[0] ?? null
+  // "Next payment" had no overdue flag, unlike Home's Upcoming Bills (LED-181 item, OD-8).
+  const nextPaymentOverdue = nextLoanDeadline
+    ? formatOverdue(daysUntilDue(nextLoanDeadline.dueDate, getLocalDateString()))
+    : null
 
   // Filter to only transactions involving this account (source or destination)
   const accountTransactions = useMemo(() => {
@@ -668,7 +672,10 @@ export default function AccountTransactionsPage() {
               <section className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <h2 className="text-sm font-semibold">Next payment</h2>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-muted-foreground">{nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : 'Nothing scheduled'}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : 'Nothing scheduled'}
+                    {nextPaymentOverdue && <span className="ml-1.5 font-medium text-expense">{nextPaymentOverdue}</span>}
+                  </span>
                   <span className="money text-lg font-bold">{formatCurrency(nextLoanDeadline?.total ?? 0, currency)}</span>
                 </div>
                 <Button className="w-full" onClick={openLoanPayment}>

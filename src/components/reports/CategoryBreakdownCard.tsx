@@ -89,7 +89,7 @@ function OtherRow({ other, max, currency }: { other: OtherSlice; max: number; cu
           <ChevronDown
             className={cn('w-3.5 h-3.5 shrink-0 text-muted-foreground transition-transform duration-(--dur-base)', open ? '' : '-rotate-90')}
           />
-          <span className="text-xs font-medium truncate">Other · {other.count} categories</span>
+          <span className="text-xs font-medium leading-tight">Other · {other.count} categories</span>
         </span>
         <Meter value={other.amount} max={max} color={OTHER_COLOR} />
         <span className="text-xs tabular-nums">{formatCurrency(other.amount, currency)}</span>

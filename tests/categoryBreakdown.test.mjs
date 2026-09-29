@@ -13,6 +13,7 @@ import {
 const tx = (overrides) => ({
   type: 'expense',
   amount: 10,
+  currency: 'PHP',
   exchange_rate: 1,
   category_id: 'c1',
   subcategory_id: null,
@@ -27,24 +28,45 @@ const categories = (n) =>
 const spread = (n) => buildCategoryBreakdown(
   Array.from({ length: n }, (_, i) => tx({ category_id: `c${i + 1}`, amount: n - i })),
   categories(n),
-)
+  'PHP',
+).rows
+
+// 1 USD = 56 PHP.
+const table = { base: 'PHP', rates: { USD: 1 / 56 }, overrides: {}, asOf: '2026-09-25', fetchedAt: '2026-09-26T08:00:00' }
 
 test('expenses only, converted, largest first, uncategorized bucketed', () => {
-  const rows = buildCategoryBreakdown(
+  const { rows, excludedCurrencies } = buildCategoryBreakdown(
     [
-      tx({ category_id: 'c1', amount: 10, exchange_rate: 2 }),
+      tx({ category_id: 'c1', currency: 'USD', amount: 10, exchange_rate: 2 }),
       tx({ category_id: 'c2', amount: 5 }),
       tx({ category_id: null, amount: 3 }),
       tx({ type: 'income', category_id: 'c2', amount: 999 }),
       tx({ type: 'transfer', category_id: 'c2', amount: 999 }),
     ],
     categories(2),
+    'PHP',
   )
   assert.deepEqual(rows.map((r) => [r.key, r.name, r.amount]), [
     ['c1', 'Cat 1', 20],
     ['c2', 'Cat 2', 5],
     ['__none__', 'Uncategorized', 3],
   ])
+  assert.deepEqual(excludedCurrencies, [])
+})
+
+test('a currency with no rate is left out of every total and named, never counted at 1', () => {
+  const { rows, excludedCurrencies } = buildCategoryBreakdown(
+    [
+      tx({ category_id: 'c1', amount: 5 }),
+      tx({ category_id: 'c1', currency: 'USD', amount: 56, exchange_rate: 1 }),
+      tx({ category_id: 'c2', currency: 'EUR', amount: 3, exchange_rate: 1 }),
+    ],
+    categories(2),
+    'PHP',
+    table,
+  )
+  assert.deepEqual(rows.map((r) => [r.key, r.amount]), [['c1', 3141]])
+  assert.deepEqual(excludedCurrencies, ['EUR'])
 })
 
 test('two categories with the same name stay separate', () => {
@@ -52,7 +74,7 @@ test('two categories with the same name stay separate', () => {
     ['a', { name: 'Food', color: '#1' }],
     ['b', { name: 'Food', color: '#2' }],
   ])
-  const rows = buildCategoryBreakdown([tx({ category_id: 'a' }), tx({ category_id: 'b', amount: 4 })], byId)
+  const { rows } = buildCategoryBreakdown([tx({ category_id: 'a' }), tx({ category_id: 'b', amount: 4 })], byId, 'PHP')
   assert.deepEqual(rows.map((r) => r.key), ['a', 'b'])
 })
 
@@ -91,13 +113,14 @@ test('Other previews its first rows and summarises the rest', () => {
 })
 
 test('subcategories split each category, remainder is "No subcategory"', () => {
-  const [row] = buildCategoryBreakdown(
+  const { rows: [row] } = buildCategoryBreakdown(
     [
       tx({ amount: 6, subcategory_id: 's1', subcategory: { id: 's1', name: 'Coffee' } }),
       tx({ amount: 2, subcategory_id: 's1', subcategory: { id: 's1', name: 'Coffee' } }),
       tx({ amount: 2 }),
     ],
     categories(1),
+    'PHP',
   )
   assert.deepEqual(row.subcategories.map((s) => [s.name, s.amount, s.share]), [
     ['Coffee', 8, 0.8],
@@ -106,7 +129,7 @@ test('subcategories split each category, remainder is "No subcategory"', () => {
 })
 
 test('a zero total never divides by zero', () => {
-  const rows = buildCategoryBreakdown([tx({ amount: 0 })], categories(1))
+  const { rows } = buildCategoryBreakdown([tx({ amount: 0 })], categories(1), 'PHP')
   assert.equal(rows[0].share, 0)
   assert.equal(rows[0].subcategories[0].share, 0)
   assert.deepEqual(rollupBreakdown([]), { mode: 'pie', total: 0, top: [], other: null })

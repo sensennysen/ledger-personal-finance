@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
@@ -320,5 +320,79 @@ export function useBudgets(
     createBudgets,
     updateBudget,
     deleteBudget,
+  }
+}
+
+export interface InactiveBudgetExport extends Budget {
+  spent: number
+  unrated_currencies: string[]
+}
+
+/**
+ * Inactive budgets, with this cycle's converted spend, for the deletion-page export only (LED-186).
+ * `useBudgets` reads active budgets and 13 months of history for rollover; an inactive budget needs
+ * neither, so this is its own simple read against `expenseTx` the caller already has loaded.
+ */
+export function useInactiveBudgetsForExport(expenseTx: BudgetSpendTx[]) {
+  const { user } = useAuth()
+  const rates = useOptionalExchangeRates()
+  const rateTable = rates?.table ?? null
+  const [budgets, setBudgets] = useState<Budget[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
+  const requestId = useRef(0)
+
+  const fetch = useCallback(async () => {
+    const request = ++requestId.current
+    if (!user) {
+      setLoading(false)
+      return
+    }
+    setLoadFailure(null)
+    setLoading(true)
+    if (!navigator.onLine) {
+      setLoadFailure({ message: 'Inactive budgets are not cached. Reconnect to load them.', detail: null })
+      setLoading(false)
+      return
+    }
+    const { data, error } = await supabase
+      .from('budgets')
+      .select('*, category:categories(id, name, color, icon, type)')
+      .eq('user_id', user.id)
+      .eq('is_active', false)
+      .order('created_at', { ascending: true })
+    if (request !== requestId.current) return
+    if (error) {
+      setLoadFailure(describeDataError(error, { action: 'load' }))
+      setLoading(false)
+      return
+    }
+    setBudgets(data as Budget[])
+    setLoading(false)
+  }, [user])
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetch()
+    })
+  }, [fetch])
+
+  const monthKey = getCurrentCycleMonthKey(1)
+  const enriched = useMemo<InactiveBudgetExport[]>(
+    () =>
+      budgets.map((b) => {
+        const { start, end } = getBudgetCycleRange(b.period, monthKey, 1)
+        const { spent, unrated } = sumBudgetSpend(expenseTx, b, start, end, rateTable)
+        return { ...b, spent, unrated_currencies: unrated }
+      }),
+    [budgets, expenseTx, rateTable, monthKey]
+  )
+
+  return {
+    budgets: enriched,
+    loading,
+    error: loadFailure?.message ?? null,
+    errorDetail: loadFailure?.detail ?? null,
+    refetch: fetch,
   }
 }

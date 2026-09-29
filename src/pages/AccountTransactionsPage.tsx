@@ -6,6 +6,7 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { useCycle } from '@/contexts/cycleState'
 import { ACCOUNT_TYPE_LABELS } from '@/types'
 import { formatCurrency, formatDate, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange, getLocalDateString } from '@/lib/utils'
@@ -87,6 +88,7 @@ export default function AccountTransactionsPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
+  const { table: rateTable } = useExchangeRates()
   const { accounts, error: accountsError, refetch: refetchAccounts, updateAccountWithAdjustment } = useAccounts()
   const { categories } = useCategories()
   const { transactions, loading, error: txError, errorDetail: txErrorDetail, refetch: refetchTransactions, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
@@ -260,9 +262,11 @@ export default function AccountTransactionsPage() {
   const cycleRange = getCustomMonthRange(selectedMonth, startDay)
   const cycleLabel = `${formatDateShort(cycleRange.start)} – ${formatDateShort(cycleRange.end)}`
   const categoryById = new Map(categories.map((category) => [category.id, category]))
-  const cycleBreakdown = buildCategoryBreakdown(
+  // Every row here belongs to this one account, so it is already in `currency`; no conversion needed.
+  const { rows: cycleBreakdown } = buildCategoryBreakdown(
     accountTransactions.filter((t) => t.type === 'expense' && t.account_id === accountId && t.date >= cycleRange.start && t.date <= cycleRange.end),
     categoryById,
+    currency,
   )
   const statementDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.statement_day) : null
   const dueDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.due_day) : null
@@ -852,7 +856,7 @@ export default function AccountTransactionsPage() {
 
         {showMonthJump && <MonthJumpBar months={months} activeKey={null} onPick={jumpToMonth} />}
       </div>
-      {showMonthJump && <MonthRail months={months} activeKey={null} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} />} />}
+      {showMonthJump && <MonthRail months={months} activeKey={null} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} baseCurrency={currency} rateTable={rateTable} />} />}
     </div>
   )
 }

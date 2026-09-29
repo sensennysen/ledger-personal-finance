@@ -65,7 +65,10 @@ export function DashboardFirstRunChecklist({
             <div
               key={step.id}
               className={cn(
-                'flex flex-wrap items-center gap-4 rounded-2xl border p-4',
+                // gap-x/gap-y split (not gap-4): the transaction step's button
+                // group wraps below sm, and a 16px vertical gap there pushed
+                // the row past its height target (LED-158).
+                'flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border p-4',
                 step.done ? 'border-border' : 'border-2 border-primary',
               )}
             >
@@ -81,7 +84,14 @@ export function DashboardFirstRunChecklist({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold">{step.title}</span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                <span
+                  className={cn(
+                    'mt-0.5 block text-xs leading-relaxed text-muted-foreground',
+                    // One line below sm: with the wrapped button row, two
+                    // description lines pushed step 2 past ~130px (LED-158).
+                    step.id === 'transaction' && !step.done && 'line-clamp-1 sm:line-clamp-none',
+                  )}
+                >
                   {step.description}
                 </span>
               </span>

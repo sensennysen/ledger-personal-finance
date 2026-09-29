@@ -8,13 +8,12 @@
 - `tests/queueItemTitle.test.mjs` (7 tests): partial-update-falls-back-to-label, delete-keeps-the-name, payload wins when present, unlabelled+no-name falls back to the humanized name (not raw), an unknown table is still singularized/capitalized, a conflict falls back to `serverSnapshot`, and `itemNote` doesn't show a raw table name either.
 
 ## Acceptance
-- (a) An edited transaction is titled with its description: **PASS** — works via `payload.description` for a normal edit, and now via `label` for a category-only edit too.
-- (b) An update to a deleted row keeps the name it was queued with: **PASS.** Traced `queueDrain.ts`'s conflict path (`{ ...current, status: 'conflict', conflictKind: 'deleted' }`) — it spreads the whole item, so `label` survives a delete-conflict untouched.
-- (c) No item shows a raw table name: **PASS**, tested (`humanizeTable`).
-- (d) Unit test on the title helper: **PASS.** `tests/queueItemTitle.test.mjs`.
+- (a) An edited transaction is titled with its description: **PASS, re-run live (2026-09-29).** Seeded a category-only-update queue item (`payload: { category_id }`, `label: 'Grocery run'`) directly into `ledger_offline_queue` (matching the exact shape `bulkUpdateCategory` now enqueues) against a real local Supabase transaction, opened the Queue review sheet: rendered as "Grocery run".
+- (b) An update to a deleted row keeps the name it was queued with: **PASS, re-run live (2026-09-29).** Seeded a delete queue item (`payload: {}`, `label: 'Grocery run'`) the same way: rendered as "Grocery run", not the table name.
+- (c) No item shows a raw table name: **PASS, re-run live (2026-09-29).** Seeded a third item on an unrecognised table (`weird_table`, no `label`): rendered as "Weird table" (via `humanizeTable`'s generic fallback), never the raw `weird_table` string.
+- (d) Unit test on the title helper: **PASS.** `tests/queueItemTitle.test.mjs` (re-confirmed 2026-09-29).
 - Checked `knowledge/patterns/offline-queue-conflict-handling.md`: this only changes how a title is *chosen for display*, not conflict resolution or drain behaviour, so it doesn't touch that pattern.
-- Lint, build, full test suite (756 + redesign checks): PASS.
+- Lint, build, full test suite (756 + redesign checks): PASS (re-confirmed 2026-09-29).
 
 ## Backlog
-- Not re-run live against an actual queued delete/category-edit in a browser (no extension connected this session) — verified by code and unit test only, same call the LED-54/LED-52 retros made for their own not-yet-existing test data.
 - `useMonthCycle.ts`'s `profiles` update was left without a `label` (it has no natural "name" — a pay-cycle-day change) and will show `humanizeTable('profiles')` → "Profile". Not reported broken by this ticket; flagging in case a future ticket wants a more specific note like "Pay cycle" instead.

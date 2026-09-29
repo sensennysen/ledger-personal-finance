@@ -4,9 +4,12 @@ import {
   buildAccountsCsv,
   buildBudgetsCsv,
   buildCategoriesCsv,
+  buildCreditCardPaymentsCsv,
+  buildExchangeRatesCsv,
   buildLoanAllocationsCsv,
   buildLoanPurchasesCsv,
   buildSavingsGoalsCsv,
+  buildSubcategoriesCsv,
   buildTransactionRulesCsv,
   exportFileName,
 } from '../src/lib/dataExport.ts'
@@ -84,5 +87,23 @@ test('savings goals, loan purchases/allocations and rules carry their own column
   assert.equal(
     buildTransactionRulesCsv([{ keyword: 'starbucks', category: { name: 'Coffee' }, type_hint: 'expense', priority: 5 }]),
     'Keyword,Category,Type Hint,Priority\nstarbucks,Coffee,expense,5',
+  )
+})
+
+test('subcategories, credit card payments and exchange rates carry their own columns (LED-180)', () => {
+  assert.equal(
+    buildSubcategoriesCsv([{ name: 'Fast food', category: { name: 'Food & Dining' } }]),
+    'Category,Name\nFood & Dining,Fast food',
+  )
+  assert.equal(
+    buildCreditCardPaymentsCsv([{ account: { name: 'Visa' }, amount: 3000, payment_date: '2026-09-16', notes: null }]),
+    'Account,Amount,Payment Date,Notes\nVisa,3000,2026-09-16,',
+  )
+  assert.equal(
+    buildExchangeRatesCsv([
+      { currency: 'USD', rate: 1, source: 'base', asOf: '2026-09-26' },
+      { currency: 'PHP', rate: 62.6, source: 'override', asOf: '2026-09-26' },
+    ]),
+    'Currency,Rate,Source,As Of\nUSD,1,base,2026-09-26\nPHP,62.6,override,2026-09-26',
   )
 })

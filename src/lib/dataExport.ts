@@ -166,9 +166,50 @@ export function buildTransactionRulesCsv(rules: readonly ExportTransactionRule[]
   return toCsv(TRANSACTION_RULE_CSV_HEADERS, rules.map((r) => [r.keyword, r.category?.name, r.type_hint, r.priority]))
 }
 
+interface ExportSubcategory {
+  name: string
+  category?: { name: string } | null
+}
+
+export const SUBCATEGORY_CSV_HEADERS = ['Category', 'Name']
+
+export function buildSubcategoriesCsv(subcategories: readonly ExportSubcategory[]): string {
+  return toCsv(SUBCATEGORY_CSV_HEADERS, subcategories.map((s) => [s.category?.name, s.name]))
+}
+
+interface ExportCreditCardPayment {
+  account?: { name: string } | null
+  amount: number
+  payment_date: string
+  notes: string | null
+}
+
+export const CREDIT_CARD_PAYMENT_CSV_HEADERS = ['Account', 'Amount', 'Payment Date', 'Notes']
+
+export function buildCreditCardPaymentsCsv(payments: readonly ExportCreditCardPayment[]): string {
+  return toCsv(
+    CREDIT_CARD_PAYMENT_CSV_HEADERS,
+    payments.map((p) => [p.account?.name, p.amount, p.payment_date, p.notes]),
+  )
+}
+
+interface ExportExchangeRate {
+  currency: string
+  rate: number
+  source: 'base' | 'feed' | 'override'
+  asOf: string | null
+}
+
+export const EXCHANGE_RATE_CSV_HEADERS = ['Currency', 'Rate', 'Source', 'As Of']
+
+export function buildExchangeRatesCsv(rates: readonly ExportExchangeRate[]): string {
+  return toCsv(EXCHANGE_RATE_CSV_HEADERS, rates.map((r) => [r.currency, r.rate, r.source, r.asOf]))
+}
+
 export type ExportKind =
   | 'transactions' | 'accounts' | 'categories' | 'budgets'
   | 'savings-goals' | 'loan-purchases' | 'loan-allocations' | 'transaction-rules'
+  | 'subcategories' | 'credit-card-payments' | 'exchange-rates'
 
 /** `ledger-export_accounts_2026-09-26.csv`; `localDate` is a local YYYY-MM-DD. */
 export function exportFileName(kind: ExportKind, localDate: string): string {

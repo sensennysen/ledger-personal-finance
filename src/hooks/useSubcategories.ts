@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
 import type { Subcategory } from '@/types'
-import { toResult, type MutationResult } from '@/lib/dataErrors'
+import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 export function useSubcategories(categoryId: string | null) {
   const { user } = useAuth()
@@ -112,11 +112,14 @@ export function useSubcategories(categoryId: string | null) {
   return { subcategories, loading, refetch: fetch, createSubcategory, updateSubcategory, deleteSubcategory, updateSubcategoryOrder }
 }
 
-// Fetch all subcategories for a user at once (keyed by category_id)
+// Fetch all subcategories for a user at once (keyed by category_id). The only "every subcategory
+// for this user" read (LED-180's export card needs one; useSubcategories(categoryId) reads one
+// category at a time and is the wrong shape for that).
 export function useAllSubcategories() {
   const { user } = useAuth()
   const [subcategoriesByCategoryId, setSubcategoriesByCategoryId] = useState<Record<string, Subcategory[]>>({})
   const [loading, setLoading] = useState(true)
+  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
 
   const fetch = useCallback(async () => {
     if (!user) { setLoading(false); return }
@@ -129,14 +132,18 @@ export function useAllSubcategories() {
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true })
       .order('created_at', { ascending: true })
-    if (!error && data) {
-      const map: Record<string, Subcategory[]> = {}
-      for (const sub of data as Subcategory[]) {
-        if (!map[sub.category_id]) map[sub.category_id] = []
-        map[sub.category_id].push(sub)
-      }
-      setSubcategoriesByCategoryId(map)
+    if (error) {
+      setLoadFailure(describeDataError(error, { action: 'load', entity: 'subcategory' }))
+      setLoading(false)
+      return
     }
+    const map: Record<string, Subcategory[]> = {}
+    for (const sub of data as Subcategory[]) {
+      if (!map[sub.category_id]) map[sub.category_id] = []
+      map[sub.category_id].push(sub)
+    }
+    setLoadFailure(null)
+    setSubcategoriesByCategoryId(map)
     setLoading(false)
   }, [user])
 
@@ -146,5 +153,5 @@ export function useAllSubcategories() {
     })
   }, [fetch])
 
-  return { subcategoriesByCategoryId, loading, refetch: fetch }
+  return { subcategoriesByCategoryId, loading, error: loadFailure?.message ?? null, refetch: fetch }
 }

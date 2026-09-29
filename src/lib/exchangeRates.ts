@@ -249,3 +249,22 @@ export function displayRate(table: RateTable, code: string): { rate: number; sou
   if (isUsableRate(table.rates[code])) return { rate: table.rates[code], source: 'feed' }
   return null
 }
+
+export interface ExchangeRateRow {
+  currency: string
+  rate: number
+  source: 'base' | 'feed' | 'override'
+  asOf: string | null
+}
+
+/** Every known currency's rate against the base, base included at 1 (LED-180 export). */
+export function exchangeRateRows(table: RateTable): ExchangeRateRow[] {
+  const codes = new Set([...Object.keys(table.rates), ...Object.keys(table.overrides)])
+  codes.delete(table.base)
+  const rows: ExchangeRateRow[] = [{ currency: table.base, rate: 1, source: 'base', asOf: table.asOf }]
+  for (const code of [...codes].sort()) {
+    const display = displayRate(table, code)
+    if (display) rows.push({ currency: code, rate: display.rate, source: display.source, asOf: table.asOf })
+  }
+  return rows
+}

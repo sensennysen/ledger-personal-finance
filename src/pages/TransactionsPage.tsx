@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, ArrowLeftRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCardPayment } from '@/hooks/useCardPayment'
+import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { useCycle } from '@/contexts/cycleState'
 import { useNotify } from '@/contexts/notificationState'
 import { useCategories } from '@/hooks/useCategories'
@@ -54,6 +56,9 @@ import { TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import type { Transaction } from '@/types'
 
 export default function TransactionsPage() {
+  const { profile } = useAuth()
+  const baseCurrency = profile?.default_currency ?? 'USD'
+  const { table: rateTable } = useExchangeRates()
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
   const { startDay, selectedMonth, setSelectedMonth } = useCycle()
@@ -946,7 +951,7 @@ export default function TransactionsPage() {
 
         {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} onSelect={toggleSelectMode} selecting={selectMode} />}
       </div>
-      {showMonthJump && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} />} />}
+      {showMonthJump && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} baseCurrency={baseCurrency} rateTable={rateTable} />} />}
     </div>
   )
 }

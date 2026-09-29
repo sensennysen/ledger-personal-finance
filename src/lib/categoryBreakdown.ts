@@ -2,6 +2,8 @@
 // above PIE_MAX_CATEGORIES the Reports card ranks bars, shows the top
 // RANKED_TOP and rolls the tail into one expandable "Other" row with its own share.
 
+import { amountInCurrency, type RateTable } from './exchangeRates.ts'
+
 export const PIE_MAX_CATEGORIES = 12
 export const RANKED_TOP = 8
 export const OTHER_PREVIEW = 6
@@ -12,6 +14,7 @@ const NO_SUBCATEGORY = '__none__'
 interface BreakdownTx {
   type: 'income' | 'expense' | 'transfer'
   amount: number
+  currency: string
   exchange_rate?: number | null
   category_id?: string | null
   subcategory_id?: string | null
@@ -58,15 +61,28 @@ export interface BreakdownRollup {
 
 const shareOf = (amount: number, total: number) => (total > 0 ? amount / total : 0)
 
-/** Expenses by category in the report currency, largest first. */
+export interface CategoryBreakdownResult {
+  rows: CategorySlice[]
+  /** Currencies left out of every row because no exchange rate converts them (LED-183). */
+  excludedCurrencies: string[]
+}
+
+/** Expenses by category, converted into `target`; a row with no rate is left out and named. */
 export function buildCategoryBreakdown(
   transactions: BreakdownTx[],
   categoryById: Map<string, BreakdownCategory>,
-): CategorySlice[] {
+  target: string,
+  table: RateTable | null = null,
+): CategoryBreakdownResult {
   const map = new Map<string, { name: string; color: string; amount: number; subs: Map<string, { name: string; amount: number }> }>()
+  const excluded = new Set<string>()
   for (const t of transactions) {
     if (t.type !== 'expense') continue
-    const amount = t.amount * (t.exchange_rate ?? 1)
+    const amount = amountInCurrency({ ...t, exchange_rate: t.exchange_rate ?? null }, target, table)
+    if (amount === null) {
+      excluded.add(t.currency)
+      continue
+    }
     const key = t.category_id ?? NO_CATEGORY
     let entry = map.get(key)
     if (!entry) {
@@ -83,7 +99,7 @@ export function buildCategoryBreakdown(
   }
 
   const total = Array.from(map.values()).reduce((sum, e) => sum + e.amount, 0)
-  return Array.from(map.entries())
+  const rows = Array.from(map.entries())
     .map(([key, e]) => ({
       key,
       name: e.name,
@@ -95,6 +111,8 @@ export function buildCategoryBreakdown(
         .sort((a, b) => b.amount - a.amount),
     }))
     .sort((a, b) => b.amount - a.amount)
+
+  return { rows, excludedCurrencies: [...excluded].sort() }
 }
 
 /** Pie at 12 or fewer categories; above that the top 8 plus one "Other" row. */

@@ -1,8 +1,11 @@
+import { amountInCurrency, type RateTable } from './exchangeRates.ts'
+
 /** The subset of a transaction the period maths reads. */
 export interface PeriodTransaction {
   date: string
   type: string
   amount: number
+  currency: string
   exchange_rate?: number | null
   to_account_id?: string | null
   transfer_fee?: number | null
@@ -21,16 +24,26 @@ export function cycleMonthLabel(cycleKey: string): string {
   return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short' })
 }
 
-/** Income, expenses and net for transactions dated within [start, end], in the default currency. */
-export function summarizeRange(transactions: PeriodTransaction[], start: string, end: string) {
+/**
+ * Income, expenses and net for transactions dated within [start, end], converted into `target`.
+ * A row with no rate is left out and its currency named, never counted at a rate of 1 (LED-183).
+ */
+export function summarizeRange(transactions: PeriodTransaction[], start: string, end: string, target: string, table: RateTable | null = null) {
   let income = 0
   let expenses = 0
+  const excluded = new Set<string>()
   for (const t of transactions) {
     if (t.date < start || t.date > end) continue
-    if (t.type === 'income') income += t.amount * (t.exchange_rate ?? 1)
-    else if (t.type === 'expense') expenses += t.amount * (t.exchange_rate ?? 1)
+    if (t.type !== 'income' && t.type !== 'expense') continue
+    const amount = amountInCurrency({ ...t, exchange_rate: t.exchange_rate ?? null }, target, table)
+    if (amount === null) {
+      excluded.add(t.currency)
+      continue
+    }
+    if (t.type === 'income') income += amount
+    else expenses += amount
   }
-  return { income, expenses, net: income - expenses }
+  return { income, expenses, net: income - expenses, excludedCurrencies: [...excluded].sort() }
 }
 
 /**
@@ -42,6 +55,24 @@ export function netWorthEffect(tx: PeriodTransaction): number {
   if (tx.type === 'income') return tx.amount
   if (tx.type === 'expense' && !tx.to_account_id) return -tx.amount
   if (tx.type === 'transfer') return tx.transfer_fee ? -tx.transfer_fee : 0
+  return 0
+}
+
+/**
+ * `netWorthEffect`, converted into `target`; null means no rate converts it (LED-184). A
+ * transfer fee converts by its own currency, not the transfer's own cross-currency rate
+ * (that rate is between the two accounts, not into `target` — LED-185, not decided here).
+ */
+export function convertedNetWorthEffect(tx: PeriodTransaction, target: string, table: RateTable | null): number | null {
+  if (tx.type === 'income') return amountInCurrency({ ...tx, exchange_rate: tx.exchange_rate ?? null }, target, table)
+  if (tx.type === 'expense' && !tx.to_account_id) {
+    const amount = amountInCurrency({ ...tx, exchange_rate: tx.exchange_rate ?? null }, target, table)
+    return amount === null ? null : -amount
+  }
+  if (tx.type === 'transfer' && tx.transfer_fee) {
+    const fee = amountInCurrency({ amount: tx.transfer_fee, currency: tx.currency, exchange_rate: null }, target, table)
+    return fee === null ? null : -fee
+  }
   return 0
 }
 

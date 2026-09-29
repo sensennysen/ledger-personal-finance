@@ -52,13 +52,13 @@ test('the category breakdown ignores a card payment and keeps a loan repayment',
     ['groc', { name: 'Groceries', color: '#1' }],
     ['loans', { name: 'Loans', color: '#2' }],
   ])
-  const slices = buildCategoryBreakdown([groceries, cardPayment, loanRepayment], cats)
+  const { rows: slices } = buildCategoryBreakdown([groceries, cardPayment, loanRepayment], cats, 'PHP')
   assert.deepEqual(slices.map((s) => [s.name, s.amount]), [['Loans', 500], ['Groceries', 120]])
   assert.equal(slices.some((s) => s.name === 'Uncategorized'), false)
 })
 
 test('Reports totals ignore a card payment and count a loan repayment', () => {
-  const { expenses } = summarizeRange([groceries, cardPayment, loanRepayment], '2026-09-01', '2026-09-30')
+  const { expenses } = summarizeRange([groceries, cardPayment, loanRepayment], '2026-09-01', '2026-09-30', 'PHP')
   assert.equal(expenses, 620)
 })
 

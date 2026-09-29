@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { CURRENCIES } from "@/types"
 import { monthCycleRange } from "./cycleRange"
+import { amountInCurrency, type RateTable } from "./exchangeRates"
 import type { Transaction, Category } from "@/types"
 
 export function cn(...inputs: ClassValue[]) {
@@ -203,16 +204,25 @@ export function getLast5Years(): Array<{ label: string; start: string; end: stri
   return years
 }
 
+/** Expenses by category, converted into `target`; a row with no rate is left out and its currency returned. */
 export function groupExpensesByCategory(
   transactions: Transaction[],
   categories: Category[],
   startDate: string,
   endDate: string,
-  limit = 8,
-): { name: string; color: string; icon: string; amount: number }[] {
+  limit: number,
+  target: string,
+  table: RateTable | null = null,
+): { rows: { name: string; color: string; icon: string; amount: number }[]; excludedCurrencies: string[] } {
   const map: Record<string, { name: string; color: string; icon: string; amount: number }> = {}
+  const excluded = new Set<string>()
   for (const tx of transactions) {
     if (tx.type !== 'expense' || tx.date < startDate || tx.date > endDate || !tx.category_id) continue
+    const amount = amountInCurrency(tx, target, table)
+    if (amount === null) {
+      excluded.add(tx.currency)
+      continue
+    }
     const cat = categories.find((c) => c.id === tx.category_id)
     if (!map[tx.category_id]) {
       map[tx.category_id] = {
@@ -222,7 +232,10 @@ export function groupExpensesByCategory(
         amount: 0,
       }
     }
-    map[tx.category_id].amount += tx.amount
+    map[tx.category_id].amount += amount
   }
-  return Object.values(map).sort((a, b) => b.amount - a.amount).slice(0, limit)
+  return {
+    rows: Object.values(map).sort((a, b) => b.amount - a.amount).slice(0, limit),
+    excludedCurrencies: [...excluded].sort(),
+  }
 }

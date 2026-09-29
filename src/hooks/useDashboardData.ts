@@ -12,7 +12,8 @@ import {
   daysUntilDayOfMonth,
 } from '@/lib/creditCards'
 import { summarizeBalances } from '@/lib/accountsOverview'
-import type { ConvertFn } from '@/lib/exchangeRates'
+import { sumConverted } from '@/lib/convertedTotals'
+import type { ConvertFn, RateTable } from '@/lib/exchangeRates'
 import { buildUpcomingLoanBills } from '@/lib/loanInstallments'
 import type { Account, Category, LoanPaymentAllocation, LoanPurchase, Transaction } from '@/types'
 
@@ -45,6 +46,8 @@ export type DashboardStatsSummary = {
   income: number
   expenses: number
   net: number
+  /** Currencies left out of income/expenses/net (no exchange rate); distinct from the balance figures above. */
+  excludedFlowCurrencies: string[]
 }
 
 type RecurringTransaction = Transaction & {
@@ -186,10 +189,6 @@ function groupLatestRecurringSeries(transactions: Transaction[], predicate: (tx:
   return Array.from(seriesMap.entries()).map(([key, tx]) => ({ key, tx }))
 }
 
-function sumTransactionsByType(transactions: Transaction[], type: Transaction['type']) {
-  return transactions.filter((tx) => tx.type === type).reduce((sum, tx) => sum + tx.amount, 0)
-}
-
 function buildUpcomingBills(
   recurringSeries: RecurringSeriesItem[],
   cycleStart: Date,
@@ -279,6 +278,7 @@ export function useDashboardData({
   startDay,
   baseCurrency,
   convert,
+  rateTable = null,
 }: {
   accounts: Account[]
   categories: Category[]
@@ -291,6 +291,8 @@ export function useDashboardData({
   baseCurrency: string
   /** Converts an amount in another currency into `baseCurrency`, or null when no rate does (LED-136). */
   convert?: ConvertFn
+  /** The raw rate table income/expense totals convert with (LED-182); a transaction's own recorded rate wins over it. */
+  rateTable?: RateTable | null
 }) {
   const { start: monthStart, end: monthEnd } = useMemo(
     () => getCustomMonthRange(selectedMonth, startDay),
@@ -341,38 +343,39 @@ export function useDashboardData({
 
   const stats = useMemo<DashboardStatsSummary>(() => {
     const balanceSummary = summarizeBalances(accounts, baseCurrency, convert)
-    const income = sumTransactionsByType(monthTransactions, 'income')
-    const expenses = sumTransactionsByType(monthTransactions, 'expense')
+    const incomeResult = sumConverted(monthTransactionGroups.income, baseCurrency, rateTable)
+    const expensesResult = sumConverted(monthTransactionGroups.expenses, baseCurrency, rateTable)
+    const excludedFlowCurrencies = [...new Set([...incomeResult.excludedCurrencies, ...expensesResult.excludedCurrencies])].sort()
 
     return {
       totalBalance: balanceSummary.netWorth,
       ...balanceSummary,
-      income,
-      expenses,
-      net: income - expenses,
+      income: incomeResult.total,
+      expenses: expensesResult.total,
+      net: incomeResult.total - expensesResult.total,
+      excludedFlowCurrencies,
     }
-  }, [accounts, baseCurrency, convert, monthTransactions])
+  }, [accounts, baseCurrency, convert, rateTable, monthTransactionGroups])
 
-  const cashFlowData = useMemo<DashboardCashFlowPoint[]>(() => {
+  const { cashFlowData, excludedCashFlowCurrencies } = useMemo(() => {
     const periods = getCashFlowPeriods(chartPeriod, selectedMonth, monthStart, monthEnd, startDay)
+    const excluded = new Set<string>()
 
-    return periods.map(({ label, start, end }) => {
-      let income = 0
-      let expenses = 0
-
-      for (const tx of transactions) {
-        if (tx.date < start || tx.date > end) continue
-        if (tx.type === 'income') income += tx.amount
-        else if (tx.type === 'expense') expenses += tx.amount
-      }
+    const cashFlowData = periods.map(({ label, start, end }) => {
+      const periodTx = transactions.filter((tx) => tx.date >= start && tx.date <= end)
+      const incomeResult = sumConverted(periodTx.filter((tx) => tx.type === 'income'), baseCurrency, rateTable)
+      const expensesResult = sumConverted(periodTx.filter((tx) => tx.type === 'expense'), baseCurrency, rateTable)
+      for (const code of [...incomeResult.excludedCurrencies, ...expensesResult.excludedCurrencies]) excluded.add(code)
 
       return {
         label,
-        income,
-        expenses,
+        income: incomeResult.total,
+        expenses: expensesResult.total,
       }
     })
-  }, [transactions, chartPeriod, selectedMonth, monthStart, monthEnd, startDay])
+
+    return { cashFlowData, excludedCashFlowCurrencies: [...excluded].sort() }
+  }, [transactions, chartPeriod, selectedMonth, monthStart, monthEnd, startDay, baseCurrency, rateTable])
 
   const monthIncomeTx = useMemo(
     () => monthTransactionGroups.income,
@@ -386,8 +389,9 @@ export function useDashboardData({
 
   const expensesByCategory = useMemo<DashboardExpenseCategoryBreakdown[]>(
     // Uncapped: the pie card ranks and rolls the tail into Other itself above 12 categories (LED-149).
-    () => groupExpensesByCategory(transactions, categories, monthStart, monthEnd, Infinity),
-    [transactions, categories, monthStart, monthEnd]
+    // Currencies left out for having no rate are already named by stats.excludedFlowCurrencies (same rows).
+    () => groupExpensesByCategory(transactions, categories, monthStart, monthEnd, Infinity, baseCurrency, rateTable).rows,
+    [transactions, categories, monthStart, monthEnd, baseCurrency, rateTable]
   )
 
   const recentTx = useMemo(() => monthTransactions.slice(0, 5), [monthTransactions])
@@ -497,6 +501,7 @@ export function useDashboardData({
     isCurrentMonth,
     stats,
     cashFlowData,
+    excludedCashFlowCurrencies,
     monthIncomeTx,
     monthExpenseTx,
     expensesByCategory,

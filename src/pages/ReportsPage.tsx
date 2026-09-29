@@ -36,6 +36,7 @@ import { useCycle } from '@/contexts/cycleState'
 import { getReportRange } from '@/lib/reportCycle'
 import {
   compareToPrevious,
+  convertedNetWorthEffect,
   cycleMonthLabel,
   formatComparison,
   netWorthEffect,
@@ -321,12 +322,14 @@ function IncomeExpenseCard({
   onLookbackChange,
   loading,
   currency,
+  excludedCurrencies = [],
 }: {
   data: { month: string; income: number; expenses: number }[]
   lookback: Lookback
   onLookbackChange: (value: Lookback) => void
   loading: boolean
   currency: string
+  excludedCurrencies?: string[]
 }) {
   return (
     <div className="h-full rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
@@ -348,6 +351,7 @@ function IncomeExpenseCard({
           ))}
         </select>
       </div>
+      {!loading && <UnratedCurrencyNotice currencies={excludedCurrencies} subject="income and expenses" />}
   {loading ? (
         <div className="relative flex-1 min-h-60 lg:min-h-72"><Skeleton className="absolute inset-0 rounded-lg" /></div>
       ) : (
@@ -459,17 +463,17 @@ export default function ReportsPage() {
   )
 
   // Summary stats
-  const { income: totalIncome, expenses: totalExpenses, net: netChange } = useMemo(
-    () => summarizeRange(transactions, start, end),
-    [transactions, start, end]
+  const { income: totalIncome, expenses: totalExpenses, net: netChange, excludedCurrencies: summaryExcludedCurrencies } = useMemo(
+    () => summarizeRange(transactions, start, end, currency, rateTable),
+    [transactions, start, end, currency, rateTable]
   )
 
   // Same figures for the previous cycle, so each stat card has a reference point.
   const previousLabel = cycleMonthLabel(previousCycleKey(selectedMonth))
   const previousTotals = useMemo(() => {
     const range = getReportRange(previousCycleKey(selectedMonth), startDay)
-    return summarizeRange(transactions, range.start, range.end)
-  }, [transactions, selectedMonth, startDay])
+    return summarizeRange(transactions, range.start, range.end, currency, rateTable)
+  }, [transactions, selectedMonth, startDay, currency, rateTable])
   const netWorthChange = useMemo(
     () => filtered.reduce((sum, t) => sum + netWorthEffect(t), 0),
     [filtered]
@@ -486,9 +490,9 @@ export default function ReportsPage() {
   }
 
   // Category breakdown (expenses only)
-  const categoryBreakdown = useMemo(
-    () => buildCategoryBreakdown(filtered, categoryById),
-    [filtered, categoryById]
+  const { rows: categoryBreakdown, excludedCurrencies: categoryExcludedCurrencies } = useMemo(
+    () => buildCategoryBreakdown(filtered, categoryById, currency, rateTable),
+    [filtered, categoryById, currency, rateTable]
   )
 
   // Over budget stat card: the report's total in the display currency, against last cycle.
@@ -527,7 +531,7 @@ export default function ReportsPage() {
   }
 
   // ── Net Worth Over Time (last 13 months) ──
-  const netWorthData = useMemo(() => {
+  const { netWorthData, netWorthExcludedCurrencies } = useMemo(() => {
     const now = new Date()
     const currentNetWorth = summarizeBalances(accounts, currency, convertToDefault).netWorth
     const boundaries: { date: string; label: string }[] = []
@@ -543,37 +547,37 @@ export default function ReportsPage() {
     }
     let netWorth = currentNetWorth
     let txIdx = 0
+    const excluded = new Set<string>()
     const data: { month: string; netWorth: number }[] = []
     for (let i = 12; i >= 0; i--) {
       const boundary = boundaries[i].date
       while (txIdx < allTransactionsSorted.length && allTransactionsSorted[txIdx].date > boundary) {
         const tx = allTransactionsSorted[txIdx]
-        netWorth -= netWorthEffect(tx)
+        const effect = convertedNetWorthEffect(tx, currency, rateTable)
+        if (effect === null) excluded.add(tx.currency)
+        else netWorth -= effect
         txIdx++
       }
       data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
     }
-    return data
-  }, [accounts, allTransactionsSorted, convertToDefault, currency])
+    return { netWorthData: data, netWorthExcludedCurrencies: [...excluded].sort() }
+  }, [accounts, allTransactionsSorted, convertToDefault, currency, rateTable])
 
   // ── Income vs Expenses trend (own lookback, independent of the cycle) ──
   const [lookback, setLookback] = useState<Lookback>(DEFAULT_LOOKBACK)
-  const monthlyData = useMemo(() => {
-    return getLookbackBuckets(lookback, new Date()).map((bucket) => {
-      let income = 0
-      let expenses = 0
-      for (const t of transactions) {
-        if (t.date < bucket.start || t.date > bucket.end) continue
-        if (t.type === 'income') income += t.amount * (t.exchange_rate ?? 1)
-        else if (t.type === 'expense') expenses += t.amount * (t.exchange_rate ?? 1)
-      }
+  const { monthlyData, monthlyExcludedCurrencies } = useMemo(() => {
+    const excluded = new Set<string>()
+    const monthlyData = getLookbackBuckets(lookback, new Date()).map((bucket) => {
+      const { income, expenses, excludedCurrencies } = summarizeRange(transactions, bucket.start, bucket.end, currency, rateTable)
+      for (const code of excludedCurrencies) excluded.add(code)
       return {
         month: bucket.label,
         income: Math.round(income * 100) / 100,
         expenses: Math.round(expenses * 100) / 100,
       }
     })
-  }, [transactions, lookback])
+    return { monthlyData, monthlyExcludedCurrencies: [...excluded].sort() }
+  }, [transactions, lookback, currency, rateTable])
 
   // ── Spending by Merchant (top 10 from filtered period) ──
   const merchantBreakdown = (() => {
@@ -685,6 +689,7 @@ export default function ReportsPage() {
           color={INCOME}
           comparison={compare(totalIncome, previousTotals.income, 'up')}
           loading={loading}
+          note={<UnratedCurrencyNotice currencies={summaryExcludedCurrencies} subject="income and expenses" />}
         />
         <StatCard
           title="Total Expenses"
@@ -693,6 +698,7 @@ export default function ReportsPage() {
           color={EXPENSE}
           comparison={compare(totalExpenses, previousTotals.expenses, 'down')}
           loading={loading}
+          note={<UnratedCurrencyNotice currencies={summaryExcludedCurrencies} subject="income and expenses" />}
         />
         <StatCard
           title="Net Change"
@@ -741,6 +747,7 @@ export default function ReportsPage() {
             onLookbackChange={setLookback}
             loading={loading}
             currency={currency}
+            excludedCurrencies={monthlyExcludedCurrencies}
           />
 
 
@@ -803,6 +810,11 @@ export default function ReportsPage() {
 
         {/* Category breakdown */}
         <CategoryBreakdownCard rows={categoryBreakdown} loading={loading} currency={currency} />
+        {!loading && (
+          <div className="px-3">
+            <UnratedCurrencyNotice currencies={categoryExcludedCurrencies} />
+          </div>
+        )}
       </div>
 
       {/* Transactions table */}
@@ -972,6 +984,7 @@ export default function ReportsPage() {
               <TrendingUp className="w-3.5 h-3.5" style={{ color: INCOME }} />
               <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time — Last 13 months · monthly</p>
             </div>
+            {!loading && <UnratedCurrencyNotice currencies={netWorthExcludedCurrencies} />}
             {loading ? (
               <div className="h-52 md:h-72 xl:h-80"><Skeleton className="h-full w-full rounded-lg" /></div>
             ) : (
@@ -1023,6 +1036,7 @@ export default function ReportsPage() {
             onLookbackChange={setLookback}
             loading={loading}
             currency={currency}
+            excludedCurrencies={monthlyExcludedCurrencies}
           />
 
           {/* Spending by Merchant */}

@@ -266,7 +266,8 @@ export default function DashboardPage() {
       <div className="hidden md:flex items-start justify-between gap-3 flex-wrap col-span-full">
         <div className="min-w-0 2xl:flex 2xl:items-baseline 2xl:gap-3">
           <h1 className="text-2xl font-bold leading-tight truncate">
-            {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Dashboard'}
+            {/* Matches the "Home" nav title (src/App.tsx) so the page doesn't read as two names (LED-181 item, OD-8). */}
+            {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Home'}
           </h1>
           <p className="text-muted-foreground text-[0.8125rem] mt-0.5 2xl:mt-0">
             {new Date().toLocaleDateString('en-US', {

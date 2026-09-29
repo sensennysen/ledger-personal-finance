@@ -249,7 +249,7 @@ function exportToPdf(
     margin: { left: margin, right: margin },
   })
 
-  doc.save(`expense-report_${filenameLabel}.pdf`)
+  doc.save(`ledger-report_${filenameLabel}.pdf`)
 }
 
 // ─── stat card ────────────────────────────────────────────────────────────────

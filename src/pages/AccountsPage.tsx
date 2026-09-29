@@ -28,7 +28,7 @@ import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import { normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
-import { formatLoanSchedule } from '@/lib/loans'
+import { formatLoanSchedule, loansOwed } from '@/lib/loans'
 import { buildAccountsOverview, formatShare, isLiability, type AssetRow, type LiabilityRow } from '@/lib/accountsOverview'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
 import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
@@ -545,7 +545,9 @@ export default function AccountsPage() {
   }
 
   const cardCount = accounts.filter((account) => account.type === 'credit_card').length
-  const loanCount = accounts.filter((account) => account.type === 'loan').length
+  // A fully repaid loan does not count (LED-181 item, OD-8), matching the search palette
+  // and the Add Transaction kind menu's shared loansOwed() definition (LED-156).
+  const loanCount = loansOwed(accounts).length
   const liabilityMix = [
     cardCount > 0 && `${cardCount} card${cardCount > 1 ? 's' : ''}`,
     loanCount > 0 && `${loanCount} loan${loanCount > 1 ? 's' : ''}`,

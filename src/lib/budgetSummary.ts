@@ -11,7 +11,7 @@ export interface SummaryBudget {
   amount: number
   spent?: number
   effective_amount?: number
-  category?: { name: string; icon?: string | null } | null
+  category?: { name: string; icon?: string | null; type?: string | null } | null
 }
 
 const effectiveOf = (budget: SummaryBudget) => budget.effective_amount ?? budget.amount
@@ -29,11 +29,14 @@ export interface BudgetSummary {
   otherCurrency: number
   /** Not counted: only monthly budgets belong to a cycle. */
   otherPeriod: number
+  /** Not counted: an income-category budget isn't spending, so it doesn't belong in Budgeted/Remaining (LED-181 item, OD-8). */
+  otherType: number
 }
 
 /**
- * Totals for the cycle on screen. Only monthly budgets in `currency` are added
- * together; anything else is counted separately so the tiles can say what they leave out.
+ * Totals for the cycle on screen. Only monthly budgets in `currency` against an expense
+ * (or "both") category are added together; anything else is counted separately so the
+ * tiles can say what they leave out.
  */
 export function summarizeBudgets(budgets: SummaryBudget[], currency: string): BudgetSummary {
   const summary: BudgetSummary = {
@@ -45,6 +48,7 @@ export function summarizeBudgets(budgets: SummaryBudget[], currency: string): Bu
     overNames: [],
     otherCurrency: 0,
     otherPeriod: 0,
+    otherType: 0,
   }
   for (const budget of budgets) {
     if (budget.period !== 'monthly') {
@@ -53,6 +57,10 @@ export function summarizeBudgets(budgets: SummaryBudget[], currency: string): Bu
     }
     if (budget.currency !== currency) {
       summary.otherCurrency += 1
+      continue
+    }
+    if (budget.category?.type === 'income') {
+      summary.otherType += 1
       continue
     }
     const limit = effectiveOf(budget)

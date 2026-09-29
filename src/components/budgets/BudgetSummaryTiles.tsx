@@ -23,6 +23,8 @@ export function BudgetSummaryTiles({
       `${summary.otherCurrency} ${summary.otherCurrency === 1 ? 'budget' : 'budgets'} in another currency`,
     summary.otherPeriod > 0 &&
       `${summary.otherPeriod} weekly, quarterly or yearly ${summary.otherPeriod === 1 ? 'budget' : 'budgets'}`,
+    summary.otherType > 0 &&
+      `${summary.otherType} income-category ${summary.otherType === 1 ? 'budget' : 'budgets'}`,
   ].filter(Boolean)
 
   return (

@@ -46,8 +46,9 @@ export function OfflineBanner({
       {!isOnline && (
         <>
           <CloudOff className="size-4 shrink-0" />
-          Offline — {pendingCount} {pendingCount === 1 ? 'entry' : 'entries'}{' '}
-          will sync when you reconnect
+          {pendingCount === 0
+            ? "Offline — you're not connected"
+            : `Offline — ${pendingCount} ${pendingCount === 1 ? 'entry' : 'entries'} will sync when you reconnect`}
         </>
       )}
       {isOnline && isSyncing && (

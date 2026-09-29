@@ -48,6 +48,16 @@ test('other currencies and other periods are counted, never added', () => {
   assert.equal(s.otherPeriod, 1)
 })
 
+test('an income-category budget is counted but never added to Budgeted/Remaining (LED-181 item, OD-8)', () => {
+  const s = summarizeBudgets(
+    [...list, budget('sidegig', 200, 5000, { category: { name: 'Side gig', type: 'income' } })],
+    'PHP',
+  )
+  assert.equal(s.budgeted, 2500)
+  assert.equal(s.counted, 4)
+  assert.equal(s.otherType, 1)
+})
+
 test('sortByUsage orders by percent used, a zero limit with spending first, ties stable', () => {
   const rows = [
     budget('a', 50, 100),

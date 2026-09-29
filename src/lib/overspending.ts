@@ -1,6 +1,7 @@
 import { nextRollover, canRollover, type DeficitBehaviour } from './budgetRollover.ts'
 import { sumBudgetSpend, type BudgetSpendTx } from './budgetSpend.ts'
 import { monthCycleRange, type DateRange as Range } from './cycleRange.ts'
+import type { RateTable } from './exchangeRates.ts'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -47,6 +48,8 @@ interface Input {
   behaviour: DeficitBehaviour
   /** Range of the selected cycle for weekly, quarterly and yearly budgets. */
   rangeFor: (period: OverspendingBudget['period']) => Range
+  /** Exchange rates for spend in a currency other than the budget's (LED-136). */
+  rates?: RateTable | null
 }
 
 /**
@@ -56,14 +59,14 @@ interface Input {
  * Budgets page shows; other periods only report the selected cycle.
  */
 export function computeOverspending(input: Input): OverspendingResult {
-  const { budgets, txs, month, startDay, behaviour, rangeFor } = input
+  const { budgets, txs, month, startDay, behaviour, rangeFor, rates = null } = input
   const rows: OverspendingRow[] = []
   const unrated = new Set<string>()
 
   for (const b of budgets) {
     if (!canRollover(b.period)) {
       const { start, end } = rangeFor(b.period)
-      const { spent, unrated: u } = sumBudgetSpend(txs, b, start, end)
+      const { spent, unrated: u } = sumBudgetSpend(txs, b, start, end, rates)
       u.forEach((c) => unrated.add(c))
       if (spent > b.amount) {
         rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, spent, limit: b.amount, over: spent - b.amount, streak: 1, uncarried: 0 })
@@ -79,7 +82,7 @@ export function computeOverspending(input: Input): OverspendingResult {
 
     for (;;) {
       const { start, end } = monthCycleRange(key, startDay)
-      const { spent, unrated: u } = sumBudgetSpend(txs, b, start, end)
+      const { spent, unrated: u } = sumBudgetSpend(txs, b, start, end, rates)
       const limit = Math.max(0, b.amount + (rolloverActive ? rollover : 0))
       const over = Math.max(0, spent - limit)
       streak = over > 0 ? streak + 1 : 0

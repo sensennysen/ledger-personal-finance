@@ -15,6 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { LedgerMark } from '@/components/brand/LedgerMark'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -69,9 +70,20 @@ export function TopBar({
   const { pathname } = useLocation()
   const tabStrip = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    tabStrip.current
-      ?.querySelector('[aria-current="page"]')
-      ?.scrollIntoView({ inline: 'center', block: 'nearest' })
+    // Keep the active tab visible without Element.scrollIntoView: in Chrome it
+    // moves the page's sequential-focus starting point to wherever it scrolled,
+    // which put a fresh Tab press after the header instead of at the skip link
+    // (LED-155). A manual scrollLeft has no such side effect.
+    const strip = tabStrip.current
+    const active = strip?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!strip || !active) return
+    const activeLeft = active.offsetLeft - strip.offsetLeft
+    const activeRight = activeLeft + active.offsetWidth
+    if (activeLeft < strip.scrollLeft) {
+      strip.scrollLeft = activeLeft
+    } else if (activeRight > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollLeft = activeRight - strip.clientWidth
+    }
   }, [pathname])
   const { theme, toggleTheme } = useTheme()
   const tabStop = rovingTabStop(NAV_TABS, pathname)
@@ -79,14 +91,11 @@ export function TopBar({
   return (
     <>
     <header className="hidden md:flex shrink-0 h-16 items-center gap-6 border-b border-border bg-sidebar px-6 lg:px-8">
-      <NavLink to="/" className="flex items-center gap-2.5 shrink-0">
-        <img
-          src={theme === 'dark' ? '/l-white.png' : '/l-black.png'}
-          alt=""
-          className="size-8 object-contain"
-        />
+      {/* Out of the tab order (LED-148): Home is the next stop and the tab group is the way in. */}
+      <NavLink to="/" tabIndex={-1} aria-label="Ledger home" className="flex items-center gap-2.5 shrink-0">
+        <LedgerMark decorative className="size-8 text-foreground" />
         <span
-          className="hidden lg:inline text-sm font-semibold tracking-[0.08em] uppercase text-foreground/80"
+          className="hidden xl:inline text-sm font-semibold tracking-[0.08em] uppercase text-foreground/80"
           style={{ fontFamily: '"Roboto", sans-serif' }}
         >
           Ledger
@@ -114,7 +123,7 @@ export function TopBar({
               tabIndex={index === tabStop ? 0 : -1}
               title={locked ? `${tab.label} (finish setup to unlock)` : tab.label}
               className={cn(
-                'flex h-10 items-center gap-2 rounded-full px-3 lg:px-4 text-[0.8125rem] font-medium transition-colors press-scale',
+                'flex h-10 items-center gap-2 rounded-full px-3 xl:px-4 text-[0.8125rem] font-medium transition-colors press-scale focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
                 locked
                   ? 'text-muted-foreground hover:text-foreground hover:bg-foreground/4'
                   : active
@@ -123,7 +132,7 @@ export function TopBar({
               )}
             >
               <Icon className="size-4 shrink-0" />
-              <span className="sr-only lg:not-sr-only">{tab.label}</span>
+              <span className="sr-only xl:not-sr-only">{tab.label}</span>
             </NavLink>
           )
         })}
@@ -134,11 +143,11 @@ export function TopBar({
         type="button"
         onClick={onSearch}
         aria-label="Search"
-        className="flex h-10 w-10 lg:w-60 items-center justify-center lg:justify-start gap-2.5 rounded-full border border-border bg-background lg:px-3.5 text-[0.8125rem] text-muted-foreground hover:bg-muted"
+        className="flex h-10 w-10 xl:w-60 items-center justify-center xl:justify-start gap-2.5 rounded-full border border-border bg-background xl:px-3.5 text-[0.8125rem] text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
       >
         <Search className="size-4" />
-        <span className="hidden lg:block flex-1 text-left">Search…</span>
-        <kbd className="hidden lg:block rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold">
+        <span className="hidden xl:block flex-1 text-left">Search…</span>
+        <kbd className="hidden xl:block rounded-md bg-muted px-1.5 py-0.5 text-[0.6875rem] font-semibold">
           ⌘K
         </kbd>
       </button>
@@ -156,7 +165,7 @@ export function TopBar({
           aria-label={SETTINGS_DESTINATION.label}
           className={({ isActive }) =>
             cn(
-              'flex size-9 items-center justify-center rounded-full transition-colors hover:bg-foreground/4',
+              'flex size-9 items-center justify-center rounded-full transition-colors hover:bg-foreground/4 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
               isActive ? 'text-foreground' : 'text-muted-foreground',
             )
           }
@@ -227,7 +236,7 @@ export function TopBar({
               aria-current={active ? 'page' : undefined}
               tabIndex={index === tabStop ? 0 : -1}
               className={cn(
-                'shrink-0 rounded-full px-4 py-2 text-[0.8125rem] font-medium transition-colors',
+                'shrink-0 rounded-full px-4 py-2 text-[0.8125rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
                 active
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
                   : 'text-muted-foreground',

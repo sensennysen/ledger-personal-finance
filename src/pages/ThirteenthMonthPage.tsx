@@ -1,17 +1,21 @@
 import { useMemo, useState } from 'react'
-import { CalendarCheck, Info, CheckSquare, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { CalendarCheck, CheckSquare, SquareMinus, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAuth } from '@/contexts/AuthContext'
-import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, getLocalDateString, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { InlineLoadError } from '@/components/ui/error-state'
-import { Skeleton } from '@/components/ui/skeleton'
+import { SkeletonText } from '@/components/ui/skeleton'
+import { RefreshingRegion } from '@/components/ui/refreshing-region'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { INCOME } from '@/constants/colors'
-import { excludedByCategory, groupByMonth, monthKey, salaryOnlySelection } from '@/lib/thirteenthMonth'
+import { excludedByCategory, groupByMonth, monthCoverage, monthKey, pd851Checklist, salaryOnlySelection } from '@/lib/thirteenthMonth'
+import { CoverageStrip } from '@/components/thirteenth-month/CoverageStrip'
+import { Pd851Checklist } from '@/components/thirteenth-month/Pd851Checklist'
 import type { Transaction } from '@/types'
 
 // --- constants ---
@@ -64,7 +68,18 @@ export default function ThirteenthMonthPage() {
   const startDate = `${year}-01-01`
   const endDate = `${year}-12-31`
 
-  const { transactions, loading, error, refetch } = useTransactions({ startDate, endDate, type: 'income' })
+  const { transactions: fetched, loading, error, refetch } = useTransactions({ startDate, endDate, type: 'income' })
+  // Switching year keeps the last year's records on screen until the new ones arrive (LED-150,
+  // keep-previous-data-with-its-key). The hook does not tag its rows, but every row carries its
+  // date, so the year the rows belong to is read from them. If the new year's read fails, the old
+  // rows are dropped and the error shows, never passed off as the new year.
+  const dataYear = fetched.length > 0 ? Number(fetched[0].date.slice(0, 4)) : null
+  const mismatch = dataYear !== null && dataYear !== year
+  const failed = mismatch && !loading && !!error
+  const refreshing = mismatch && !failed
+  const showSkeleton = loading && !refreshing
+  const transactions = useMemo(() => (failed ? [] : fetched), [failed, fetched])
+  const shownYear = refreshing ? dataYear : year
   const { transactions: anyIncomeEver, loading: anyIncomeLoading } = useTransactions({ type: 'income', limit: 1 })
 
   const handleYearChange = (v: string) => {
@@ -74,9 +89,10 @@ export default function ThirteenthMonthPage() {
     setIncluded(loadSelection(userId, y))
   }
 
+  // While the old year is still showing, its own saved selection applies, not the new year's.
   const effectiveIncluded = useMemo(
-    () => included ?? new Set(transactions.map((transaction) => transaction.id)),
-    [included, transactions]
+    () => (refreshing ? loadSelection(userId, shownYear!) : included) ?? new Set(transactions.map((transaction) => transaction.id)),
+    [refreshing, userId, shownYear, included, transactions]
   )
 
   const updateIncluded = (next: Set<string>) => {
@@ -100,7 +116,7 @@ export default function ThirteenthMonthPage() {
   const thirteenthMonthPay = totalIncluded / 12
 
   const currentMonth = new Date().getMonth()
-  const isCurrentYear = year === CURRENT_YEAR
+  const isCurrentYear = shownYear === CURRENT_YEAR
   const monthsElapsed = isCurrentYear ? currentMonth + 1 : 12
 
   const monthIncludedTotal = (txs: Transaction[]) =>
@@ -134,6 +150,15 @@ export default function ThirteenthMonthPage() {
     })
   }
 
+  const coverage = useMemo(
+    () => monthCoverage(transactions, effectiveIncluded, shownYear!, getLocalDateString()),
+    [transactions, effectiveIncluded, shownYear]
+  )
+  const checklist = useMemo(
+    () => pd851Checklist(transactions, effectiveIncluded),
+    [transactions, effectiveIncluded]
+  )
+
   const includedCount = transactions.filter((t) => effectiveIncluded.has(t.id)).length
   const excluded = useMemo(
     () => excludedByCategory(transactions, effectiveIncluded),
@@ -142,6 +167,11 @@ export default function ThirteenthMonthPage() {
 
   return (
     <div className="p-4 md:p-6 lg:px-8 space-y-6">
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Link to="/reports" className="rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring">Reports</Link>
+        <ChevronRight className="w-3.5 h-3.5" aria-hidden />
+        <span aria-current="page" className="truncate text-foreground">13th Month Pay</span>
+      </nav>
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold md:hidden">
           13th Month Pay Estimator
@@ -172,31 +202,27 @@ export default function ThirteenthMonthPage() {
         />
       )}
 
+      <RefreshingRegion refreshing={refreshing} label={`Loading ${year}…`}>
       <div className="space-y-6 xl:grid xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start xl:gap-6 xl:space-y-0">
       <div className="space-y-6 xl:order-2 xl:sticky xl:top-6">
       <section className="rounded-3xl bg-accent text-accent-foreground p-6">
         <p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p>
-        {loading
-          ? <Skeleton className="h-10 w-40 mt-3" />
+        {showSkeleton
+          ? <p className="text-[40px] leading-tight mt-3"><SkeletonText className="w-40" /></p>
           : <p className="money text-[40px] leading-tight mt-3">{formatCurrency(thirteenthMonthPay, currency)}</p>
         }
         <p className="text-sm mt-3">{formatCurrency(totalIncluded, currency)} basic salary ÷ 12</p>
-        {!loading && (
+        {showSkeleton ? (
+          <p className="text-xs mt-1"><SkeletonText className="w-48" /></p>
+        ) : (
           <p className="text-xs mt-1 opacity-80">
-            Across {monthsWithIncome} of {monthsElapsed} month{monthsElapsed !== 1 ? 's' : ''} {isCurrentYear ? 'so far this year' : `of ${year}`}
+            Across {monthsWithIncome} of {monthsElapsed} month{monthsElapsed !== 1 ? 's' : ''} {isCurrentYear ? 'so far this year' : `of ${shownYear}`}
           </p>
         )}
       </section>
 
-      <div className="flex items-start gap-2.5 rounded-xl bg-transfer-container p-4 text-sm text-transfer">
-        <Info className="w-4 h-4 mt-0.5 shrink-0" />
-        <p className="max-w-prose">
-          All income transactions for the year are shown below. Check only the records that qualify
-          as <strong className="text-foreground">basic salary</strong> under PD 851 – exclude bonuses,
-          allowances, overtime, and non-covered sources. Your selection is saved on this device only
-          and never affects your account balances.
-        </p>
-      </div>
+      <CoverageStrip coverage={coverage} loading={showSkeleton} />
+      <Pd851Checklist rows={checklist} />
       </div>
 
       <Card className="xl:order-1">
@@ -205,16 +231,16 @@ export default function ThirteenthMonthPage() {
             <div className="min-w-0">
               <CardTitle className="text-base flex items-center gap-2">
                 <CalendarCheck className="w-4 h-4" style={{ color: INCOME }} />
-                Income Records – {year}
+                Income Records – {shownYear}
               </CardTitle>
               <CardDescription>
-                {loading || transactions.length === 0
+                {showSkeleton || transactions.length === 0
                   ? 'Select the records that count as basic salary'
                   : `${includedCount} of ${transactions.length} counted as basic salary`}
               </CardDescription>
             </div>
           </div>
-          {!loading && transactions.length > 0 && (
+          {!showSkeleton && transactions.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <Button
                 variant="outline"
@@ -235,7 +261,7 @@ export default function ThirteenthMonthPage() {
               </Button>
             </div>
           )}
-          {!loading && excluded.length > 0 && (
+          {!showSkeleton && excluded.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-muted-foreground">
               <span>Excluded by category:</span>
               {excluded.map(({ name, count }) => (
@@ -248,16 +274,26 @@ export default function ThirteenthMonthPage() {
         </CardHeader>
 
         <CardContent className="p-0">
-          {loading ? (
-            <div className="divide-y divide-border/50">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-5 py-3">
-                  <Skeleton className="w-4 h-4 rounded" />
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 flex-1" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              ))}
+          {showSkeleton ? (
+            <div className="divide-y divide-border/50" aria-busy="true" aria-label="Loading income records">
+              <div className="flex items-center gap-3 bg-muted/30 px-5 py-3">
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-hidden />
+                <Square className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+                <span className="flex-1 text-sm"><SkeletonText className="w-24" /></span>
+                <span className="text-sm"><SkeletonText className="w-20" /></span>
+              </div>
+              <div className="divide-y divide-border/30">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-5 py-2.5">
+                    <Square className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm"><SkeletonText className="w-40 max-w-full" /></p>
+                      <p className="text-xs"><SkeletonText className="w-20" /></p>
+                    </div>
+                    <span className="text-sm"><SkeletonText className="w-16" /></span>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : transactions.length === 0 && !anyIncomeLoading && anyIncomeEver.length === 0 ? (
             <EmptyState icon={TrendingUp} title="Nothing recorded yet" bare />
@@ -304,7 +340,7 @@ export default function ThirteenthMonthPage() {
                         {allOn
                           ? <CheckSquare className="w-4 h-4" style={{ color: INCOME }} />
                           : someOn
-                            ? <CheckSquare className="w-4 h-4 opacity-50" style={{ color: INCOME }} />
+                            ? <SquareMinus className="w-4 h-4" style={{ color: INCOME }} aria-label="Some selected" />
                             : <Square className="w-4 h-4" />
                         }
                       </button>
@@ -339,7 +375,6 @@ export default function ThirteenthMonthPage() {
                               key={tx.id}
                               className={cn(
                                 'flex items-center gap-3 px-5 py-2.5 cursor-pointer hover:bg-muted/30 transition-colors',
-                                !isOn && 'opacity-50',
                               )}
                             >
                               <input
@@ -349,14 +384,15 @@ export default function ThirteenthMonthPage() {
                                 className="w-4 h-4 accent-primary rounded shrink-0"
                               />
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
+                                <p className={cn('text-sm font-medium truncate', !isOn && 'line-through text-muted-foreground')}>
                                   {tx.description || '(no description)'}
                                 </p>
                                 <p className="text-[0.6875rem] text-muted-foreground flex items-center gap-1.5">
                                   <span>{formatDate(tx.date)}</span>
+                                  {!isOn && <span className="font-medium">Not counted</span>}
                                   {tx.category && (
                                     <>
-                                      <span className="text-border">–</span>
+                                      <span className="text-muted-foreground">–</span>
                                       <span>{tx.category.icon} {tx.category.name}</span>
                                     </>
                                   )}
@@ -364,7 +400,7 @@ export default function ThirteenthMonthPage() {
                               </div>
                               <span className={cn(
                                 'text-sm font-semibold tabular-nums shrink-0',
-                                isOn ? 'text-foreground' : 'text-muted-foreground',
+                                isOn ? 'text-foreground' : 'line-through text-muted-foreground',
                               )}>
                                 {formatCurrency(txAmt(tx), currency)}
                               </span>
@@ -382,6 +418,7 @@ export default function ThirteenthMonthPage() {
         </CardContent>
       </Card>
       </div>
+      </RefreshingRegion>
     </div>
   )
 }

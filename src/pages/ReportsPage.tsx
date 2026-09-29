@@ -4,6 +4,7 @@ import {
   Download,
   TrendingUp,
   TrendingDown,
+  TriangleAlert,
   Wallet,
   FileBarChart2,
   Store,
@@ -29,6 +30,8 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { converterTo } from '@/lib/exchangeRates'
 import { useCycle } from '@/contexts/cycleState'
 import { getReportRange } from '@/lib/reportCycle'
 import {
@@ -47,9 +50,10 @@ import {
   type Lookback,
 } from '@/lib/reportLookback'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
-import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
+import { buildReportCsv, downloadCsv } from '@/lib/transactionCsv'
+import { buildRunningBalanceMap } from '@/lib/runningBalance'
 import { abbreviateTick } from '@/lib/chartTicks'
-import { REPORT_COLUMNS, defaultColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
+import { REPORT_COLUMNS, defaultColumns, exportColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -70,8 +74,10 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { INCOME, EXPENSE, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
 import { OverspendingCard } from '@/components/reports/OverspendingCard'
+import { useOverspendingReport } from '@/hooks/useOverspendingReport'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
-import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
+import { summarizeBalances } from '@/lib/accountsOverview'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { buildCategoryBreakdown, rollupBreakdown, type CategorySlice } from '@/lib/categoryBreakdown'
 import { CategoryBreakdownCard } from '@/components/reports/CategoryBreakdownCard'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
@@ -103,6 +109,8 @@ function exportToPdf(
   categoryBreakdown: CategorySlice[],
   merchantBreakdown: { displayName: string; amount: number; count: number }[],
   filenameLabel: string,
+  columns: ReportColumn[],
+  balanceMap: Map<string, number>,
 ) {
   // jsPDF's built-in Helvetica font only covers Latin-1, so Unicode currency
   // symbols (₱, €, £, ¥, …) render as garbled characters. Use the ISO currency
@@ -206,30 +214,42 @@ function exportToPdf(
   doc.setFontSize(10)
   doc.text('Transactions', margin, currentY)
   currentY += 4
+  // Same columns, in the same order, as the table on screen (the Columns control).
+  const pdfCell = (column: ReportColumn, t: Transaction): string => {
+    switch (column) {
+      case 'date': return t.date
+      case 'description': return t.description
+      case 'category': return t.category?.name ?? '—'
+      case 'account': return t.account?.name ?? '—'
+      case 'type': return t.type.charAt(0).toUpperCase() + t.type.slice(1)
+      case 'amount': return `${t.type === 'income' ? '+' : t.type === 'transfer' ? '~' : '-'} ${pdfFmt(t.amount, t.currency)}`
+      case 'balance': {
+        const balance = balanceMap.get(t.id)
+        return balance === undefined ? '—' : pdfFmt(balance, t.account?.currency ?? t.currency)
+      }
+    }
+  }
+  const labelOf = new Map(REPORT_COLUMNS.map((c) => [c.key, c.label]))
+  const columnStyles: Record<number, { halign?: 'right'; cellWidth: number | 'auto' }> = {}
+  columns.forEach((column, index) => {
+    if (column === 'date') columnStyles[index] = { cellWidth: 22 }
+    else if (column === 'description') columnStyles[index] = { cellWidth: 'auto' }
+    else if (column === 'category') columnStyles[index] = { cellWidth: 30 }
+    else if (column === 'account') columnStyles[index] = { cellWidth: 32 }
+    else if (column === 'type') columnStyles[index] = { cellWidth: 20 }
+    else columnStyles[index] = { halign: 'right', cellWidth: 28 }
+  })
   autoTable(doc, {
     startY: currentY,
-    head: [['Date', 'Description', 'Category', 'Account', 'Amount']],
-    body: transactions.map((t) => [
-      t.date,
-      t.description,
-      t.category?.name ?? '—',
-      t.account?.name ?? '—',
-      `${t.type === 'income' ? '+' : t.type === 'transfer' ? '~' : '-'} ${pdfFmt(t.amount, t.currency)}`,
-
-    ]),
+    head: [columns.map((column) => labelOf.get(column) ?? column)],
+    body: transactions.map((t) => columns.map((column) => pdfCell(column, t))),
     styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak' },
     headStyles: { fillColor: [45, 45, 45], textColor: 255, fontStyle: 'bold' },
-    columnStyles: {
-      0: { cellWidth: 22 },
-      1: { cellWidth: 'auto' },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 32 },
-      4: { halign: 'right', cellWidth: 28 },
-    },
+    columnStyles,
     margin: { left: margin, right: margin },
   })
 
-  doc.save(`expense-report_${filenameLabel}.pdf`)
+  doc.save(`ledger-report_${filenameLabel}.pdf`)
 }
 
 // ─── stat card ────────────────────────────────────────────────────────────────
@@ -242,6 +262,7 @@ function StatCard({
   color,
   comparison,
   loading,
+  note,
 }: {
   title: string
   value: string
@@ -250,6 +271,7 @@ function StatCard({
   color: string
   comparison?: { text: string; color: string }
   loading?: boolean
+  note?: React.ReactNode
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-border/60 p-4 sm:p-5 bg-card">
@@ -278,6 +300,7 @@ function StatCard({
               {comparison.text}
             </p>
           )}
+          {note && !loading && <div className="mt-1.5">{note}</div>}
         </div>
         <div
           className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0"
@@ -326,9 +349,12 @@ function IncomeExpenseCard({
         </select>
       </div>
   {loading ? (
-        <div className="flex-1 min-h-52 lg:min-h-72"><Skeleton className="h-full w-full rounded-lg" /></div>
+        <div className="relative flex-1 min-h-60 lg:min-h-72"><Skeleton className="absolute inset-0 rounded-lg" /></div>
       ) : (
-        <div className="flex-1 min-h-52 lg:min-h-72">
+        // The chart fills an absolutely placed box: a percentage height has no parent to
+        // resolve against in Analytics' flex column, which measured 0px (LED-168).
+        <div className="relative flex-1 min-h-60 lg:min-h-72">
+          <div className="absolute inset-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -360,6 +386,7 @@ function IncomeExpenseCard({
               <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+          </div>
         </div>
       )}
     </div>
@@ -386,6 +413,8 @@ export default function ReportsPage() {
   const { profile } = useAuth()
   const deficitBehaviour = useDeficitBehaviour()
   const currency = profile?.default_currency ?? 'USD'
+  const { table: rateTable } = useExchangeRates()
+  const convertToDefault = useMemo(() => converterTo(rateTable, currency), [rateTable, currency])
 
   const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
   const { accounts, loading: accLoading, error: accError, refetch: refetchAccounts } = useAccounts()
@@ -399,6 +428,7 @@ export default function ReportsPage() {
   }
 
   const { startDay, selectedMonth, setSelectedMonth } = useCycle()
+  const overspending = useOverspendingReport({ startDay, month: selectedMonth, deficitBehaviour })
   const [activeTab, setActiveTab] = useState('overview')
   const { start, end, label: rangeLabel, filenameLabel } = useMemo(
     () => getReportRange(selectedMonth, startDay),
@@ -461,8 +491,23 @@ export default function ReportsPage() {
     [filtered, categoryById]
   )
 
+  // Over budget stat card: the report's total in the display currency, against last cycle.
+  const overspendingReady = overspending.state === 'ready' || overspending.state === 'stale-error'
+  const overNow = overspending.result.totals.find((total) => total.currency === currency)?.over ?? 0
+  const overPrevious = overspending.previous.totals.find((total) => total.currency === currency)?.over ?? 0
+  const overCategories = overspending.result.rows.length
+  const overOtherCurrencies = overspending.result.totals.filter((total) => total.currency !== currency)
+  const overspendingSub =
+    overspending.state === 'error'
+      ? "Couldn't load your budgets"
+      : overspending.state === 'empty'
+        ? 'No budgets set'
+        : `${overCategories} ${overCategories === 1 ? 'category' : 'categories'}${
+            overOtherCurrencies.length > 0 ? ` · plus ${overOtherCurrencies.map((total) => total.currency).join(', ')}` : ''
+          }`
+
   const handleExport = () => {
-    downloadCsv(buildTransactionsCsv(sortedTransactions, txBalanceMap), `ledger-report_${filenameLabel}.csv`)
+    downloadCsv(buildReportCsv(sortedTransactions, exportColumns(visibleColumns), txBalanceMap), `ledger-report_${filenameLabel}.csv`)
   }
 
   const handleExportPdf = () => {
@@ -476,13 +521,15 @@ export default function ReportsPage() {
       categoryBreakdown,
       merchantBreakdown,
       filenameLabel,
+      exportColumns(visibleColumns),
+      txBalanceMap,
     )
   }
 
   // ── Net Worth Over Time (last 13 months) ──
   const netWorthData = useMemo(() => {
     const now = new Date()
-    const currentNetWorth = accounts.reduce((sum, a) => sum + getAccountNetWorthContribution(a), 0)
+    const currentNetWorth = summarizeBalances(accounts, currency, convertToDefault).netWorth
     const boundaries: { date: string; label: string }[] = []
     for (let i = 12; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -507,7 +554,7 @@ export default function ReportsPage() {
       data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
     }
     return data
-  }, [accounts, allTransactionsSorted])
+  }, [accounts, allTransactionsSorted, convertToDefault, currency])
 
   // ── Income vs Expenses trend (own lookback, independent of the cycle) ──
   const [lookback, setLookback] = useState<Lookback>(DEFAULT_LOOKBACK)
@@ -569,7 +616,7 @@ export default function ReportsPage() {
       </tr>
     </thead>
   )
-  const balanceSummary = getBalanceSummary(activeAccounts)
+  const balanceSummary = summarizeBalances(activeAccounts, currency, convertToDefault)
   const totalBalance = balanceSummary.netWorth
 
   // Sorted transactions for table (newest first)
@@ -577,33 +624,8 @@ export default function ReportsPage() {
     (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)
   )
 
-  // Running balance per account, derived by unwinding all transactions newest→oldest
-  // starting from each account's current live balance.
-  const txBalanceMap = (() => {
-    // Build a mutable balance register from current account balances
-    const register = new Map<string, number>()
-    for (const acc of accounts) register.set(acc.id, acc.balance)
-
-    const map = new Map<string, number>()
-    for (const tx of allTransactionsSorted) {
-      // Record the account balance *after* this transaction
-      if (register.has(tx.account_id)) {
-        map.set(tx.id, register.get(tx.account_id)!)
-      }
-      // Undo the effect of this transaction to step backwards in time
-      if (tx.type === 'income') {
-        register.set(tx.account_id, (register.get(tx.account_id) ?? 0) - tx.amount)
-      } else if (tx.type === 'expense') {
-        register.set(tx.account_id, (register.get(tx.account_id) ?? 0) + tx.amount)
-      } else if (tx.type === 'transfer') {
-        register.set(tx.account_id, (register.get(tx.account_id) ?? 0) + tx.amount + (tx.transfer_fee ?? 0))
-        if (tx.to_account_id) {
-          register.set(tx.to_account_id, (register.get(tx.to_account_id) ?? 0) - tx.amount)
-        }
-      }
-    }
-    return map
-  })()
+  // Running balance per account, unwound from each account's live balance (src/lib/runningBalance.ts).
+  const txBalanceMap = buildRunningBalanceMap(accounts, transactions)
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6 lg:px-8 pb-24 md:pb-6">
@@ -624,9 +646,12 @@ export default function ReportsPage() {
             <div className="flex items-center gap-2">
               <Link
                 to="/thirteenth-month"
+                aria-label="13th Month Pay"
                 className="inline-flex items-center gap-1 shrink-0 text-xs font-medium text-muted-foreground hover:text-primary"
               >
-                13th Month Pay
+                {/* 9a draws the short label below lg; the full name stays the accessible name. */}
+                <span aria-hidden className="lg:hidden">13th Mo</span>
+                <span aria-hidden className="hidden lg:inline">13th Month Pay</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
               <DropdownMenu>
@@ -650,14 +675,9 @@ export default function ReportsPage() {
         </PageActions>
 
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
-          <OverspendingCard
-            categories={categories}
-            startDay={startDay}
-            month={selectedMonth}
-            deficitBehaviour={deficitBehaviour}
-          />
+          <OverspendingCard categories={categories} month={selectedMonth} report={overspending} />
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         <StatCard
           title="Total Income"
           value={formatCurrency(totalIncome, currency)}
@@ -693,6 +713,7 @@ export default function ReportsPage() {
             : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
           icon={Wallet}
           color={'var(--foreground)'}
+          note={<UnratedCurrencyNotice currencies={balanceSummary.excludedCurrencies} subject="balances" />}
           comparison={loadFailed ? undefined : {
             text: netWorthChange === 0
               ? 'No change this cycle'
@@ -700,6 +721,15 @@ export default function ReportsPage() {
             color: netWorthChange > 0 ? INCOME : netWorthChange < 0 ? EXPENSE : 'var(--muted-foreground)',
           }}
           loading={loading}
+        />
+        <StatCard
+          title="Over budget"
+          value={overspendingReady ? formatCurrency(overNow, currency) : '—'}
+          sub={overspendingSub}
+          icon={TriangleAlert}
+          color={overNow > 0 ? 'var(--warning)' : 'var(--foreground)'}
+          comparison={overspendingReady ? compare(overNow, overPrevious, 'down') : undefined}
+          loading={overspending.state === 'loading'}
         />
       </div>
 
@@ -763,6 +793,9 @@ export default function ReportsPage() {
                 <span className="text-[0.8125rem] font-bold tabular-nums" style={{ color: 'var(--foreground)' }}>
                   {formatCurrency(totalBalance, currency)}
                 </span>
+              </div>
+              <div className="px-3">
+                <UnratedCurrencyNotice currencies={balanceSummary.excludedCurrencies} subject="balances" />
               </div>
             </div>
           )}

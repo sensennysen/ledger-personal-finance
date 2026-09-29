@@ -1,3 +1,5 @@
+import { amountInCurrency, type RateTable } from './exchangeRates.ts'
+
 export interface ImpactTx {
   type: string
   category_id: string | null
@@ -35,14 +37,13 @@ export function entryBudgetImpact(
   tx: ImpactTx,
   budget: ImpactBudget | null | undefined,
   range: { start: string; end: string },
+  rates: RateTable | null = null,
 ): BudgetImpact | null {
   if (tx.type !== 'expense' || !tx.category_id || !budget) return null
   if (budget.category_id !== tx.category_id) return null
   if (tx.date < range.start || tx.date > range.end) return null
-  let entry: number
-  if (tx.currency === budget.currency) entry = tx.amount
-  else if (tx.exchange_rate == null) return null
-  else entry = tx.amount * tx.exchange_rate
+  const entry = amountInCurrency(tx, budget.currency, rates)
+  if (entry === null) return null
   const allowance = budget.effective_amount ?? budget.amount
   if (!(allowance > 0)) return null
   return { entry, spent: Math.max(budget.spent ?? 0, entry), allowance, currency: budget.currency }

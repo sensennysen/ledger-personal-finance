@@ -55,6 +55,20 @@
   --transfer-container: #DCEAF2;
   --warning: #7A6430;
   --warning-container: #F0E7D2;
+  /* Design gold #9A7F3D is 2.84:1 on the page; this step of the same hue holds 3:1 on page and card.
+     For borders, fills, meters and icon tiles only. Text on gold tint uses --warning. */
+  --gold: #917738;
+  /* Disabled controls: solid ink on a solid surface, never opacity. Design ink #8A8892 is
+     2.79:1 on its own #E7E5EA fill and 2.59:1 on the page; this step of the same hue holds 3:1
+     on page, card, muted and the disabled fill. */
+  --disabled: #E7E5EA;
+  --disabled-foreground: #7A7883;
+  /* Google's sign-in button guidance: white or neutral ground with a hairline and dark ink, so the
+     multicolour G stays legal. Light: white, #747775, #1F1F1F. Dark: #131314, #8E918F, #E3E3E3. */
+  --google-surface: #FFFFFF;
+  --google-surface-hover: #F8F9FA;
+  --google-line: #747775;
+  --google-ink: #1F1F1F;
 
   /* Charts alias the semantics so Recharts needs no per-series colors */
   --chart-1: var(--primary);
@@ -122,6 +136,13 @@
   --transfer-container: #24323C;
   --warning: #E8CE92;
   --warning-container: #3C3320;
+  --gold: #C9AC6A;
+  --disabled: #34333C;
+  --disabled-foreground: #96949E;   /* design dark disabled ink */
+  --google-surface: #131314;
+  --google-surface-hover: #1E1E20;
+  --google-line: #8E918F;
+  --google-ink: #E3E3E3;
 
   --chart-1: var(--primary);
   --chart-2: var(--income);
@@ -159,6 +180,13 @@
   --color-transfer-container: var(--transfer-container);
   --color-warning: var(--warning);
   --color-warning-container: var(--warning-container);
+  --color-gold: var(--gold);
+  --color-disabled: var(--disabled);
+  --color-disabled-foreground: var(--disabled-foreground);
+  --color-google-surface: var(--google-surface);
+  --color-google-surface-hover: var(--google-surface-hover);
+  --color-google-line: var(--google-line);
+  --color-google-ink: var(--google-ink);
 
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);

@@ -30,17 +30,20 @@ export function useImportDuplicates(accountId: string, span: { start: string; en
 
     const run = async () => {
       // PostgREST caps a response at 1,000 rows; a large statement spans more.
-      const { rows, error } = await readAllPages<ExistingTx>((from, to) =>
-        supabase
-          .from('transactions')
-          .select('id, date, amount, type, description, account_id, to_account_id, exchange_rate')
-          .eq('user_id', user.id)
-          .or(`account_id.eq.${accountId},to_account_id.eq.${accountId}`)
-          .gte('date', span.start)
-          .lte('date', span.end)
-          .order('date', { ascending: true })
-          .order('id', { ascending: true })
-          .range(from, to),
+      const { rows, error } = await readAllPages<ExistingTx>(
+        (from, to) =>
+          supabase
+            .from('transactions')
+            .select('id, date, amount, type, description, account_id, to_account_id, exchange_rate, original_amount, original_currency')
+            .eq('user_id', user.id)
+            .or(`account_id.eq.${accountId},to_account_id.eq.${accountId}`)
+            .gte('date', span.start)
+            .lte('date', span.end)
+            .order('date', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to),
+        undefined,
+        () => cancelled,
       )
       if (cancelled) return
       setResult({ key, existing: error ? [] : rows, error: describeDataError(error, { action: 'load' }) })

@@ -2,18 +2,22 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildRows,
+  dateOrderIsAmbiguous,
   detectDateOrder,
   fixableByOtherOrder,
   groupProblems,
   importableRows,
+  isAmbiguousSlashDate,
   isSelectable,
   isSelected,
   parseAmount,
   parseDate,
   processFile,
+  skipReason,
   selectAll,
   sortProblemsFirst,
   summarise,
+  withAmbiguousDateIssues,
   withCategoryIssues,
 } from '../src/lib/csvImport.ts'
 
@@ -199,6 +203,17 @@ test('rows with an error or under a skipped cause have no checkbox', () => {
   assert.equal(isSelectable(byLine.get(3), selection), true)
 })
 
+test('a row kept out of the import says why, in text', () => {
+  const { rows } = rowsOf(MESSY, 'MDY')
+  const byLine = new Map(rows.map((row) => [row.line, row]))
+  const selection = { duplicates: new Set([6]), skipped: new Set(['empty-description']), toggled: new Set([3]) }
+  assert.equal(skipReason(byLine.get(4), selection), 'Skipped - description empty')
+  assert.equal(skipReason(byLine.get(3), selection), 'Not selected')
+  assert.equal(skipReason(byLine.get(6), selection), 'Not selected')
+  assert.equal(skipReason(byLine.get(1), selection), null)
+  assert.equal(skipReason(byLine.get(3), { ...selection, toggled: new Set() }), null)
+})
+
 test('select all ticks every selectable row, duplicates included; clearing unticks them', () => {
   const { rows } = rowsOf(MESSY, 'MDY')
   const base = { duplicates: new Set([6]), skipped: new Set(['bad-date', 'bad-amount']), toggled: new Set([3]) }
@@ -218,4 +233,54 @@ test('rows with no category match are a warning that still imports', () => {
   )
   assert.deepEqual(importableRows(flagged, none).map((row) => row.line), [1, 2])
   assert.equal(withCategoryIssues(rows, new Set()), rows)
+})
+
+test('a slash date is ambiguous only when both parts fit a month and differ (LED-147)', () => {
+  assert.equal(isAmbiguousSlashDate('03/04/2026'), true)
+  assert.equal(isAmbiguousSlashDate('05/05/2026'), false)
+  assert.equal(isAmbiguousSlashDate('13/04/2026'), false)
+  assert.equal(isAmbiguousSlashDate('03/25/2026'), false)
+  assert.equal(isAmbiguousSlashDate('2026-03-04'), false)
+})
+
+test('a file is ambiguous when no date settles the order', () => {
+  assert.equal(dateOrderIsAmbiguous(['03/04/2026', '05/06/2026']), true)
+  assert.equal(dateOrderIsAmbiguous(['03/04/2026', '15/06/2026']), false)
+  assert.equal(dateOrderIsAmbiguous(['03/04/2026', '06/15/2026']), false)
+  assert.equal(dateOrderIsAmbiguous(['2026-03-04']), false)
+  assert.equal(dateOrderIsAmbiguous(['05/05/2026']), false)
+})
+
+test('an all-ambiguous file is flagged and a confirmed order clears the warning', () => {
+  const text = ['Date,Description,Debit,Credit', '03/04/2026,Coffee,50,', '05/06/2026,Salary,,1000'].join('\n')
+  const file = processFile(text)
+  assert.ok(!('error' in file))
+  assert.equal(file.dateOrderAmbiguous, true)
+  assert.equal(file.dateOrder, 'MDY')
+  const built = buildRows(file.raw, file.headerIdx, file.format, file.dateOrder).rows
+  const flagged = withAmbiguousDateIssues(built, true)
+  assert.ok(flagged.every((row) => row.issues.includes('ambiguous-date')))
+  assert.deepEqual(groupProblems(flagged, new Set()).map((cause) => cause.id), ['ambiguous-date'])
+  assert.equal(groupProblems(flagged, new Set())[0].sample, '03/04/2026')
+  // Confirming the order (either one) stops flagging; the rows then parse in that order.
+  assert.deepEqual(withAmbiguousDateIssues(built, false), built)
+  const dmy = buildRows(file.raw, file.headerIdx, file.format, 'DMY').rows
+  assert.equal(dmy[0].date, '2026-04-03')
+  assert.equal(built[0].date, '2026-03-04')
+})
+
+test('a warning does not block the import', () => {
+  const text = ['Date,Description,Debit,Credit', '03/04/2026,Coffee,50,'].join('\n')
+  const file = processFile(text)
+  const rows = withAmbiguousDateIssues(buildRows(file.raw, file.headerIdx, file.format, 'MDY').rows, true)
+  const summary = summarise(rows, none)
+  assert.equal(summary.errors, 0)
+  assert.equal(summary.warnings, 1)
+})
+
+test('a file with a day over 12 is settled, not ambiguous', () => {
+  const text = ['Date,Description,Debit,Credit', '03/04/2026,Coffee,50,', '25/04/2026,Lunch,80,'].join('\n')
+  const file = processFile(text)
+  assert.equal(file.dateOrderAmbiguous, false)
+  assert.equal(file.dateOrder, 'DMY')
 })

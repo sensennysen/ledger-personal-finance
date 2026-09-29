@@ -43,8 +43,10 @@ const pairs = [
   ['--expense', '--expense-container'],
   ['--transfer', '--transfer-container'],
   ['--warning', '--warning-container'],
+  ['--foreground', '--warning-container'],
   ['--income', '--card'],
   ['--expense', '--card'],
+  ['--warning', '--card'],
 ]
 
 for (const [theme, map] of Object.entries(themes)) {
@@ -52,6 +54,26 @@ for (const [theme, map] of Object.entries(themes)) {
     test(`${theme}: ${fg} on ${bg} holds 4.5:1`, () => {
       const ratio = contrastRatio(resolve(map, fg), resolve(map, bg))
       assert.ok(ratio >= 4.5, `${ratio.toFixed(2)}:1`)
+    })
+  }
+}
+
+// Gold is UI chrome (borders, fills, meters), so 3:1 applies, not 4.5:1.
+for (const [theme, map] of Object.entries(themes)) {
+  for (const surface of ['--background', '--card']) {
+    test(`${theme}: --gold on ${surface} holds 3:1`, () => {
+      const ratio = contrastRatio(resolve(map, '--gold'), resolve(map, surface))
+      assert.ok(ratio >= 3, `${ratio.toFixed(2)}:1`)
+    })
+  }
+}
+
+// Disabled ink is UI chrome, so 3:1 applies. It can sit on the disabled fill or any surface a control lands on.
+for (const [theme, map] of Object.entries(themes)) {
+  for (const surface of ['--disabled', '--background', '--card', '--muted', '--popover']) {
+    test(`${theme}: --disabled-foreground on ${surface} holds 3:1`, () => {
+      const ratio = contrastRatio(resolve(map, '--disabled-foreground'), resolve(map, surface))
+      assert.ok(ratio >= 3, `${ratio.toFixed(2)}:1`)
     })
   }
 }

@@ -27,10 +27,13 @@ import type { FormErrorValue } from '@/lib/dataErrors'
 import { authErrorActionLabel } from '@/lib/authErrors'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useCardPayment } from '@/hooks/useCardPayment'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
 import { isSetupComplete } from '@/lib/firstRunChecklist'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
+import { NetworkStatusProvider } from '@/contexts/NetworkStatusContext'
+import { ExchangeRatesProvider } from '@/contexts/ExchangeRatesContext'
 import {
   Dialog,
   DialogContent,
@@ -44,10 +47,8 @@ import {
   TransactionForm,
   type TransactionFormValues,
 } from '@/components/transactions/TransactionForm'
-import {
-  TRANSACTION_KIND_DIALOG_TITLES,
-  type TransactionKind,
-} from '@/components/transactions/transactionKinds'
+import { TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
+import { entryDialogWidthClass, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { SearchPalette } from '@/components/search/SearchPalette'
 import { EntryDetail } from '@/components/transactions/EntryDetail'
 import { X } from 'lucide-react'
@@ -55,15 +56,27 @@ import { cn } from '@/lib/utils'
 import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
 import type { Transaction } from '@/types'
 
+export type AddTransactionOptions = {
+  targetAccountId?: string
+  categoryId?: string
+  prefill?: { amount: number; date: string }
+}
+
 export type AppLayoutContext = {
   /** `targetAccountId` locks the card or loan for card-payment and loan-repayment. */
-  openAddTransactionModal: (kind: TransactionKind, options?: { targetAccountId?: string }) => void
+  /** `categoryId` opens the form with that category chosen (search: "New expense in Groceries"). */
+  /** `prefill` opens it with an amount and date (Home: Pay now on a loan bill). */
+  openAddTransactionModal: (kind: TransactionKind, options?: AddTransactionOptions) => void
 }
 export default function AppLayout() {
   return (
     <CycleProvider>
       <NotificationProvider>
-        <LayoutShell />
+        <NetworkStatusProvider>
+          <ExchangeRatesProvider>
+            <LayoutShell />
+          </ExchangeRatesProvider>
+        </NetworkStatusProvider>
       </NotificationProvider>
     </CycleProvider>
   )
@@ -79,6 +92,7 @@ function LayoutShell() {
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
   const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
+  const { createWithStatement } = useCardPayment(createTransaction)
   const { accounts, loading: accountsLoading } = useAccounts()
   // ⌘F in search scopes to the account page it opened over.
   const accountRouteId = useMatch('/accounts/:accountId')?.params.accountId
@@ -98,6 +112,8 @@ function LayoutShell() {
   const [transactionKind, setTransactionKind] =
     useState<TransactionKind>('expense')
   const [targetAccountId, setTargetAccountId] = useState<string | undefined>()
+  const [prefillCategoryId, setPrefillCategoryId] = useState<string | undefined>()
+  const [prefill, setPrefill] = useState<AddTransactionOptions['prefill']>()
   const [entry, setEntry] = useState<{
     transaction: Transaction
     actions?: EntryActions
@@ -161,11 +177,13 @@ function LayoutShell() {
     return () => observer.disconnect()
   }, [location.pathname])
   const touchStart = useRef<number | null>(null)
-  const openAddTransactionModal = (kind: TransactionKind, options?: { targetAccountId?: string }) => {
+  const openAddTransactionModal = (kind: TransactionKind, options?: AddTransactionOptions) => {
     rememberTrigger()
     setFormError(null)
     setTransactionKind(kind)
     setTargetAccountId(options?.targetAccountId)
+    setPrefillCategoryId(options?.categoryId)
+    setPrefill(options?.prefill)
     setSheet('add')
   }
   useEffect(() => {
@@ -186,7 +204,7 @@ function LayoutShell() {
     }
   }, [generateDueRecurring])
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error, errorDetail } = await createTransaction(
+    const { error, errorDetail } = await createWithStatement(
       values as Parameters<typeof createTransaction>[0],
     )
     if (error) {
@@ -229,10 +247,6 @@ function LayoutShell() {
       />
     </ErrorBoundary>
   )
-  const title =
-    sheet === 'account'
-      ? 'Your account'
-      : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]
   return (
     <EntryContext.Provider
       value={(transaction, actions) => {
@@ -339,7 +353,8 @@ function LayoutShell() {
           </aside>
         )}
         </div>
-        {/* The FAB comes before the nav in the DOM, so Tab reaches the page's
+        {/* While the month-jump bar (56px, above the nav) is on the page the FAB rides above it (LED-149).
+            The FAB comes before the nav in the DOM, so Tab reaches the page's
             primary action before Home (27a). */}
         {mobile && !sheet && location.pathname !== '/settings' && (
           <button
@@ -349,7 +364,7 @@ function LayoutShell() {
             aria-hidden={fabHidden}
             tabIndex={fabHidden ? -1 : 0}
             className={cn(
-              'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-(--dur-base)',
+              'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] [body:has([data-month-jump-bar])_&]:bottom-[calc(160px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-(--dur-base)',
               fabHidden && 'opacity-0 pointer-events-none',
             )}
           >
@@ -405,7 +420,8 @@ function LayoutShell() {
           <DialogContent
             finalFocus={triggerFocus}
             className={cn(
-              'max-w-md max-h-[90dvh] overflow-y-auto',
+              'max-h-[90dvh] overflow-y-auto',
+              sheet === 'add' ? entryDialogWidthClass(transactionKind) : 'max-w-md',
               mobile && 'm3-bottom-sheet',
             )}
           >
@@ -428,15 +444,20 @@ function LayoutShell() {
                 <span className="h-1 w-8 rounded-full bg-muted-foreground/50" />
               </div>
             )}
-            <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
-            </DialogHeader>
+            {sheet === 'add' ? (
+              <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
+            ) : (
+              <DialogHeader>
+                <DialogTitle>Your account</DialogTitle>
+              </DialogHeader>
+            )}
             <FormError error={formError} className="px-0 mt-0" />
             {sheet === 'add' && (
               <TransactionForm
                 entryKind={transactionKind}
                 lockedCardAccountId={transactionKind === 'card-payment' ? targetAccountId : undefined}
                 lockedLoanAccountId={transactionKind === 'loan-repayment' ? targetAccountId : undefined}
+                defaultValues={prefillCategoryId || prefill ? { ...(prefillCategoryId ? { category_id: prefillCategoryId } : {}), ...prefill } : undefined}
                 onSubmit={handleCreate}
                 onClose={() => setSheet(null)}
               />

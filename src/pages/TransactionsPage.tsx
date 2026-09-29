@@ -2,14 +2,18 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, ArrowLeftRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useCardPayment } from '@/hooks/useCardPayment'
 import { useCycle } from '@/contexts/cycleState'
+import { useNotify } from '@/contexts/notificationState'
 import { useCategories } from '@/hooks/useCategories'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactionTemplates } from '@/hooks/useTransactionTemplates'
+import { useSavedFilters } from '@/hooks/useSavedFilters'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { usePreferences } from '@/hooks/usePreferences'
 import { formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -26,17 +30,23 @@ import { resolveLoadState } from '@/lib/loadState'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { PageActions } from '@/components/layout/PageActions'
+import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
-import { inferTransactionKind, TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
+import { entryDialogWidthClass, inferTransactionKind, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
 import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
 import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { effectiveDensity, groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { buildRunningBalanceMap } from '@/lib/runningBalance'
+import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
+import { FilterTopCategories } from '@/components/transactions/FilterTopCategories'
 import { buildMonthNets } from '@/lib/monthJump'
 import { searchMatcher } from '@/lib/globalSearch'
+import { filterFromParams, isFilterActive, type ActivityFilter, type FilterType } from '@/lib/savedFilters'
+import { SavedFiltersDialog } from '@/components/transactions/SavedFiltersDialog'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
 import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
@@ -79,29 +89,47 @@ export default function TransactionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Search handoff (LED-64): "See all" from the palette arrives as ?q=. Take it
-  // while rendering, clear filters that would hide matches, then drop the param.
-  const handoffQuery = searchParams.get('q')
-  const [takenQuery, setTakenQuery] = useState<string | null>(null)
-  if (handoffQuery !== takenQuery) {
-    setTakenQuery(handoffQuery)
-    if (handoffQuery !== null) {
-      setSearch(handoffQuery)
-      setFilterType('all')
-      setActiveTagFilter(null)
+  // Search handoff (LED-64, LED-138): "See all" from the palette arrives as ?q=, and a saved
+  // filter as ?q=&type=&tag=. Take it while rendering, replacing whatever filters were set so
+  // none hides a match, then drop the params.
+  const handoffFilter = filterFromParams(searchParams)
+  const handoffKey = handoffFilter ? JSON.stringify(handoffFilter) : null
+  const [takenKey, setTakenKey] = useState<string | null>(null)
+  if (handoffKey !== takenKey) {
+    setTakenKey(handoffKey)
+    if (handoffFilter) {
+      setSearch(handoffFilter.search)
+      setFilterType(handoffFilter.type)
+      setActiveTagFilter(handoffFilter.tag)
     }
   }
   useEffect(() => {
-    if (handoffQuery === null) return
+    if (handoffKey === null) return
     setSearchParams((params) => {
       params.delete('q')
+      params.delete('type')
+      params.delete('tag')
       return params
     }, { replace: true })
-  }, [handoffQuery, setSearchParams])
+  }, [handoffKey, setSearchParams])
 
   // ── Templates ─────────────────────────────────────────────
   const { templates, addTemplate, removeTemplate } = useTransactionTemplates()
   const { accounts } = useAccounts()
+
+  // ── Saved filters (LED-138) ───────────────────────────────
+  const savedFilters = useSavedFilters()
+  const [savedFiltersOpen, setSavedFiltersOpen] = useState(false)
+  const currentFilter = useMemo<ActivityFilter>(
+    () => ({ type: filterType as FilterType, search, tag: activeTagFilter }),
+    [filterType, search, activeTagFilter]
+  )
+  const applySavedFilter = (filter: ActivityFilter) => {
+    setSearch(filter.search)
+    setFilterType(filter.type)
+    setActiveTagFilter(filter.tag)
+  }
+
   // tx pending "save as template" name input
   const [templateSourceTx, setTemplateSourceTx] = useState<Transaction | null>(null)
   const [templateName, setTemplateName] = useState('')
@@ -117,11 +145,14 @@ export default function TransactionsPage() {
     createTransaction,
     updateTransaction,
     deleteTransaction,
+    splitTransaction,
     bulkDeleteTransactions,
     bulkUpdateCategory,
     bulkCreateTransactions,
   } = useTransactions()
+  const { createWithStatement } = useCardPayment(createTransaction)
 
+  const notify = useNotify()
   const { categories } = useCategories()
   const loadState = resolveLoadState({ loading, error, hasData: transactions.length > 0 })
 
@@ -248,6 +279,7 @@ export default function TransactionsPage() {
   // Window the list (LED-60). The cycle is left out of the reset key so
   // stepping it keeps the window and the scroll position.
   const compactList = useMediaQuery('(max-width: 767px)')
+  const density = effectiveDensity(prefs.txDensity, compactList)
   const { rendered, sentinelRef } = useRenderWindow(filtered.length, {
     step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
     resetKey: JSON.stringify([filterType, search, activeTagFilter, prefs.txView, sort]),
@@ -256,7 +288,7 @@ export default function TransactionsPage() {
   // ── Handlers ───────────────────────────────────────────────
 
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error, errorDetail } = await createTransaction(values as Parameters<typeof createTransaction>[0])
+    const { error, errorDetail } = await createWithStatement(values as Parameters<typeof createTransaction>[0])
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setCreateOpen(false)
@@ -270,15 +302,17 @@ export default function TransactionsPage() {
     setEditingTx(null)
   }
 
-  const handleDelete = async (id: string) => {
+  // useCallback (LED-164): stable across a scroll/window-growth render so a
+  // memoised TransactionRow's onDelete prop doesn't change identity every render.
+  const handleDelete = useCallback(async function attempt(id: string) {
     const snapshot = transactions.find((t) => t.id === id)
     const { error } = await deleteTransaction(id)
     if (error) {
-      announceDeleteFailed("Couldn't delete that transaction", () => void handleDelete(id))
+      announceDeleteFailed("Couldn't delete that transaction", () => void attempt(id))
       return
     }
     if (snapshot) announceDeleted([snapshot], `"${snapshot.description}" deleted`)
-  }
+  }, [transactions, deleteTransaction, announceDeleteFailed, announceDeleted])
 
   const deleteMany = async (ids: string[], snapshots: Transaction[]) => {
     const label = `${ids.length} transaction${ids.length !== 1 ? 's' : ''}`
@@ -308,14 +342,16 @@ export default function TransactionsPage() {
     setRecategorizeCategoryId(UNCATEGORIZED_VALUE)
   }
 
-  const toggleSelect = (id: string) => {
+  // useCallback (LED-164): stable across a scroll/window-growth render so a
+  // memoised TransactionRow's onSelect prop doesn't change identity every render.
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }
+  }, [])
 
   const selectAll = () => setSelectedIds(new Set(filtered.map((t) => t.id)))
   const deselectAll = () => setSelectedIds(new Set())
@@ -327,29 +363,22 @@ export default function TransactionsPage() {
 
   // ── Split handler ──────────────────────────────────────────
 
+  // The split is one database call. On failure the dialog closes and the notification's Retry
+  // repeats the same call with the same lines, so nothing typed is lost.
+  const runSplit = async (tx: Transaction, splits: SplitInput[]) => {
+    const { error } = await splitTransaction(tx.id, splits)
+    if (!error) return
+    notify({
+      severity: 'failure',
+      title: "Couldn't split that transaction",
+      body: error,
+      action: navigator.onLine ? { label: 'Retry', run: () => void runSplit(tx, splits) } : undefined,
+    })
+  }
+
   const handleSplitConfirm = async (splits: SplitInput[]) => {
     if (!splittingTx) return
-    for (const s of splits) {
-      await createTransaction({
-        type: splittingTx.type,
-        account_id: splittingTx.account_id,
-        to_account_id: null,
-        category_id: s.category_id,
-        subcategory_id: null,
-        amount: s.amount,
-        currency: splittingTx.currency,
-        exchange_rate: splittingTx.exchange_rate,
-        description: s.description,
-        notes: splittingTx.notes,
-        date: splittingTx.date,
-        transfer_fee: null,
-        is_recurring: false,
-        recurrence_interval: null,
-        recurrence_end_date: null,
-        receipt_url: null,
-      })
-    }
-    await deleteTransaction(splittingTx.id)
+    await runSplit(splittingTx, splits)
     setSplittingTx(null)
   }
 
@@ -373,6 +402,8 @@ export default function TransactionsPage() {
       recurrence_interval: null as null,
       recurrence_end_date: null as string | null,
       receipt_url: null as string | null,
+      // A converted row keeps the statement's own amount and currency, so a re-import at another rate is still caught.
+      ...(t.original ? { original_amount: t.original.amount, original_currency: t.original.currency } : {}),
     }))
     const result = await bulkCreateTransactions(rows)
     return { imported: result.imported ?? 0, error: result.error ?? null }
@@ -385,6 +416,13 @@ export default function TransactionsPage() {
 
   // ── Render ─────────────────────────────────────────────────
 
+  // useCallback (LED-164): stable across a scroll/window-growth render so a
+  // memoised TransactionRow's onSaveTemplate prop doesn't change identity every render.
+  const handleSaveTemplate = useCallback((t: Transaction) => {
+    setTemplateSourceTx(t)
+    setTemplateName(t.description)
+  }, [])
+
   const renderRow = (tx: Transaction) => (
     <TransactionRow
       key={tx.id}
@@ -392,13 +430,20 @@ export default function TransactionsPage() {
       onEdit={setEditingTx}
       onDelete={handleDelete}
       onSplit={setSplittingTx}
-      onSaveTemplate={(t) => { setTemplateSourceTx(t); setTemplateName(t.description) }}
+      onSaveTemplate={handleSaveTemplate}
       selectable={selectMode}
       selected={selectedIds.has(tx.id)}
       onSelect={toggleSelect}
-      dense={prefs.txDensity === 'compact'}
+      dense={density === 'compact'}
     />
   )
+
+  // Export match (29a): exactly the rows the bar counts, in the order on screen, not just the rendered window.
+  const exportMatch = () =>
+    downloadCsv(
+      buildTransactionsCsv(sortByDate(filtered, sort), buildRunningBalanceMap(accounts, transactions)),
+      `ledger-activity_${selectedMonth}.csv`,
+    )
 
   const resultBar = (
     <ResultBar
@@ -409,8 +454,14 @@ export default function TransactionsPage() {
       sum={matchSum}
       sort={sort}
       onSortChange={setSort}
-      density={prefs.txDensity}
-      onDensityChange={(density) => setPref('txDensity', density)}
+      density={density}
+      onDensityChange={(next) => setPref('txDensity', next)}
+      onExport={exportMatch}
+      savedFilters={{
+        count: savedFilters.filters.length,
+        canSave: isFilterActive(currentFilter),
+        onOpen: () => setSavedFiltersOpen(true),
+      }}
       compact={compactList}
     />
   )
@@ -453,8 +504,8 @@ export default function TransactionsPage() {
               }
             />
             <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
-              <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-                <DialogHeader><DialogTitle>{TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}</DialogTitle></DialogHeader>
+              <DialogContent className={`max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
+                <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
                 <FormError error={formError} />
                 <TransactionForm
                   entryKind={transactionKind}
@@ -559,7 +610,7 @@ export default function TransactionsPage() {
                   <div className="flex flex-col min-w-0">
                     <span className="text-xs font-medium truncate max-w-30">{tmpl.name}</span>
                     <span className={`text-[0.6875rem] ${TRANSACTION_TYPE_COLOR[tmpl.values.type]}`}>
-                      {tmpl.values.type === 'income' ? '+' : tmpl.values.type === 'expense' ? '-' : ''}
+                      {tmpl.values.type === 'income' ? '+' : tmpl.values.type === 'expense' ? MINUS : ''}
                       {formatCurrency(tmpl.values.amount, tmpl.values.currency)}
                     </span>
                   </div>
@@ -762,7 +813,7 @@ export default function TransactionsPage() {
         {/* Edit dialog */}
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
           <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-            <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
+            <TransactionEditHeader type={editingTx?.type ?? 'expense'} toAccountId={editingTx?.to_account_id ?? null} />
             <FormError error={formError} />
             {editingTx && (
               <TransactionForm
@@ -859,6 +910,22 @@ export default function TransactionsPage() {
           </DialogContent>
         </Dialog>
 
+        <SavedFiltersDialog
+          open={savedFiltersOpen}
+          onOpenChange={setSavedFiltersOpen}
+          current={currentFilter}
+          filters={savedFilters.filters}
+          loading={savedFilters.loading}
+          error={savedFilters.error}
+          errorDetail={savedFilters.errorDetail}
+          skipped={savedFilters.skipped}
+          onRetry={() => void savedFilters.refetch()}
+          onSave={(name) => savedFilters.save(name, currentFilter)}
+          onRename={savedFilters.rename}
+          onDelete={savedFilters.remove}
+          onApply={applySavedFilter}
+        />
+
         {/* Split transaction dialog */}
         {splittingTx && (
           <SplitTransactionDialog
@@ -877,9 +944,9 @@ export default function TransactionsPage() {
         />
 
 
-        {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} />}
+        {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} onSelect={toggleSelectMode} selecting={selectMode} />}
       </div>
-      {showMonthJump && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} />}
+      {showMonthJump && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} />} />}
     </div>
   )
 }

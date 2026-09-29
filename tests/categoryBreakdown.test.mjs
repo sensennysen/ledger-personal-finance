@@ -4,6 +4,7 @@ import {
   buildCategoryBreakdown,
   rollupBreakdown,
   previewOther,
+  topCategories,
   PIE_MAX_CATEGORIES,
   RANKED_TOP,
   OTHER_PREVIEW,
@@ -109,4 +110,17 @@ test('a zero total never divides by zero', () => {
   assert.equal(rows[0].share, 0)
   assert.equal(rows[0].subcategories[0].share, 0)
   assert.deepEqual(rollupBreakdown([]), { mode: 'pie', total: 0, top: [], other: null })
+})
+
+test('topCategories keeps the biggest four and rolls the rest into one Other line (29a rail)', () => {
+  const rows = spread(6)
+  const { top, other } = topCategories(rows)
+  assert.deepEqual(top.map((r) => r.key), ['c1', 'c2', 'c3', 'c4'])
+  assert.equal(other.count, 2)
+  assert.equal(other.amount, rows[4].amount + rows[5].amount)
+})
+
+test('topCategories has no Other line when everything fits', () => {
+  assert.equal(topCategories(spread(4)).other, null)
+  assert.deepEqual(topCategories([]), { top: [], other: null })
 })

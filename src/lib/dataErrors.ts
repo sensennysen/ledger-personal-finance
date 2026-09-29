@@ -46,8 +46,11 @@ function sentence(kind: DataErrorKind, { action, entity }: DataErrorContext): st
       return action === 'load'
         ? "Couldn't reach the server. Check your connection and try again."
         : "Couldn't reach the server. Check your connection and try again. Nothing was changed."
-    case 'unique':
-      return entity ? `A ${entity} with that name already exists.` : 'That already exists.'
+    case 'unique': {
+      if (!entity) return 'That already exists.'
+      const article = /^[aeiou]/i.test(entity) ? 'An' : 'A'
+      return `${article} ${entity} with that name already exists.`
+    }
     case 'permission':
       return "You don't have access to that. Sign in again and retry."
     default:

@@ -40,3 +40,8 @@ export function createNotification(input: NotificationInput, id: number): Notifi
 export function dismissNotification(current: Notification | null, id: number): Notification | null {
   return current?.id === id ? null : current
 }
+
+/** What a screen reader hears for a notification: the title, then the body if there is one. */
+export function announcementFor(notification: Pick<Notification, 'title' | 'body'>): string {
+  return notification.body ? `${notification.title}. ${notification.body}` : notification.title
+}

@@ -1,5 +1,5 @@
 // Credit utilisation colour as a scale (LED-77), not a snap from green to red:
-// income at 0%, gold (--primary, "liability due") at the card's target, expense at 100%.
+// income at 0%, gold (--gold, "liability due") at the card's target, expense at 100%.
 
 function mix(from: string, to: string, t: number): string {
   const pct = Math.round(Math.min(1, Math.max(0, t)) * 100)
@@ -11,8 +11,8 @@ function mix(from: string, to: string, t: number): string {
 export function utilizationTone(pct: number, targetPct: number = 30): string {
   const target = Math.min(99, Math.max(1, targetPct))
   if (!Number.isFinite(pct) || pct <= 0) return 'var(--income)'
-  if (pct < target) return mix('--income', '--primary', pct / target)
-  return mix('--primary', '--expense', (pct - target) / (100 - target))
+  if (pct < target) return mix('--income', '--gold', pct / target)
+  return mix('--gold', '--expense', (pct - target) / (100 - target))
 }
 
 /** Pass as `style` to <Progress>; its indicator reads --progress-tone. */

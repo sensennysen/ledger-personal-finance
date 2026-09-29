@@ -1,7 +1,7 @@
 import { CalendarClock, CreditCard } from 'lucide-react'
-import { GOLD } from '@/constants/colors'
+import { WARNING_INK } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
-import { TONED_PROGRESS_CLASS, utilizationTone, utilizationToneStyle } from '@/lib/utilizationTone'
+import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
 import type { CreditCardWithState } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
 import { Progress } from '@/components/ui/progress'
@@ -42,7 +42,7 @@ export function DashboardCreditCardMonitor({
                   {formatCurrency(card.acc.credit_limit ?? 0, card.acc.currency)}
                 </p>
               </div>
-              <p className="shrink-0 text-xs font-semibold" style={{ color: utilizationTone(card.utilizationPct, card.targetPct) }}>
+              <p className="shrink-0 text-xs font-semibold text-foreground">
                 {card.utilizationPct.toFixed(1)}% used
               </p>
             </div>
@@ -63,7 +63,7 @@ export function DashboardCreditCardMonitor({
               )}
             </p>
             {(card.paymentReminder || card.statementReminder) && (
-              <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: card.paymentReminder ? GOLD : undefined }}>
+              <p className="flex items-center gap-1.5 text-xs font-medium" style={{ color: card.paymentReminder ? WARNING_INK : undefined }}>
                 <CalendarClock className="w-3.5 h-3.5 shrink-0" aria-hidden />
                 {[
                   card.paymentReminder && `Payment due ${formatCountdown(card.dueCountdown)}`,

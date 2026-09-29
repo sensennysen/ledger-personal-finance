@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeftRight, ChevronRight, Search, Plus, Upload, CreditCard, Wallet, Pencil } from 'lucide-react'
+import { ArrowLeftRight, ChevronDown, ChevronRight, Search, Plus, Upload, CreditCard, Wallet, Pencil } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
@@ -10,7 +10,7 @@ import { useCycle } from '@/contexts/cycleState'
 import { ACCOUNT_TYPE_LABELS } from '@/types'
 import { formatCurrency, formatDate, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange, getLocalDateString } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
-import { formatLoanSchedule, getLoanAmountOwed } from '@/lib/loans'
+import { daysUntilDue, formatLoanSchedule, formatOverdue, getLoanAmountOwed } from '@/lib/loans'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,11 +25,12 @@ import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
 import { searchMatcher } from '@/lib/globalSearch'
 import { useUndoDelete } from '@/hooks/useUndoDelete'
-import { useNotify } from '@/contexts/notificationState'
+import { useCardPayment } from '@/hooks/useCardPayment'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { defaultCardPaymentDescription } from '@/lib/cardPayment'
+import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
-import { TRANSACTION_KIND_DIALOG_TITLES, type TransactionKind } from '@/components/transactions/transactionKinds'
+import { entryDialogWidthClass, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
 import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
 import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
@@ -37,24 +38,26 @@ import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
 import { usePreferences } from '@/hooks/usePreferences'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { dateSpan, groupByDay, sliceGroups, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { dateSpan, effectiveDensity, groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { buildRunningBalanceMap } from '@/lib/runningBalance'
+import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
+import { FilterTopCategories } from '@/components/transactions/FilterTopCategories'
 import { buildMonthNets, monthJumpTarget } from '@/lib/monthJump'
 import { cardAmountDue, loanProgress } from '@/lib/accountsOverview'
 import { buildCategoryBreakdown } from '@/lib/categoryBreakdown'
 import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
 import type { LoanDeadline } from '@/lib/loanInstallments'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
-import type { Account, CreditCardPayment, Transaction } from '@/types'
+import type { CreditCardPayment, Transaction } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 
-function bandCell(label: string, value: string, sub?: string, money = true) {
+function bandCell(label: string, value: string, sub?: string, money = true, wrapValue = false) {
   return (
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`${money ? 'money ' : ''}mt-1 truncate text-lg font-semibold`}>{value}</p>
+      <p className={`${money ? 'money ' : ''}mt-1 ${wrapValue ? 'break-words' : 'truncate'} text-lg font-semibold`}>{value}</p>
       {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
     </div>
   )
@@ -74,12 +77,17 @@ function dayInDaysLabel(days: number | null) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+// A month jump's ensure() can leave the render window's own auto-grow sentinel
+// in view, so it grows again right after the jump lands (LED-165). Re-scroll
+// on every further growth and only give up once none arrives for this long.
+const SETTLE_DEBOUNCE_MS = 500
+
 export default function AccountTransactionsPage() {
   const ink = useCategoryInk()
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
-  const { accounts, error: accountsError, refetch: refetchAccounts, updateAccount, updateAccountWithAdjustment } = useAccounts()
+  const { accounts, error: accountsError, refetch: refetchAccounts, updateAccountWithAdjustment } = useAccounts()
   const { categories } = useCategories()
   const { transactions, loading, error: txError, errorDetail: txErrorDetail, refetch: refetchTransactions, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
 
@@ -112,15 +120,13 @@ export default function AccountTransactionsPage() {
   const [editAccountOpen, setEditAccountOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<FormErrorValue>(null)
-  const [paymentAmount, setPaymentAmount] = useState('')
-  const [paymentDate, setPaymentDate] = useState(getLocalDateString)
-  const [paymentFromAccountId, setPaymentFromAccountId] = useState<string | null>(null)
   const [paymentHistory, setPaymentHistory] = useState<CreditCardPayment[]>([])
   const [paymentsLoading, setPaymentsLoading] = useState(false)
   const [loanSection, setLoanSection] = useState<'summary' | 'purchases' | 'activity'>('summary')
 
-  const notify = useNotify()
   const { announceDeleted, announceDeleteFailed } = useUndoDelete(createTransaction, refetchAccounts)
+  // Every card payment, from the header or the pane, saves the transfer, the payment record and the statement (LED-146).
+  const { createWithStatement } = useCardPayment(createTransaction, (payment) => setPaymentHistory((prev) => [payment, ...prev]))
 
   const account = accounts.find((a) => a.id === accountId)
   const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet
@@ -137,14 +143,10 @@ export default function AccountTransactionsPage() {
 
   const loanRepayment = loanProgress(loanData.purchases, loanData.allocations)
   const nextLoanDeadline = loanData.deadlines[0] ?? null
-
-  const effectivePaymentFromAccountId = useMemo(() => {
-    if (!paymentSourceAccounts.length) return null
-    if (paymentFromAccountId && paymentSourceAccounts.some((a) => a.id === paymentFromAccountId)) {
-      return paymentFromAccountId
-    }
-    return paymentSourceAccounts[0].id
-  }, [paymentSourceAccounts, paymentFromAccountId])
+  // "Next payment" had no overdue flag, unlike Home's Upcoming Bills (LED-181 item, OD-8).
+  const nextPaymentOverdue = nextLoanDeadline
+    ? formatOverdue(daysUntilDue(nextLoanDeadline.dueDate, getLocalDateString()))
+    : null
 
   // Filter to only transactions involving this account (source or destination)
   const accountTransactions = useMemo(() => {
@@ -172,6 +174,13 @@ export default function AccountTransactionsPage() {
 
   // Window the list (LED-60); nets in the day headers are relative to this account.
   const compactList = useMediaQuery('(max-width: 767px)')
+  const density = effectiveDensity(prefs.txDensity, compactList)
+  // Export match (29a): exactly the rows the result bar counts, in the order on screen.
+  const exportMatch = () =>
+    downloadCsv(
+      buildTransactionsCsv(sortByDate(filtered, sort), buildRunningBalanceMap(accounts, transactions)),
+      `ledger-${(account?.name ?? 'account').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`,
+    )
   const windowKey = (type: string, query: string) => JSON.stringify([accountId, type, query, sort])
   const { rendered, sentinelRef, ensure } = useRenderWindow(filtered.length, {
     step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
@@ -204,14 +213,20 @@ export default function AccountTransactionsPage() {
     scrollTargetRef.current = target.date
     setJumpCount((n) => n + 1)
   }
-  // Scrolls once the target day is rendered; the window may need a render to grow first.
+  // Scrolls once the target day is rendered. `rendered` growing again (the
+  // window's own IntersectionObserver can fire right after the jump lands,
+  // LED-165) re-runs this and re-scrolls; only once no further growth arrives
+  // within SETTLE_DEBOUNCE_MS does the target get left alone.
   useEffect(() => {
     const day = scrollTargetRef.current
     if (!day) return
     const node = document.querySelector(`[data-day="${day}"]`)
     if (!node) return
-    scrollTargetRef.current = null
     node.scrollIntoView({ block: 'start' })
+    const timer = window.setTimeout(() => {
+      scrollTargetRef.current = null
+    }, SETTLE_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
   }, [jumpCount, rendered, grouped])
 
   // Result bar (LED-61): the sum is relative to this account, the range spans its history.
@@ -253,7 +268,7 @@ export default function AccountTransactionsPage() {
   const dueDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.due_day) : null
 
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error, errorDetail } = await createTransaction(values as Parameters<typeof createTransaction>[0])
+    const { error, errorDetail } = await createWithStatement(values as Parameters<typeof createTransaction>[0])
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     refetchAccounts()
@@ -269,6 +284,20 @@ export default function AccountTransactionsPage() {
     setCreateOpen(true)
   }
 
+  // Both "Make payment" buttons open the same form, prefilled for the next deadline (LED-146).
+  const openLoanPayment = () => {
+    if (nextLoanDeadline) return handleRecordPayment(nextLoanDeadline)
+    setFormError(null)
+    setTransactionKind('loan-repayment')
+    setCreateOpen(true)
+  }
+
+  const openCardPayment = () => {
+    setFormError(null)
+    setTransactionKind('card-payment')
+    setCreateOpen(true)
+  }
+
   const handleEdit = async (values: TransactionFormValues) => {
     if (!editingTx) return
     const { error, errorDetail } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
@@ -278,16 +307,18 @@ export default function AccountTransactionsPage() {
     setEditingTx(null)
   }
 
-  const handleDelete = async (id: string) => {
+  // useCallback (LED-164): stable across a scroll/window-growth render so a
+  // memoised TransactionRow's onDelete prop doesn't change identity every render.
+  const handleDelete = useCallback(async function attempt(id: string) {
     const snapshot = transactions.find((t) => t.id === id)
     const { error } = await deleteTransaction(id)
     if (error) {
-      announceDeleteFailed("Couldn't delete that transaction", () => void handleDelete(id))
+      announceDeleteFailed("Couldn't delete that transaction", () => void attempt(id))
       return
     }
     refetchAccounts()
     if (snapshot) announceDeleted([snapshot], `"${snapshot.description}" deleted`)
-  }
+  }, [transactions, deleteTransaction, refetchAccounts, announceDeleteFailed, announceDeleted])
 
   useEffect(() => {
     const fetchPaymentHistory = async () => {
@@ -316,93 +347,6 @@ export default function AccountTransactionsPage() {
     fetchPaymentHistory()
   }, [user, accountId, account?.type])
 
-  const handleLogPayment = async () => {
-    if (!account || account.type !== 'credit_card' || !user) return
-    const amount = Number(paymentAmount)
-    if (!amount || amount <= 0 || !effectivePaymentFromAccountId) return
-
-    const { error: transferError, errorDetail: transferErrorDetail } = await createTransaction({
-      type: 'transfer',
-      account_id: effectivePaymentFromAccountId,
-      to_account_id: account.id,
-      category_id: null,
-      subcategory_id: null,
-      amount,
-      currency: account.currency,
-      exchange_rate: 1,
-      description: `Credit card payment - ${account.name}`,
-      notes: null,
-      date: paymentDate,
-      transfer_fee: null,
-      is_recurring: false,
-      recurrence_interval: null,
-      recurrence_end_date: null,
-      receipt_url: null,
-      tags: [],
-      goal_id: null,
-    })
-    if (transferError) {
-      setFormError({ message: transferError, detail: transferErrorDetail ?? null })
-      return
-    }
-
-    // The transfer is saved: clear the form so a retry can never pay twice.
-    setFormError(null)
-    setPaymentAmount('')
-    await recordStatementPayment(account, amount, paymentDate, null)
-  }
-
-  /**
-   * Statement tracking after the transfer has saved. If a step fails the payment is
-   * half-recorded, so Fix reruns only the steps that did not complete.
-   */
-  const recordStatementPayment = async (
-    card: Account,
-    amount: number,
-    paymentDate: string,
-    recorded: CreditCardPayment | null,
-    retrying = false,
-  ): Promise<void> => {
-    if (!user) return
-    const fix = (payment: CreditCardPayment | null) => {
-      refetchAccounts()
-      notify({
-        severity: 'partial',
-        title: 'Payment recorded, statement not updated',
-        body: `The transfer saved, but statement tracking for ${card.name} may be out of date.`,
-        action: { label: 'Fix', run: () => void recordStatementPayment(card, amount, paymentDate, payment, true) },
-      })
-    }
-
-    let payment = recorded
-    if (!payment) {
-      const { data, error } = await supabase
-        .from('credit_card_payments')
-        .insert({
-          user_id: user.id,
-          account_id: card.id,
-          amount,
-          payment_date: paymentDate,
-        })
-        .select('*')
-        .single()
-      if (error) return fix(null)
-      const inserted = data as CreditCardPayment
-      payment = inserted
-      setPaymentHistory((prev) => [inserted, ...prev])
-    }
-
-    const nextPaid = Math.min((card.statement_paid_amount ?? 0) + amount, card.statement_balance ?? 0)
-    const { error } = await updateAccount(card.id, {
-      statement_paid_amount: nextPaid,
-      last_payment_amount: amount,
-      last_payment_date: paymentDate,
-    })
-    if (error) return fix(payment)
-    refetchAccounts()
-    if (retrying) notify({ severity: 'success', title: `Statement updated for ${card.name}` })
-  }
-
   // Same path as editing the balance in the account form, so the change leaves an adjustment in history.
   const handleSetLoanAmount = async (owed: number) => {
     if (!account) return { error: 'Account not found' }
@@ -427,6 +371,47 @@ export default function AccountTransactionsPage() {
     (account?.type !== 'loan' || loanSection === 'activity') &&
     (loadState === 'ready' || loadState === 'stale-error') &&
     months.length > 0
+
+  // "Where it went" and the account facts: a side column from lg, a disclosure below it (LED-146).
+  const accountFacts = account ? (
+    <>
+      {account.type !== 'loan' && (
+        <section className="space-y-2 rounded-xl border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold">Where it went</h2>
+          <p className="text-xs text-muted-foreground">Spending from this account in {cycleLabel}</p>
+          {cycleBreakdown.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No spending this cycle.</p>
+          ) : (
+            <ul className="space-y-1.5">
+              {cycleBreakdown.slice(0, 4).map((slice) => (
+                <li key={slice.key} className="flex items-center gap-2 text-sm">
+                  <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: ink(slice.color) }} aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">{slice.name}</span>
+                  <span className="money shrink-0 font-medium">{formatCurrency(slice.amount, currency)}</span>
+                </li>
+              ))}
+              {cycleBreakdown.length > 4 && (
+                <li className="text-xs text-muted-foreground">+{cycleBreakdown.length - 4} more categories</li>
+              )}
+            </ul>
+          )}
+        </section>
+      )}
+      <section className="rounded-xl border border-border bg-card p-4">
+        <h2 className="mb-2 text-sm font-semibold">Account</h2>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+          <dt className="text-muted-foreground">Type</dt><dd className="text-right">{ACCOUNT_TYPE_LABELS[account.type]}</dd>
+          {account.type === 'credit_card' && (
+            <>
+              <dt className="text-muted-foreground">Statement day</dt><dd className="text-right">{account.statement_day ?? 'Not set'}</dd>
+              <dt className="text-muted-foreground">Due day</dt><dd className="text-right">{account.due_day ?? 'Not set'}</dd>
+            </>
+          )}
+          <dt className="text-muted-foreground">Currency</dt><dd className="text-right">{account.currency}</dd>
+        </dl>
+      </section>
+    </>
+  ) : null
 
   return (
     <div className="flex justify-center gap-6 lg:pr-6">
@@ -462,10 +447,7 @@ export default function AccountTransactionsPage() {
           {account?.type === 'loan' ? (
             <Button
               className="gap-2 shrink-0"
-              onClick={() => {
-                setTransactionKind('loan-repayment')
-                setCreateOpen(true)
-              }}
+              onClick={openLoanPayment}
             >
               <Plus className="w-4 h-4" />Make payment
             </Button>
@@ -475,11 +457,7 @@ export default function AccountTransactionsPage() {
               <Button
                 variant="outline"
                 className="gap-2 shrink-0"
-                onClick={() => {
-                  setFormError(null)
-                  setTransactionKind('card-payment')
-                  setCreateOpen(true)
-                }}
+                onClick={openCardPayment}
               >
                 <CreditCard className="w-4 h-4" />Pay card
               </Button>
@@ -505,12 +483,18 @@ export default function AccountTransactionsPage() {
             </div>
           )}
           <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setRepaymentPrefill(null) }}>
-              <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-              <DialogHeader>
-                <DialogTitle>
-                  {account?.type === 'loan' ? `Pay ${account.name}` : TRANSACTION_KIND_DIALOG_TITLES[transactionKind]}
-                </DialogTitle>
-              </DialogHeader>
+              <DialogContent className={`max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(account?.type === 'loan' ? 'loan-repayment' : transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
+              <TransactionEntryHeader
+                kind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
+                title={account?.type === 'loan' ? `Pay ${account.name}` : undefined}
+                onChangeKind={setTransactionKind}
+                showCardPayment={account?.type !== 'credit_card'}
+                showLoanRepayment={Boolean(
+                  account &&
+                  account.type !== 'credit_card' &&
+                  accounts.some((candidate) => candidate.type === 'loan' && candidate.currency === account.currency)
+                )}
+              />
               <FormError error={formError} />
               <TransactionForm
                 entryKind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
@@ -539,6 +523,7 @@ export default function AccountTransactionsPage() {
                         to_account_id: account.id,
                         currency: account.currency,
                         description: defaultCardPaymentDescription(account.name),
+                        ...(cardAmountDue(account) > 0 ? { amount: cardAmountDue(account) } : {}),
                       }
                     : transactionKind === 'card-payment'
                       ? { account_id: accountId, type: 'expense' }
@@ -593,7 +578,7 @@ export default function AccountTransactionsPage() {
                     nextLoanDeadline ? formatCurrency(nextLoanDeadline.total, currency) : 'None due',
                     nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : undefined,
                   )}
-                  {bandCell('Schedule', formatLoanSchedule(account) ?? 'Per purchase', 'Subtracted from net worth', false)}
+                  {bandCell('Schedule', formatLoanSchedule(account) ?? 'Per purchase', 'Subtracted from net worth', false, true)}
                 </>
               ) : (
                 <>
@@ -651,52 +636,12 @@ export default function AccountTransactionsPage() {
                     Statement {formatCurrency(account.statement_balance, currency)}, paid {formatCurrency(account.statement_paid_amount ?? 0, currency)}
                   </p>
                 )}
-                <div className="grid gap-2">
-                  <Select
-                    value={effectivePaymentFromAccountId ?? ''}
-                    onValueChange={(value) => setPaymentFromAccountId(value)}
-                  >
-                    <SelectTrigger aria-label="Pay from account">
-                      <SelectValue>
-                        {(value) => {
-                          const account = paymentSourceAccounts.find(a => a.id === value);
-                          return account ? (account.name && account.name !== account.id ? account.name : 'Unnamed Account') : 'Pay from account';
-                        }}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {paymentSourceAccounts.map((source) => (
-                        <SelectItem key={source.id} value={source.id}>{source.name && source.name !== source.id ? source.name : 'Unnamed Account'}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="Amount"
-                      aria-label="Payment amount"
-                      value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(e.target.value)}
-                    />
-                    <Input
-                      type="date"
-                      aria-label="Payment date"
-                      value={paymentDate}
-                      onChange={(e) => setPaymentDate(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={handleLogPayment}
-                    disabled={!effectivePaymentFromAccountId}
-                  >
-                    Record payment
-                  </Button>
-                </div>
+                <Button className="w-full" onClick={openCardPayment} disabled={paymentSourceAccounts.length === 0}>
+                  <CreditCard className="w-4 h-4" />Pay card
+                </Button>
                 {paymentSourceAccounts.length === 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Add a cash, bank, or wallet account to record credit card payments correctly.
+                    Add a cash, bank, or wallet account in {account.currency} to record credit card payments correctly.
                   </p>
                 )}
                 {account.last_payment_date && account.last_payment_amount != null && (
@@ -727,49 +672,26 @@ export default function AccountTransactionsPage() {
               <section className="space-y-3 rounded-xl border border-border bg-card p-4">
                 <h2 className="text-sm font-semibold">Next payment</h2>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-muted-foreground">{nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : 'Nothing scheduled'}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : 'Nothing scheduled'}
+                    {nextPaymentOverdue && <span className="ml-1.5 font-medium text-expense">{nextPaymentOverdue}</span>}
+                  </span>
                   <span className="money text-lg font-bold">{formatCurrency(nextLoanDeadline?.total ?? 0, currency)}</span>
                 </div>
-                <Button className="w-full" onClick={() => { setTransactionKind('loan-repayment'); setCreateOpen(true) }}>
+                <Button className="w-full" onClick={openLoanPayment}>
                   Make payment
                 </Button>
               </section>
             )}
-            {account.type !== 'loan' && (
-              <section className="hidden space-y-2 rounded-xl border border-border bg-card p-4 lg:block">
-                <h2 className="text-sm font-semibold">Where it went</h2>
-                <p className="text-xs text-muted-foreground">Spending from this account in {cycleLabel}</p>
-                {cycleBreakdown.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No spending this cycle.</p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {cycleBreakdown.slice(0, 4).map((slice) => (
-                      <li key={slice.key} className="flex items-center gap-2 text-sm">
-                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: ink(slice.color) }} aria-hidden />
-                        <span className="min-w-0 flex-1 truncate">{slice.name}</span>
-                        <span className="money shrink-0 font-medium">{formatCurrency(slice.amount, currency)}</span>
-                      </li>
-                    ))}
-                    {cycleBreakdown.length > 4 && (
-                      <li className="text-xs text-muted-foreground">+{cycleBreakdown.length - 4} more categories</li>
-                    )}
-                  </ul>
-                )}
-              </section>
-            )}
-            <section className="hidden rounded-xl border border-border bg-card p-4 lg:block">
-              <h2 className="mb-2 text-sm font-semibold">Account</h2>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
-                <dt className="text-muted-foreground">Type</dt><dd className="text-right">{ACCOUNT_TYPE_LABELS[account.type]}</dd>
-                {account.type === 'credit_card' && (
-                  <>
-                    <dt className="text-muted-foreground">Statement day</dt><dd className="text-right">{account.statement_day ?? 'Not set'}</dd>
-                    <dt className="text-muted-foreground">Due day</dt><dd className="text-right">{account.due_day ?? 'Not set'}</dd>
-                  </>
-                )}
-                <dt className="text-muted-foreground">Currency</dt><dd className="text-right">{account.currency}</dd>
-              </dl>
-            </section>
+            {/* Account facts: beside the list from lg, behind a disclosure below it so a phone can reach them (LED-146). */}
+            <div className="hidden space-y-4 lg:block">{accountFacts}</div>
+            <details className="group lg:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                Account details
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <div className="mt-3 space-y-4">{accountFacts}</div>
+            </details>
           </aside>
         )}
         <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
@@ -868,8 +790,9 @@ export default function AccountTransactionsPage() {
                 sum={matchSum}
                 sort={sort}
                 onSortChange={setSort}
-                density={prefs.txDensity}
-                onDensityChange={(density) => setPref('txDensity', density)}
+                density={density}
+                onDensityChange={(next) => setPref('txDensity', next)}
+                onExport={exportMatch}
                 compact={compactList}
               />
             }
@@ -884,7 +807,7 @@ export default function AccountTransactionsPage() {
                   onEdit={setEditingTx}
                   onDelete={handleDelete}
                   contextAccountId={accountId}
-                  dense={prefs.txDensity === 'compact'}
+                  dense={density === 'compact'}
                 />
               )}
             />
@@ -897,7 +820,7 @@ export default function AccountTransactionsPage() {
         {/* Edit dialog */}
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
           <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
-            <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
+            <TransactionEditHeader type={editingTx?.type ?? 'expense'} toAccountId={editingTx?.to_account_id ?? null} />
             <FormError error={formError} />
             {editingTx && (
               <TransactionForm
@@ -929,7 +852,7 @@ export default function AccountTransactionsPage() {
 
         {showMonthJump && <MonthJumpBar months={months} activeKey={null} onPick={jumpToMonth} />}
       </div>
-      {showMonthJump && <MonthRail months={months} activeKey={null} onPick={jumpToMonth} />}
+      {showMonthJump && <MonthRail months={months} activeKey={null} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} />} />}
     </div>
   )
 }

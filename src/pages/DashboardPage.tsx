@@ -1,5 +1,5 @@
 import { WidgetDragContext } from '@/contexts/widgetDragState'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   ChevronRight,
@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { converterTo } from '@/lib/exchangeRates'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
@@ -23,8 +25,8 @@ import { usePreferences } from '@/hooks/usePreferences'
 import { useFlipReorder } from '@/hooks/useFlipReorder'
 import { formatCurrency, getCurrencySymbol, getLocalDateString, cn } from '@/lib/utils'
 import { useCycle } from '@/contexts/cycleState'
-import { INCOME, EXPENSE, GOLD } from '@/constants/colors'
-import { Skeleton } from '@/components/ui/skeleton'
+import { INCOME, EXPENSE } from '@/constants/colors'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { RefreshingRegion } from '@/components/ui/refreshing-region'
@@ -40,6 +42,7 @@ import { DashboardUpcomingBillsCard } from '@/components/dashboard/DashboardUpco
 import { DashboardCashFlowForecastCard } from '@/components/dashboard/DashboardCashFlowForecastCard'
 import { DashboardFirstRunChecklist } from '@/components/dashboard/DashboardFirstRunChecklist'
 import { getCreditCardSpending } from '@/lib/creditCards'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
 import { PageActions } from '@/components/layout/PageActions'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
@@ -54,6 +57,7 @@ function StatCard({
   variant = 'default',
   onClick,
   className,
+  note,
 }: {
   title: string
   value: string
@@ -64,11 +68,12 @@ function StatCard({
   variant?: 'balance' | 'income' | 'expense' | 'default'
   onClick?: () => void
   className?: string
+  note?: React.ReactNode
 }) {
   const accentColor =
     variant === 'income' ? INCOME
     : variant === 'expense' ? EXPENSE
-    : GOLD
+    : 'var(--primary)'
 
   return (
     <div
@@ -104,7 +109,10 @@ function StatCard({
       </div>
 
       {loading ? (
-        <Skeleton className="h-9 w-32" />
+        <>
+          <div className="mb-2 flex h-[1.75rem] items-center"><Skeleton className="h-6 w-32" /></div>
+          {sub !== undefined && <div className="text-[0.6875rem]"><SkeletonText className="w-24" /></div>}
+        </>
       ) : (
         <>
           <p
@@ -126,6 +134,7 @@ function StatCard({
               {sub}
             </p>
           )}
+          {note && <div className="mt-2">{note}</div>}
         </>
       )}
     </div>
@@ -144,6 +153,8 @@ export default function DashboardPage() {
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
   const currencySymbol = getCurrencySymbol(currency)
+  const { table: rateTable } = useExchangeRates()
+  const convertToDefault = useMemo(() => converterTo(rateTable, currency), [rateTable, currency])
   const { accounts, loading: accountsLoading, error: accountsError, refetch: refetchAccounts, updateAccount } = useAccounts()
   const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
   const { categories } = useCategories()
@@ -175,6 +186,8 @@ export default function DashboardPage() {
     chartPeriod,
     selectedMonth,
     startDay,
+    baseCurrency: currency,
+    convert: convertToDefault,
   })
 
   const monthLabel = formatMonthLabel(selectedMonth)
@@ -253,7 +266,8 @@ export default function DashboardPage() {
       <div className="hidden md:flex items-start justify-between gap-3 flex-wrap col-span-full">
         <div className="min-w-0 2xl:flex 2xl:items-baseline 2xl:gap-3">
           <h1 className="text-2xl font-bold leading-tight truncate">
-            {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Dashboard'}
+            {/* Matches the "Home" nav title (src/App.tsx) so the page doesn't read as two names (LED-181 item, OD-8). */}
+            {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Home'}
           </h1>
           <p className="text-muted-foreground text-[0.8125rem] mt-0.5 2xl:mt-0">
             {new Date().toLocaleDateString('en-US', {
@@ -340,6 +354,7 @@ export default function DashboardPage() {
                 type="button"
                 aria-label="Dismiss warning"
                 onClick={() => setDismissedAlerts((state) => new Set([...state, alert.id]))}
+                className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
               >
                 <X className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
               </button>
@@ -354,13 +369,20 @@ export default function DashboardPage() {
           isCurrentMonth={isCurrentMonth}
           monthLabel={monthLabel}
           loading={loading}
+          onPay={(payment) =>
+            openAddTransactionModal('loan-repayment', {
+              targetAccountId: payment.accountId,
+              prefill: { amount: payment.amount, date: payment.date },
+            })
+          }
           style={widgetGridStyle('upcomingBills')}
         />
       )}
 
-      {widgets.stats && <section className="md:hidden rounded-3xl bg-card p-5" style={widgetGridStyle('stats')}>
-        <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] mt-2">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
-        <div className="grid grid-cols-2 gap-3 mt-4">{([{view:'income',label:'↙ In',value:stats.income,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl p-3 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p></button>)}</div>
+      {widgets.stats && <section className="md:hidden rounded-3xl bg-card p-4" style={widgetGridStyle('stats')}>
+        <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] mt-1">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
+        {!loading && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" /></div>}
+        <div className="grid grid-cols-2 gap-3 mt-3">{([{view:'income',label:'↙ In',value:stats.income,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-2 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p></button>)}</div>
       </section>}
       {widgets.stats && (
         <div className="hidden md:grid gap-4 grid-cols-3 col-span-full" style={widgetGridStyle('stats')}>
@@ -368,6 +390,7 @@ export default function DashboardPage() {
             title="Net Worth"
             value={formatCurrency(stats.totalBalance, currency)}
             sub="Assets minus Liabilities"
+            note={<UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" />}
             icon={Wallet}
             variant="balance"
             loading={loading}

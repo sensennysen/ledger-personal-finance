@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  MAX_QUEUE_AGE_MS, markExpired, applyKeepMine, removeFlagged, isPending, isFlagged,
-  mergeDrainResult, rowKey,
+  MAX_QUEUE_AGE_MS, MAX_ATTEMPTS, markExpired, applyKeepMine, removeFlagged, isPending, isFlagged,
+  mergeDrainResult, rowKey, expireNow, nextExpiryAt, isCountableError, recordFailure, retryFailed,
+  describeConflict, canKeepMine,
 } from '../src/lib/queueState.ts'
 
 const NOW = 1_000_000_000_000
@@ -72,4 +73,70 @@ test('merge keeps the drain result for items flagged by the drain itself', () =>
   const conflicted = item({ id: 'p', status: 'conflict' })
   const [out] = mergeDrainResult([conflicted], [item({ id: 'p' })], new Set(['p']), new Set())
   assert.equal(out.status, 'conflict')
+})
+
+test('expireNow flags on the clock and returns the same array when nothing changed', () => {
+  const q = [item({ id: 'old', timestamp: NOW - MAX_QUEUE_AGE_MS - 1 }), item({ id: 'new' })]
+  const next = expireNow(q, NOW)
+  assert.equal(next[0].status, 'expired')
+  assert.equal(next[1], q[1])
+  const quiet = [item({ id: 'new' })]
+  assert.equal(expireNow(quiet, NOW), quiet)
+})
+
+test('nextExpiryAt is the oldest pending item plus the limit, ignoring flagged ones', () => {
+  assert.equal(nextExpiryAt([]), null)
+  assert.equal(nextExpiryAt([item({ status: 'conflict', timestamp: 1 })]), null)
+  const q = [item({ id: 'b', timestamp: NOW }), item({ id: 'a', timestamp: NOW - 5 })]
+  assert.equal(nextExpiryAt(q), NOW - 5 + MAX_QUEUE_AGE_MS + 1)
+  // At that moment expireNow flags it, so a timer set for it does not spin.
+  assert.equal(expireNow(q, nextExpiryAt(q))[1].status, 'expired')
+})
+
+test('only a database error with a code counts as a failed attempt', () => {
+  assert.equal(isCountableError({ code: '23505', message: 'dup' }), true)
+  assert.equal(isCountableError({ code: '', message: 'TypeError: Failed to fetch' }), false)
+  assert.equal(isCountableError(null), false)
+  assert.equal(isCountableError(new Error('x')), false)
+})
+
+test('recordFailure counts, flags at the limit, and leaves a network failure alone', () => {
+  const base = item({})
+  assert.equal(recordFailure(base, 'x', false), base)
+  let cur = base
+  for (let i = 1; i < MAX_ATTEMPTS; i++) cur = recordFailure(cur, 'boom', true)
+  assert.deepEqual([cur.attempts, cur.status, cur.lastError], [MAX_ATTEMPTS - 1, undefined, 'boom'])
+  cur = recordFailure(cur, 'boom', true)
+  assert.equal(cur.status, 'failed')
+  assert.ok(isFlagged(cur) && !isPending(cur))
+})
+
+test('retryFailed makes a failed item pending with a fresh count and leaves others alone', () => {
+  const q = [item({ id: 'f', status: 'failed', attempts: 5, lastError: 'x' }), item({ id: 'c', status: 'conflict' })]
+  const [f, c] = retryFailed(q, 'f')
+  assert.deepEqual([f.status, f.attempts, f.lastError], [undefined, undefined, undefined])
+  assert.equal(retryFailed(q, 'c')[1], q[1])
+  assert.equal(c.status, 'conflict')
+})
+
+test('describeConflict lists only the fields that differ, and nothing for a deleted row', () => {
+  const edited = item({
+    status: 'conflict', conflictKind: 'edited',
+    payload: { amount: 5, notes: 'same', tags: ['a'] },
+    serverSnapshot: { updated_at: 'x', amount: 9, notes: 'same', tags: ['b'] },
+  })
+  assert.deepEqual(describeConflict(edited), [
+    { field: 'amount', mine: 5, theirs: 9 },
+    { field: 'tags', mine: ['a'], theirs: ['b'] },
+  ])
+  assert.deepEqual(describeConflict({ ...edited, conflictKind: 'deleted' }), [])
+  assert.deepEqual(describeConflict(item({})), [])
+})
+
+test('an update to a deleted row can only be discarded; keep mine clears the conflict details', () => {
+  assert.equal(canKeepMine(item({ status: 'conflict', conflictKind: 'deleted' })), false)
+  assert.equal(canKeepMine(item({ status: 'conflict', conflictKind: 'edited' })), true)
+  assert.equal(canKeepMine(item({ status: 'failed' })), true)
+  const [r] = applyKeepMine([item({ status: 'failed', attempts: 5, lastError: 'x', conflictKind: 'edited', serverSnapshot: {} })], 'a', NOW)
+  assert.deepEqual([r.attempts, r.lastError, r.conflictKind, r.serverSnapshot], [undefined, undefined, undefined, undefined])
 })

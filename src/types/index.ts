@@ -1,3 +1,5 @@
+import { SWATCHES } from '../lib/swatches.ts'
+
 export type AccountType =
   | 'cash'
   | 'digital_wallet'
@@ -35,6 +37,7 @@ export interface Profile {
   default_currency: string
   month_start_day: number
   budget_deficit_behaviour?: 'carry' | 'reset' | null
+  exchange_rate_refresh?: 'open' | 'daily' | 'weekly' | 'manual' | null
   dashboard_widget_order?: string[] | null
   account_group_order?: AccountType[] | null
   account_view_mode?: 'all' | AccountType | null
@@ -115,6 +118,9 @@ export interface Transaction {
   receipt_url: string | null
   tags?: string[]
   goal_id?: string | null
+  /** The statement amount and currency of a converted CSV import row (LED-136). */
+  original_amount?: number | null
+  original_currency?: string | null
   created_at: string
   updated_at: string
   // joined
@@ -156,6 +162,8 @@ export interface Budget {
   rollover_amount?: number
   effective_amount?: number
   history?: BudgetHistoryEntry[]
+  /** Spend in every closed monthly period, oldest first; lets the form replay Carried in. */
+  period_spends?: number[]
 }
 
 export interface SavingsGoal {
@@ -253,15 +261,5 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   other: 'Other',
 }
 
-export const ACCOUNT_COLORS = [
-  '#6366f1',
-  '#8b5cf6',
-  '#ec4899',
-  '#ef4444',
-  '#f97316',
-  '#eab308',
-  '#22c55e',
-  '#14b8a6',
-  '#3b82f6',
-  '#06b6d4',
-]
+/** The shared swatch list (src/lib/swatches.ts): accounts, budgets, categories and the accent all pick from it. */
+export const ACCOUNT_COLORS: readonly string[] = SWATCHES

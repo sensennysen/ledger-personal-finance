@@ -54,3 +54,60 @@ test('null data ends the read', async () => {
   const { rows, error } = await readAllPages(async () => ({ data: null, error: null }), 10)
   assert.deepEqual({ rows, error }, { rows: [], error: null })
 })
+
+test('totals over more than 1,000 rows count every row', async () => {
+  const total = 2500
+  const fetchPage = async (from, to) => {
+    const rows = []
+    for (let i = from; i <= to && i < total; i++) rows.push({ id: i, amount: 2 })
+    return { data: rows, error: null }
+  }
+  const { rows, error } = await readAllPages(fetchPage)
+  assert.equal(error, null)
+  assert.equal(rows.reduce((sum, row) => sum + row.amount, 0), total * 2)
+})
+
+test('a failed later page returns the error so the caller can refuse a partial list', async () => {
+  let n = 0
+  const fetchPage = async () => {
+    n++
+    return n === 3 ? { data: null, error: { message: 'boom' } } : { data: Array(1000).fill(0), error: null }
+  }
+  const { rows, error } = await readAllPages(fetchPage)
+  assert.equal(error, 'boom')
+  assert.equal(rows.length, 2000)
+  assert.equal(n, 3)
+})
+
+test('a cancelled read stops after the current page instead of paging on', async () => {
+  const { fetchPage, calls } = table(5000)
+  let stale = false
+  const { rows, error } = await readAllPages(
+    async (from, to) => {
+      const page = await fetchPage(from, to)
+      if (calls.length === 2) stale = true
+      return page
+    },
+    1000,
+    () => stale,
+  )
+  assert.equal(error, null)
+  assert.equal(calls.length, 2)
+  assert.equal(rows.length, 1000)
+})
+
+test('a cancel check that is never true reads everything', async () => {
+  const { fetchPage } = table(2100)
+  const { rows } = await readAllPages(fetchPage, 1000, () => false)
+  assert.equal(rows.length, 2100)
+})
+
+test('a page error that arrives after cancellation is dropped, not reported', async () => {
+  const { rows, error } = await readAllPages(
+    async () => ({ data: null, error: { message: 'late' } }),
+    10,
+    () => true,
+  )
+  assert.equal(error, null)
+  assert.deepEqual(rows, [])
+})

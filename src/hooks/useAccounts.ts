@@ -1,15 +1,18 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotify } from '@/contexts/notificationState'
 import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { registerAccountsListener } from '@/lib/cacheEvents'
 import { getLocalDateString } from '@/lib/utils'
+import { planAccountSave, type BalanceAdjustment } from '@/lib/accountAdjustment'
 import type { Account } from '@/types'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 export function useAccounts() {
   const { user } = useAuth()
+  const notify = useNotify()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
@@ -80,34 +83,44 @@ export function useAccounts() {
     return toResult(error, { action: 'save', entity: 'account' })
   }
 
+  // The account has already saved by the time this runs, so a failure is partial: Fix
+  // reruns only this insert and never saves the account a second time.
+  const recordBalanceAdjustment = async (accountId: string, adjustment: BalanceAdjustment, currency: string): Promise<void> => {
+    if (!user) return
+    const { error } = await supabase.from('transactions').insert({
+      user_id: user.id,
+      account_id: accountId,
+      type: adjustment.type,
+      amount: adjustment.amount,
+      currency,
+      exchange_rate: 1,
+      description: BALANCE_ADJUSTMENT_DESCRIPTION,
+      date: getLocalDateString(),
+    })
+    await fetch()
+    if (!error) return
+    notify({
+      severity: 'partial',
+      title: 'Account saved, balance adjustment not recorded',
+      body: 'Your changes saved, but the balance still shows the old amount.',
+      action: { label: 'Fix', run: () => void recordBalanceAdjustment(accountId, adjustment, currency) },
+    })
+  }
+
   const updateAccountWithAdjustment = async (id: string, values: Partial<Account>, oldBalance: number): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this account.' }
-    const newBalance = values.balance ?? oldBalance
 
-    // Update account fields; if balance changed, omit it — the transaction trigger handles it
-    const updatePayload: Partial<Account> = { ...values }
-    if (newBalance !== oldBalance) {
-      delete updatePayload.balance
-    }
+    // If the balance changed, omit it from the update: the transaction trigger handles it.
+    const { updatePayload, adjustment } = planAccountSave(oldBalance, values)
 
     const { error: updateError } = await supabase.from('accounts').update(updatePayload).eq('id', id).eq('user_id', user.id)
     if (updateError) return toResult(updateError, { action: 'save', entity: 'account' })
 
-    if (newBalance !== oldBalance) {
-      const diff = newBalance - oldBalance
+    if (adjustment) {
       const account = accounts.find((a) => a.id === id)
-      const { error: txError } = await supabase.from('transactions').insert({
-        user_id: user.id,
-        account_id: id,
-        type: diff > 0 ? 'income' : 'expense',
-        amount: Math.abs(diff),
-        currency: account?.currency ?? values.currency ?? DEFAULT_CURRENCY,
-        exchange_rate: 1,
-        description: BALANCE_ADJUSTMENT_DESCRIPTION,
-        date: getLocalDateString(),
-      })
-      if (txError) return toResult(txError, { action: 'save', entity: 'balance adjustment' })
+      await recordBalanceAdjustment(id, adjustment, account?.currency ?? values.currency ?? DEFAULT_CURRENCY)
+      return { error: null }
     }
 
     await fetch()
@@ -146,6 +159,8 @@ export function useAccounts() {
 
   const updateAccountOrder = async (orderedIds: string[]): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
+    // A reorder is one write per account, so it is not queued; say so rather than do nothing.
+    if (!navigator.onLine) return { error: 'Connect to the internet to change the order.' }
 
     const orderMap = new Map(orderedIds.map((id, index) => [id, index]))
     const nextAccounts = accounts

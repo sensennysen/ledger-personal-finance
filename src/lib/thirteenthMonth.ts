@@ -52,3 +52,93 @@ export function groupByMonth<T extends IncomeRecord>(records: T[]): [string, T[]
   for (const arr of map.values()) arr.sort((a, b) => b.date.localeCompare(a.date))
   return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b))
 }
+
+export type MonthStatus = 'covered' | 'partial' | 'missing' | 'future'
+
+export interface MonthCoverage {
+  /** 1 to 12. */
+  month: number
+  status: MonthStatus
+  includedCount: number
+  totalCount: number
+}
+
+/**
+ * The 12-bar strip of design 15a. A month is `covered` when every income record
+ * in it is ticked, `partial` when some are, `missing` when the month has happened
+ * and nothing in it is ticked (or it has no income at all), and `future` when it
+ * has not started. `today` is "YYYY-MM-DD"; a past year has no future months and a
+ * later year is all future.
+ */
+export function monthCoverage(
+  records: IncomeRecord[],
+  included: Set<string>,
+  year: number,
+  today: string,
+): MonthCoverage[] {
+  const totals = new Map<string, { included: number; total: number }>()
+  for (const record of records) {
+    const key = monthKey(record.date)
+    const entry = totals.get(key) ?? { included: 0, total: 0 }
+    entry.total += 1
+    if (included.has(record.id)) entry.included += 1
+    totals.set(key, entry)
+  }
+  const thisMonth = today.slice(0, 7)
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1
+    const key = `${year}-${String(month).padStart(2, '0')}`
+    const counts = totals.get(key) ?? { included: 0, total: 0 }
+    let status: MonthStatus
+    if (key > thisMonth) status = 'future'
+    else if (counts.included === 0) status = 'missing'
+    else if (counts.included === counts.total) status = 'covered'
+    else status = 'partial'
+    return { month, status, includedCount: counts.included, totalCount: counts.total }
+  })
+}
+
+export type Pd851RowId = 'basic' | 'overtime' | 'allowances' | 'other'
+
+export interface Pd851Row {
+  id: Pd851RowId
+  label: string
+  /** True when PD 851 counts this pay as basic salary. */
+  counts: boolean
+  /** Ticked records whose category reads like this row. */
+  selected: number
+}
+
+// Matched on the category name only; a per-user "counts as salary" flag is a product decision.
+const PD851_PATTERNS: Record<Exclude<Pd851RowId, 'basic'>, RegExp> = {
+  overtime: /\b(overtime|holiday|night|premium|differential)\b/i,
+  allowances: /\b(allowances?|bonus(es)?|commission|incentives?|benefits?|13th|thirteenth)\b/i,
+  other: /\b(freelance|business|investment|dividends?|interest|rental|gifts?|refunds?)\b/i,
+}
+
+const PD851_LABELS: Record<Pd851RowId, string> = {
+  basic: 'Basic salary: your regular wage for work performed',
+  overtime: 'Overtime, holiday and night-shift premiums',
+  allowances: 'Allowances, bonuses and other monetary benefits',
+  other: 'Income from freelance or non-employment sources',
+}
+
+/**
+ * The four PD 851 rules as a tick/cross list. Each row also counts the ticked
+ * records that look like it, so a cross row with `selected > 0` is a warning
+ * that the estimate includes pay PD 851 leaves out.
+ */
+export function pd851Checklist(records: IncomeRecord[], included: Set<string>): Pd851Row[] {
+  const ticked = records.filter((record) => included.has(record.id))
+  const count = (test: (name: string | null | undefined) => boolean) =>
+    ticked.filter((record) => test(record.category?.name)).length
+  return [
+    { id: 'basic', label: PD851_LABELS.basic, counts: true, selected: count(isSalaryCategory) },
+    ...(['overtime', 'allowances', 'other'] as const).map((id) => ({
+      id,
+      label: PD851_LABELS[id],
+      counts: false,
+      selected: count((name) => !!name && !isSalaryCategory(name) && PD851_PATTERNS[id].test(name)),
+    })),
+  ]
+}

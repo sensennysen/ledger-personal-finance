@@ -1,7 +1,7 @@
 // Month jump (spec §7 V3): a list of cycle months, each with its net, that
 // jumps straight to a month instead of stepping one cycle at a time.
 import { monthCycleRange, type DateRange } from './cycleRange.ts'
-import { signedAmount, type DayGroup } from './transactionWindow.ts'
+import { signedAmount, signedCurrency, type DayGroup } from './transactionWindow.ts'
 
 interface MonthTx {
   date: string
@@ -10,6 +10,7 @@ interface MonthTx {
   currency: string
   exchange_rate?: number | null
   to_account_id?: string | null
+  to_account?: { currency?: string | null } | null
 }
 
 export interface MonthNet {
@@ -65,7 +66,8 @@ export function buildMonthNets(
       byKey.set(key, month)
     }
     month.count += 1
-    month.net[tx.currency] = (month.net[tx.currency] ?? 0) + signedAmount(tx, contextAccountId)
+    const currency = signedCurrency(tx, contextAccountId)
+    month.net[currency] = (month.net[currency] ?? 0) + signedAmount(tx, contextAccountId)
   }
   const months: MonthNet[] = []
   for (let key = newest; key >= oldest; key = shiftMonthKey(key, -1)) {

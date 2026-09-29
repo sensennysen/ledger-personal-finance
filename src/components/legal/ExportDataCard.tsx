@@ -5,8 +5,21 @@ import { NotificationProvider } from '@/contexts/NotificationContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useCategories } from '@/hooks/useCategories'
+import { useLoanPurchases } from '@/hooks/useLoanPurchases'
+import { useSavingsGoals } from '@/hooks/useSavingsGoals'
+import { useTransactionRules } from '@/hooks/useTransactionRules'
 import { useTransactions } from '@/hooks/useTransactions'
-import { buildAccountsCsv, buildBudgetsCsv, buildCategoriesCsv, exportFileName, type ExportKind } from '@/lib/dataExport'
+import {
+  buildAccountsCsv,
+  buildBudgetsCsv,
+  buildCategoriesCsv,
+  buildLoanAllocationsCsv,
+  buildLoanPurchasesCsv,
+  buildSavingsGoalsCsv,
+  buildTransactionRulesCsv,
+  exportFileName,
+  type ExportKind,
+} from '@/lib/dataExport'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
 import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
 import { resolveLoadState, type LoadState } from '@/lib/loadState'
@@ -15,11 +28,12 @@ import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { InlineLoadError } from '@/components/ui/error-state'
 
-// "Rather export first?" beside the deletion instructions (LED-89, LED-143). The page is
-// public, so a signed-out visitor is sent to sign in; a signed-in one gets a file for each
+// "Rather export first?" beside the deletion instructions (LED-89, LED-143, LED-180). The page
+// is public, so a signed-out visitor is sent to sign in; a signed-in one gets a file for each
 // thing the page says we hold: transactions (with Standing Balance, from the same function
-// Reports uses), accounts, categories and budgets. Each file has its own read, so a failed
-// one shows its error and offers no download, and never writes an empty or partial file.
+// Reports uses), accounts, categories, budgets, savings goals, loan purchases and their
+// allocations, and auto-categorisation rules. Each file has its own read, so a failed one shows
+// its error and offers no download, and never writes an empty or partial file.
 
 export function ExportDataCard() {
   const { user, loading } = useAuth()
@@ -56,6 +70,9 @@ function SignedInExport() {
   const accounts = useAccounts()
   const categories = useCategories()
   const budgets = useBudgets()
+  const savingsGoals = useSavingsGoals()
+  const loanPurchases = useLoanPurchases()
+  const transactionRules = useTransactionRules(true)
 
   // Standing Balance needs every account's live balance, so a failed accounts read fails this file too.
   const transactionsState = resolveLoadState({
@@ -66,6 +83,12 @@ function SignedInExport() {
   const accountsState = resolveLoadState({ loading: accounts.loading, error: accounts.error, hasData: accounts.accounts.length > 0 })
   const categoriesState = resolveLoadState({ loading: categories.loading, error: categories.error, hasData: categories.categories.length > 0 })
   const budgetsState = resolveLoadState({ loading: budgets.loading, error: budgets.error, hasData: budgets.budgets.length > 0 })
+  const savingsGoalsState = resolveLoadState({ loading: savingsGoals.loading, error: savingsGoals.error, hasData: savingsGoals.goals.length > 0 })
+  const loanPurchasesState = resolveLoadState({ loading: loanPurchases.loading, error: loanPurchases.error, hasData: loanPurchases.purchases.length > 0 })
+  // The allocations file shares the loan purchases read: allocations only exist for a purchase, and a failed
+  // purchases read leaves both empty, so one retry (below) covers both files.
+  const loanAllocationsState = resolveLoadState({ loading: loanPurchases.loading, error: loanPurchases.error, hasData: loanPurchases.allocations.length > 0 })
+  const transactionRulesState = resolveLoadState({ loading: transactionRules.loading, error: transactionRules.error, hasData: transactionRules.rules.length > 0 })
 
   const save = (kind: ExportKind, csv: string) => downloadCsv(csv, exportFileName(kind, getLocalDateString()))
 
@@ -100,6 +123,51 @@ function SignedInExport() {
         state={budgetsState}
         onRetry={() => void budgets.refetch()}
         onExport={() => save('budgets', buildBudgetsCsv(budgets.budgets))}
+      />
+      <ExportRow
+        label="Savings goals"
+        count={savingsGoals.goals.length}
+        state={savingsGoalsState}
+        onRetry={() => void savingsGoals.refetch()}
+        onExport={() => save('savings-goals', buildSavingsGoalsCsv(savingsGoals.goals))}
+      />
+      <ExportRow
+        label="Loan purchases"
+        count={loanPurchases.purchases.length}
+        state={loanPurchasesState}
+        onRetry={() => void loanPurchases.refetch()}
+        onExport={() =>
+          save(
+            'loan-purchases',
+            buildLoanPurchasesCsv(
+              loanPurchases.purchases.map((p) => ({ ...p, account: accounts.accounts.find((a) => a.id === p.account_id) })),
+            ),
+          )
+        }
+      />
+      <ExportRow
+        label="Loan payment allocations"
+        count={loanPurchases.allocations.length}
+        state={loanAllocationsState}
+        onRetry={() => void loanPurchases.refetch()}
+        onExport={() =>
+          save(
+            'loan-allocations',
+            buildLoanAllocationsCsv(
+              loanPurchases.allocations.map((a) => ({
+                ...a,
+                loanPurchase: loanPurchases.purchases.find((p) => p.id === a.loan_purchase_id),
+              })),
+            ),
+          )
+        }
+      />
+      <ExportRow
+        label="Auto-categorisation rules"
+        count={transactionRules.rules.length}
+        state={transactionRulesState}
+        onRetry={() => void transactionRules.refetch()}
+        onExport={() => save('transaction-rules', buildTransactionRulesCsv(transactionRules.rules))}
       />
     </ul>
   )

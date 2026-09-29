@@ -5,21 +5,28 @@ import { NotificationProvider } from '@/contexts/NotificationContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useCategories } from '@/hooks/useCategories'
+import { useCreditCardPayments } from '@/hooks/useCreditCardPayments'
+import { useExchangeRateRow } from '@/hooks/useExchangeRateRow'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { useSavingsGoals } from '@/hooks/useSavingsGoals'
+import { useAllSubcategories } from '@/hooks/useSubcategories'
 import { useTransactionRules } from '@/hooks/useTransactionRules'
 import { useTransactions } from '@/hooks/useTransactions'
 import {
   buildAccountsCsv,
   buildBudgetsCsv,
   buildCategoriesCsv,
+  buildCreditCardPaymentsCsv,
+  buildExchangeRatesCsv,
   buildLoanAllocationsCsv,
   buildLoanPurchasesCsv,
   buildSavingsGoalsCsv,
+  buildSubcategoriesCsv,
   buildTransactionRulesCsv,
   exportFileName,
   type ExportKind,
 } from '@/lib/dataExport'
+import { exchangeRateRows } from '@/lib/exchangeRates'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
 import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
 import { resolveLoadState, type LoadState } from '@/lib/loadState'
@@ -32,8 +39,9 @@ import { InlineLoadError } from '@/components/ui/error-state'
 // is public, so a signed-out visitor is sent to sign in; a signed-in one gets a file for each
 // thing the page says we hold: transactions (with Standing Balance, from the same function
 // Reports uses), accounts, categories, budgets, savings goals, loan purchases and their
-// allocations, and auto-categorisation rules. Each file has its own read, so a failed one shows
-// its error and offers no download, and never writes an empty or partial file.
+// allocations, auto-categorisation rules, subcategories, credit card payments and exchange
+// rates. Each file has its own read, so a failed one shows its error and offers no download,
+// and never writes an empty or partial file.
 
 export function ExportDataCard() {
   const { user, loading } = useAuth()
@@ -73,6 +81,9 @@ function SignedInExport() {
   const savingsGoals = useSavingsGoals()
   const loanPurchases = useLoanPurchases()
   const transactionRules = useTransactionRules(true)
+  const subcategories = useAllSubcategories()
+  const creditCardPayments = useCreditCardPayments()
+  const exchangeRate = useExchangeRateRow()
 
   // Standing Balance needs every account's live balance, so a failed accounts read fails this file too.
   const transactionsState = resolveLoadState({
@@ -89,6 +100,11 @@ function SignedInExport() {
   // purchases read leaves both empty, so one retry (below) covers both files.
   const loanAllocationsState = resolveLoadState({ loading: loanPurchases.loading, error: loanPurchases.error, hasData: loanPurchases.allocations.length > 0 })
   const transactionRulesState = resolveLoadState({ loading: transactionRules.loading, error: transactionRules.error, hasData: transactionRules.rules.length > 0 })
+  const subcategoryCount = Object.values(subcategories.subcategoriesByCategoryId).reduce((n, list) => n + list.length, 0)
+  const subcategoriesState = resolveLoadState({ loading: subcategories.loading, error: subcategories.error, hasData: subcategoryCount > 0 })
+  const creditCardPaymentsState = resolveLoadState({ loading: creditCardPayments.loading, error: creditCardPayments.error, hasData: creditCardPayments.payments.length > 0 })
+  const exchangeRateRowCount = exchangeRate.table ? exchangeRateRows(exchangeRate.table).length : 0
+  const exchangeRateState = resolveLoadState({ loading: exchangeRate.loading, error: exchangeRate.error, hasData: exchangeRateRowCount > 0 })
 
   const save = (kind: ExportKind, csv: string) => downloadCsv(csv, exportFileName(kind, getLocalDateString()))
 
@@ -170,13 +186,44 @@ function SignedInExport() {
           onRetry={() => void transactionRules.refetch()}
           onExport={() => save('transaction-rules', buildTransactionRulesCsv(transactionRules.rules))}
         />
+        <ExportRow
+          label="Subcategories"
+          count={subcategoryCount}
+          state={subcategoriesState}
+          onRetry={() => void subcategories.refetch()}
+          onExport={() =>
+            save(
+              'subcategories',
+              buildSubcategoriesCsv(
+                Object.entries(subcategories.subcategoriesByCategoryId).flatMap(([categoryId, list]) =>
+                  list.map((s) => ({ ...s, category: categories.categories.find((c) => c.id === categoryId) })),
+                ),
+              ),
+            )
+          }
+        />
+        <ExportRow
+          label="Credit card payments"
+          count={creditCardPayments.payments.length}
+          state={creditCardPaymentsState}
+          onRetry={() => void creditCardPayments.refetch()}
+          onExport={() =>
+            save(
+              'credit-card-payments',
+              buildCreditCardPaymentsCsv(
+                creditCardPayments.payments.map((p) => ({ ...p, account: accounts.accounts.find((a) => a.id === p.account_id) })),
+              ),
+            )
+          }
+        />
+        <ExportRow
+          label="Exchange rates"
+          count={exchangeRateRowCount}
+          state={exchangeRateState}
+          onRetry={() => void exchangeRate.refetch()}
+          onExport={() => save('exchange-rates', buildExchangeRatesCsv(exchangeRate.table ? exchangeRateRows(exchangeRate.table) : []))}
+        />
       </ul>
-      {/* Held (and deleted) per "Data we hold" above, but not downloadable yet: no public-page-safe
-          "read everything for this user" query exists for these three (LED-180 backlog). */}
-      <p className="mt-2 text-xs text-muted-foreground">
-        Credit card payments, subcategories and exchange rate overrides aren't downloadable here yet,
-        but deleting your account removes them along with everything else.
-      </p>
     </>
   )
 }

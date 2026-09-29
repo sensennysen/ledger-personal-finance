@@ -5,6 +5,7 @@ import {
   converterTo,
   displayRate,
   effectiveRates,
+  exchangeRateRows,
   feedUrl,
   lookupRate,
   missingCurrencies,
@@ -171,6 +172,14 @@ test('displayRate prefers the override and says where it came from', () => {
   assert.deepEqual(displayRate(table({ overrides: { PHP: 60 } }), 'PHP'), { rate: 60, source: 'override' })
   assert.deepEqual(displayRate(table(), 'PHP'), { rate: 62.5, source: 'feed' })
   assert.equal(displayRate(table(), 'JPY'), null)
+})
+
+test('exchangeRateRows lists the base at 1, then every other currency sorted, override over feed (LED-180)', () => {
+  assert.deepEqual(exchangeRateRows(table({ overrides: { PHP: 60 } })), [
+    { currency: 'USD', rate: 1, source: 'base', asOf: '2026-09-25' },
+    { currency: 'EUR', rate: 0.8, source: 'feed', asOf: '2026-09-25' },
+    { currency: 'PHP', rate: 60, source: 'override', asOf: '2026-09-25' },
+  ])
 })
 
 test('typed rates are re-expressed when the base changes, and dropped when they cannot be', () => {

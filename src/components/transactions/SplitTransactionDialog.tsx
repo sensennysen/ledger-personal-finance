@@ -157,12 +157,14 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
                 >
                   <SelectTrigger aria-label={`Line ${idx + 1} category`} className="w-full h-9 min-w-0">
                     <SelectValue placeholder="Category">
-                      {line.category_id
-                        ? (() => {
-                            const cat = categories.find((c) => c.id === line.category_id)
-                            return cat ? `${cat.icon} ${cat.name}` : 'Category'
-                          })()
-                        : 'Uncategorized'}
+                      <span className="min-w-0 truncate">
+                        {line.category_id
+                          ? (() => {
+                              const cat = categories.find((c) => c.id === line.category_id)
+                              return cat ? `${cat.icon} ${cat.name}` : 'Category'
+                            })()
+                          : 'Uncategorized'}
+                      </span>
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>

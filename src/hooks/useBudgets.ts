@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
 import type { Budget } from '@/types'
 import type { BudgetSpendTx } from '@/lib/budgetSpend'
+import type { RateTable } from '@/lib/exchangeRates'
 import { getCurrentCycleMonthKey } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { sumBudgetSpend } from '@/lib/budgetSpend'
@@ -323,20 +324,20 @@ export function useBudgets(
   }
 }
 
-export interface InactiveBudgetExport extends Budget {
+export interface BudgetExportRow extends Budget {
   spent: number
   unrated_currencies: string[]
 }
 
 /**
- * Inactive budgets, with this cycle's converted spend, for the deletion-page export only (LED-186).
- * `useBudgets` reads active budgets and 13 months of history for rollover; an inactive budget needs
- * neither, so this is its own simple read against `expenseTx` the caller already has loaded.
+ * Every budget, active or not, with this cycle's converted spend, for the deletion-page export only
+ * (LED-186). That page renders outside `ExchangeRatesProvider`, so `useBudgets` cannot convert there;
+ * the caller passes the rates it read itself. No rollover or history is needed, so this is its own
+ * simple read against `expenseTx` the caller already has loaded.
  */
-export function useInactiveBudgetsForExport(expenseTx: BudgetSpendTx[]) {
-  const { user } = useAuth()
-  const rates = useOptionalExchangeRates()
-  const rateTable = rates?.table ?? null
+export function useBudgetsForExport(expenseTx: BudgetSpendTx[], rateTable: RateTable | null) {
+  const { user, profile } = useAuth()
+  const startDay = profile?.month_start_day ?? 1
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
   const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
@@ -351,7 +352,7 @@ export function useInactiveBudgetsForExport(expenseTx: BudgetSpendTx[]) {
     setLoadFailure(null)
     setLoading(true)
     if (!navigator.onLine) {
-      setLoadFailure({ message: 'Inactive budgets are not cached. Reconnect to load them.', detail: null })
+      setLoadFailure({ message: 'Budgets are not cached for export. Reconnect to load them.', detail: null })
       setLoading(false)
       return
     }
@@ -359,7 +360,6 @@ export function useInactiveBudgetsForExport(expenseTx: BudgetSpendTx[]) {
       .from('budgets')
       .select('*, category:categories(id, name, color, icon, type)')
       .eq('user_id', user.id)
-      .eq('is_active', false)
       .order('created_at', { ascending: true })
     if (request !== requestId.current) return
     if (error) {
@@ -377,15 +377,15 @@ export function useInactiveBudgetsForExport(expenseTx: BudgetSpendTx[]) {
     })
   }, [fetch])
 
-  const monthKey = getCurrentCycleMonthKey(1)
-  const enriched = useMemo<InactiveBudgetExport[]>(
+  const monthKey = getCurrentCycleMonthKey(startDay)
+  const enriched = useMemo<BudgetExportRow[]>(
     () =>
       budgets.map((b) => {
-        const { start, end } = getBudgetCycleRange(b.period, monthKey, 1)
+        const { start, end } = getBudgetCycleRange(b.period, monthKey, startDay)
         const { spent, unrated } = sumBudgetSpend(expenseTx, b, start, end, rateTable)
         return { ...b, spent, unrated_currencies: unrated }
       }),
-    [budgets, expenseTx, rateTable, monthKey]
+    [budgets, expenseTx, rateTable, monthKey, startDay]
   )
 
   return {

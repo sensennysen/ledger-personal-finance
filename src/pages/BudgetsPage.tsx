@@ -1174,12 +1174,15 @@ export default function BudgetsPage() {
     error: selectedBudgetTransactionsError,
     errorDetail: selectedBudgetTransactionsErrorDetail,
     refetch: refetchSelectedBudgetTransactions,
-  } = useTransactions({
-    categoryId: selectedBudget?.category_id ?? '__no_budget_selected__',
-    type: 'expense',
-    startDate: selectedBudgetRange?.start,
-    endDate: selectedBudgetRange?.end,
-  })
+  } = useTransactions(
+    {
+      categoryId: selectedBudget?.category_id,
+      type: 'expense',
+      startDate: selectedBudgetRange?.start,
+      endDate: selectedBudgetRange?.end,
+    },
+    { enabled: selectedBudget != null },
+  )
 
   const handleCreateBudget = async (values: BudgetFormValues) => {
     const { error, errorDetail } = await createBudget({ ...values, is_active: true })

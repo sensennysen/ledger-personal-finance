@@ -37,7 +37,16 @@ import { describeDataError, toResult, type DescribedError, type MutationResult }
 /** What a generated card payment hands back so the statement steps can run (LED-190). */
 export type CardPaymentHandler = (payment: { card: Account; amount: number; date: string; transactionId: string }) => Promise<void>
 
-export function useTransactions(filters: TransactionFilters = {}) {
+export interface UseTransactionsOptions {
+  /**
+   * When false the hook reads nothing and returns an empty list — for callers
+   * whose filter isn't known yet (Budgets before a budget is picked). A missing
+   * filter still means "no filter", so a placeholder id is never needed.
+   */
+  enabled?: boolean
+}
+
+export function useTransactions(filters: TransactionFilters = {}, { enabled = true }: UseTransactionsOptions = {}) {
   const { user } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
@@ -64,15 +73,22 @@ export function useTransactions(filters: TransactionFilters = {}) {
   }, [buildCacheKey])
 
   const reloadFromCache = useCallback(() => {
-    if (!user) return
+    // Disabled, the key would be the unfiltered list's: never load it here.
+    if (!user || !enabled) return
     const cached = readCache<Transaction[]>(buildCacheKey())
     if (cached) setTransactions(cached)
-  }, [user, buildCacheKey])
+  }, [user, enabled, buildCacheKey])
 
   useEffect(() => registerTransactionsListener(reloadFromCache), [reloadFromCache])
 
   const fetch = useCallback(async () => {
     if (!user) {
+      setLoading(false)
+      return
+    }
+    if (!enabled) {
+      setTransactions([])
+      setLoadFailure(null)
       setLoading(false)
       return
     }
@@ -126,7 +142,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       writeCache(cacheKey, rows)
     }
     setLoading(false)
-  }, [user, buildCacheKey, filters.accountId, filters.categoryId, filters.type, filters.startDate, filters.endDate, filters.limit])
+  }, [user, enabled, buildCacheKey, filters.accountId, filters.categoryId, filters.type, filters.startDate, filters.endDate, filters.limit])
 
   useEffect(() => {
     queueMicrotask(() => {

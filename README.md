@@ -93,6 +93,13 @@ Run `pnpm db:status` for the local API URL and anon key, then put them in `.env.
 | `pnpm db:diff` | Show schema changes in the local database not yet in a migration |
 | `pnpm db:push:remote` | Push migrations to the **linked remote** project. Prod-facing, never run by another script |
 
+`supabase/seed.sql` creates a demo user with accounts, about three months of transactions, budgets, savings goals, a financed car loan and categorization rules. Dates are relative to today, so the data stays current after each `pnpm db:reset`. In dev builds the login page shows an email/password form prefilled with the demo credentials (it is not included in production builds):
+
+- Email: `demo@ledger.local`
+- Password: `ledger-demo-123`
+
+The first-run checklist's pay-cycle step is stored in the browser, not the database, so a fresh browser still shows it and keeps the Activity, Budgets, Categories and Reports tabs locked until you confirm the cycle on the dashboard. Automated tests can skip it by setting `localStorage['ledger-first-run']` to `{"cycleConfirmed":true}` before loading the app.
+
 Schema changes ship only as timestamped, idempotent files in `supabase/migrations/`; do not edit prod by hand. All `db:*` commands except `db:push:remote` target the local stack only.
 
 ## Project Structure

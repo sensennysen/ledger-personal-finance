@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarRange, Download, FileUp, KeyRound, Trash2, Wallet } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 import { LedgerMark } from '@/components/brand/LedgerMark'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { supabase } from '@/lib/supabase'
 import { oauthErrorFromSearch } from '@/lib/oauthErrors'
 
 // Design 11a: the page says what Ledger does. All three are true of the app as
@@ -26,6 +28,59 @@ const CAPABILITIES = [
     body: 'BDO, BPI and Metrobank exports are recognised automatically.',
   },
 ]
+
+// Email/password sign-in for the local Supabase stack. Only rendered when
+// import.meta.env.DEV is true, so it is stripped from production builds.
+// Defaults match the demo user created by supabase/seed.sql.
+function DevPasswordLogin() {
+  const [email, setEmail] = useState('demo@ledger.local')
+  const [password, setPassword] = useState('ledger-demo-123')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setError(error.message)
+    setSubmitting(false)
+  }
+
+  return (
+    <form
+      onSubmit={(event) => void handleSubmit(event)}
+      className="mt-5 space-y-3 rounded-2xl border border-dashed border-border p-4"
+      aria-label="Development sign-in"
+    >
+      <p className="text-[0.6875rem] font-medium uppercase tracking-[.14em] text-muted-foreground">
+        Dev only · seeded login
+      </p>
+      <Input
+        type="email"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+        autoComplete="username"
+        aria-label="Email"
+      />
+      <Input
+        type="password"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+        autoComplete="current-password"
+        aria-label="Password"
+      />
+      {error && (
+        <p role="alert" className="text-[0.8125rem]" style={{ color: 'var(--expense)' }}>
+          {error}
+        </p>
+      )}
+      <Button type="submit" variant="outline" className="w-full" disabled={submitting}>
+        {submitting ? 'Signing in…' : 'Sign in with email'}
+      </Button>
+    </form>
+  )
+}
 
 export default function LoginPage() {
   const { signInWithGoogle, loading, authError: sessionError } = useAuth()
@@ -115,6 +170,8 @@ export default function LoginPage() {
             </svg>
             {isSigningIn ? 'Signing in…' : 'Continue with Google'}
           </button>
+
+          {import.meta.env.DEV && <DevPasswordLogin />}
 
           {/* ── Trust lines ── */}
           <ul className="mt-5 space-y-2 text-[0.8125rem] text-muted-foreground">

@@ -15,6 +15,7 @@ import {
 import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/lib/splitState'
 import { addRecurringIntervalToDateString } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
+import { generatedCardPayment } from '@/lib/cardPayment'
 import type { Transaction, Account, Category } from '@/types'
 import {
   applyTxDelta,
@@ -32,6 +33,9 @@ import {
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 // ---------- hook ----------
+
+/** What a generated card payment hands back so the statement steps can run (LED-190). */
+export type CardPaymentHandler = (payment: { card: Account; amount: number; date: string; transactionId: string }) => Promise<void>
 
 export function useTransactions(filters: TransactionFilters = {}) {
   const { user } = useAuth()
@@ -161,7 +165,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
 
   // ---------- mutations ----------
 
-  const createTransaction = async (values: TransactionUpsertValues): Promise<MutationResult & { queued?: boolean }> => {
+  const createTransaction = async (values: TransactionUpsertValues): Promise<MutationResult & { queued?: boolean; id?: string }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const now = new Date().toISOString()
@@ -187,12 +191,16 @@ export function useTransactions(filters: TransactionFilters = {}) {
       enqueueInsert(values)
       return { error: null, queued: true }
     }
-    const { error } = await supabase.from('transactions').insert({ ...withTransactionDefaults(values), user_id: user.id })
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert({ ...withTransactionDefaults(values), user_id: user.id })
+      .select('id')
+      .single()
     if (!error) {
       await fetch()
       notifyLoanPurchasesRefresh()
     }
-    return toResult(error, { action: 'save', entity: 'transaction' })
+    return { ...toResult(error, { action: 'save', entity: 'transaction' }), id: data?.id }
   }
 
   const updateTransaction = async (id: string, values: Partial<Transaction>): Promise<MutationResult & { queued?: boolean }> => {
@@ -348,7 +356,12 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return { ...toResult(error, { action: 'save' }), imported: error ? 0 : rows.length }
   }
 
-  const generateDueRecurring = useCallback(async (): Promise<number> => {
+  /**
+   * Posts every recurring row that has come due. `onCardPayment` runs for a generated transfer
+   * into a credit card, with the card as it is now, so the statement steps follow (LED-190).
+   * It is awaited, so two payments to one card never read the same statement.
+   */
+  const generateDueRecurring = useCallback(async (onCardPayment?: CardPaymentHandler): Promise<number> => {
     if (!user || !navigator.onLine) return 0
     const today = getLocalDateString()
     const { rows: allRecurring, error: recurringError } = await readAllPages<Transaction>((from, to) =>
@@ -372,7 +385,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       if (tx.recurrence_end_date && nextDate > tx.recurrence_end_date) continue
       if (wasRecurringGenerated(tx.id, nextDate)) continue
 
-      const { error } = await supabase.from('transactions').insert({
+      const { data: inserted, error } = await supabase.from('transactions').insert({
         user_id: user.id,
         account_id: tx.account_id,
         to_account_id: tx.to_account_id,
@@ -392,10 +405,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
         receipt_url: null,
         tags: tx.tags ?? [],
         goal_id: tx.goal_id ?? null,
-      })
+      }).select('id').single()
       if (!error) {
         markRecurringGenerated(tx.id, nextDate)
         generated++
+        if (onCardPayment && inserted && tx.type === 'transfer' && tx.to_account_id) {
+          const { data: destination } = await supabase.from('accounts').select('*').eq('id', tx.to_account_id).maybeSingle()
+          const payment = destination ? generatedCardPayment(tx, [destination as Account]) : null
+          if (payment) await onCardPayment({ ...payment, date: nextDate, transactionId: inserted.id })
+        }
       }
     }
     if (generated > 0) await fetch()

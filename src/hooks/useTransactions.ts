@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
+import { editQueuedInsert, enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
@@ -15,6 +15,7 @@ import {
 import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/lib/splitState'
 import { addRecurringIntervalToDateString } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
+import { generatedCardPayment } from '@/lib/cardPayment'
 import type { Transaction, Account, Category } from '@/types'
 import {
   applyTxDelta,
@@ -32,6 +33,9 @@ import {
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 // ---------- hook ----------
+
+/** What a generated card payment hands back so the statement steps can run (LED-190). */
+export type CardPaymentHandler = (payment: { card: Account; amount: number; date: string; transactionId: string }) => Promise<void>
 
 export function useTransactions(filters: TransactionFilters = {}) {
   const { user } = useAuth()
@@ -148,23 +152,26 @@ export function useTransactions(filters: TransactionFilters = {}) {
     notifyAccountsRefresh()
   }, [user])
 
-  const enqueueInsert = useCallback((values: TransactionUpsertValues) => {
+  // `id` is chosen here, not by the database, so a queued create keeps one identity: a later edit of
+  // it finds the queued insert (LED-193) and a card payment's statement can name the row it came from.
+  const enqueueInsert = useCallback((values: TransactionUpsertValues, id?: string) => {
     if (!user) return
 
     enqueue({
       table: 'transactions',
       operation: 'insert',
-      payload: { ...withTransactionDefaults(values), user_id: user.id },
+      payload: { ...(id ? { id } : {}), ...withTransactionDefaults(values), user_id: user.id },
       userId: user.id,
     })
   }, [user])
 
   // ---------- mutations ----------
 
-  const createTransaction = async (values: TransactionUpsertValues): Promise<MutationResult & { queued?: boolean }> => {
+  const createTransaction = async (values: TransactionUpsertValues): Promise<MutationResult & { queued?: boolean; id?: string }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const now = new Date().toISOString()
+      const queuedId = crypto.randomUUID()
       const cachedAccounts = readCache<Account[]>(`${user.id}:accounts`) ?? []
       const cachedCategories = readCache<Category[]>(`${user.id}:categories`) ?? []
       const optimistic: Transaction = {
@@ -172,7 +179,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
           values,
           userId: user.id,
           now,
-          id: crypto.randomUUID(),
+          id: queuedId,
           accounts: cachedAccounts,
           categories: cachedCategories,
         }),
@@ -184,15 +191,19 @@ export function useTransactions(filters: TransactionFilters = {}) {
       }
 
       optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
-      enqueueInsert(values)
-      return { error: null, queued: true }
+      enqueueInsert(values, queuedId)
+      return { error: null, queued: true, id: queuedId }
     }
-    const { error } = await supabase.from('transactions').insert({ ...withTransactionDefaults(values), user_id: user.id })
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert({ ...withTransactionDefaults(values), user_id: user.id })
+      .select('id')
+      .single()
     if (!error) {
       await fetch()
       notifyLoanPurchasesRefresh()
     }
-    return toResult(error, { action: 'save', entity: 'transaction' })
+    return { ...toResult(error, { action: 'save', entity: 'transaction' }), id: data?.id }
   }
 
   const updateTransaction = async (id: string, values: Partial<Transaction>): Promise<MutationResult & { queued?: boolean }> => {
@@ -208,16 +219,20 @@ export function useTransactions(filters: TransactionFilters = {}) {
           applyTxDelta(reverseTxDelta(accounts, existing), merged)
         )
       }
-      enqueue({
-        table: 'transactions',
-        operation: 'update',
-        payload: values as Record<string, unknown>,
-        rowId: id,
-        userId: user.id,
-        // The edit may not touch description (e.g. a category-only change), so
-        // the queue sheet title still has a name to show (LED-160).
-        label: existing?.description,
-      })
+      // A row that is still only a queued create is fixed in the queue; an update would target a
+      // row the database has not seen (LED-193).
+      if (!editQueuedInsert(id, values as Record<string, unknown>)) {
+        enqueue({
+          table: 'transactions',
+          operation: 'update',
+          payload: values as Record<string, unknown>,
+          rowId: id,
+          userId: user.id,
+          // The edit may not touch description (e.g. a category-only change), so
+          // the queue sheet title still has a name to show (LED-160).
+          label: existing?.description,
+        })
+      }
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').update(values).eq('id', id).eq('user_id', user.id)
@@ -348,7 +363,12 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return { ...toResult(error, { action: 'save' }), imported: error ? 0 : rows.length }
   }
 
-  const generateDueRecurring = useCallback(async (): Promise<number> => {
+  /**
+   * Posts every recurring row that has come due. `onCardPayment` runs for a generated transfer
+   * into a credit card, with the card as it is now, so the statement steps follow (LED-190).
+   * It is awaited, so two payments to one card never read the same statement.
+   */
+  const generateDueRecurring = useCallback(async (onCardPayment?: CardPaymentHandler): Promise<number> => {
     if (!user || !navigator.onLine) return 0
     const today = getLocalDateString()
     const { rows: allRecurring, error: recurringError } = await readAllPages<Transaction>((from, to) =>
@@ -372,7 +392,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
       if (tx.recurrence_end_date && nextDate > tx.recurrence_end_date) continue
       if (wasRecurringGenerated(tx.id, nextDate)) continue
 
-      const { error } = await supabase.from('transactions').insert({
+      const { data: inserted, error } = await supabase.from('transactions').insert({
         user_id: user.id,
         account_id: tx.account_id,
         to_account_id: tx.to_account_id,
@@ -392,10 +412,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
         receipt_url: null,
         tags: tx.tags ?? [],
         goal_id: tx.goal_id ?? null,
-      })
+      }).select('id').single()
       if (!error) {
         markRecurringGenerated(tx.id, nextDate)
         generated++
+        if (onCardPayment && inserted && tx.type === 'transfer' && tx.to_account_id) {
+          const { data: destination } = await supabase.from('accounts').select('*').eq('id', tx.to_account_id).maybeSingle()
+          const payment = destination ? generatedCardPayment(tx, [destination as Account]) : null
+          if (payment) await onCardPayment({ ...payment, date: nextDate, transactionId: inserted.id })
+        }
       }
     }
     if (generated > 0) await fetch()

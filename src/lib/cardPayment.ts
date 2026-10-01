@@ -162,9 +162,38 @@ export function isCardPaymentTransaction<A extends Pick<Account, 'id' | 'type'>>
   return transferCard(tx, accounts) !== null
 }
 
+/**
+ * Which generated recurring rows take the card path (LED-190): a transfer into a credit card
+ * records the payment and moves the statement, as a payment made by hand does. Any other row
+ * is a plain insert. `accounts` need only contain the destination.
+ */
+export function generatedCardPayment<A extends Pick<Account, 'id' | 'type'>>(
+  tx: Pick<CardPaymentShape, 'type' | 'to_account_id'> & { amount: number; exchange_rate?: number | null },
+  accounts: A[],
+): { card: A; amount: number } | null {
+  const card = transferCard(tx, accounts)
+  return card ? { card, amount: creditedAmount(tx) } : null
+}
+
 /** What reaches the card: the amount, converted when the paying account is in another currency. */
 export function creditedAmount(values: { amount: number; exchange_rate?: number | null }): number {
   return round2(values.amount * (values.exchange_rate ?? 1))
+}
+
+/**
+ * The paid amount after a payment of `delta` (negative takes one back). Mirrors
+ * `card_statement_shift` in the LED-191 migration, which applies it when a card payment's
+ * transfer is edited or deleted: with no statement the paid amount is left alone, and it stays
+ * between 0 and the locked statement balance.
+ */
+export function shiftStatementPaid(
+  paid: number | null | undefined,
+  statementBalance: number | null | undefined,
+  delta: number,
+): number {
+  const current = paid ?? 0
+  if (statementBalance == null) return current
+  return round2(Math.max(0, Math.min(current + delta, statementBalance)))
 }
 
 /**
@@ -177,10 +206,8 @@ export function planStatementPayment(
   amount: number,
   date: string,
 ): Pick<Account, 'statement_paid_amount' | 'last_payment_amount' | 'last_payment_date'> {
-  const paid = card.statement_paid_amount ?? 0
   return {
-    statement_paid_amount:
-      card.statement_balance == null ? paid : round2(Math.min(paid + amount, card.statement_balance)),
+    statement_paid_amount: shiftStatementPaid(card.statement_paid_amount, card.statement_balance, amount),
     last_payment_amount: amount,
     last_payment_date: date,
   }

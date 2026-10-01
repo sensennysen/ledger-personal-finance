@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { registerSyncedListener } from '@/lib/offlineQueue'
 import { isNearScrollEnd } from '@/lib/scrollEnd'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import {
@@ -92,7 +93,7 @@ function LayoutShell() {
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
   const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
-  const { createWithStatement } = useCardPayment(createTransaction)
+  const { createWithStatement, recordGenerated, recordSynced } = useCardPayment(createTransaction)
   const { accounts, loading: accountsLoading } = useAccounts()
   // ⌘F in search scopes to the account page it opened over.
   const accountRouteId = useMatch('/accounts/:accountId')?.params.accountId
@@ -197,12 +198,14 @@ function LayoutShell() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
   useCreditCardNotifications()
+  // A card payment made offline records its statement when the queue drains (LED-193). One owner: here.
+  useEffect(() => registerSyncedListener((item) => void recordSynced(item)), [recordSynced])
   useEffect(() => {
     if (!hasGenerated.current) {
       hasGenerated.current = true
-      void generateDueRecurring()
+      void generateDueRecurring(recordGenerated)
     }
-  }, [generateDueRecurring])
+  }, [generateDueRecurring, recordGenerated])
   const handleCreate = async (values: TransactionFormValues) => {
     const { error, errorDetail } = await createWithStatement(
       values as Parameters<typeof createTransaction>[0],

@@ -160,7 +160,7 @@ test('the dialog subtitle for a primary kind is the menu\'s own description', ()
 test('a payment dialog states its kind with the design caption, not the aggregate line', () => {
   const items = kindMenuItems([cash, loan, visa], opts)
   assert.equal(kindDialogSubtitle('loan-repayment', items), 'Posts as an expense against the loan · type locked')
-  assert.equal(kindDialogSubtitle('card-payment', items), 'Posts as an expense against the card · type locked')
+  assert.equal(kindDialogSubtitle('card-payment', items), 'Posts as a transfer to the card · type locked')
 })
 
 test('Change kind is offered from the three primary kinds only', () => {

@@ -1,6 +1,67 @@
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { supabase } from '@/lib/supabase'
+
+// Email/password sign-in for the local Supabase stack. Only rendered when
+// import.meta.env.DEV is true, so it is stripped from production builds.
+// Defaults match the demo user created by supabase/seed.sql.
+function DevPasswordLogin() {
+  const [email, setEmail] = useState('demo@ledger.local')
+  const [password, setPassword] = useState('ledger-demo-123')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setError(error.message)
+    setSubmitting(false)
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="mt-6 rounded-2xl border border-dashed p-4 space-y-3"
+      aria-label="Development sign-in"
+    >
+      <p className="text-[0.75rem] font-medium uppercase tracking-wide text-muted-foreground">
+        Dev only · seeded login
+      </p>
+      <input
+        type="email"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+        autoComplete="username"
+        aria-label="Email"
+        className="w-full h-10 rounded-lg border bg-transparent px-3 text-sm"
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+        autoComplete="current-password"
+        aria-label="Password"
+        className="w-full h-10 rounded-lg border bg-transparent px-3 text-sm"
+      />
+      {error && (
+        <p className="text-[0.8125rem]" style={{ color: 'var(--expense)' }}>
+          {error}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full h-10 rounded-full border text-sm font-medium disabled:opacity-50"
+      >
+        {submitting ? 'Signing in…' : 'Sign in with email'}
+      </button>
+    </form>
+  )
+}
 
 export default function LoginPage() {
   const { signInWithGoogle, loading } = useAuth()
@@ -99,6 +160,8 @@ export default function LoginPage() {
             </svg>
             {loading ? 'Signing in…' : 'Continue with Google'}
           </button>
+
+          {import.meta.env.DEV && <DevPasswordLogin />}
         </div>
 
         <p className="text-center text-[0.6875rem] text-muted-foreground mt-6 leading-relaxed">

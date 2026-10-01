@@ -50,6 +50,29 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 Run the Supabase schema in `supabase/schema.sql`, then apply any migrations in `supabase/migrations` that match your deployment state.
 
+### Local Supabase with seed data
+
+For development and testing you can run Supabase locally instead (requires Docker and the Supabase CLI):
+
+```bash
+supabase start      # applies migrations and supabase/seed.sql on first start
+supabase db reset   # re-applies migrations and reloads the seed at any time
+```
+
+Point `.env.local` at the local stack (`supabase status` prints the anon key):
+
+```env
+VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_ANON_KEY=<anon key from supabase status>
+```
+
+The seed creates a demo user with accounts, about three months of transactions, budgets, savings goals, a financed car loan, and categorization rules. Dates are relative to today, so the data stays current after each reset. In dev builds the login page shows an email/password form prefilled with the demo credentials:
+
+- Email: `demo@ledger.local`
+- Password: `ledger-demo-123`
+
+The form is only rendered when `import.meta.env.DEV` is true, so it is not included in production builds.
+
 Start the app:
 
 ```bash

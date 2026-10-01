@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/contexts/notificationState'
 import { useAccounts } from '@/hooks/useAccounts'
-import { notifyAccountsRefresh } from '@/lib/cacheEvents'
+import { notifyAccountsRefresh, notifyCardPaymentsRefresh } from '@/lib/cacheEvents'
 import { creditedAmount, planStatementPayment, transferCard } from '@/lib/cardPayment'
 import type { MutationResult } from '@/lib/dataErrors'
 import type { TransactionUpsertValues } from '@/hooks/useTransactions.helpers'
@@ -57,6 +57,7 @@ export function useCardPayment(
       if (error) return fix(null)
       payment = data as CreditCardPayment
       onRecorded?.(payment)
+      notifyCardPaymentsRefresh()
     }
 
     const { error } = await updateAccount(card.id, planStatementPayment(card, amount, paymentDate))

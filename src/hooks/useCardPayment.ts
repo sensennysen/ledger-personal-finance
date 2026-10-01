@@ -9,7 +9,7 @@ import type { TransactionUpsertValues } from '@/hooks/useTransactions.helpers'
 import type { CardPaymentHandler } from '@/hooks/useTransactions'
 import type { Account, CreditCardPayment } from '@/types'
 
-type CreateTransaction = (values: TransactionUpsertValues) => Promise<MutationResult & { queued?: boolean }>
+type CreateTransaction = (values: TransactionUpsertValues) => Promise<MutationResult & { queued?: boolean; id?: string }>
 
 /**
  * One way to pay a card (LED-146). Wrap a form's `createTransaction`: a transfer into a credit card
@@ -34,6 +34,7 @@ export function useCardPayment(
     paymentDate: string,
     recorded: CreditCardPayment | null,
     retrying = false,
+    transactionId: string | null = null,
   ): Promise<void> => {
     if (!user) return
     const fix = (payment: CreditCardPayment | null) => {
@@ -42,7 +43,7 @@ export function useCardPayment(
         severity: 'partial',
         title: 'Payment recorded, statement not updated',
         body: `The transfer saved, but statement tracking for ${card.name} may be out of date.`,
-        action: { label: 'Fix', run: () => void recordStatementPayment(card, amount, paymentDate, payment, true) },
+        action: { label: 'Fix', run: () => void recordStatementPayment(card, amount, paymentDate, payment, true, transactionId) },
       })
     }
 
@@ -50,7 +51,7 @@ export function useCardPayment(
     if (!payment) {
       const { data, error } = await supabase
         .from('credit_card_payments')
-        .insert({ user_id: user.id, account_id: card.id, amount, payment_date: paymentDate })
+        .insert({ user_id: user.id, account_id: card.id, amount, payment_date: paymentDate, transaction_id: transactionId })
         .select('*')
         .single()
       if (error) return fix(null)
@@ -80,12 +81,13 @@ export function useCardPayment(
       })
       return result
     }
-    void recordStatementPayment(card, amount, values.date, null)
+    void recordStatementPayment(card, amount, values.date, null, false, result.id ?? null)
     return result
   }
 
   /** A recurring transfer into a card that `generateDueRecurring` just posted (LED-190): same statement steps. */
-  const recordGenerated: CardPaymentHandler = ({ card, amount, date }) => recordStatementPayment(card, amount, date, null)
+  const recordGenerated: CardPaymentHandler = ({ card, amount, date, transactionId }) =>
+    recordStatementPayment(card, amount, date, null, false, transactionId)
 
   return { createWithStatement, recordGenerated }
 }

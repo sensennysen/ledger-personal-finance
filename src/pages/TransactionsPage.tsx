@@ -163,7 +163,8 @@ export default function TransactionsPage() {
 
   // ── Helpers ────────────────────────────────────────────────
 
-  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createTransaction)
+  // Through the card path, so undoing a deleted card payment restores its statement too (LED-191).
+  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createWithStatement)
 
   // ── Keyboard shortcuts ─────────────────────────────────────
   useKeyboardShortcut('n', useCallback(() => {

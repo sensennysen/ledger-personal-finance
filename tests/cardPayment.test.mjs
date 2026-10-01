@@ -211,3 +211,16 @@ test('with no statement the paid amount is left alone', () => {
   assert.equal(patch.statement_paid_amount, 0)
   assert.equal(patch.last_payment_amount, 300)
 })
+
+// LED-191: the same figures `card_statement_shift` produced on a local database (card with a
+// 500 statement; two payments of 100 and 150, then edits and deletes).
+test('shiftStatementPaid matches card_statement_shift', async () => {
+  const { shiftStatementPaid } = await import('../src/lib/cardPayment.ts')
+  assert.equal(shiftStatementPaid(250, 500, 50), 300) // 150 -> 200
+  assert.equal(shiftStatementPaid(300, 500, -20), 280) // 100 -> 80
+  assert.equal(shiftStatementPaid(280, 500, 700), 500) // never above the statement
+  assert.equal(shiftStatementPaid(200, 500, -200), 0) // a delete takes the payment back
+  assert.equal(shiftStatementPaid(100, 500, -400), 0) // never below zero
+  assert.equal(shiftStatementPaid(null, 500, 100), 100)
+  assert.equal(shiftStatementPaid(40, null, 100), 40) // no statement: left alone
+})

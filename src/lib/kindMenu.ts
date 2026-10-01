@@ -109,7 +109,7 @@ export function kindMenuItems(accounts: Account[], options: KindMenuOptions): Ki
 // this caption instead (LED-111).
 const LIABILITY_DIALOG_SUBTITLES = {
   'loan-repayment': 'Posts as an expense against the loan · type locked',
-  'card-payment': 'Posts as an expense against the card · type locked',
+  'card-payment': 'Posts as a transfer to the card · type locked',
 } as const
 
 /** The line under a new-transaction dialog's title: the menu's own text for the three primary kinds. */

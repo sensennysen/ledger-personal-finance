@@ -24,11 +24,12 @@ import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
 import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
+import { notifyCardPaymentsRefresh, registerCardPaymentsListener } from '@/lib/cacheEvents'
 import { searchMatcher } from '@/lib/globalSearch'
 import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { useCardPayment } from '@/hooks/useCardPayment'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
-import { defaultCardPaymentDescription } from '@/lib/cardPayment'
+import { defaultCardPaymentDescription, isCardPaymentTransaction } from '@/lib/cardPayment'
 import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { entryDialogWidthClass, type TransactionKind } from '@/components/transactions/transactionKinds'
@@ -122,13 +123,15 @@ export default function AccountTransactionsPage() {
   const [editAccountOpen, setEditAccountOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<FormErrorValue>(null)
-  const [paymentHistory, setPaymentHistory] = useState<CreditCardPayment[]>([])
-  const [paymentsLoading, setPaymentsLoading] = useState(false)
+  // The rows are kept with the card they were read for, so a card change never shows the last card's payments.
+  const [paymentHistory, setPaymentHistory] = useState<{ accountId: string; rows: CreditCardPayment[] } | null>(null)
+  const [paymentsError, setPaymentsError] = useState<string | null>(null)
   const [loanSection, setLoanSection] = useState<'summary' | 'purchases' | 'activity'>('summary')
 
-  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createTransaction, refetchAccounts)
   // Every card payment, from the header or the pane, saves the transfer, the payment record and the statement (LED-146).
-  const { createWithStatement } = useCardPayment(createTransaction, (payment) => setPaymentHistory((prev) => [payment, ...prev]))
+  const { createWithStatement } = useCardPayment(createTransaction)
+  // Undo restores a deleted card payment through the same path, so its payment record and statement come back too (LED-191).
+  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createWithStatement, refetchAccounts)
 
   const account = accounts.find((a) => a.id === accountId)
   const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet
@@ -308,6 +311,8 @@ export default function AccountTransactionsPage() {
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     refetchAccounts()
+    // The database moved the payment's history row and statement with the transfer (LED-191).
+    if (isCardPaymentTransaction(editingTx, accounts) || isCardPaymentTransaction(values, accounts)) notifyCardPaymentsRefresh()
     setEditingTx(null)
   }
 
@@ -321,35 +326,44 @@ export default function AccountTransactionsPage() {
       return
     }
     refetchAccounts()
+    if (snapshot && isCardPaymentTransaction(snapshot, accounts)) notifyCardPaymentsRefresh()
     if (snapshot) announceDeleted([snapshot], `"${snapshot.description}" deleted`)
-  }, [transactions, deleteTransaction, refetchAccounts, announceDeleteFailed, announceDeleted])
+  }, [transactions, accounts, deleteTransaction, refetchAccounts, announceDeleteFailed, announceDeleted])
+
+  const isCard = account?.type === 'credit_card'
+  const fetchPaymentHistory = useCallback(async () => {
+    if (!user || !accountId || !isCard) return
+    const { data, error } = await supabase
+      .from('credit_card_payments')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('account_id', accountId)
+      .order('payment_date', { ascending: false })
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setPaymentsError(describeDataError(error, { action: 'load' })?.message ?? 'Could not load payment history')
+      return
+    }
+    setPaymentsError(null)
+    setPaymentHistory({ accountId, rows: (data as CreditCardPayment[]) ?? [] })
+  }, [user, accountId, isCard])
 
   useEffect(() => {
-    const fetchPaymentHistory = async () => {
-      if (!user || !accountId || account?.type !== 'credit_card') {
-        setPaymentHistory([])
-        return
-      }
+    queueMicrotask(() => void fetchPaymentHistory())
+  }, [fetchPaymentHistory])
 
-      setPaymentsLoading(true)
-      const { data, error } = await supabase
-        .from('credit_card_payments')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('account_id', accountId)
-        .order('payment_date', { ascending: false })
-        .order('created_at', { ascending: false })
+  // A payment made from the global modal, or a card payment edited or deleted, signals here instead of
+  // this page running a second listener of its own (LED-192).
+  useEffect(() => registerCardPaymentsListener(() => void fetchPaymentHistory()), [fetchPaymentHistory])
 
-      if (error) {
-        setFormError(describeDataError(error, { action: 'load' }))
-      } else {
-        setPaymentHistory((data as CreditCardPayment[]) ?? [])
-      }
-      setPaymentsLoading(false)
-    }
-
-    fetchPaymentHistory()
-  }, [user, accountId, account?.type])
+  const historyLoaded = paymentHistory !== null && paymentHistory.accountId === accountId
+  const historyRows = historyLoaded ? paymentHistory.rows : []
+  const historyState = resolveLoadState({
+    loading: !historyLoaded,
+    error: paymentsError,
+    hasData: historyRows.length > 0,
+  })
 
   // Same path as editing the balance in the account form, so the change leaves an adjustment in history.
   const handleSetLoanAmount = async (owed: number) => {
@@ -655,13 +669,16 @@ export default function AccountTransactionsPage() {
                 )}
                 <div className="border-t border-border/60 pt-2">
                   <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground mb-1.5">Payment history</p>
-                  {paymentsLoading ? (
+                  {historyState === 'loading' ? (
                     <p className="text-xs text-muted-foreground">Loading payment history...</p>
-                  ) : paymentHistory.length === 0 ? (
+                  ) : historyState === 'error' ? (
+                    <p className="text-xs text-expense" role="alert">{paymentsError}</p>
+                  ) : historyState === 'empty' ? (
                     <p className="text-xs text-muted-foreground">No logged payments yet.</p>
                   ) : (
                     <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                      {paymentHistory.map((p) => (
+                      {historyState === 'stale-error' && <p className="text-xs text-expense" role="alert">{paymentsError}</p>}
+                      {historyRows.map((p) => (
                         <div key={p.id} className="flex items-center justify-between text-xs">
                           <span className="text-muted-foreground">{p.payment_date}</span>
                           <span className="money font-semibold">{formatCurrency(p.amount, currency)}</span>

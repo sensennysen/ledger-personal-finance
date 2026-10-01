@@ -78,3 +78,22 @@ test('reads and Home top categories count only expenses', () => {
   }
   assert.match(readFileSync('src/lib/utils.ts', 'utf8'), /tx\.type !== 'expense'/)
 })
+
+// LED-194: the Categories page counts and the rail's top categories are not moved by a card payment.
+test('Categories usage counts no transaction and no spend for a card payment', async () => {
+  const { buildCategoryUsage } = await import('../src/lib/categoryUsage.ts')
+  const range = { start: '2026-09-01', end: '2026-09-30' }
+  const usage = buildCategoryUsage([groceries, cardPayment], range, 'PHP')
+  assert.deepEqual([...usage.byCategory.keys()], ['groc'])
+  assert.equal(usage.byCategory.get('groc').txCount, 1)
+  assert.equal(usage.totals.expense, 120)
+})
+
+test('the top categories rail lists no row for a card payment', async () => {
+  const { topCategories } = await import('../src/lib/categoryBreakdown.ts')
+  const cats = new Map([['groc', { name: 'Groceries', color: '#1' }]])
+  const { rows } = buildCategoryBreakdown([groceries, cardPayment], cats, 'PHP')
+  const { top, other } = topCategories(rows)
+  assert.deepEqual(top.map((s) => s.name), ['Groceries'])
+  assert.equal(other, null)
+})

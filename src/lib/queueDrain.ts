@@ -37,10 +37,12 @@ export interface DrainDeps {
   writeQueue: (items: QueueItem[]) => void
   receipts: ReceiptDeps
   now: () => number
+  /** Called after an insert reaches the database, with the item as it was sent. A throw is ignored: the row is already saved. */
+  onSynced?: (item: QueueItem) => void
 }
 
 type Outcome =
-  | { kind: 'synced' }
+  | { kind: 'synced'; inserted?: QueueItem }
   | { kind: 'keep'; item: QueueItem }
 
 const messageOf = (error: unknown) =>
@@ -113,7 +115,7 @@ async function processItem(item: QueueItem, deps: DrainDeps, updatedRows: Set<st
   if (current.operation === 'insert') {
     const { error } = await client.from(current.table).insert(current.payload)
     if (error) return { kind: 'keep', item: recordFailure(current, messageOf(error), isCountableError(error)) }
-    return { kind: 'synced' }
+    return { kind: 'synced', inserted: current }
   }
 
   if (!current.rowId) return { kind: 'synced' }
@@ -187,8 +189,12 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
   for (const [index, item] of fresh.entries()) {
     try {
       const outcome = await processItem(item, deps, updatedRows)
-      if (outcome.kind === 'synced') synced++
-      else remaining.push(outcome.item)
+      if (outcome.kind === 'synced') {
+        synced++
+        if (outcome.inserted) {
+          try { deps.onSynced?.(outcome.inserted) } catch { /* the row is saved; a follow-up reports its own failure */ }
+        }
+      } else remaining.push(outcome.item)
     } catch {
       // Unexpected error (usually a dropped connection): keep the item for the next drain.
       remaining.push(item)

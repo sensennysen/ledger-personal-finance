@@ -45,6 +45,17 @@ function toLocalDateString(date: Date): string {
   return `${y}-${m}-${d}`
 }
 
+/**
+ * The date Pay now opens on (LED-195). A loan payment's date decides its split
+ * (`rules/loan-payment-date-decides-its-split.md`), so a bill already past due opens on today:
+ * dated on the old due date it would allocate as if paid on time. A bill not yet due keeps its
+ * due date. The form's Date field still lets the user change either.
+ */
+export function payNowDate(dueDate: string, today: Date): string {
+  const todayString = toLocalDateString(today)
+  return dueDate < todayString ? todayString : dueDate
+}
+
 export function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
@@ -161,7 +172,7 @@ export function buildUpcomingLoanBills(
         detail: formatLoanSchedule(account),
         nextDue,
         daysUntil: isCurrentMonth ? Math.round((nextDue.getTime() - today.getTime()) / 86400000) : null,
-        payment: { accountId: account.id, amount: nextDeadline.total, date: nextDeadline.dueDate },
+        payment: { accountId: account.id, amount: nextDeadline.total, date: payNowDate(nextDeadline.dueDate, today) },
       })
       continue
     }
@@ -177,8 +188,8 @@ export function buildUpcomingLoanBills(
       if (!nextInstallment) continue
       const nextDue = createDateAtLocalMidnight(nextInstallment.dueDate)
       const payment = accountDeadline
-        ? { accountId: account.id, amount: accountDeadline.total, date: accountDeadline.dueDate }
-        : { accountId: account.id, amount: nextInstallment.remainingAmount, date: nextInstallment.dueDate }
+        ? { accountId: account.id, amount: accountDeadline.total, date: payNowDate(accountDeadline.dueDate, today) }
+        : { accountId: account.id, amount: nextInstallment.remainingAmount, date: payNowDate(nextInstallment.dueDate, today) }
       bills.push({
         key: `loan-purchase:${purchase.id}:${nextInstallment.dueDate}`,
         source: 'loan',

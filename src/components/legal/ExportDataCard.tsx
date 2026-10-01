@@ -4,7 +4,7 @@ import { Download } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
 import { useAccounts } from '@/hooks/useAccounts'
-import { useBudgets, useInactiveBudgetsForExport } from '@/hooks/useBudgets'
+import { useBudgetsForExport } from '@/hooks/useBudgets'
 import { useCategories } from '@/hooks/useCategories'
 import { useCreditCardPayments } from '@/hooks/useCreditCardPayments'
 import { useExchangeRateRow } from '@/hooks/useExchangeRateRow'
@@ -78,16 +78,15 @@ function SignedInExport() {
   const transactions = useTransactions()
   const accounts = useAccounts()
   const categories = useCategories()
-  const budgets = useBudgets()
-  // Inactive budgets are not shown anywhere else, so the export reads them separately (LED-186).
   const expenseTx = useMemo(() => transactions.transactions.filter((t) => t.type === 'expense'), [transactions.transactions])
-  const inactiveBudgets = useInactiveBudgetsForExport(expenseTx)
   const savingsGoals = useSavingsGoals()
   const loanPurchases = useLoanPurchases()
   const transactionRules = useTransactionRules(true)
   const subcategories = useAllSubcategories()
   const creditCardPayments = useCreditCardPayments()
   const exchangeRate = useExchangeRateRow()
+  // This page has no ExchangeRatesProvider, so budgets convert with the rates read here (LED-186).
+  const budgets = useBudgetsForExport(expenseTx, exchangeRate.table)
 
   // Standing Balance needs every account's live balance, so a failed accounts read fails this file too.
   const transactionsState = resolveLoadState({
@@ -99,9 +98,9 @@ function SignedInExport() {
   const categoriesState = resolveLoadState({ loading: categories.loading, error: categories.error, hasData: categories.categories.length > 0 })
   // Spend needs every expense transaction, so a failed transactions read fails this file too.
   const budgetsState = resolveLoadState({
-    loading: budgets.loading || inactiveBudgets.loading || transactions.loading,
-    error: budgets.error ?? inactiveBudgets.error ?? transactions.error,
-    hasData: budgets.budgets.length > 0 || inactiveBudgets.budgets.length > 0,
+    loading: budgets.loading || exchangeRate.loading || transactions.loading,
+    error: budgets.error ?? exchangeRate.error ?? transactions.error,
+    hasData: budgets.budgets.length > 0,
   })
   const savingsGoalsState = resolveLoadState({ loading: savingsGoals.loading, error: savingsGoals.error, hasData: savingsGoals.goals.length > 0 })
   const loanPurchasesState = resolveLoadState({ loading: loanPurchases.loading, error: loanPurchases.error, hasData: loanPurchases.purchases.length > 0 })
@@ -145,14 +144,14 @@ function SignedInExport() {
         />
         <ExportRow
           label="Budgets"
-          count={budgets.budgets.length + inactiveBudgets.budgets.length}
+          count={budgets.budgets.length}
           state={budgetsState}
-          onRetry={() => { void budgets.refetch(); inactiveBudgets.refetch() }}
+          onRetry={() => void budgets.refetch()}
           onExport={() =>
             save(
               'budgets',
               buildBudgetsCsv(
-                [...budgets.budgets, ...inactiveBudgets.budgets].map((b) => ({
+                budgets.budgets.map((b) => ({
                   ...b,
                   spent: b.spent ?? 0,
                   unrated_currencies: b.unrated_currencies ?? [],

@@ -70,6 +70,43 @@ export function retryFailed(queue: QueueItem[], id: string): QueueItem[] {
   })
 }
 
+/**
+ * "Fix" on a queued create (LED-193): an edit made while the row is still only in the queue
+ * changes that queued insert's payload, so the row syncs once with the corrected values. A
+ * queued edit would target a row the database has not seen yet. A failed insert (a typo the
+ * database rejected) becomes pending again with a fresh attempt count. Anything else, a
+ * conflict or an expired item included, is left alone and `edited` is false.
+ */
+export function editQueuedInsert(
+  queue: QueueItem[],
+  rowId: string,
+  values: Record<string, unknown>,
+): { queue: QueueItem[]; edited: boolean } {
+  let edited = false
+  const next = queue.map((item) => {
+    if (
+      edited ||
+      item.table !== 'transactions' ||
+      item.operation !== 'insert' ||
+      item.payload.id !== rowId ||
+      (item.status && item.status !== 'failed')
+    ) {
+      return item
+    }
+    edited = true
+    const fixed: QueueItem = {
+      ...item,
+      payload: { ...item.payload, ...values, id: rowId, user_id: item.payload.user_id },
+    }
+    if (typeof values.description === 'string') fixed.label = values.description
+    delete fixed.status
+    delete fixed.attempts
+    delete fixed.lastError
+    return fixed
+  })
+  return { queue: edited ? next : queue, edited }
+}
+
 /** When the earliest pending item passes the max age, or null when nothing is pending. */
 export function nextExpiryAt(queue: QueueItem[]): number | null {
   const stamps = queue.filter(isPending).map((item) => item.timestamp)

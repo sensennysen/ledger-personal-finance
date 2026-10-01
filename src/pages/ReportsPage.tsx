@@ -39,7 +39,6 @@ import {
   convertedNetWorthEffect,
   cycleMonthLabel,
   formatComparison,
-  netWorthEffect,
   previousCycleKey,
   summarizeRange,
 } from '@/lib/periodCompare'
@@ -475,8 +474,8 @@ export default function ReportsPage() {
     return summarizeRange(transactions, range.start, range.end, currency, rateTable)
   }, [transactions, selectedMonth, startDay, currency, rateTable])
   const netWorthChange = useMemo(
-    () => filtered.reduce((sum, t) => sum + netWorthEffect(t), 0),
-    [filtered]
+    () => filtered.reduce((sum, t) => sum + (convertedNetWorthEffect(t, currency, rateTable) ?? 0), 0),
+    [filtered, currency, rateTable]
   )
   // good: which direction is good news for this figure. Hidden when a read
   // failed, since partial data would produce a false comparison.

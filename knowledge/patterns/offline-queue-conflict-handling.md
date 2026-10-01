@@ -17,3 +17,5 @@ Three layers, so the drain can be tested without Supabase or localStorage (LED-0
 **Colour.** Pending is gold; red is for a genuine failure. Conflict and expired keep their LED-05 treatment.
 
 **Not queued:** reordering accounts or categories (one write per row) and splitting a transaction. Both refuse offline with a message.
+
+**A queued create is edited in the queue (LED-193).** An offline create is given its row id on the device (`payload.id`), and `editQueuedInsert` merges a later edit into that queued insert (a `failed` one becomes pending again). Queuing an update instead would target a row the database has never seen, and it would be flagged as deleted. `drainWith` calls `deps.onSynced(item)` for each saved insert; `registerSyncedListener` in `offlineQueue.ts` lets one owner (AppLayout) run follow-up steps, such as a card payment's statement, once per row. Register one listener only, or the follow-up runs twice.

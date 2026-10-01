@@ -189,6 +189,8 @@ export interface CreditCardPayment {
   amount: number
   payment_date: string
   notes: string | null
+  /** The transfer this payment came from. Null on payments made before LED-191 that could not be matched. */
+  transaction_id: string | null
   created_at: string
 }
 

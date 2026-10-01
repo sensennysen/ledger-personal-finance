@@ -1,66 +1,19 @@
-import { useEffect, useState, useCallback } from 'react'
-import { drainQueue, pendingCount } from '@/lib/offlineQueue'
-
-interface NetworkStatus {
-  isOnline: boolean
-  isSyncing: boolean
-  pendingCount: number
-  /** Manually trigger a sync attempt */
-  syncNow: () => Promise<void>
-  /** Re-read the pending count from storage */
-  refreshCount: () => void
-}
+import { useContext } from 'react'
+import { NetworkStatusContext, type NetworkStatus } from '@/contexts/networkStatusState'
 
 /**
- * Tracks online/offline status and automatically drains the offline mutation
- * queue whenever the connection is restored.
+ * Online/offline state and the offline-queue drain. The state lives in one
+ * NetworkStatusProvider (mounted in AppLayout), so any number of components can call
+ * this without adding a listener or a second drain.
  */
 export function useNetworkStatus(): NetworkStatus {
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
-  const [isSyncing, setIsSyncing] = useState(false)
-  const [count, setCount] = useState(() => pendingCount())
-
-  const refreshCount = useCallback(() => {
-    setCount(pendingCount())
-  }, [])
-
-  const syncNow = useCallback(async () => {
-    if (isSyncing) return
-    const current = pendingCount()
-    if (current === 0) return
-    setIsSyncing(true)
-    try {
-      await drainQueue()
-      notifySyncListeners()
-    } catch {
-      // drainQueue itself failed — count will be refreshed in finally
-    } finally {
-      // Always refresh the displayed count, even if the drain partially failed
-      setCount(pendingCount())
-      setIsSyncing(false)
-    }
-  }, [isSyncing])
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true)
-      syncNow()
-    }
-    const handleOffline = () => setIsOnline(false)
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [syncNow])
-
-  return { isOnline, isSyncing, pendingCount: count, syncNow, refreshCount }
+  const status = useContext(NetworkStatusContext)
+  if (!status) throw new Error('useNetworkStatus must be used inside NetworkStatusProvider')
+  return status
 }
 
 // ---------------------------------------------------------------------------
-// Singleton store so App-level hook instance can be shared with data hooks
+// Sync listeners: data hooks register a refetch to run after a drain or a resolve.
 // ---------------------------------------------------------------------------
 type SyncListener = () => void
 const syncListeners = new Set<SyncListener>()
@@ -71,7 +24,7 @@ export function registerSyncListener(cb: SyncListener) {
   return () => syncListeners.delete(cb)
 }
 
-/** Called by drainQueue after successful sync to notify data hooks. */
+/** Called after a sync or a resolve to notify data hooks. */
 export function notifySyncListeners() {
   syncListeners.forEach((cb) => cb())
 }

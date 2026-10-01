@@ -1,15 +1,16 @@
 import { useState, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Download,
   TrendingUp,
   TrendingDown,
+  TriangleAlert,
   Wallet,
   FileBarChart2,
-  CalendarDays,
   Store,
-  Bookmark,
-  BookmarkPlus,
-  Trash2,
+  ArrowUpRight,
+  ChevronDown,
+  Columns3,
 } from 'lucide-react'
 import {
   ResponsiveContainer,
@@ -29,21 +30,58 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
-import { useReportPresets } from '@/hooks/useReportPresets'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { converterTo } from '@/lib/exchangeRates'
+import { useCycle } from '@/contexts/cycleState'
+import { getReportRange } from '@/lib/reportCycle'
+import {
+  compareToPrevious,
+  convertedNetWorthEffect,
+  cycleMonthLabel,
+  formatComparison,
+  netWorthEffect,
+  previousCycleKey,
+  summarizeRange,
+} from '@/lib/periodCompare'
+import {
+  DEFAULT_LOOKBACK,
+  LOOKBACK_OPTIONS,
+  getLookbackBuckets,
+  getLookbackSubtitle,
+  type Lookback,
+} from '@/lib/reportLookback'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { buildReportCsv, downloadCsv } from '@/lib/transactionCsv'
+import { buildRunningBalanceMap } from '@/lib/runningBalance'
+import { abbreviateTick } from '@/lib/chartTicks'
+import { REPORT_COLUMNS, defaultColumns, exportColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { INCOME, EXPENSE, GOLD, TRANSFER } from '@/constants/colors'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { PageActions } from '@/components/layout/PageActions'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { InlineLoadError } from '@/components/ui/error-state'
+import { EmptyState } from '@/components/ui/empty-state'
+import { INCOME, EXPENSE, TRANSFER } from '@/constants/colors'
 import type { Transaction } from '@/types'
-import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
-import { getAccountNetWorthContribution, getBalanceSummary } from '@/lib/creditCards'
+import { OverspendingCard } from '@/components/reports/OverspendingCard'
+import { useOverspendingReport } from '@/hooks/useOverspendingReport'
+import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
+import { summarizeBalances } from '@/lib/accountsOverview'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
+import { buildCategoryBreakdown, rollupBreakdown, type CategorySlice } from '@/lib/categoryBreakdown'
+import { CategoryBreakdownCard } from '@/components/reports/CategoryBreakdownCard'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
 
@@ -54,104 +92,13 @@ function localDateStr(date: Date) {
   return `${y}-${m}-${d}`
 }
 
-type Preset = 'this_month' | 'last_month' | 'last_3m' | 'last_6m' | 'this_year' | 'all_time' | 'custom'
-
-function resolvePreset(preset: Preset): { start: string; end: string } {
-  const now = new Date()
-  const today = localDateStr(now)
-  switch (preset) {
-    case 'this_month': {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1)
-      return { start: localDateStr(start), end: today }
-    }
-    case 'last_month': {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const end = new Date(now.getFullYear(), now.getMonth(), 0)
-      return { start: localDateStr(start), end: localDateStr(end) }
-    }
-    case 'last_3m': {
-      const start = new Date(now.getFullYear(), now.getMonth() - 2, 1)
-      return { start: localDateStr(start), end: today }
-    }
-    case 'last_6m': {
-      const start = new Date(now.getFullYear(), now.getMonth() - 5, 1)
-      return { start: localDateStr(start), end: today }
-    }
-    case 'this_year': {
-      return { start: `${now.getFullYear()}-01-01`, end: today }
-    }
-    case 'all_time':
-    case 'custom':
-    default:
-      return { start: '', end: '' }
-  }
-}
-
-// ─── csv export ───────────────────────────────────────────────────────────────
-
-function escapeCsvCell(value: string | number | null | undefined): string {
-  let str = String(value ?? '')
-  // Neutralize spreadsheet formulas when the CSV is opened in Excel/Sheets.
-  if (/^[=+\-@]/.test(str)) {
-    str = `'${str}`
-  }
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`
-  }
-  return str
-}
-
-function exportToCsv(
-  transactions: Transaction[],
-  filename: string,
-  balanceMap: Map<string, number>,
-) {
-  const headers = [
-    'Date',
-    'Type',
-    'Description',
-    'Category',
-    'Account',
-    'To Account',
-    'Amount',
-    'Currency',
-    'Exchange Rate',
-    'Transfer Fee',
-    'Standing Balance',
-    'Notes',
-  ]
-
-  const rows = transactions.map((t) => [
-    t.date,
-    t.type,
-    t.description,
-    t.category?.name ?? '',
-    t.account?.name ?? t.account_id,
-    t.to_account?.name ?? t.to_account_id ?? '',
-    t.amount,
-    t.currency,
-    t.exchange_rate,
-    t.transfer_fee ?? '',
-    balanceMap.get(t.id) ?? '',
-    t.notes ?? '',
-  ])
-
-  const csvContent = [headers, ...rows]
-    .map((row) => row.map(escapeCsvCell).join(','))
-    .join('\n')
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.setAttribute('download', filename)
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-}
-
 // ─── pdf export ──────────────────────────────────────────────────────────────
+
+/** Same rollup as the on-screen card, so the PDF's shares add up to the whole. */
+function pdfCategoryRows(categoryBreakdown: CategorySlice[]) {
+  const { top, other } = rollupBreakdown(categoryBreakdown)
+  return other ? [...top, { name: `Other - ${other.count} categories`, amount: other.amount }] : top
+}
 
 function exportToPdf(
   transactions: Transaction[],
@@ -160,9 +107,11 @@ function exportToPdf(
   netChange: number,
   currency: string,
   dateRangeLabel: string,
-  categoryBreakdown: { name: string; color: string; amount: number }[],
+  categoryBreakdown: CategorySlice[],
   merchantBreakdown: { displayName: string; amount: number; count: number }[],
   filenameLabel: string,
+  columns: ReportColumn[],
+  balanceMap: Map<string, number>,
 ) {
   // jsPDF's built-in Helvetica font only covers Latin-1, so Unicode currency
   // symbols (₱, €, £, ¥, …) render as garbled characters. Use the ISO currency
@@ -222,7 +171,7 @@ function exportToPdf(
     autoTable(doc, {
       startY: currentY,
       head: [['Category', 'Amount', '% of Total']],
-      body: categoryBreakdown.slice(0, 8).map((cat) => [
+      body: pdfCategoryRows(categoryBreakdown).map((cat) => [
         cat.name,
         pdfFmt(cat.amount, currency),
         totalExpenses > 0 ? `${((cat.amount / totalExpenses) * 100).toFixed(1)}%` : '-',
@@ -266,30 +215,42 @@ function exportToPdf(
   doc.setFontSize(10)
   doc.text('Transactions', margin, currentY)
   currentY += 4
+  // Same columns, in the same order, as the table on screen (the Columns control).
+  const pdfCell = (column: ReportColumn, t: Transaction): string => {
+    switch (column) {
+      case 'date': return t.date
+      case 'description': return t.description
+      case 'category': return t.category?.name ?? '—'
+      case 'account': return t.account?.name ?? '—'
+      case 'type': return t.type.charAt(0).toUpperCase() + t.type.slice(1)
+      case 'amount': return `${t.type === 'income' ? '+' : t.type === 'transfer' ? '~' : '-'} ${pdfFmt(t.amount, t.currency)}`
+      case 'balance': {
+        const balance = balanceMap.get(t.id)
+        return balance === undefined ? '—' : pdfFmt(balance, t.account?.currency ?? t.currency)
+      }
+    }
+  }
+  const labelOf = new Map(REPORT_COLUMNS.map((c) => [c.key, c.label]))
+  const columnStyles: Record<number, { halign?: 'right'; cellWidth: number | 'auto' }> = {}
+  columns.forEach((column, index) => {
+    if (column === 'date') columnStyles[index] = { cellWidth: 22 }
+    else if (column === 'description') columnStyles[index] = { cellWidth: 'auto' }
+    else if (column === 'category') columnStyles[index] = { cellWidth: 30 }
+    else if (column === 'account') columnStyles[index] = { cellWidth: 32 }
+    else if (column === 'type') columnStyles[index] = { cellWidth: 20 }
+    else columnStyles[index] = { halign: 'right', cellWidth: 28 }
+  })
   autoTable(doc, {
     startY: currentY,
-    head: [['Date', 'Description', 'Category', 'Account', 'Amount']],
-    body: transactions.map((t) => [
-      t.date,
-      t.description,
-      t.category?.name ?? '—',
-      t.account?.name ?? '—',
-      `${t.type === 'income' ? '+' : t.type === 'transfer' ? '~' : '-'} ${pdfFmt(t.amount, t.currency)}`,
-
-    ]),
+    head: [columns.map((column) => labelOf.get(column) ?? column)],
+    body: transactions.map((t) => columns.map((column) => pdfCell(column, t))),
     styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak' },
     headStyles: { fillColor: [45, 45, 45], textColor: 255, fontStyle: 'bold' },
-    columnStyles: {
-      0: { cellWidth: 22 },
-      1: { cellWidth: 'auto' },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 32 },
-      4: { halign: 'right', cellWidth: 28 },
-    },
+    columnStyles,
     margin: { left: margin, right: margin },
   })
 
-  doc.save(`expense-report_${filenameLabel}.pdf`)
+  doc.save(`ledger-report_${filenameLabel}.pdf`)
 }
 
 // ─── stat card ────────────────────────────────────────────────────────────────
@@ -300,14 +261,18 @@ function StatCard({
   sub,
   icon: Icon,
   color,
+  comparison,
   loading,
+  note,
 }: {
   title: string
   value: string
   sub?: string
   icon: React.ElementType
   color: string
+  comparison?: { text: string; color: string }
   loading?: boolean
+  note?: React.ReactNode
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-border/60 p-4 sm:p-5 bg-card">
@@ -325,9 +290,18 @@ function StatCard({
               {value}
             </p>
           )}
+          {loading && [sub, comparison].filter(Boolean).map((_, i) => (
+            <div key={i} className="flex h-4 items-center mt-1"><Skeleton className="h-3 w-24" /></div>
+          ))}
           {sub && !loading && (
             <p className="text-[0.6875rem] text-muted-foreground mt-1 wrap-break-word">{sub}</p>
           )}
+          {comparison && !loading && (
+            <p className="text-[0.6875rem] font-medium tabular-nums mt-1 wrap-break-word" style={{ color: comparison.color }}>
+              {comparison.text}
+            </p>
+          )}
+          {note && !loading && <div className="mt-1.5">{note}</div>}
         </div>
         <div
           className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg shrink-0"
@@ -340,41 +314,130 @@ function StatCard({
   )
 }
 
+// ─── income vs expenses trend card ────────────────────────────────────────────
+
+function IncomeExpenseCard({
+  data,
+  lookback,
+  onLookbackChange,
+  loading,
+  currency,
+  excludedCurrencies = [],
+}: {
+  data: { month: string; income: number; expenses: number }[]
+  lookback: Lookback
+  onLookbackChange: (value: Lookback) => void
+  loading: boolean
+  currency: string
+  excludedCurrencies?: string[]
+}) {
+  return (
+    <div className="h-full rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FileBarChart2 className="w-3.5 h-3.5 text-muted-foreground" />
+          <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
+            Income vs. Expenses — {getLookbackSubtitle(lookback, new Date())}
+          </p>
+        </div>
+        <select
+          aria-label="Trend chart lookback"
+          value={lookback}
+          onChange={(e) => onLookbackChange(e.target.value as Lookback)}
+          className="h-7 rounded-md border border-border bg-background px-2 text-xs"
+        >
+          {LOOKBACK_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+      {!loading && <UnratedCurrencyNotice currencies={excludedCurrencies} subject="income and expenses" />}
+  {loading ? (
+        <div className="relative flex-1 min-h-60 lg:min-h-72"><Skeleton className="absolute inset-0 rounded-lg" /></div>
+      ) : (
+        // The chart fills an absolutely placed box: a percentage height has no parent to
+        // resolve against in Analytics' flex column, which measured 0px (LED-168).
+        <div className="relative flex-1 min-h-60 lg:min-h-72">
+          <div className="absolute inset-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={abbreviateTick}
+                width={40}
+              />
+              <Tooltip
+                formatter={(v, name) => [formatCurrency(v as number, currency), name as string]}
+                contentStyle={{
+                  fontSize: 11,
+                  background: 'var(--card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  color: 'var(--foreground)',
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+              <Bar dataKey="income" name="Income" fill={INCOME} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const RIGHT_ALIGNED = new Set<ReportColumn>(['amount', 'balance'])
+
+// Text-run widths for the loading table, roughly the width of each column's content.
+const SKELETON_WIDTH: Record<ReportColumn, string> = {
+  date: 'w-12',
+  description: 'w-32',
+  category: 'w-20',
+  account: 'w-24',
+  type: 'w-14',
+  amount: 'w-16',
+  balance: 'w-16',
+}
+
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
+  const ink = useCategoryInk()
   const { profile } = useAuth()
+  const deficitBehaviour = useDeficitBehaviour()
   const currency = profile?.default_currency ?? 'USD'
+  const { table: rateTable } = useExchangeRates()
+  const convertToDefault = useMemo(() => converterTo(rateTable, currency), [rateTable, currency])
 
-  const { transactions, loading: txLoading } = useTransactions()
-  const { accounts, loading: accLoading } = useAccounts()
+  const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
+  const { accounts, loading: accLoading, error: accError, refetch: refetchAccounts } = useAccounts()
   const { categories } = useCategories()
 
   const loading = txLoading || accLoading
+  const loadFailed = !!(txError || accError)
+  const retryFailedSources = () => {
+    if (txError) void refetchTransactions()
+    if (accError) void refetchAccounts()
+  }
 
-  // Date range state
-  const [preset, setPreset] = useState<Preset>('this_month')
-  const [customStart, setCustomStart] = useState('')
-  const [customEnd, setCustomEnd] = useState('')
+  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
+  const overspending = useOverspendingReport({ startDay, month: selectedMonth, deficitBehaviour })
   const [activeTab, setActiveTab] = useState('overview')
-  const [presetName, setPresetName] = useState('')
-  const { presets: savedPresets, savePreset, deletePreset } = useReportPresets()
-  const [dateRangeOpen, setDateRangeOpen] = useState(false)
-  const [presetsOpen, setPresetsOpen] = useState(false)
-
-  const { start, end } = useMemo(() => {
-    if (preset === 'custom') {
-      // Guard against inverted ranges which would match nothing (or everything)
-      if (customStart && customEnd && customStart > customEnd) {
-        return { start: '', end: '' }
-      }
-      return { start: customStart, end: customEnd }
-    }
-    if (preset === 'all_time') {
-      return { start: '', end: '' }
-    }
-    return resolvePreset(preset)
-  }, [preset, customStart, customEnd])
+  const { start, end, label: rangeLabel, filenameLabel } = useMemo(
+    () => getReportRange(selectedMonth, startDay),
+    [selectedMonth, startDay],
+  )
 
   // Filtered transactions
   const filtered = useMemo(() => {
@@ -384,6 +447,10 @@ export default function ReportsPage() {
       return true
     })
   }, [transactions, start, end])
+
+  const goToPreviousPeriod = () => {
+    setSelectedMonth(previousCycleKey(selectedMonth))
+  }
 
   const categoryById = useMemo(
     () => new Map(categories.map((category) => [category.id, category])),
@@ -396,49 +463,55 @@ export default function ReportsPage() {
   )
 
   // Summary stats
-  const { totalIncome, totalExpenses, netChange } = useMemo(() => {
-    let totalIncome = 0
-    let totalExpenses = 0
-    for (const t of filtered) {
-      if (t.type === 'income') totalIncome += t.amount * (t.exchange_rate ?? 1)
-      else if (t.type === 'expense') totalExpenses += t.amount * (t.exchange_rate ?? 1)
-    }
-    return { totalIncome, totalExpenses, netChange: totalIncome - totalExpenses }
-  }, [filtered])
+  const { income: totalIncome, expenses: totalExpenses, net: netChange, excludedCurrencies: summaryExcludedCurrencies } = useMemo(
+    () => summarizeRange(transactions, start, end, currency, rateTable),
+    [transactions, start, end, currency, rateTable]
+  )
+
+  // Same figures for the previous cycle, so each stat card has a reference point.
+  const previousLabel = cycleMonthLabel(previousCycleKey(selectedMonth))
+  const previousTotals = useMemo(() => {
+    const range = getReportRange(previousCycleKey(selectedMonth), startDay)
+    return summarizeRange(transactions, range.start, range.end, currency, rateTable)
+  }, [transactions, selectedMonth, startDay, currency, rateTable])
+  const netWorthChange = useMemo(
+    () => filtered.reduce((sum, t) => sum + netWorthEffect(t), 0),
+    [filtered]
+  )
+  // good: which direction is good news for this figure. Hidden when a read
+  // failed, since partial data would produce a false comparison.
+  const compare = (current: number, previous: number, good: 'up' | 'down') => {
+    if (loadFailed) return undefined
+    const cmp = compareToPrevious(current, previous)
+    const color = cmp.direction === 'flat' || cmp.pct === null
+      ? 'var(--muted-foreground)'
+      : cmp.direction === good ? INCOME : EXPENSE
+    return { text: formatComparison(cmp, previousLabel), color }
+  }
 
   // Category breakdown (expenses only)
-  const categoryBreakdown = useMemo(() => {
-    const map = new Map<string, { name: string; color: string; amount: number }>()
-    for (const t of filtered) {
-      if (t.type !== 'expense') continue
-      const key = t.category_id ?? '__none__'
-      const cat = t.category_id ? categoryById.get(t.category_id) : undefined
-      const existing = map.get(key)
-      if (existing) {
-        existing.amount += t.amount * (t.exchange_rate ?? 1)
-      } else {
-        map.set(key, {
-          name: cat?.name ?? 'Uncategorized',
-          color: cat?.color ?? '#888',
-          amount: t.amount * (t.exchange_rate ?? 1),
-        })
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => b.amount - a.amount)
-  }, [filtered, categoryById])
+  const { rows: categoryBreakdown, excludedCurrencies: categoryExcludedCurrencies } = useMemo(
+    () => buildCategoryBreakdown(filtered, categoryById, currency, rateTable),
+    [filtered, categoryById, currency, rateTable]
+  )
 
-  const maxCategoryAmount = categoryBreakdown[0]?.amount ?? 1
-
-  // Date range label for filename
-  const filenameLabel = useMemo(() => {
-    if (preset === 'all_time') return 'all-time'
-    if (start && end) return `${start}_to_${end}`
-    if (start) return `from_${start}`
-    return 'report'
-  }, [preset, start, end])
+  // Over budget stat card: the report's total in the display currency, against last cycle.
+  const overspendingReady = overspending.state === 'ready' || overspending.state === 'stale-error'
+  const overNow = overspending.result.totals.find((total) => total.currency === currency)?.over ?? 0
+  const overPrevious = overspending.previous.totals.find((total) => total.currency === currency)?.over ?? 0
+  const overCategories = overspending.result.rows.length
+  const overOtherCurrencies = overspending.result.totals.filter((total) => total.currency !== currency)
+  const overspendingSub =
+    overspending.state === 'error'
+      ? "Couldn't load your budgets"
+      : overspending.state === 'empty'
+        ? 'No budgets set'
+        : `${overCategories} ${overCategories === 1 ? 'category' : 'categories'}${
+            overOtherCurrencies.length > 0 ? ` · plus ${overOtherCurrencies.map((total) => total.currency).join(', ')}` : ''
+          }`
 
   const handleExport = () => {
-    exportToCsv(sortedTransactions, `ledger-report_${filenameLabel}.csv`, txBalanceMap)
+    downloadCsv(buildReportCsv(sortedTransactions, exportColumns(visibleColumns), txBalanceMap), `ledger-report_${filenameLabel}.csv`)
   }
 
   const handleExportPdf = () => {
@@ -448,17 +521,19 @@ export default function ReportsPage() {
       totalExpenses,
       netChange,
       currency,
-      presetLabel,
+      rangeLabel,
       categoryBreakdown,
       merchantBreakdown,
       filenameLabel,
+      exportColumns(visibleColumns),
+      txBalanceMap,
     )
   }
 
   // ── Net Worth Over Time (last 13 months) ──
-  const netWorthData = useMemo(() => {
+  const { netWorthData, netWorthExcludedCurrencies } = useMemo(() => {
     const now = new Date()
-    const currentNetWorth = accounts.reduce((sum, a) => sum + getAccountNetWorthContribution(a), 0)
+    const currentNetWorth = summarizeBalances(accounts, currency, convertToDefault).netWorth
     const boundaries: { date: string; label: string }[] = []
     for (let i = 12; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
@@ -472,50 +547,37 @@ export default function ReportsPage() {
     }
     let netWorth = currentNetWorth
     let txIdx = 0
+    const excluded = new Set<string>()
     const data: { month: string; netWorth: number }[] = []
     for (let i = 12; i >= 0; i--) {
       const boundary = boundaries[i].date
       while (txIdx < allTransactionsSorted.length && allTransactionsSorted[txIdx].date > boundary) {
         const tx = allTransactionsSorted[txIdx]
-        if (tx.type === 'income') netWorth -= tx.amount
-        else if (tx.type === 'expense' && !tx.to_account_id) netWorth += tx.amount
-        else if (tx.type === 'transfer') netWorth += (tx.transfer_fee ?? 0)
+        const effect = convertedNetWorthEffect(tx, currency, rateTable)
+        if (effect === null) excluded.add(tx.currency)
+        else netWorth -= effect
         txIdx++
       }
       data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
     }
-    return data
-  }, [accounts, allTransactionsSorted])
+    return { netWorthData: data, netWorthExcludedCurrencies: [...excluded].sort() }
+  }, [accounts, allTransactionsSorted, convertToDefault, currency, rateTable])
 
-  // ── Monthly Income vs Expenses (last 12 months) ──
-  const monthlyData = useMemo(() => {
-    const now = new Date()
-    const result: { month: string; income: number; expenses: number }[] = []
-    for (let i = 11; i >= 0; i--) {
-      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const monthEnd = i === 0
-        ? now
-        : new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0)
-      const startStr = localDateStr(monthStart)
-      const endStr = localDateStr(monthEnd)
-      const label = monthStart.getFullYear() !== now.getFullYear()
-        ? monthStart.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-        : monthStart.toLocaleDateString('en-US', { month: 'short' })
-      let income = 0
-      let expenses = 0
-      for (const t of transactions) {
-        if (t.date < startStr || t.date > endStr) continue
-        if (t.type === 'income') income += t.amount * (t.exchange_rate ?? 1)
-        else if (t.type === 'expense') expenses += t.amount * (t.exchange_rate ?? 1)
-      }
-      result.push({
-        month: label,
+  // ── Income vs Expenses trend (own lookback, independent of the cycle) ──
+  const [lookback, setLookback] = useState<Lookback>(DEFAULT_LOOKBACK)
+  const { monthlyData, monthlyExcludedCurrencies } = useMemo(() => {
+    const excluded = new Set<string>()
+    const monthlyData = getLookbackBuckets(lookback, new Date()).map((bucket) => {
+      const { income, expenses, excludedCurrencies } = summarizeRange(transactions, bucket.start, bucket.end, currency, rateTable)
+      for (const code of excludedCurrencies) excluded.add(code)
+      return {
+        month: bucket.label,
         income: Math.round(income * 100) / 100,
         expenses: Math.round(expenses * 100) / 100,
-      })
-    }
-    return result
-  }, [transactions])
+      }
+    })
+    return { monthlyData, monthlyExcludedCurrencies: [...excluded].sort() }
+  }, [transactions, lookback, currency, rateTable])
 
   // ── Spending by Merchant (top 10 from filtered period) ──
   const merchantBreakdown = (() => {
@@ -536,267 +598,117 @@ export default function ReportsPage() {
   })()
 
   const activeAccounts = accounts.filter((a) => a.is_active)
-  const balanceSummary = getBalanceSummary(activeAccounts)
-  const totalBalance = balanceSummary.netWorth
 
-  const presetLabel = {
-    this_month: 'This Month',
-    last_month: 'Last Month',
-    last_3m: 'Last 3 Months',
-    last_6m: 'Last 6 Months',
-    this_year: 'This Year',
-    all_time: 'All Time',
-    custom: 'Custom Range',
-  }[preset]
+  // Transaction table columns: all seven when there is room, session-only.
+  const wide = useMediaQuery('(min-width: 768px)')
+  const [visibleColumns, setVisibleColumns] = useState(() => defaultColumns(wide))
+  const columns = REPORT_COLUMNS.filter((c) => visibleColumns.has(c.key))
+  const tableHead = (
+    <thead className="sticky top-0 bg-card z-10">
+      <tr className="border-b border-border/40">
+        {columns.map((c) => (
+          <th
+            key={c.key}
+            className={cn(
+              'px-2 py-2.5 first:pl-4 last:pr-4 text-[0.6875rem] font-medium text-muted-foreground tracking-wide',
+              RIGHT_ALIGNED.has(c.key) ? 'text-right' : 'text-left',
+            )}
+          >
+            {c.label}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  )
+  const balanceSummary = summarizeBalances(activeAccounts, currency, convertToDefault)
+  const totalBalance = balanceSummary.netWorth
 
   // Sorted transactions for table (newest first)
   const sortedTransactions = [...filtered].sort(
     (a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)
   )
 
-  // Running balance per account, derived by unwinding all transactions newest→oldest
-  // starting from each account's current live balance.
-  const txBalanceMap = (() => {
-    // Build a mutable balance register from current account balances
-    const register = new Map<string, number>()
-    for (const acc of accounts) register.set(acc.id, acc.balance)
-
-    const map = new Map<string, number>()
-    for (const tx of allTransactionsSorted) {
-      // Record the account balance *after* this transaction
-      if (register.has(tx.account_id)) {
-        map.set(tx.id, register.get(tx.account_id)!)
-      }
-      // Undo the effect of this transaction to step backwards in time
-      if (tx.type === 'income') {
-        register.set(tx.account_id, (register.get(tx.account_id) ?? 0) - tx.amount)
-      } else if (tx.type === 'expense') {
-        register.set(tx.account_id, (register.get(tx.account_id) ?? 0) + tx.amount)
-      } else if (tx.type === 'transfer') {
-        register.set(tx.account_id, (register.get(tx.account_id) ?? 0) + tx.amount + (tx.transfer_fee ?? 0))
-        if (tx.to_account_id) {
-          register.set(tx.to_account_id, (register.get(tx.to_account_id) ?? 0) - tx.amount)
-        }
-      }
-    }
-    return map
-  })()
+  // Running balance per account, unwound from each account's live balance (src/lib/runningBalance.ts).
+  const txBalanceMap = buildRunningBalanceMap(accounts, transactions)
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 md:pb-6">
+    <div className="flex flex-col gap-6 p-4 md:p-6 lg:px-8 pb-24 md:pb-6">
+      {loadFailed && !loading && (
+        <InlineLoadError
+          message="Some of your data didn't load, so these reports may be incomplete."
+          onRetry={retryFailedSources}
+        />
+      )}
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold">Reports</h1>
-            <p className="text-xs text-muted-foreground">{presetLabel}</p>
-          </div>
-
-          <div className="flex flex-col items-end gap-2">
+        <h1 className="sr-only md:hidden">Reports</h1>
+        <PageActions>
+          <div className="flex w-full flex-wrap items-center justify-between gap-2 md:w-auto md:flex-nowrap">
             <TabsList className="h-8">
               <TabsTrigger value="overview" className="text-xs h-7 px-3">Overview</TabsTrigger>
               <TabsTrigger value="analytics" className="text-xs h-7 px-3">Analytics</TabsTrigger>
-              <TabsTrigger value="thirteenth" className="text-xs h-7 px-3">13th Month</TabsTrigger>
             </TabsList>
             <div className="flex items-center gap-2">
-              <Button
-                onClick={handleExport}
-                disabled={loading || filtered.length === 0}
-                size="sm"
-                className="gap-2 shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 15%, transparent), color-mix(in srgb, var(--primary) 8%, transparent))',
-                  border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
-                  color: 'var(--primary)',
-                }}
+              <Link
+                to="/thirteenth-month"
+                aria-label="13th Month Pay"
+                className="inline-flex items-center gap-1 shrink-0 text-xs font-medium text-muted-foreground hover:text-primary"
               >
-                <Download className="w-3.5 h-3.5" />
-                CSV
-              </Button>
-              <Button
-                onClick={handleExportPdf}
-                disabled={loading || filtered.length === 0}
-                size="sm"
-                className="gap-2 shrink-0"
-                style={{
-                  background: 'linear-gradient(135deg, oklch(0.620 0.160 18 / 0.15), oklch(0.620 0.160 18 / 0.08))',
-                  border: '1px solid oklch(0.620 0.160 18 / 0.30)',
-                  color: EXPENSE,
-                }}
-              >
-                <Download className="w-3.5 h-3.5" />
-                PDF
-              </Button>
+                {/* 9a draws the short label below lg; the full name stays the accessible name. */}
+                <span aria-hidden className="lg:hidden">13th Mo</span>
+                <span aria-hidden className="hidden lg:inline">13th Month Pay</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  disabled={loading || filtered.length === 0}
+                  render={
+                    <Button variant="outline" size="sm" className="gap-2 shrink-0">
+                      <Download className="w-3.5 h-3.5" />
+                      Export
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent align="end" className="w-36">
+                  <DropdownMenuItem onClick={handleExport}>CSV</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportPdf}>PDF</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-        </div>
+        </PageActions>
 
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
-      {/* Mobile-only controls row */}
-      <div className="flex items-end gap-3 md:hidden">
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <span className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground px-0.5">Date Range</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 w-full justify-start"
-            onClick={() => setDateRangeOpen(true)}
-          >
-            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">{presetLabel}</span>
-          </Button>
-        </div>
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
-          <span className="text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground px-0.5">Saved Presets</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 w-full justify-start"
-            onClick={() => setPresetsOpen(true)}
-          >
-            <Bookmark className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Presets</span>
-            {savedPresets.length > 0 && (
-              <span className="ml-auto text-[0.625rem] bg-muted rounded px-1.5 py-0.5">{savedPresets.length}</span>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* Date controls */}
-      <div
-        className="hidden md:flex rounded-[20px] border border-border bg-card p-4 flex-col gap-4"
-      >
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Date Range</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {([
-            ['this_month', 'This Month'],
-            ['last_month', 'Last Month'],
-            ['last_3m', 'Last 3 Months'],
-            ['last_6m', 'Last 6 Months'],
-            ['this_year', 'This Year'],
-            ['all_time', 'All Time'],
-            ['custom', 'Custom'],
-          ] as [Preset, string][]).map(([p, label]) => (
-            <button
-              key={p}
-              onClick={() => setPreset(p)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-[0.6875rem] font-medium tracking-wide border transition-all duration-150',
-                preset === p
-                  ? 'border-transparent'
-                  : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
-              )}
-              style={preset === p ? { background: GOLD, color: 'var(--primary-foreground)' } : {}}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {preset === 'custom' && (
-          <div className="flex flex-wrap gap-4 pt-1">
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
-              <Input
-                type="date"
-                value={customStart}
-                onChange={(e) => setCustomStart(e.target.value)}
-                className="w-40 text-[0.8125rem] h-8"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
-              <Input
-                type="date"
-                value={customEnd}
-                onChange={(e) => setCustomEnd(e.target.value)}
-                className="w-40 text-[0.8125rem] h-8"
-              />
-            </div>
-            {customStart && customEnd && customStart > customEnd && (
-              <p className="self-end pb-1 text-xs text-destructive">
-                Start date must be on or before end date.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Saved presets */}
-      <div className="hidden md:flex rounded-[20px] border border-border bg-card p-4 flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Bookmark className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Saved Presets</span>
-        </div>
-        {savedPresets.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {savedPresets.map((p) => (
-              <div key={p.id} className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/40 px-2 py-1">
-                <button
-                  className="text-[0.6875rem] font-medium text-foreground hover:text-primary"
-                  onClick={() => {
-                    setPreset(p.preset as Preset)
-                    if (p.preset === 'custom') { setCustomStart(p.startDate ?? ''); setCustomEnd(p.endDate ?? '') }
-                    setActiveTab(p.activeTab ?? 'overview')
-                  }}
-                >{p.name}</button>
-                <button className="ml-1 text-muted-foreground hover:text-destructive" onClick={() => deletePreset(p.id)}>
-                  <Trash2 className="w-2.5 h-2.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="flex items-center gap-2">
-          <Input
-            className="h-7 text-xs w-40"
-            placeholder="Preset name…"
-            value={presetName}
-            onChange={(e) => setPresetName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && presetName.trim()) {
-                savePreset(presetName.trim(), preset, customStart, customEnd, activeTab)
-                setPresetName('')
-              }
-            }}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs gap-1"
-            disabled={!presetName.trim()}
-            onClick={() => { savePreset(presetName.trim(), preset, customStart, customEnd, activeTab); setPresetName('') }}
-          >
-            <BookmarkPlus className="w-3 h-3" />Save
-          </Button>
-        </div>
-      </div>
-
+          <OverspendingCard categories={categories} month={selectedMonth} report={overspending} />
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         <StatCard
           title="Total Income"
           value={formatCurrency(totalIncome, currency)}
           icon={TrendingUp}
           color={INCOME}
+          comparison={compare(totalIncome, previousTotals.income, 'up')}
           loading={loading}
+          note={<UnratedCurrencyNotice currencies={summaryExcludedCurrencies} subject="income and expenses" />}
         />
         <StatCard
           title="Total Expenses"
           value={formatCurrency(totalExpenses, currency)}
           icon={TrendingDown}
           color={EXPENSE}
+          comparison={compare(totalExpenses, previousTotals.expenses, 'down')}
           loading={loading}
+          note={<UnratedCurrencyNotice currencies={summaryExcludedCurrencies} subject="income and expenses" />}
         />
         <StatCard
           title="Net Change"
           value={formatCurrency(netChange, currency)}
-          sub={netChange >= 0 ? 'Surplus' : 'Deficit'}
+          sub={netChange >= 0 && totalIncome > 0
+            ? `Surplus · ${Math.round((netChange / totalIncome) * 100)}% of income kept`
+            : netChange >= 0 ? 'Surplus' : 'Deficit'}
           icon={netChange >= 0 ? TrendingUp : TrendingDown}
           color={netChange >= 0 ? INCOME : EXPENSE}
+          comparison={compare(netChange, previousTotals.net, 'up')}
           loading={loading}
         />
         <StatCard
@@ -807,63 +719,53 @@ export default function ReportsPage() {
             : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
           icon={Wallet}
           color={'var(--foreground)'}
+          note={<UnratedCurrencyNotice currencies={balanceSummary.excludedCurrencies} subject="balances" />}
+          comparison={loadFailed ? undefined : {
+            text: netWorthChange === 0
+              ? 'No change this cycle'
+              : `${netWorthChange > 0 ? '↑' : '↓'} ${formatCurrency(Math.abs(netWorthChange), currency)} this cycle`,
+            color: netWorthChange > 0 ? INCOME : netWorthChange < 0 ? EXPENSE : 'var(--muted-foreground)',
+          }}
           loading={loading}
+        />
+        <StatCard
+          title="Over budget"
+          value={overspendingReady ? formatCurrency(overNow, currency) : '—'}
+          sub={overspendingSub}
+          icon={TriangleAlert}
+          color={overNow > 0 ? 'var(--warning)' : 'var(--foreground)'}
+          comparison={overspendingReady ? compare(overNow, overPrevious, 'down') : undefined}
+          loading={overspending.state === 'loading'}
         />
       </div>
 
-      <div className="grid lg:grid-cols-[1.6fr_1fr] gap-4">
-          {/* Monthly Income vs Expenses */}
-          <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
-              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Monthly Income vs. Expenses — Last 12 Months</p>
-            </div>
-            {loading ? (
-              <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
-            ) : (
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: number) => formatCurrency(v, currency)}
-                      width={72}
-                    />
-                    <Tooltip
-                      formatter={(v, name) => [formatCurrency(v as number, currency), name as string]}
-                      contentStyle={{
-                        fontSize: 11,
-                        background: 'var(--card)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        color: 'var(--foreground)',
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-                    <Bar dataKey="income" name="Income" fill={INCOME} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+      <div className="grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-4">
+          {/* Income vs Expenses trend */}
+          <IncomeExpenseCard
+            data={monthlyData}
+            lookback={lookback}
+            onLookbackChange={setLookback}
+            loading={loading}
+            currency={currency}
+            excludedCurrencies={monthlyExcludedCurrencies}
+          />
 
 
         {/* Account balances */}
         <div className="order-3 lg:col-span-2 rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
           <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Account Balances</p>
           {loading ? (
-            <div className="flex flex-col gap-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            <div className="flex flex-col gap-1" aria-hidden>
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="flex h-5 items-center gap-2.5 min-w-0">
+                    <Skeleton className="w-2 h-2 rounded-full" />
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-3.5 w-12" />
+                  </div>
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              ))}
             </div>
           ) : activeAccounts.length === 0 ? (
             <p className="text-[0.8125rem] text-muted-foreground text-center py-4">No accounts</p>
@@ -877,7 +779,7 @@ export default function ReportsPage() {
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div
                       className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: acc.color }}
+                      style={{ background: ink(acc.color) }}
                     />
                     <span className="text-[0.8125rem] font-medium truncate">{acc.name}</span>
                     <Badge variant="outline" className="text-[0.625rem] capitalize shrink-0 px-1.5 py-0">
@@ -895,55 +797,24 @@ export default function ReportsPage() {
               <Separator className="my-1" />
               <div className="flex items-center justify-between px-3 py-1.5">
                 <span className="text-xs font-medium text-muted-foreground">Net</span>
-                <span className="text-[0.8125rem] font-bold tabular-nums" style={{ color: GOLD }}>
+                <span className="text-[0.8125rem] font-bold tabular-nums" style={{ color: 'var(--foreground)' }}>
                   {formatCurrency(totalBalance, currency)}
                 </span>
+              </div>
+              <div className="px-3">
+                <UnratedCurrencyNotice currencies={balanceSummary.excludedCurrencies} subject="balances" />
               </div>
             </div>
           )}
         </div>
 
         {/* Category breakdown */}
-        <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
-          <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
-            Expenses by Category
-          </p>
-          {loading ? (
-            <div className="flex flex-col gap-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
-            </div>
-          ) : categoryBreakdown.length === 0 ? (
-            <p className="text-[0.8125rem] text-muted-foreground text-center py-4">No expenses in this period</p>
-          ) : (
-            <ScrollArea className="max-h-56">
-              <div className="flex flex-col gap-2 pr-3">
-                {categoryBreakdown.map((cat) => (
-                  <div key={cat.name} className="flex flex-col gap-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: cat.color }} />
-                        <span className="text-xs font-medium truncate">{cat.name}</span>
-                      </div>
-                      <span className="text-xs tabular-nums text-muted-foreground shrink-0">
-                        {formatCurrency(cat.amount, currency)}
-                      </span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${(cat.amount / maxCategoryAmount) * 100}%`,
-                          background: cat.color,
-                          opacity: 0.8,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
-        </div>
+        <CategoryBreakdownCard rows={categoryBreakdown} loading={loading} currency={currency} />
+        {!loading && (
+          <div className="px-3">
+            <UnratedCurrencyNotice currencies={categoryExcludedCurrencies} />
+          </div>
+        )}
       </div>
 
       {/* Transactions table */}
@@ -952,48 +823,140 @@ export default function ReportsPage() {
           <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">
             Transactions
           </p>
-          <span className="text-[0.6875rem] text-muted-foreground tabular-nums">
-            {filtered.length} record{filtered.length !== 1 ? 's' : ''}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-[0.6875rem] text-muted-foreground tabular-nums">
+              {filtered.length} record{filtered.length !== 1 ? 's' : ''}
+            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+                    <Columns3 className="w-3.5 h-3.5" />
+                    Columns
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="w-40">
+                {REPORT_COLUMNS.filter((c) => !c.required).map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c.key}
+                    checked={visibleColumns.has(c.key)}
+                    onCheckedChange={() => setVisibleColumns((prev) => toggleColumn(prev, c.key))}
+                  >
+                    {c.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
         {loading ? (
-          <div className="flex flex-col gap-0">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-border/40 last:border-0">
-                <Skeleton className="h-8 w-8 rounded-lg" />
-                <div className="flex-1 flex flex-col gap-1.5">
-                  <Skeleton className="h-3.5 w-40" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-                <Skeleton className="h-4 w-20" />
-              </div>
-            ))}
-          </div>
-        ) : sortedTransactions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
-            <FileBarChart2 className="w-8 h-8 opacity-30" />
-            <p className="text-[0.8125rem]">No transactions in this period</p>
-          </div>
-        ) : (
-          <ScrollArea className="max-h-120">
-            <table className="w-full text-[0.8125rem]">
-              <thead className="sticky top-0 bg-card z-10">
-                <tr className="border-b border-border/40">
-                  <th className="text-left px-4 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Date</th>
-                  <th className="text-left px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Description</th>
-                  <th className="hidden sm:table-cell text-left px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Category</th>
-                  <th className="hidden md:table-cell text-left px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Account</th>
-                  <th className="text-right px-2 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Amount</th>
-                  <th className="hidden lg:table-cell text-right px-4 py-2.5 text-[0.6875rem] font-medium text-muted-foreground tracking-wide">Balance</th>
+          <table className="w-full text-[0.8125rem]" aria-hidden>
+            {tableHead}
+            <tbody>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <tr key={i} className="border-b border-border/30 last:border-0">
+                  {columns.map((c) => (
+                    <td key={c.key} className="px-2 py-3 first:pl-4 last:pr-4">
+                      <div className={cn('flex h-5 items-center', RIGHT_ALIGNED.has(c.key) && 'justify-end')}>
+                        <Skeleton className={cn('h-3', SKELETON_WIDTH[c.key])} />
+                      </div>
+                    </td>
+                  ))}
                 </tr>
-              </thead>
+              ))}
+            </tbody>
+          </table>
+        ) : transactions.length === 0 ? (
+          <EmptyState icon={FileBarChart2} title="Nothing recorded yet" bare />
+        ) : sortedTransactions.length === 0 ? (
+          <EmptyState
+            icon={FileBarChart2}
+            title={`No transactions in ${rangeLabel}`}
+            bare
+            action={
+              <Button variant="outline" size="sm" onClick={goToPreviousPeriod}>
+                Try previous period
+              </Button>
+            }
+          />
+        ) : (
+          <ScrollArea className="max-h-120" horizontal>
+            <table className="w-full min-w-max text-[0.8125rem]">
+              {tableHead}
               <tbody>
                 {sortedTransactions.map((t, i) => {
                   const isIncome = t.type === 'income'
                   const isTransfer = t.type === 'transfer'
                   const amountColor = isIncome ? INCOME : isTransfer ? TRANSFER : EXPENSE
                   const sign = isIncome ? '+' : isTransfer ? '↔' : '−'
+                  const cell = (key: ReportColumn) => {
+                    switch (key) {
+                      case 'date':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-muted-foreground whitespace-nowrap">
+                            {formatDate(t.date)}
+                          </td>
+                        )
+                      case 'description':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 max-w-40">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-medium truncate">{t.description}</span>
+                              {!visibleColumns.has('category') && (
+                                <span className="text-[0.6875rem] text-muted-foreground">
+                                  {t.category?.name ?? '—'}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )
+                      case 'category':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-muted-foreground">
+                            {t.category ? (
+                              <span className="flex items-center gap-1.5">
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full inline-block shrink-0"
+                                  style={{ background: ink(t.category.color) }}
+                                />
+                                {t.category.name}
+                              </span>
+                            ) : '—'}
+                          </td>
+                        )
+                      case 'account':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-muted-foreground">
+                            {t.account?.name ?? '—'}
+                            {t.type === 'transfer' && t.to_account && (
+                              <span className="text-[0.6875rem]"> → {t.to_account.name}</span>
+                            )}
+                          </td>
+                        )
+                      case 'type':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 capitalize" style={{ color: amountColor }}>
+                            {t.type}
+                          </td>
+                        )
+                      case 'amount':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-right font-semibold tabular-nums whitespace-nowrap" style={{ color: amountColor }}>
+                            {sign} {formatCurrency(t.amount, t.currency)}
+                          </td>
+                        )
+                      case 'balance':
+                        return (
+                          <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-right tabular-nums whitespace-nowrap text-muted-foreground">
+                            {txBalanceMap.has(t.id)
+                              ? formatCurrency(txBalanceMap.get(t.id)!, t.account?.currency ?? t.currency)
+                              : '—'}
+                          </td>
+                        )
+                    }
+                  }
                   return (
                     <tr
                       key={t.id}
@@ -1002,42 +965,7 @@ export default function ReportsPage() {
                         i % 2 === 0 ? '' : 'bg-muted/10'
                       )}
                     >
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                        {formatDate(t.date)}
-                      </td>
-                      <td className="px-2 py-3 max-w-40">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-medium truncate">{t.description}</span>
-                          <span className="text-[0.6875rem] text-muted-foreground sm:hidden">
-                            {t.category?.name ?? '—'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="hidden sm:table-cell px-2 py-3 text-muted-foreground">
-                        {t.category ? (
-                          <span className="flex items-center gap-1.5">
-                            <span
-                              className="w-1.5 h-1.5 rounded-full inline-block shrink-0"
-                              style={{ background: t.category.color }}
-                            />
-                            {t.category.name}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td className="hidden md:table-cell px-2 py-3 text-muted-foreground">
-                        {t.account?.name ?? '—'}
-                        {t.type === 'transfer' && t.to_account && (
-                          <span className="text-[0.6875rem]"> → {t.to_account.name}</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-3 text-right font-semibold tabular-nums whitespace-nowrap" style={{ color: amountColor }}>
-                        {sign} {formatCurrency(t.amount, t.currency)}
-                      </td>
-                      <td className="hidden lg:table-cell px-4 py-3 text-right tabular-nums whitespace-nowrap text-muted-foreground">
-                        {txBalanceMap.has(t.id)
-                          ? formatCurrency(txBalanceMap.get(t.id)!, t.account?.currency ?? t.currency)
-                          : '—'}
-                      </td>
+                      {columns.map((c) => cell(c.key))}
                     </tr>
                   )
                 })}
@@ -1054,15 +982,16 @@ export default function ReportsPage() {
           <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-3.5 h-3.5" style={{ color: INCOME }} />
-              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time</p>
+              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time — Last 13 months · monthly</p>
             </div>
+            {!loading && <UnratedCurrencyNotice currencies={netWorthExcludedCurrencies} />}
             {loading ? (
-              <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
+              <div className="h-52 md:h-72 xl:h-80"><Skeleton className="h-full w-full rounded-lg" /></div>
             ) : (
-              <div className="h-52">
+              <div className="h-52 md:h-72 xl:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={netWorthData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis
                       dataKey="month"
                       tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
@@ -1073,8 +1002,8 @@ export default function ReportsPage() {
                       tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: number) => formatCurrency(v, currency)}
-                      width={72}
+                      tickFormatter={abbreviateTick}
+                      width={40}
                     />
                     <Tooltip
                       formatter={(v) => [formatCurrency(v as number, currency), 'Net Worth']}
@@ -1100,50 +1029,15 @@ export default function ReportsPage() {
             )}
           </div>
 
-          {/* Monthly Income vs Expenses */}
-          <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <FileBarChart2 className="w-3.5 h-3.5" style={{ color: GOLD }} />
-              <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Monthly Income vs. Expenses — Last 12 Months</p>
-            </div>
-            {loading ? (
-              <div className="h-52"><div className="h-full w-full rounded-lg bg-muted animate-pulse" /></div>
-            ) : (
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="30%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.18)" vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: number) => formatCurrency(v, currency)}
-                      width={72}
-                    />
-                    <Tooltip
-                      formatter={(v, name) => [formatCurrency(v as number, currency), name as string]}
-                      contentStyle={{
-                        fontSize: 11,
-                        background: 'var(--card)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        color: 'var(--foreground)',
-                      }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-                    <Bar dataKey="income" name="Income" fill={INCOME} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="expenses" name="Expenses" fill={EXPENSE} radius={[3, 3, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
+          {/* Income vs Expenses trend */}
+          <IncomeExpenseCard
+            data={monthlyData}
+            lookback={lookback}
+            onLookbackChange={setLookback}
+            loading={loading}
+            currency={currency}
+            excludedCurrencies={monthlyExcludedCurrencies}
+          />
 
           {/* Spending by Merchant */}
           <div className="rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
@@ -1152,14 +1046,25 @@ export default function ReportsPage() {
                 <Store className="w-3.5 h-3.5" style={{ color: EXPENSE }} />
                 <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Spending by Merchant</p>
               </div>
-              <span className="text-[0.6875rem] text-muted-foreground">{presetLabel}</span>
+              <span className="text-[0.6875rem] text-muted-foreground">{rangeLabel}</span>
             </div>
             {loading ? (
-              <div className="flex flex-col gap-2">
-                {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-8 rounded-lg bg-muted animate-pulse" />)}
+              <div className="flex flex-col gap-2.5" aria-hidden>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex flex-col gap-1">
+                    <div className="flex h-4 items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[0.6875rem] tabular-nums text-muted-foreground w-4 text-right shrink-0">{i}</span>
+                        <Skeleton className="h-3 w-28" />
+                      </div>
+                      <Skeleton className="h-3 w-14" />
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted" />
+                  </div>
+                ))}
               </div>
             ) : merchantBreakdown.length === 0 ? (
-              <p className="text-[0.8125rem] text-muted-foreground text-center py-6">No expense transactions in this period</p>
+              <EmptyState icon={Store} title="No expense transactions in this period" bare />
             ) : (
               <div className="flex flex-col gap-2.5">
                 {merchantBreakdown.map((merchant, i) => (
@@ -1176,7 +1081,7 @@ export default function ReportsPage() {
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all duration-500"
+                        className="h-full rounded-full transition-all duration-(--dur-meter)"
                         style={{
                           width: `${(merchant.amount / merchantBreakdown[0].amount) * 100}%`,
                           background: EXPENSE,
@@ -1191,133 +1096,7 @@ export default function ReportsPage() {
           </div>
 
         </TabsContent>
-
-        <TabsContent value="thirteenth" className="mt-0 -mx-4 md:-mx-6">
-          <ThirteenthMonthPage />
-        </TabsContent>
       </Tabs>
-
-      {/* Mobile: Date Range modal */}
-      <Dialog open={dateRangeOpen} onOpenChange={setDateRangeOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Date Range</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-wrap gap-2">
-            {([
-              ['this_month', 'This Month'],
-              ['last_month', 'Last Month'],
-              ['last_3m', 'Last 3 Months'],
-              ['last_6m', 'Last 6 Months'],
-              ['this_year', 'This Year'],
-              ['all_time', 'All Time'],
-              ['custom', 'Custom'],
-            ] as [Preset, string][]).map(([p, label]) => (
-              <button
-                key={p}
-                onClick={() => { setPreset(p); if (p !== 'custom') setDateRangeOpen(false) }}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg text-[0.6875rem] font-medium tracking-wide border transition-all duration-150',
-                  preset === p
-                    ? 'border-transparent'
-                    : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
-                )}
-                style={preset === p ? { background: GOLD, color: 'var(--primary-foreground)' } : {}}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {preset === 'custom' && (
-            <div className="flex flex-wrap gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-[0.6875rem] text-muted-foreground">From</Label>
-                <Input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="w-40 text-[0.8125rem] h-8"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label className="text-[0.6875rem] text-muted-foreground">To</Label>
-                <Input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="w-40 text-[0.8125rem] h-8"
-                />
-              </div>
-              {customStart && customEnd && customStart > customEnd && (
-                <p className="self-end pb-1 text-xs text-destructive">
-                  Start date must be on or before end date.
-                </p>
-              )}
-            </div>
-          )}
-          <Button size="sm" className="w-full" onClick={() => setDateRangeOpen(false)}>
-            Done
-          </Button>
-        </DialogContent>
-      </Dialog>
-
-      {/* Mobile: Saved Presets modal */}
-      <Dialog open={presetsOpen} onOpenChange={setPresetsOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Saved Presets</DialogTitle>
-          </DialogHeader>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Save your current date range and active tab as a named preset. Tap a saved preset to instantly restore those settings — useful for reports you check regularly.
-          </p>
-          {savedPresets.length === 0 && (
-            <p className="text-xs text-muted-foreground italic">No presets saved yet.</p>
-          )}
-          {savedPresets.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {savedPresets.map((p) => (
-                <div key={p.id} className="flex items-center gap-1 rounded-lg border border-border/60 bg-muted/40 px-2 py-1">
-                  <button
-                    className="text-[0.6875rem] font-medium text-foreground hover:text-primary"
-                    onClick={() => {
-                      setPreset(p.preset as Preset)
-                      if (p.preset === 'custom') { setCustomStart(p.startDate ?? ''); setCustomEnd(p.endDate ?? '') }
-                      setActiveTab(p.activeTab ?? 'overview')
-                      setPresetsOpen(false)
-                    }}
-                  >{p.name}</button>
-                  <button className="ml-1 text-muted-foreground hover:text-destructive" onClick={() => deletePreset(p.id)}>
-                    <Trash2 className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <Input
-              className="h-7 text-xs flex-1"
-              placeholder="Preset name…"
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && presetName.trim()) {
-                  savePreset(presetName.trim(), preset, customStart, customEnd, activeTab)
-                  setPresetName('')
-                }
-              }}
-            />
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs gap-1 shrink-0"
-              disabled={!presetName.trim()}
-              onClick={() => { savePreset(presetName.trim(), preset, customStart, customEnd, activeTab); setPresetName('') }}
-            >
-              <BookmarkPlus className="w-3 h-3" />Save
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

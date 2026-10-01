@@ -1,0 +1,8 @@
+# Override a UI primitive at its own specificity, and give charts a definite height
+Three layout bugs in the phase 12 sweep had the same shape: a class that looked right did nothing.
+**Why:** LED-159 (`w-full` lost to the sheet's `data-[side=right]:w-3/4`), LED-169 (a phone dialog 2x too wide) and LED-168 (a chart 0px tall) each passed lint, build and tests, and each needed a measurement to find.
+**How:**
+1. **`cn()` does not dedupe across variants.** `tailwind-merge` keeps `w-full` and `data-[side=right]:w-3/4` side by side, and the data variant wins. Pass the same variant from the call site (`data-[side=right]:w-full`). Read the primitive's base string in `ui/*.tsx` before trusting a width, height or max-width class, and delete a class that the base overrides (LED-159's `sm:max-w-md` never applied).
+2. **A grid with one implicit column is `auto`.** `ui/dialog.tsx` is `grid`, so its column grows to the widest child's min-content and `min-w-0` on a descendant cannot stop it. Give the content `grid-cols-[minmax(0,1fr)]` and let inner wrappers (`overflow-x-auto`) scroll. Find the culprit by listing elements wider than the dialog's `clientWidth`.
+3. **`height: 100%` needs a definite parent.** Recharts' `ResponsiveContainer height="100%"` inside a `flex-1 min-h-*` child of a flex column measured 0. Put the chart in an `absolute inset-0` box inside a `relative flex-1 min-h-*` wrapper, so the wrapper's min-height gives it a size.
+4. **Measure the failing element, then the neighbours.** Record `getBoundingClientRect` and `scrollWidth` vs `clientWidth` before and after, at the phone widths (320, 375, 390) and at the widths that must not change (768, 1280).

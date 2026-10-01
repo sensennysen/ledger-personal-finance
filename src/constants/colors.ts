@@ -1,12 +1,8 @@
 /**
- * Replacement for src/constants/colors.ts
+ * Money and status colors as CSS custom properties, so the same constant
+ * follows the theme instead of a hard-coded oklch string.
  *
- * Before: three hard-coded oklch strings (EMERALD / CORAL / GOLD) imported
- * into DashboardPage, SettingsPage, chart components and badges — which meant
- * money colors could not follow the theme.
- *
- * After: read the CSS custom properties, so the same constant resolves to the
- * light or dark M3 tone automatically. Recharts and inline `style` props need
+ * The same constant resolves to the light or dark tone automatically. Recharts and inline `style` props need
  * real color strings, so expose both the var() reference (for CSS) and a
  * resolver (for canvas/SVG libraries that cannot parse var()).
  */
@@ -15,7 +11,10 @@
 export const INCOME = 'var(--income)'
 export const EXPENSE = 'var(--expense)'
 export const TRANSFER = 'var(--transfer)'
-export const GOLD = 'var(--primary)'
+/** Borders, fills, meters, icon tiles (3:1). Never text: use WARNING_INK. */
+export const GOLD = 'var(--gold)'
+/** Text on a gold tint or card (4.5:1). */
+export const WARNING_INK = 'var(--warning)'
 
 export const INCOME_CONTAINER = 'var(--income-container)'
 export const EXPENSE_CONTAINER = 'var(--expense-container)'

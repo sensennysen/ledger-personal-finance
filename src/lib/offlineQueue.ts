@@ -1,24 +1,20 @@
 import { supabase } from './supabase'
 import { PENDING_RECEIPT_PREFIX, getPendingReceipt, removePendingReceipt } from './receiptStore'
 import { buildReceiptObjectPath } from './receiptUrls'
+import { discardFlagged, drainWith, singleFlight, type DrainClient, type DrainDeps } from './queueDrain'
+import {
+  applyKeepMine,
+  expireNow,
+  isFlagged,
+  isPending,
+  nextExpiryAt,
+  retryFailed,
+  type QueueItem,
+} from './queueState'
 
-export type QueueOperation = 'insert' | 'update' | 'delete'
-
-export interface QueueItem {
-  id: string
-  table: string
-  operation: QueueOperation
-  payload: Record<string, unknown>
-  /** For update/delete: the row id to target */
-  rowId?: string
-  userId: string
-  timestamp: number
-}
+export type { ConflictKind, QueueItem, QueueOperation, QueueStatus } from './queueState'
 
 const QUEUE_KEY = 'ledger_offline_queue'
-
-/** Queue items older than this are dropped on drain to avoid stale mutations. */
-const MAX_QUEUE_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
 // localStorage is used here only for resilient device-local sync state.
 // Queue contents should be treated as local user data, not secure storage.
@@ -32,12 +28,25 @@ function readQueue(): QueueItem[] {
   }
 }
 
+type QueueListener = () => void
+const queueListeners = new Set<QueueListener>()
+
+/** Subscribe to queue changes (enqueue, drain, resolve). Returns an unsubscribe fn. */
+export function subscribeQueue(cb: QueueListener): () => void {
+  queueListeners.add(cb)
+  return () => {
+    queueListeners.delete(cb)
+  }
+}
+
 function writeQueue(items: QueueItem[]): void {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(items))
+  queueListeners.forEach((cb) => cb())
 }
 
 export function clearOfflineQueue(): void {
   localStorage.removeItem(QUEUE_KEY)
+  queueListeners.forEach((cb) => cb())
 }
 
 export function enqueue(item: Omit<QueueItem, 'id' | 'timestamp'>): void {
@@ -46,130 +55,68 @@ export function enqueue(item: Omit<QueueItem, 'id' | 'timestamp'>): void {
   writeQueue(queue)
 }
 
+/** Items still waiting to sync (excludes conflicted and expired items). */
 export function pendingCount(): number {
-  return readQueue().length
+  return readQueue().filter(isPending).length
+}
+
+/** Items the user must review: conflicted or expired. */
+export function flaggedCount(): number {
+  return readQueue().filter(isFlagged).length
+}
+
+/** Items that hit a database error too many times and need a Retry or a discard. */
+export function failedCount(): number {
+  return readQueue().filter((item) => item.status === 'failed').length
+}
+
+export function listQueue(): QueueItem[] {
+  return readQueue()
+}
+
+/** Keep the local edit: it is retried on the next drain, bypassing the conflict check. */
+export function keepMine(id: string): void {
+  writeQueue(applyKeepMine(readQueue(), id, Date.now()))
+}
+
+/** Keep the server version, or discard a failed item: drop it (and any pending receipt blob). */
+export async function keepTheirs(id?: string): Promise<void> {
+  await discardFlagged(deps, id)
+}
+
+/** Retry a failed item: it becomes pending again with a fresh attempt count. */
+export function retryFailedItem(id: string): void {
+  writeQueue(retryFailed(readQueue(), id))
+}
+
+/** Flags items that have passed the max age. Called on a timer so an offline item flags without waiting for a drain. */
+export function expireQueueNow(): void {
+  const stored = readQueue()
+  const next = expireNow(stored, Date.now())
+  if (next !== stored) writeQueue(next)
+}
+
+/** The earliest moment a pending item will expire, or null when nothing is pending. */
+export function nextQueueExpiry(): number | null {
+  return nextExpiryAt(readQueue())
+}
+
+const deps: DrainDeps = {
+  client: supabase as unknown as DrainClient,
+  readQueue,
+  writeQueue,
+  receipts: {
+    prefix: PENDING_RECEIPT_PREFIX,
+    get: getPendingReceipt,
+    remove: removePendingReceipt,
+    buildPath: buildReceiptObjectPath,
+  },
+  now: Date.now,
 }
 
 /**
- * Replays all queued operations against Supabase in order.
- * Removes items that succeed; leaves failed items in the queue.
- * Returns the number of successfully synced items.
+ * Replays all pending operations against Supabase in order (see drainWith).
+ * Only one drain runs at a time: a second call while one is running shares its result
+ * instead of starting another, so two triggers can never replay the same items twice.
  */
-export async function drainQueue(): Promise<number> {
-  const queue = readQueue()
-  if (queue.length === 0) return 0
-
-  // Drop items that are too old to be reliably replayed
-  const now = Date.now()
-  const fresh = queue.filter((item) => now - item.timestamp <= MAX_QUEUE_AGE_MS)
-  const staleCount = queue.length - fresh.length
-  if (staleCount > 0) {
-    console.warn(`[offlineQueue] Dropping ${staleCount} stale item(s) older than 30 days`)
-    writeQueue(fresh)
-  }
-  if (fresh.length === 0) return 0
-
-  const remaining: QueueItem[] = []
-  let synced = 0
-
-  for (const item of fresh) {
-    try {
-      let skipInsert = false
-
-      // Resolve any pending receipt file before the DB insert
-      if (
-        item.operation === 'insert' &&
-        typeof item.payload.receipt_url === 'string' &&
-        item.payload.receipt_url.startsWith(PENDING_RECEIPT_PREFIX)
-      ) {
-        const tempId = item.payload.receipt_url.slice(PENDING_RECEIPT_PREFIX.length)
-        let file: File | null = null
-        try {
-          file = await getPendingReceipt(tempId)
-        } catch {
-          // IndexedDB unavailable — treat as missing file, insert without receipt
-        }
-        if (file) {
-          // When retrieved from IndexedDB, a File may come back as a plain Blob
-          // without a .name property on some browsers — guard against that.
-          const fileName = (file as File).name ?? 'receipt.jpg'
-          const path = buildReceiptObjectPath(item.userId, fileName)
-          let uploadErr: unknown = null
-          try {
-            const { error: err } = await supabase.storage.from('receipts').upload(path, file)
-            uploadErr = err
-          } catch (e) {
-            uploadErr = e
-          }
-          if (uploadErr) {
-            // Upload failed — keep in queue and retry next time
-            remaining.push(item)
-            skipInsert = true
-          } else {
-            item.payload = { ...item.payload, receipt_url: path }
-            try { await removePendingReceipt(tempId) } catch { /* best-effort */ }
-          }
-        } else {
-          // File missing (e.g. IndexedDB was cleared) — insert without receipt
-          item.payload = { ...item.payload, receipt_url: null }
-        }
-      }
-
-      if (skipInsert) continue
-
-      let error: unknown = null
-      if (item.operation === 'insert') {
-        const { error: err } = await supabase.from(item.table).insert(item.payload)
-        error = err
-      } else if (item.operation === 'update' && item.rowId) {
-        // Conflict detection: if the server record's updated_at is newer than when
-        // we queued this change, a concurrent edit happened — skip to avoid overwrite.
-        try {
-          const { data: serverRow } = await supabase
-            .from(item.table)
-            .select('updated_at')
-            .eq('id', item.rowId)
-            .eq('user_id', item.userId)
-            .maybeSingle()
-          if (serverRow?.updated_at) {
-            const serverMs = new Date(serverRow.updated_at as string).getTime()
-            if (serverMs > item.timestamp) {
-              console.warn(
-                `[offlineQueue] Conflict detected for ${item.table}:${item.rowId} — skipping stale update`
-              )
-              synced++ // count as processed
-              continue
-            }
-          }
-        } catch {
-          // If the conflict check itself fails, proceed with the update anyway
-        }
-        const { error: err } = await supabase
-          .from(item.table)
-          .update(item.payload)
-          .eq('id', item.rowId)
-          .eq('user_id', item.userId)
-        error = err
-      } else if (item.operation === 'delete' && item.rowId) {
-        const { error: err } = await supabase
-          .from(item.table)
-          .delete()
-          .eq('id', item.rowId)
-          .eq('user_id', item.userId)
-        error = err
-      }
-
-      if (error) {
-        remaining.push(item)
-      } else {
-        synced++
-      }
-    } catch {
-      // Unexpected error for this item — keep it in the queue for the next retry
-      remaining.push(item)
-    }
-  }
-
-  writeQueue(remaining)
-  return synced
-}
+export const drainQueue = singleFlight((onProgress) => drainWith(deps, onProgress))

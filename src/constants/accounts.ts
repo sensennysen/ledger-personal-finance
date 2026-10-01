@@ -37,5 +37,4 @@ export const TRANSACTION_TYPE_COLOR: Record<TransactionType, string> = {
 
 export const BALANCE_ADJUSTMENT_DESCRIPTION = 'Balance Adjustment'
 export const DEFAULT_CURRENCY = 'USD'
-export const BUDGET_WARNING_THRESHOLD = 80
 export const UNCATEGORIZED_VALUE = '__none'

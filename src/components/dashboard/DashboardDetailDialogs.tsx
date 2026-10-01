@@ -1,14 +1,19 @@
+import type { LucideIcon } from 'lucide-react'
+import { PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { EXPENSE, INCOME } from '@/constants/colors'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { getAccountNetWorthContribution } from '@/lib/creditCards'
 import { formatCurrency } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import type { DashboardExpenseCategoryDetail, DashboardStatsSummary } from '@/hooks/useDashboardData'
 import type { Account, Transaction } from '@/types'
 import { DialogHeader } from '@/components/ui/dialog'
 import { DetailSurface as Dialog, DetailContent as DialogContent, DetailTitle as DialogTitle } from './DashboardDetailSurface'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { EmptyState } from '@/components/ui/empty-state'
 import { DashboardSummaryValueRow } from '@/components/dashboard/DashboardSummaryValueRow'
 import { DashboardTransactionRow } from '@/components/dashboard/DashboardTransactionRow'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 export type DashboardDetailView = 'balance' | 'income' | 'expenses' | 'categories' | null
 
@@ -28,6 +33,7 @@ function TransactionListDialog({
   open,
   onOpenChange,
   title,
+  emptyIcon,
   emptyMessage,
   totalLabel,
   totalValue,
@@ -38,6 +44,7 @@ function TransactionListDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   title: string
+  emptyIcon: LucideIcon
   emptyMessage: string
   totalLabel: string
   totalValue: number
@@ -65,14 +72,14 @@ function TransactionListDialog({
                 subtitle={`${tx.category?.name ?? 'Uncategorized'} - ${tx.date}`}
                 amount={
                   <span style={{ color: totalColor }}>
-                    {prefix}
+                    {prefix === '-' ? MINUS : prefix}
                     {formatCurrency(tx.amount, tx.currency)}
                   </span>
                 }
               />
             ))}
             {transactions.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">{emptyMessage}</p>
+              <EmptyState icon={emptyIcon} title={emptyMessage} bare />
             )}
           </div>
         </ScrollArea>
@@ -104,6 +111,7 @@ export function DashboardDetailDialogs({
   stats,
   currency,
 }: DashboardDetailDialogsProps) {
+  const ink = useCategoryInk()
   return (
     <>
       <Dialog open={detailView === 'balance'} onOpenChange={(open) => !open && setDetailView(null)}>
@@ -121,9 +129,9 @@ export function DashboardDetailDialogs({
                   <div key={account.id} className="flex items-center gap-3 rounded-lg border border-border/50 px-3 py-2.5 bg-muted/30">
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 border border-border/50"
-                      style={{ backgroundColor: account.color + '22' }}
+                      style={{ backgroundColor: ink(account.color) + '22' }}
                     >
-                      <AccountIcon className="w-4 h-4" style={{ color: account.color }} />
+                      <AccountIcon className="w-4 h-4" style={{ color: ink(account.color) }} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[0.8125rem] font-medium truncate">{account.name}</p>
@@ -135,7 +143,7 @@ export function DashboardDetailDialogs({
                   </div>
                 )
               })}
-              {accounts.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No accounts yet</p>}
+              {accounts.length === 0 && <EmptyState icon={Wallet} title="No accounts yet" bare />}
             </div>
           </ScrollArea>
           {accounts.length > 0 && (
@@ -167,6 +175,7 @@ export function DashboardDetailDialogs({
         open={detailView === 'income'}
         onOpenChange={(open) => !open && setDetailView(null)}
         title={`Income - ${monthLabel}`}
+        emptyIcon={TrendingUp}
         emptyMessage="No income this month"
         totalLabel="Total Income"
         totalValue={stats.income}
@@ -179,6 +188,7 @@ export function DashboardDetailDialogs({
         open={detailView === 'expenses'}
         onOpenChange={(open) => !open && setDetailView(null)}
         title={`Expenses - ${monthLabel}`}
+        emptyIcon={TrendingDown}
         emptyMessage="No expenses this month"
         totalLabel="Total Expenses"
         totalValue={stats.expenses}
@@ -201,14 +211,14 @@ export function DashboardDetailDialogs({
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{categoryBreakdown.icon}</span>
                       <span className="flex-1 text-[0.8125rem] font-medium">{categoryBreakdown.name}</span>
-                      <span className="money text-[0.8125rem] font-semibold shrink-0" style={{ color: categoryBreakdown.color }}>
+                      <span className="money text-[0.8125rem] font-semibold shrink-0" style={{ color: ink(categoryBreakdown.color) }}>
                         {formatCurrency(categoryBreakdown.amount, currency)}
                       </span>
                     </div>
                     <div className="h-1.5 rounded-full bg-border overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
-                        style={{ width: `${categoryBreakdown.percentage}%`, backgroundColor: categoryBreakdown.color }}
+                        style={{ width: `${categoryBreakdown.percentage}%`, backgroundColor: ink(categoryBreakdown.color) }}
                       />
                     </div>
                     <p className="text-[0.6875rem] text-muted-foreground">
@@ -230,7 +240,7 @@ export function DashboardDetailDialogs({
                 )
               })}
               {expenseCategoryDetails.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-8">No expenses this month</p>
+                <EmptyState icon={PieChart} title="No expenses this month" bare />
               )}
             </div>
           </ScrollArea>

@@ -1,0 +1,9 @@
+# Wait for more async growth with a debounce, not a fixed frame count
+
+`useRenderWindow`'s auto-grow (`IntersectionObserver`) can fire again right after a one-off `ensure()` jump lands, because the jump's own target sits near the growth sentinel. A first fix compared two consecutive `requestAnimationFrame` samples of the rendered count and called it "settled" the moment they matched (LED-165).
+
+**Why:** it looked settled after one frame because the *next* real growth hadn't happened yet, not because it was done. `IntersectionObserver` (like `ResizeObserver` and other browser-scheduled callbacks) doesn't run on the next frame on a fixed schedule — its latency scales with how much layout/paint work is already queued, and at ~2,000 mounted rows that was longer than two animation frames. The loop gave up and cleared its own "still watching" flag before the real growth (and the several-thousand-pixel `scrollHeight` change that came with it) ever happened, live-testing showed the target still landing hundreds of pixels short — unchanged from the original bug.
+
+**How:** re-run the action (here, `scrollIntoView`) every time the real signal fires (a state change from the async source, via `useEffect`'s own dependency array — not a poll), and use a plain `setTimeout` debounce to decide when to stop: schedule a fixed delay (e.g. 500 ms) that clears the "done" flag, and let the *next* re-run of the effect (a fresh real signal) cancel that timer via the effect's cleanup and schedule a new one. Only silence once nothing re-triggers the effect for the whole delay. This costs nothing extra when there's no more growth (one timer, fires once) and is exactly as responsive when there is (each new signal preempts the pending timer).
+
+**When this applies:** any "wait until an async, browser-scheduled callback stops firing" case — not just scroll settling. Prefer this over frame-counting whenever the trigger is a browser observer rather than your own code.

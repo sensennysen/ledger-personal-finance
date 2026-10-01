@@ -10,6 +10,7 @@ export interface Preferences {
   largeTransactionThreshold: number
   creditCardNotificationsEnabled: boolean
   txView: 'grouped' | 'flat'
+  txDensity: 'comfortable' | 'compact'
   accView: 'grouped' | 'flat'
   accGroupOrder: AccountType[]
 }
@@ -22,6 +23,7 @@ const DEFAULTS: Preferences = {
   largeTransactionThreshold: 0,
   creditCardNotificationsEnabled: false,
   txView: 'grouped',
+  txDensity: 'comfortable',
   accView: 'grouped',
   accGroupOrder: [],
 }

@@ -3,17 +3,24 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Sun, Moon, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
+import { ChevronRight, Sun, Moon, Monitor, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
+import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
 import { usePreferences, type DateFormat, type NumberLocale, type Preferences } from '@/hooks/usePreferences'
 import { supabase } from '@/lib/supabase'
 import { CURRENCIES } from '@/types'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
+import { DEFAULT_ACCENT, SWATCHES } from '@/lib/swatches'
+import { deficitOutcome, type DeficitBehaviour } from '@/lib/budgetRollover'
+import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { ExchangeRatesCard } from '@/components/settings/ExchangeRatesCard'
+import { FormError } from '@/components/ui/form-error'
+import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -64,16 +71,26 @@ const ACCOUNT_VIEW_LABELS: Record<Preferences['accView'], string> = {
   flat: 'Flat Grid',
 }
 
+const THEME_CHOICES = [
+  { value: 'light', label: 'Light', Icon: Sun },
+  { value: 'dark', label: 'Dark', Icon: Moon },
+  { value: 'system', label: 'System', Icon: Monitor },
+] as const
+
 export default function SettingsPage() {
   const { user, profile, signOut, deleteAccount, refreshProfile } = useAuth()
-  const { theme, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
+  const { themePreference, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
+  const { confirmCycle } = useFirstRunChecklist()
   const { prefs, set: setPref } = usePreferences()
   const [saved, setSaved] = useState(false)
+  const [deficitSaving, setDeficitSaving] = useState(false)
+  const [deficitError, setDeficitError] = useState<FormErrorValue>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<FormErrorValue>(null)
+  const [profileError, setProfileError] = useState<FormErrorValue>(null)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
       return 'unsupported'
@@ -104,8 +121,12 @@ export default function SettingsPage() {
     setDeleteError(null)
     try {
       await deleteAccount()
+      // The account is gone. Normally the sign-out unmounts this page; if it failed the
+      // user is still here, so free the dialog and let the sign-out banner show.
+      setDeleting(false)
+      setDeleteOpen(false)
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Deletion failed. Please try again.')
+      setDeleteError(err instanceof Error ? describeDataError(err, { action: 'delete', entity: 'account' }) : 'Deletion failed. Please try again.')
       setDeleting(false)
     }
   }
@@ -127,14 +148,31 @@ export default function SettingsPage() {
 
   const onSave = async (values: ProfileValues) => {
     if (!user) return
+    setProfileError(null)
     const { error } = await supabase.from('profiles').update(values).eq('id', user.id)
     if (error) {
-      form.setError('root', { message: error.message })
+      setProfileError(describeDataError(error, { action: 'save', entity: 'profile' }))
       return
     }
     await refreshProfile()
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const currency = profile?.default_currency ?? 'USD'
+  const deficitBehaviour = useDeficitBehaviour()
+
+  const onDeficitChange = async (next: DeficitBehaviour) => {
+    if (!user || !deficitBehaviour || next === deficitBehaviour || deficitSaving) return
+    setDeficitSaving(true)
+    setDeficitError(null)
+    const { error } = await supabase.from('profiles').update({ budget_deficit_behaviour: next }).eq('id', user.id)
+    if (error) {
+      setDeficitError(describeDataError(error, { action: 'save', entity: 'setting' }))
+    } else {
+      await refreshProfile()
+    }
+    setDeficitSaving(false)
   }
 
   const requestNotificationPermission = async () => {
@@ -163,7 +201,7 @@ export default function SettingsPage() {
 
   return (
     <div className="settings-grid p-4 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start max-w-6xl mx-auto">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <h1 className="text-2xl font-bold md:hidden">Settings</h1>
 
       {/* Profile */}
       <Card>
@@ -219,9 +257,7 @@ export default function SettingsPage() {
                 )}
               />
               <div className="flex items-center justify-end gap-2">
-                {form.formState.errors.root && (
-                  <span className="text-sm text-destructive">{form.formState.errors.root.message}</span>
-                )}
+                <FormError error={profileError} className="px-0 mt-0" />
                 {saved && <span className="text-sm" style={{ color: INCOME }}>Saved!</span>}
                 <Button type="submit" disabled={form.formState.isSubmitting}>
                   {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
@@ -242,32 +278,29 @@ export default function SettingsPage() {
           <div className="space-y-5">
           <div>
             <p className="text-sm font-medium mb-2 flex items-center gap-2"><Sun className="w-4 h-4" /> Colour Scheme</p>
-            <div className="flex gap-3">
-            <button
-              onClick={() => setTheme('light')}
-              className={cn(
-                'flex items-center gap-2 rounded-full border px-5 h-11 transition-all cursor-pointer',
-                theme === 'light'
-                  ? 'border-primary bg-accent'
-                  : 'border-border hover:border-primary/40 hover:bg-accent'
-              )}
-            >
-              <Sun className={cn('w-5 h-5', theme === 'light' ? 'text-primary' : 'text-muted-foreground')} />
-              <span className={cn('text-sm font-medium', theme === 'light' ? 'text-primary' : 'text-muted-foreground')}>Light</span>
-            </button>
-            <button
-              onClick={() => setTheme('dark')}
-              className={cn(
-                'flex items-center gap-2 rounded-full border px-5 h-11 transition-all cursor-pointer',
-                theme === 'dark'
-                  ? 'border-primary bg-accent'
-                  : 'border-border hover:border-primary/40 hover:bg-accent'
-              )}
-            >
-              <Moon className={cn('w-5 h-5', theme === 'dark' ? 'text-primary' : 'text-muted-foreground')} />
-              <span className={cn('text-sm font-medium', theme === 'dark' ? 'text-primary' : 'text-muted-foreground')}>Dark</span>
-            </button>
-          </div>
+            <div className="flex flex-wrap gap-3" role="group" aria-label="Colour scheme">
+              {THEME_CHOICES.map(({ value, label, Icon }) => {
+                const active = themePreference === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setTheme(value)}
+                    className={cn(
+                      'flex items-center gap-2 rounded-full border px-5 h-11 transition-all cursor-pointer',
+                      active
+                        ? 'border-primary bg-accent'
+                        : 'border-border hover:border-primary/40 hover:bg-accent'
+                    )}
+                  >
+                    <Icon className={cn('w-5 h-5', active ? 'text-primary' : 'text-muted-foreground')} />
+                    <span className={cn('text-sm font-medium', active ? 'text-primary' : 'text-muted-foreground')}>{label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">System follows your device and changes with it.</p>
           </div>
 
           <div>
@@ -297,7 +330,7 @@ export default function SettingsPage() {
             <ColorPicker
                 value={accentColor}
                 onChange={setAccentColor}
-                palette={['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#06b6d4']}
+                palette={[DEFAULT_ACCENT, ...SWATCHES]}
               />
             <p className="text-xs text-muted-foreground mt-2">Customizes the primary action color throughout the app.</p>
           </div>
@@ -371,7 +404,7 @@ export default function SettingsPage() {
 
           <div className="space-y-1.5">
             <Label htmlFor="preferences-large-transaction-threshold">
-              <AlertTriangle className="w-4 h-4 text-amber-500" /> Large Transaction Alert Threshold
+              <AlertTriangle className="w-4 h-4 text-warning" /> Large Transaction Alert Threshold
             </Label>
             <div className="flex items-center gap-2">
               <Input
@@ -464,7 +497,10 @@ export default function SettingsPage() {
             <label className="text-sm font-medium w-28">Starts on day</label>
             <Select
               value={String(startDay)}
-              onValueChange={(v) => setStartDay(Number(v))}
+              onValueChange={(v) => {
+                setStartDay(Number(v))
+                confirmCycle()
+              }}
             >
               <SelectTrigger className="w-24">
                 <SelectValue />
@@ -485,6 +521,58 @@ export default function SettingsPage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Budgets */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Budgets</CardTitle>
+          <CardDescription>What happens to the amount you went over by, when the next cycle opens.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <fieldset className="space-y-2" disabled={deficitSaving || !deficitBehaviour}>
+            <legend className="text-sm font-medium mb-2">When you overspend</legend>
+            {([
+              {
+                value: 'reset',
+                label: 'Start the next cycle fresh',
+                detail: `Example: a ${formatCurrency(600, currency)} budget with ${formatCurrency(742.3, currency)} spent. The next cycle opens at the full ${formatCurrency(deficitOutcome(600, 742.3, 'reset'), currency)}. The overspend is recorded in Reports.`,
+              },
+              {
+                value: 'carry',
+                label: "Reduce next cycle's budget",
+                detail: `Example: a ${formatCurrency(600, currency)} budget with ${formatCurrency(742.3, currency)} spent. The next cycle opens at ${formatCurrency(deficitOutcome(600, 742.3, 'carry'), currency)} \u2014 the budget minus what you went over. This is the current behaviour.`,
+              },
+            ] as const).map((option) => (
+              <label
+                key={option.value}
+                className={cn(
+                  'flex items-start gap-3 rounded-md border p-3 cursor-pointer',
+                  deficitBehaviour === option.value && 'border-primary bg-primary/5',
+                )}
+              >
+                <input
+                  type="radio"
+                  name="budget_deficit_behaviour"
+                  value={option.value}
+                  checked={deficitBehaviour === option.value}
+                  onChange={() => onDeficitChange(option.value)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-medium">{option.label}</span>
+                  <span className="block text-xs text-muted-foreground">{option.detail}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          <FormError error={deficitError} />
+          <p className="text-xs text-muted-foreground">
+            Separate from each budget's Rollover unused budget toggle, which decides whether a surplus carries. The two work independently.
+          </p>
+        </CardContent>
+      </Card>
+
+      <ExchangeRatesCard />
 
       {/* Customization â€” visible on mobile where BottomNav omits Categories */}
       {/* Legal */}
@@ -524,7 +612,7 @@ export default function SettingsPage() {
           <CardDescription>Sign out or permanently delete your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button variant="outline" onClick={signOut}>Sign Out</Button>
+          <Button variant="outline" onClick={() => void signOut()}>Sign Out</Button>
           <Separator />
           <div>
             <p className="text-sm font-medium text-destructive mb-1">Delete Account</p>
@@ -569,9 +657,7 @@ export default function SettingsPage() {
                 disabled={deleting}
                 autoComplete="off"
               />
-              {deleteError && (
-                <span className="block text-sm text-destructive">{deleteError}</span>
-              )}
+              <FormError error={deleteError} className="px-0 mt-0" />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

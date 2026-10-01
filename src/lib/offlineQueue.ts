@@ -8,6 +8,7 @@ import {
   isFlagged,
   isPending,
   nextExpiryAt,
+  editQueuedInsert as editQueuedInsertIn,
   retryFailed,
   type QueueItem,
 } from './queueState'
@@ -53,6 +54,27 @@ export function enqueue(item: Omit<QueueItem, 'id' | 'timestamp'>): void {
   const queue = readQueue()
   queue.push({ ...item, id: crypto.randomUUID(), timestamp: Date.now() })
   writeQueue(queue)
+}
+
+/**
+ * Applies an edit to a create that is still in the queue. Returns false when no such pending (or
+ * failed) create exists, so the caller queues an ordinary update instead (LED-193).
+ */
+export function editQueuedInsert(rowId: string, values: Record<string, unknown>): boolean {
+  const { queue, edited } = editQueuedInsertIn(readQueue(), rowId, values)
+  if (edited) writeQueue(queue)
+  return edited
+}
+
+type SyncedListener = (item: QueueItem) => void
+const syncedListeners = new Set<SyncedListener>()
+
+/** Hears each queued insert as the drain saves it. Mount one owner only (AppLayout), or a follow-up runs twice. */
+export function registerSyncedListener(cb: SyncedListener): () => void {
+  syncedListeners.add(cb)
+  return () => {
+    syncedListeners.delete(cb)
+  }
 }
 
 /** Items still waiting to sync (excludes conflicted and expired items). */
@@ -112,6 +134,7 @@ const deps: DrainDeps = {
     buildPath: buildReceiptObjectPath,
   },
   now: Date.now,
+  onSynced: (item) => syncedListeners.forEach((cb) => cb(item)),
 }
 
 /**

@@ -3,7 +3,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/contexts/notificationState'
 import { useAccounts } from '@/hooks/useAccounts'
 import { notifyAccountsRefresh, notifyCardPaymentsRefresh } from '@/lib/cacheEvents'
-import { creditedAmount, planStatementPayment, transferCard } from '@/lib/cardPayment'
+import { creditedAmount, generatedCardPayment, planStatementPayment, transferCard } from '@/lib/cardPayment'
+import type { QueueItem } from '@/lib/queueState'
 import type { MutationResult } from '@/lib/dataErrors'
 import type { TransactionUpsertValues } from '@/hooks/useTransactions.helpers'
 import type { CardPaymentHandler } from '@/hooks/useTransactions'
@@ -73,12 +74,12 @@ export function useCardPayment(
 
     const amount = creditedAmount(values)
     if (result.queued) {
-      // The statement writes need a connection; Fix reruns them once it is back.
+      // The statement steps need a connection, so they run when the queued payment drains
+      // (`recordSynced`). Until then the payment can still be edited in the queue (LED-193).
       notify({
-        severity: 'partial',
-        title: 'Payment saved offline, statement not updated',
-        body: `The payment for ${card.name} syncs when you are back online. Fix updates its statement then.`,
-        action: { label: 'Fix', run: () => void recordStatementPayment(card, amount, values.date, null, true) },
+        severity: 'success',
+        title: 'Payment saved offline',
+        body: `The payment for ${card.name} syncs when you are back online, and its statement updates then.`,
       })
       return result
     }
@@ -90,5 +91,31 @@ export function useCardPayment(
   const recordGenerated: CardPaymentHandler = ({ card, amount, date, transactionId }) =>
     recordStatementPayment(card, amount, date, null, false, transactionId)
 
-  return { createWithStatement, recordGenerated }
+  /**
+   * The drain saved a queued insert (LED-193). When it is a transfer into a card, run the statement
+   * steps once, on the card as it is now. Mounted by AppLayout only, so it never runs twice.
+   */
+  const recordSynced = async (item: QueueItem): Promise<void> => {
+    if (item.table !== 'transactions') return
+    const destination = item.payload.to_account_id
+    if (typeof destination !== 'string') return
+    const { data } = await supabase.from('accounts').select('*').eq('id', destination).maybeSingle()
+    const payment = data
+      ? generatedCardPayment(
+          item.payload as Pick<TransactionUpsertValues, 'type' | 'to_account_id' | 'amount' | 'exchange_rate'>,
+          [data as Account],
+        )
+      : null
+    if (!payment) return
+    await recordStatementPayment(
+      payment.card,
+      payment.amount,
+      item.payload.date as string,
+      null,
+      false,
+      typeof item.payload.id === 'string' ? item.payload.id : null,
+    )
+  }
+
+  return { createWithStatement, recordGenerated, recordSynced }
 }

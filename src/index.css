@@ -1,12 +1,12 @@
 /* ═══════════════════════════════════════════════════════
    LEDGER — Material 3 token layer
-   Drop-in replacement for the :root / .dark blocks in
-   src/index.css. Variable NAMES are unchanged, so every
-   shadcn component inherits without edits.
+   Variable NAMES follow shadcn, so every component
+   inherits without edits. Values are the design handoff's
+   token pairs (2B Screens: :root / body.dark), spec §8.
 
    Fonts: Roboto (sans + headings) · DM Mono (money)
-   Seed:  Ledger gold  →  oklch(0.565 0.115 72) light
-                          oklch(0.830 0.115 85) dark
+   Seed:  Ledger indigo  →  #55659A light
+                            #A8B4DE dark
    ═══════════════════════════════════════════════════════ */
 
 @import "tailwindcss";
@@ -17,52 +17,68 @@
 
 /* ── Light theme (M3 light scheme) ── */
 :root {
-  --background: #EFE7DA;          /* #EFE7DA surface-dim   */
-  --foreground: #1E1B13;          /* #1E1B13 on-surface    */
+  --background: #DEDDE3;          /* page                  */
+  --foreground: #2B2A30;          /* ink                   */
 
-  --card: #FFF8EE;                /* #FFF8EE surface       */
-  --card-foreground: #1E1B13;
+  --card: #FAF9FB;                /* card                  */
+  --card-foreground: #2B2A30;
 
-  --popover: #FFF8EE;
-  --popover-foreground: #1E1B13;
+  --popover: #FAF9FB;
+  --popover-foreground: #2B2A30;
 
-  --primary: #7A5900;             /* #7A5900 — 4.5:1 w/ white */
+  --primary: #55659A;
   --primary-foreground: #FFFFFF;
 
-  --secondary: #E4D8B6;           /* #E4D8B6 secondary-container */
-  --secondary-foreground: #3E3620;
+  --secondary: #EEF1FA;
+  --secondary-foreground: #2E3A63;
 
-  --muted: #F4ECDF;               /* #F4ECDF surface-container */
-  --muted-foreground: #5A5346;    /* #5A5346 — 4.5:1 on muted  */
+  --muted: #F1F0F4;               /* surface-container     */
+  --muted-foreground: #55545B;    /* design ink-2; ink-3 #6B6A72 is 3.96:1 on the page */
 
-  --accent: #FFE18E;              /* #FFE18E primary-container */
-  --accent-foreground: #261A00;   /* #261A00 */
+  --accent: #E4E7F5;              /* primary-container     */
+  --accent-foreground: #2E3A63;
 
-  --destructive: var(--expense);         /* #A4342B = --expense */
+  --destructive: var(--expense);
 
-  --border: #DDD5C4;              /* #DDD5C4 outline-variant */
-  --input: #CFC7B5;
+  --border: #D9D7DE;              /* divider               */
+  --input: #B6B4BD;               /* border                */
   --ring: var(--primary);
 
   --radius: 0.75rem;                            /* M3 shape scale, was 0.5 */
 
   /* Semantic money tokens — replace INCOME / EXPENSE / GOLD */
-  --income: #1E6B2E;             /* #1E6B2E */
-  --income-container: #C6EBC7;   /* #C6EBC7 */
-  --expense: #A4342B;             /* #A4342B */
-  --expense-container: #FFDAD6;   /* #FFDAD6 */
-  --transfer: #1F5A87;           /* #1F5A87 */
-  --transfer-container: #CDE4F7; /* #CDE4F7 */
+  --income: #2C5B37;
+  --income-container: #DCEEDF;
+  --expense: #8F3F33;
+  --expense-container: #F5DEDA;
+  --transfer: #3D6B8F;            /* design #3F6E93 is 4.43:1 on its container */
+  --transfer-container: #DCEAF2;
+  --warning: #7A6430;
+  --warning-container: #F0E7D2;
+  /* Design gold #9A7F3D is 2.84:1 on the page; this step of the same hue holds 3:1 on page and card.
+     For borders, fills, meters and icon tiles only. Text on gold tint uses --warning. */
+  --gold: #917738;
+  /* Disabled controls: solid ink on a solid surface, never opacity. Design ink #8A8892 is
+     2.79:1 on its own #E7E5EA fill and 2.59:1 on the page; this step of the same hue holds 3:1
+     on page, card, muted and the disabled fill. */
+  --disabled: #E7E5EA;
+  --disabled-foreground: #7A7883;
+  /* Google's sign-in button guidance: white or neutral ground with a hairline and dark ink, so the
+     multicolour G stays legal. Light: white, #747775, #1F1F1F. Dark: #131314, #8E918F, #E3E3E3. */
+  --google-surface: #FFFFFF;
+  --google-surface-hover: #F8F9FA;
+  --google-line: #747775;
+  --google-ink: #1F1F1F;
 
   /* Charts alias the semantics so Recharts needs no per-series colors */
   --chart-1: var(--primary);
   --chart-2: var(--income);
   --chart-3: var(--expense);
   --chart-4: var(--transfer);
-  --chart-5: oklch(0.520 0.110 300);
+  --chart-5: #8B5CF6;
 
   /* Sidebar — M3 navigation drawer */
-  --sidebar: #F8F1E4;             /* #F8F1E4 */
+  --sidebar: #EFEEF2;             /* frame                 */
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
@@ -71,8 +87,8 @@
   --sidebar-border: var(--border);
   --sidebar-ring: var(--primary);
 
-  --surface: oklch(0.940 0.014 86);
-  --elevated: #EDE4D6;            /* #EDE4D6 surface-container-high */
+  --surface: #F3F2F6;             /* header                */
+  --elevated: #E7E5EA;            /* surface-container-high */
 
   color-scheme: light;
   font-synthesis: none;
@@ -83,49 +99,58 @@
 
 /* ── Dark theme (M3 dark scheme) ── */
 .dark {
-  --background: #15130B;          /* #15130B surface       */
-  --foreground: #E9E2D4;          /* #E9E2D4 on-surface    */
+  --background: #131218;          /* page                  */
+  --foreground: #E6E4EA;          /* ink                   */
 
-  --card: #211F17;                /* #211F17 surface-container */
-  --card-foreground: #E9E2D4;
+  --card: #26252E;                /* card                  */
+  --card-foreground: #E6E4EA;
 
-  --popover: #2A2718;
-  --popover-foreground: #E9E2D4;
+  --popover: #26252E;
+  --popover-foreground: #E6E4EA;
 
-  --primary: #EDC55F;             /* #EDC55F */
-  --primary-foreground: #3E2E00;  /* #3E2E00 */
+  --primary: #A8B4DE;
+  --primary-foreground: #1B2135;  /* dark ink on the lightened accent, not white */
 
-  --secondary: #4F462B;           /* #4F462B */
-  --secondary-foreground: #F2E2BB;
+  --secondary: #2E3552;
+  --secondary-foreground: #DBE1F7;
 
-  --muted: #1D1B13;               /* #1D1B13 */
-  --muted-foreground: #999080;    /* #999080 */
+  --muted: #2C2B34;               /* surface-container     */
+  --muted-foreground: #A9A7B1;    /* muted ink             */
 
-  --accent: #594400;              /* #594400 primary-container */
-  --accent-foreground: #FFE18E;   /* #FFE18E */
+  --accent: #333C5C;              /* primary-container     */
+  --accent-foreground: #DBE1F7;
 
-  --destructive: var(--expense);         /* #FFB4AB = --expense */
+  --destructive: var(--expense);
 
-  --border: #2C2921;              /* #2C2921 */
-  --input: #4D4739;               /* #4D4739 outline */
+  --border: #38363F;              /* divider               */
+  --input: #4C4A55;               /* border                */
   --ring: var(--primary);
 
   --radius: 0.75rem;
 
-  --income: #9FD9A0;             /* #9FD9A0 */
-  --income-container: #1E3320;   /* #1E3320 */
-  --expense: #FFB4AB;             /* #FFB4AB */
-  --expense-container: #3B1512;   /* #3B1512 */
-  --transfer: #9EC6EA;           /* #9EC6EA */
-  --transfer-container: #16293A; /* #16293A */
+  --income: #A6D9B0;
+  --income-container: #22362A;
+  --expense: #F2B8AE;
+  --expense-container: #4A2621;
+  --transfer: #8FB6D4;
+  --transfer-container: #24323C;
+  --warning: #E8CE92;
+  --warning-container: #3C3320;
+  --gold: #C9AC6A;
+  --disabled: #34333C;
+  --disabled-foreground: #96949E;   /* design dark disabled ink */
+  --google-surface: #131314;
+  --google-surface-hover: #1E1E20;
+  --google-line: #8E918F;
+  --google-ink: #E3E3E3;
 
   --chart-1: var(--primary);
   --chart-2: var(--income);
   --chart-3: var(--expense);
   --chart-4: var(--transfer);
-  --chart-5: oklch(0.760 0.100 300);
+  --chart-5: #A78BFA;
 
-  --sidebar: #1D1B13;             /* #1D1B13 */
+  --sidebar: #1E1D23;             /* frame                 */
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
@@ -134,8 +159,8 @@
   --sidebar-border: var(--border);
   --sidebar-ring: var(--primary);
 
-  --surface: oklch(0.150 0.012 85);
-  --elevated: #2A2718;            /* #2A2718 */
+  --surface: #22212A;             /* header                */
+  --elevated: #34333D;            /* surface-container-high */
 
   color-scheme: dark;
 }
@@ -153,6 +178,15 @@
   --color-expense-container: var(--expense-container);
   --color-transfer: var(--transfer);
   --color-transfer-container: var(--transfer-container);
+  --color-warning: var(--warning);
+  --color-warning-container: var(--warning-container);
+  --color-gold: var(--gold);
+  --color-disabled: var(--disabled);
+  --color-disabled-foreground: var(--disabled-foreground);
+  --color-google-surface: var(--google-surface);
+  --color-google-surface-hover: var(--google-surface-hover);
+  --color-google-line: var(--google-line);
+  --color-google-ink: var(--google-ink);
 
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);
@@ -226,11 +260,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: oklch(1 0 0 / 12%);
+    background: color-mix(in oklch, var(--foreground) 12%, transparent);
     border-radius: 2px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(1 0 0 / 22%);
+    background: color-mix(in oklch, var(--foreground) 22%, transparent);
   }
 }
 
@@ -242,15 +276,12 @@
   top: auto; bottom: 0; left: 0; width: 100%; max-width: none;
   transform: none; translate: none; border-radius: 28px 28px 0 0;
   background: var(--elevated); padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
-  animation: slide-in-bottom 260ms cubic-bezier(.05,.7,.1,1);
+  animation: slide-in-bottom var(--dur-sheet) cubic-bezier(.05,.7,.1,1);
   grid-template-columns: minmax(0, 1fr);
 }
 .m3-bottom-sheet > * { min-width: 0; }
 @media (max-width: 767px) {
   button, a, input, select { touch-action: manipulation; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .m3-bottom-sheet { animation: none; }
 }
 
 /* ── Utility classes ── */
@@ -272,6 +303,16 @@
    MOTION — Page & element entrance animations
    Mobile-first: short, snappy, GPU-accelerated
    ═══════════════════════════════════════════════════════ */
+
+:root {
+  --dur-instant: 100ms;
+  --dur-fast: 160ms;
+  --dur-base: 200ms;
+  --dur-enter: 280ms;
+  --dur-sheet: 260ms;  /* deliberate, keep */
+  --dur-meter: 500ms;  /* deliberate, keep */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 @keyframes page-in {
   from { opacity: 0; transform: translateY(10px); }
@@ -295,32 +336,43 @@
 
 /* Utility classes */
 .animate-page-in {
-  animation: page-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-in var(--dur-enter) var(--ease-out) both;
 }
 
 .animate-fade-up {
-  animation: fade-up 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fade-up 0.42s var(--ease-out) both;
   animation-delay: var(--anim-delay, 0ms);
 }
 
 .animate-scale-in {
-  animation: scale-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: scale-in var(--dur-enter) var(--ease-out) both;
   animation-delay: var(--anim-delay, 0ms);
 }
 
-/* Stagger delay helpers */
+/* Stagger delay helpers — capped at four steps */
 .anim-delay-1 { --anim-delay: 60ms;  }
 .anim-delay-2 { --anim-delay: 120ms; }
 .anim-delay-3 { --anim-delay: 180ms; }
-.anim-delay-4 { --anim-delay: 240ms; }
-.anim-delay-5 { --anim-delay: 300ms; }
-.anim-delay-6 { --anim-delay: 360ms; }
-.anim-delay-7 { --anim-delay: 420ms; }
-.anim-delay-8 { --anim-delay: 480ms; }
+.anim-delay-4,
+.anim-delay-5,
+.anim-delay-6,
+.anim-delay-7,
+.anim-delay-8 { --anim-delay: 240ms; }
+
+/* Refresh progress rule: an indeterminate sweep over content that is
+   still on screen while newer data loads (LED-95). */
+@keyframes progress-rule {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(250%);  }
+}
+
+.progress-rule {
+  animation: progress-rule 1.2s var(--ease-out) infinite;
+}
 
 /* Touch press / tap feedback */
 .press-scale {
-  transition: transform 100ms ease, opacity 100ms ease;
+  transition: transform var(--dur-instant) ease, opacity var(--dur-instant) ease;
 }
 .press-scale:active {
   transform: scale(0.95);
@@ -332,11 +384,11 @@
   transform-origin: center;
   will-change: transform;
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 180ms ease,
-    opacity 160ms ease,
-    scale 180ms ease;
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease,
+    opacity var(--dur-fast) ease,
+    scale var(--dur-fast) ease;
 }
 
 .reorder-motion.is-dragging {
@@ -355,7 +407,7 @@
 }
 
 .reorder-handle {
-  transition: color 140ms ease, transform 140ms ease, background-color 140ms ease;
+  transition: color var(--dur-fast) ease, transform var(--dur-fast) ease, background-color var(--dur-fast) ease;
 }
 
 .reorder-motion:hover .reorder-handle,
@@ -367,7 +419,7 @@
 /* Card hover lift for pointer devices */
 @media (hover: hover) {
   .hover-lift {
-    transition: transform 200ms ease, box-shadow 200ms ease;
+    transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
   }
   .hover-lift:hover {
     transform: translateY(-2px);
@@ -375,12 +427,25 @@
   }
 }
 
-/* Respect reduced motion */
+/* Respect reduced motion — one block, covering every animated utility in
+   play: the four named entrance classes, tw-animate-css's animate-in/out
+   family (dialog, sheet, dropdown, popover, tooltip, select), the
+   Tailwind animate-pulse/animate-spin utilities, and the ~40 unlabeled
+   transition-colors sites. Durations collapse to near-zero rather than
+   `transition: none` so colour/state changes still take effect, just
+   instantly. */
 @media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
   .animate-page-in,
   .animate-fade-up,
   .animate-scale-in,
-  .reorder-motion {
+  .reorder-motion,
+  .m3-bottom-sheet {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;
@@ -393,5 +458,11 @@
   }
   .hover-lift:hover {
     transform: none;
+  }
+  /* Static full-width rule instead of a sweep. */
+  .progress-rule {
+    animation: none !important;
+    width: 100% !important;
+    opacity: 0.6;
   }
 }

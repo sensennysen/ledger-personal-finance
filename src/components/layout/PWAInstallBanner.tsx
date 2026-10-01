@@ -1,17 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Download, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
+import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 
 const DISMISSED_KEY = 'ledger_pwa_install_dismissed'
 
 export function PWAInstallBanner({ hidden = false }: { hidden?: boolean }) {
-  const [promptEvent, setPromptEvent] =
-    useState<BeforeInstallPromptEvent | null>(null)
+  const { canInstall, install } = useInstallPrompt()
   const [dismissed, setDismissed] = useState(() => {
     try {
       return localStorage.getItem(DISMISSED_KEY) === 'true'
@@ -20,21 +15,10 @@ export function PWAInstallBanner({ hidden = false }: { hidden?: boolean }) {
     }
   })
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault()
-      setPromptEvent(e as BeforeInstallPromptEvent)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
-
-  if (!promptEvent || dismissed || hidden) return null
+  if (!canInstall || dismissed || hidden) return null
 
   const handleInstall = async () => {
-    await promptEvent.prompt()
-    const { outcome } = await promptEvent.userChoice
-    if (outcome === 'accepted') setPromptEvent(null)
+    await install()
     setDismissed(true)
     try {
       localStorage.setItem(DISMISSED_KEY, 'true')

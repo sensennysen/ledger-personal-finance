@@ -1,5 +1,7 @@
 # Ledger
 
+[![CI](https://github.com/sensennysen/ledger-personal-finance/actions/workflows/ci.yml/badge.svg)](https://github.com/sensennysen/ledger-personal-finance/actions/workflows/ci.yml)
+
 I made this because I hate being paywalled.
 
 Personal finance tools love to start friendly, then quietly slide the useful bits behind a subscription screen: budgets, reports, exports, custom categories, account history, the very basic dignity of seeing where your money went. Ledger is my answer to that. It is a self-hostable personal wallet app for tracking accounts, spending, budgets, credit cards, and reports without asking a monthly toll to remember your own groceries.
@@ -32,7 +34,7 @@ Personal finance tools love to start friendly, then quietly slide the useful bit
 Install dependencies:
 
 ```bash
-npm install
+pnpm install
 ```
 
 Create a local environment file:
@@ -53,20 +55,45 @@ Run the Supabase schema in `supabase/schema.sql`, then apply any migrations in `
 Start the app:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 Build for production:
 
 ```bash
-npm run build
+pnpm build
 ```
 
 Preview the production build:
 
 ```bash
-npm run preview
+pnpm preview
 ```
+
+## Local development
+
+This project uses **pnpm** (not npm). Prerequisites: [pnpm](https://pnpm.io), [Docker](https://docs.docker.com/get-docker/) and the [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started).
+
+Start the local database and the app together:
+
+```bash
+pnpm dev:all
+```
+
+Run `pnpm db:status` for the local API URL and anon key, then put them in `.env.local` (see the commented block in `.env.example`). The local stack uses the ports set in `supabase/config.toml` (API 54321, DB 54322, Studio 54323).
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev:all` | Starts the local Supabase stack, then the Vite dev server |
+| `pnpm db:start` / `pnpm db:stop` | Start / stop the local Supabase stack |
+| `pnpm db:status` | Show local URLs and keys |
+| `pnpm db:reset` | Wipe the **local** database, replay all migrations, then run `supabase/seed.sql` |
+| `pnpm db:migrate` | Apply pending migrations to the local database, keeping data |
+| `pnpm db:new <name>` | Create a new timestamped migration in `supabase/migrations/` |
+| `pnpm db:diff` | Show schema changes in the local database not yet in a migration |
+| `pnpm db:push:remote` | Push migrations to the **linked remote** project. Prod-facing, never run by another script |
+
+Schema changes ship only as timestamped, idempotent files in `supabase/migrations/`; do not edit prod by hand. All `db:*` commands except `db:push:remote` target the local stack only.
 
 ## Project Structure
 
@@ -85,10 +112,17 @@ supabase/
 
 ## Scripts
 
-- `npm run dev` starts the local Vite server.
-- `npm run build` type-checks and builds the app.
-- `npm run lint` runs ESLint.
-- `npm run preview` serves the built app locally.
+- `pnpm dev` starts the local Vite server.
+- `pnpm dev:all` starts local Supabase, then the Vite server.
+- `pnpm build` type-checks and builds the app.
+- `pnpm lint` runs ESLint.
+- `pnpm test` runs the node test suite.
+- `pnpm preview` serves the built app locally.
+- `pnpm db:*` manage the local database (see [Local development](#local-development)).
+
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and on pushes to `main`. A separate `db` job starts a fresh local Supabase, applies all migrations and the seed, lints database functions and replays the migrations from scratch, so a migration that fails on an empty database fails CI. Contributor conventions are in `AGENTS.md`.
 
 ## Philosophy
 

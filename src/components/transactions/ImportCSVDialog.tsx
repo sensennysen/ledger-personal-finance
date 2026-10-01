@@ -1,21 +1,74 @@
-import { useState, useCallback, useRef } from 'react'
-import { Upload, X, AlertCircle, Loader2, FileText } from 'lucide-react'
+import { useState, useCallback, useRef, useMemo } from 'react'
+import { Upload, X, AlertCircle, AlertTriangle, Loader2, FileText, Copy, Filter, ArrowLeftRight } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
-import { formatCurrency } from '@/lib/utils'
+import { useCategories } from '@/hooks/useCategories'
+import { useImportCategoryMemory } from '@/hooks/useImportCategoryMemory'
+import { useImportDuplicates } from '@/hooks/useImportDuplicates'
+import { useRenderWindow } from '@/hooks/useRenderWindow'
+import { similarRows } from '@/lib/importCategories'
+import { duplicateSpan, matchDuplicates, type ExistingTx } from '@/lib/importDuplicates'
+import {
+  buildRows,
+  EMPTY_DESCRIPTION,
+  fixableByOtherOrder,
+  groupProblems,
+  hasError,
+  importableRows,
+  isProblem,
+  isSelectable,
+  isSelected,
+  skipReason,
+  processFile,
+  rowIssues,
+  selectAll,
+  sortProblemsFirst,
+  summarise,
+  withAmbiguousDateIssues,
+  withCategoryIssues,
+  type BankFormat,
+  type CauseId,
+  type DateOrder,
+  type ParsedFile,
+  type Severity,
+} from '@/lib/csvImport'
+import { suggestCategory, type Suggestion } from '@/lib/importCategories'
+import { convertAmount, currencyState, effectiveRate, formatSuggestedRate, rateInputValue } from '@/lib/importCurrency'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { lookupRate, ratesAsOfLabel } from '@/lib/exchangeRates'
+import { looksLikeTransfer, transferCandidates, transferLegs } from '@/lib/importTransfer'
+import { WINDOW_STEP } from '@/lib/transactionWindow'
+import { CURRENCIES } from '@/types'
+import { cn, formatCurrency } from '@/lib/utils'
+import { MINUS } from '@/lib/netSign'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { TechnicalDetail } from '@/components/ui/technical-detail'
 
 export interface ImportTx {
   date: string
   description: string
+  /** In the account's currency, converted when the statement's differs. */
   amount: number
-  type: 'income' | 'expense'
+  /** The statement's own amount and currency, kept when it was converted (LED-136). */
+  original?: { amount: number; currency: string } | null
+  type: 'income' | 'expense' | 'transfer'
   account_id: string
+  to_account_id: string | null
   currency: string
-  category_id: null
+  category_id: string | null
 }
 
 interface Props {
@@ -24,219 +77,7 @@ interface Props {
   onImport: (txs: ImportTx[]) => Promise<{ imported: number; error: string | null }>
 }
 
-type BankFormat = 'BDO' | 'BPI' | 'Metrobank' | 'Generic'
-
-interface ParsedRow {
-  date: string
-  description: string
-  amount: number
-  type: 'income' | 'expense'
-}
-
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024
-const MAX_IMPORT_ROWS = 5000
-const PREVIEW_ROW_COUNT = 8
-
-function parseCSVText(text: string): string[][] {
-  const rows: string[][] = []
-  const normalized = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  let currentRow: string[] = []
-  let currentCell = ''
-  let inQuotes = false
-
-  for (let i = 0; i < normalized.length; i++) {
-    const ch = normalized[i]
-    const next = normalized[i + 1]
-
-    if (ch === '"') {
-      if (inQuotes && next === '"') {
-        currentCell += '"'
-        i++
-      } else {
-        inQuotes = !inQuotes
-      }
-      continue
-    }
-
-    if (ch === ',' && !inQuotes) {
-      currentRow.push(currentCell.trim())
-      currentCell = ''
-      continue
-    }
-
-    if (ch === '\n' && !inQuotes) {
-      currentRow.push(currentCell.trim())
-      if (currentRow.some((cell) => cell.length > 0)) {
-        rows.push(currentRow)
-      }
-      currentRow = []
-      currentCell = ''
-      continue
-    }
-
-    currentCell += ch
-  }
-
-  if (inQuotes) {
-    throw new Error('The CSV file has an unmatched quote. Please export the file again and retry.')
-  }
-
-  if (currentCell.length > 0 || currentRow.length > 0) {
-    currentRow.push(currentCell.trim())
-    if (currentRow.some((cell) => cell.length > 0)) {
-      rows.push(currentRow)
-    }
-  }
-
-  return rows
-}
-
-function findHeaderRowIndex(rows: string[][]): number {
-  const keywords = ['date', 'description', 'amount', 'debit', 'credit', 'balance', 'remarks', 'particulars']
-  for (let i = 0; i < Math.min(rows.length, 25); i++) {
-    const row = rows[i].map((cell) => cell.toLowerCase())
-    const matches = keywords.filter((keyword) => row.some((cell) => cell.includes(keyword))).length
-    if (matches >= 2) return i
-  }
-  return -1
-}
-
-function detectFormat(headers: string[]): BankFormat {
-  const normalized = headers.map((cell) => cell.toLowerCase().trim())
-  const has = (term: string) => normalized.some((cell) => cell.includes(term))
-  if (has('post date') || has('ref. no') || has('reference no')) return 'Metrobank'
-  if (has('transaction date') || (has('date') && has('debit') && has('credit'))) return 'BDO'
-  if (has('date') && has('amount') && !has('debit') && !has('credit')) return 'BPI'
-  return 'Generic'
-}
-
-function normalizeDate(value: string): string | null {
-  if (!value) return null
-  const clean = value.trim()
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean
-
-  const monthDayYear = clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-  if (monthDayYear) return `${monthDayYear[3]}-${monthDayYear[1].padStart(2, '0')}-${monthDayYear[2].padStart(2, '0')}`
-
-  const shortMonthMap: Record<string, string> = {
-    jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
-    jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
-  }
-
-  const dayMonYear = clean.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/)
-  if (dayMonYear) {
-    const month = shortMonthMap[dayMonYear[2].toLowerCase()]
-    if (month) return `${dayMonYear[3]}-${month}-${dayMonYear[1].padStart(2, '0')}`
-  }
-
-  const monDayYear = clean.match(/^([A-Za-z]{3})\s+(\d{1,2}),?\s*(\d{4})$/)
-  if (monDayYear) {
-    const month = shortMonthMap[monDayYear[1].toLowerCase()]
-    if (month) return `${monDayYear[3]}-${month}-${monDayYear[2].padStart(2, '0')}`
-  }
-
-  return null
-}
-
-function parseAmt(value: string): number {
-  const cleaned = value.replace(/[,₱$\s]/g, '').replace(/^\((.+)\)$/, '-$1')
-  return parseFloat(cleaned) || 0
-}
-
-function parseRows(rows: string[][], headerIdx: number, format: BankFormat): ParsedRow[] {
-  const headers = rows[headerIdx].map((cell) => cell.toLowerCase().trim())
-  const col = (terms: string[]) => headers.findIndex((header) => terms.some((term) => header.includes(term)))
-
-  const dateIdx = col(['transaction date', 'post date', 'date'])
-  const descIdx = col(['description', 'remarks', 'particulars', 'details', 'memo', 'narration'])
-  const amountIdx = col(['amount'])
-  const debitIdx = col(['debit amount', 'debit'])
-  const creditIdx = col(['credit amount', 'credit'])
-
-  const result: ParsedRow[] = []
-
-  for (let i = headerIdx + 1; i < rows.length; i++) {
-    const row = rows[i]
-    if (!row.length || row.every((cell) => !cell)) continue
-
-    const dateStr = dateIdx >= 0 ? (row[dateIdx] ?? '') : ''
-    const date = normalizeDate(dateStr)
-    if (!date) continue
-
-    const rawDesc = descIdx >= 0 ? (row[descIdx] ?? '') : (row[1] ?? '')
-    const description = rawDesc.replace(/^"|"$/g, '').trim()
-    if (!description) continue
-
-    const lowerDescription = description.toLowerCase()
-    if (
-      lowerDescription.includes('beg balance') ||
-      lowerDescription.includes('beginning balance') ||
-      lowerDescription.includes('end balance') ||
-      lowerDescription.includes('opening balance')
-    ) {
-      continue
-    }
-
-    let parsedRow: ParsedRow | null = null
-
-    if (format === 'BPI' || (format === 'Generic' && amountIdx >= 0)) {
-      const rawAmount = parseAmt(row[amountIdx] ?? '')
-      if (rawAmount === 0) continue
-      parsedRow = rawAmount < 0
-        ? { date, description, amount: Math.abs(rawAmount), type: 'expense' }
-        : { date, description, amount: rawAmount, type: 'income' }
-    } else {
-      const debit = debitIdx >= 0 ? parseAmt(row[debitIdx] ?? '') : 0
-      const credit = creditIdx >= 0 ? parseAmt(row[creditIdx] ?? '') : 0
-      if (debit > 0) {
-        parsedRow = { date, description, amount: debit, type: 'expense' }
-      } else if (credit > 0) {
-        parsedRow = { date, description, amount: credit, type: 'income' }
-      }
-    }
-
-    if (parsedRow) {
-      result.push(parsedRow)
-    }
-  }
-
-  return result
-}
-
-function processFile(text: string): { format: BankFormat; rows: ParsedRow[] } | { error: string } {
-  let rawRows: string[][]
-  try {
-    rawRows = parseCSVText(text)
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Could not parse this CSV file.' }
-  }
-
-  if (rawRows.length < 2) {
-    return { error: 'File appears to be empty or has no data rows.' }
-  }
-
-  const headerIdx = findHeaderRowIndex(rawRows)
-  if (headerIdx < 0) {
-    return {
-      error:
-        'Could not detect a valid header row. Make sure this is a bank CSV export with columns like Date, Description, Debit, or Credit.',
-    }
-  }
-
-  const format = detectFormat(rawRows[headerIdx])
-  const rows = parseRows(rawRows, headerIdx, format)
-  if (rows.length === 0) {
-    return { error: 'No valid transactions found in the file.' }
-  }
-  if (rows.length > MAX_IMPORT_ROWS) {
-    return {
-      error: `This file contains ${rows.length} rows. The current import limit is ${MAX_IMPORT_ROWS} rows to keep the app responsive.`,
-    }
-  }
-
-  return { format, rows }
-}
 
 const FORMAT_LABELS: Record<BankFormat, string> = {
   BDO: 'BDO',
@@ -245,37 +86,176 @@ const FORMAT_LABELS: Record<BankFormat, string> = {
   Generic: 'Generic CSV',
 }
 
+const SEVERITY_ICON: Record<Severity, { icon: typeof AlertCircle; className: string }> = {
+  error: { icon: AlertCircle, className: 'text-destructive' },
+  warning: { icon: AlertTriangle, className: 'text-muted-foreground' },
+  duplicate: { icon: Copy, className: 'text-muted-foreground' },
+}
+
+const ORDER_LABELS: Record<DateOrder, string> = { DMY: 'D/M/Y', MDY: 'M/D/Y' }
+
+function DateOrderToggle({ order, onChange }: { order: DateOrder; onChange: (order: DateOrder) => void }) {
+  return (
+    <div className="inline-flex rounded-full border p-0.5">
+      {(['DMY', 'MDY'] as DateOrder[]).map((option) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={order === option}
+          onClick={() => onChange(option)}
+          className={cn(
+            'rounded-full px-3 py-1 text-xs font-semibold transition-colors',
+            order === option ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {ORDER_LABELS[option]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const flip = <T,>(set: ReadonlySet<T>, value: T): Set<T> => {
+  const next = new Set(set)
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  return next
+}
+
+// The row's Category control holds a category or a transfer: `cat:<id>`,
+// `to:<account id>`, or NO_CATEGORY.
+const NO_CATEGORY = 'none'
+
+const plural = (count: number, word: string) => `${count.toLocaleString()} ${word}${count !== 1 ? 's' : ''}`
+
 export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const { accounts } = useAccounts()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [parsed, setParsed] = useState<{ format: BankFormat; rows: ParsedRow[] } | null>(null)
+  const [file, setFile] = useState<ParsedFile | null>(null)
+  const [fileKey, setFileKey] = useState(0)
+  const [dateOrder, setDateOrder] = useState<DateOrder>('MDY')
+  // Picking an order, even the default one, settles an ambiguous file (LED-147).
+  const [dateOrderConfirmed, setDateOrderConfirmed] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
   const [accountId, setAccountId] = useState<string>('')
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ imported: number; account: string } | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [skipped, setSkipped] = useState<Set<CauseId>>(new Set())
+  const [toggled, setToggled] = useState<Set<number>>(new Set())
+  const [transfers, setTransfers] = useState<Map<number, string>>(new Map())
+  /** Categories the user chose; '' means they chose none. */
+  const [picks, setPicks] = useState<Map<number, string>>(new Map())
+  const [pickedCurrency, setPickedCurrency] = useState('')
+  // null until the user types: the input then shows the exchange-rate table's rate (LED-136).
+  const [rateInput, setRateInput] = useState<string | null>(null)
+  const [activeCause, setActiveCause] = useState<CauseId | null>(null)
+  const [onlyProblems, setOnlyProblems] = useState(false)
+  /** After a category pick: the same-payee rows it could also fill, then what was applied so it can be undone (LED-147). */
+  const [similarOffer, setSimilarOffer] = useState<{ categoryId: string; lines: number[] } | null>(null)
+  const [similarApplied, setSimilarApplied] = useState<{ categoryId: string; lines: number[] } | null>(null)
 
+  const { categories } = useCategories()
+  const categoryMemory = useImportCategoryMemory(file ? fileKey : null)
+  const categoryById = new Map(categories.map((category) => [category.id, category]))
   const selectedAccount = accounts.find((account) => account.id === accountId)
+  const accountCurrency = selectedAccount?.currency ?? ''
+  const statementCurrency = pickedCurrency || accountCurrency
+  const { table: rateTable } = useExchangeRates()
+  const tableRate = lookupRate(rateTable, statementCurrency, accountCurrency)
+  const suggestedRate = formatSuggestedRate(tableRate.kind === 'rate' ? tableRate.rate : null)
+  const rateText = rateInputValue(rateInput, suggestedRate)
+  const conversion = currencyState(statementCurrency, accountCurrency, rateText)
+  const rate = effectiveRate(conversion)
+  const candidates = selectedAccount ? transferCandidates(accounts, selectedAccount) : []
+
+  const built = useMemo(
+    () => (file ? buildRows(file.raw, file.headerIdx, file.format, dateOrder) : { rows: [], ignored: 0 }),
+    [file, dateOrder],
+  )
+  const span = useMemo(() => duplicateSpan(built.rows), [built.rows])
+  const dupeCheck = useImportDuplicates(accountId, span)
+  // Compare in the account's currency: that's what the existing rows are in.
+  const duplicates = matchDuplicates(
+    built.rows.map((row) =>
+      row.amount === null
+        ? row
+        : {
+            ...row,
+            amount: convertAmount(row.amount, rate),
+            original: conversion.kind === 'ok' ? { amount: row.amount, currency: statementCurrency } : null,
+          },
+    ),
+    dupeCheck.existing,
+    accountId,
+  )
+  const suggestions = new Map<number, Suggestion>()
+  const uncategorised = new Set<number>()
+  for (const row of built.rows) {
+    if (row.type === null || transfers.has(row.line)) continue
+    // Rows that stay out anyway (an error, or already in Ledger) aren't flagged.
+    const leftOut = hasError(row.issues) || (duplicates.has(row.line) && !toggled.has(row.line))
+    const suggestion = suggestCategory(row, categoryMemory.rules, categoryMemory.memory, categoryById)
+    if (suggestion) suggestions.set(row.line, suggestion)
+    else if (!leftOut && !picks.has(row.line) && !categoryMemory.loading) uncategorised.add(row.line)
+  }
+  const rows = withCategoryIssues(
+    withAmbiguousDateIssues(built.rows, Boolean(file?.dateOrderAmbiguous) && !dateOrderConfirmed),
+    uncategorised,
+  )
+  const categoryOf = (line: number): string | null => {
+    const pick = picks.get(line)
+    return pick !== undefined ? pick || null : (suggestions.get(line)?.categoryId ?? null)
+  }
+
+  const selection = { duplicates, skipped, toggled }
+  const summary = summarise(rows, selection)
+  const toImport = importableRows(rows, selection)
+  const causes = groupProblems(rows, duplicates)
+  const cause = causes.find((item) => item.id === activeCause) ?? causes[0]
+
+  const sorted = sortProblemsFirst(rows, duplicates)
+  const listed = onlyProblems ? sorted.filter((row) => isProblem(row, duplicates)) : sorted
+  const { rendered, sentinelRef } = useRenderWindow(listed.length, {
+    step: WINDOW_STEP.desktop,
+    resetKey: `${fileKey}|${onlyProblems}|${dateOrder}`,
+  })
+
+  const chooseDateOrder = (order: DateOrder) => {
+    setDateOrder(order)
+    setDateOrderConfirmed(true)
+  }
 
   const reset = () => {
-    setParsed(null)
+    setFile(null)
     setParseError(null)
     setAccountId('')
     setImportResult(null)
+    setSkipped(new Set())
+    setToggled(new Set())
+    setTransfers(new Map())
+    setPicks(new Map())
+    setDateOrderConfirmed(false)
+    setPickedCurrency('')
+    setRateInput(null)
+    setActiveCause(null)
+    setOnlyProblems(false)
+    setSimilarOffer(null)
+    setSimilarApplied(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleFile = useCallback(
-    (file: File) => {
-      if (file.size === 0) {
+    (picked: File) => {
+      if (picked.size === 0) {
         setParseError('Empty files cannot be imported.')
         return
       }
-      if (!file.name.match(/\.(csv|txt)$/i)) {
+      if (!picked.name.match(/\.(csv|txt)$/i)) {
         setParseError('Please upload a CSV file (.csv or .txt).')
         return
       }
-      if (file.size > MAX_IMPORT_FILE_SIZE) {
+      if (picked.size > MAX_IMPORT_FILE_SIZE) {
         setParseError('File too large. Maximum import size is 5 MB.')
         return
       }
@@ -286,42 +266,127 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         const result = processFile(text)
         if ('error' in result) {
           setParseError(result.error)
-          setParsed(null)
+          setFile(null)
           return
         }
 
-        setParsed(result)
+        setFile(result)
+        setFileKey((key) => key + 1)
+        setDateOrder(result.dateOrder)
+        setDateOrderConfirmed(false)
         setParseError(null)
-        if (!accountId && accounts.length > 0) {
+        setSkipped(new Set())
+        setToggled(new Set())
+        setTransfers(new Map())
+        setPicks(new Map())
+        setActiveCause(null)
+        setOnlyProblems(false)
+        setSimilarOffer(null)
+        setSimilarApplied(null)
+        // Only an unambiguous target is picked for the user (LED-75).
+        if (!accountId && accounts.length === 1) {
           setAccountId(accounts[0].id)
         }
       }
-      reader.readAsText(file)
+      reader.readAsText(picked)
     },
     [accountId, accounts],
   )
 
   const handleFileInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) handleFile(file)
+    const picked = event.target.files?.[0]
+    if (picked) handleFile(picked)
   }
 
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault()
     setDragOver(false)
-    const file = event.dataTransfer.files[0]
-    if (file) handleFile(file)
+    const picked = event.dataTransfer.files[0]
+    if (picked) handleFile(picked)
   }
 
+  const changeAccount = (id: string) => {
+    setAccountId(id)
+    // Transfer counterparts depend on the account; its own rows can't be one.
+    setTransfers(new Map())
+    setSimilarOffer(null)
+    setSimilarApplied(null)
+  }
+
+  const setKind = (line: number, value: string) => {
+    const transferTo = value.startsWith('to:') ? value.slice(3) : null
+    setTransfers((current) => {
+      const next = new Map(current)
+      if (transferTo) next.set(line, transferTo)
+      else next.delete(line)
+      return next
+    })
+    if (!transferTo) {
+      setPicks((current) => new Map(current).set(line, value.startsWith('cat:') ? value.slice(4) : ''))
+    }
+    setSimilarApplied(null)
+    setSimilarOffer(null)
+    if (value.startsWith('cat:')) {
+      const categoryId = value.slice(4)
+      const lines = similarRows(rows, line, (other) => {
+        const row = rows.find((item) => item.line === other)
+        return (
+          Boolean(row) &&
+          !picks.has(other) &&
+          !transfers.has(other) &&
+          !hasError(row!.issues) &&
+          !(duplicates.has(other) && !toggled.has(other)) &&
+          categoryOf(other) !== categoryId
+        )
+      })
+      if (lines.length > 0) setSimilarOffer({ categoryId, lines })
+    }
+  }
+
+  const applySimilar = () => {
+    if (!similarOffer) return
+    setPicks((current) => {
+      const next = new Map(current)
+      for (const line of similarOffer.lines) next.set(line, similarOffer.categoryId)
+      return next
+    })
+    setSimilarApplied(similarOffer)
+    setSimilarOffer(null)
+  }
+
+  // Removing the picks returns those rows to what they had: a suggestion, or unmatched.
+  const undoSimilar = () => {
+    if (!similarApplied) return
+    setPicks((current) => {
+      const next = new Map(current)
+      for (const line of similarApplied.lines) next.delete(line)
+      return next
+    })
+    setSimilarApplied(null)
+  }
+
+  const needsRate = conversion.kind === 'needs-rate'
+  const blocked =
+    summary.errors > 0 || dupeCheck.loading || Boolean(dupeCheck.error) || needsRate || categoryMemory.loading
+  const selectableRows = rows.filter((row) => isSelectable(row, selection))
+  const allSelected = selectableRows.length > 0 && selectableRows.every((row) => isSelected(row, selection))
+
   const handleImport = async () => {
-    if (!parsed || !accountId || !selectedAccount) return
+    if (!file || !accountId || !selectedAccount || blocked || toImport.length === 0) return
     setImporting(true)
-    const txs: ImportTx[] = parsed.rows.map((row) => ({
-      ...row,
-      account_id: accountId,
-      currency: selectedAccount.currency,
-      category_id: null,
-    }))
+    const txs: ImportTx[] = toImport.map((row) => {
+      const base = {
+        date: row.date!,
+        description: row.description || EMPTY_DESCRIPTION,
+        amount: convertAmount(row.amount!, rate),
+        currency: selectedAccount.currency,
+        original: conversion.kind === 'ok' ? { amount: row.amount!, currency: statementCurrency } : null,
+      }
+      const other = transfers.get(row.line)
+      return other
+        ? { ...base, type: 'transfer', category_id: null, ...transferLegs(row.type!, accountId, other) }
+        : { ...base, type: row.type!, account_id: accountId, to_account_id: null, category_id: categoryOf(row.line) }
+    })
     const result = await onImport(txs)
     setImporting(false)
     if (result.error) {
@@ -331,6 +396,23 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     }
   }
 
+  const accountName = (id: string | null) => accounts.find((account) => account.id === id)?.name ?? 'another account'
+
+  const describeMatch = (match: ExistingTx) => {
+    if (match.type === 'transfer') {
+      const inbound = match.account_id !== accountId
+      const amount = Number(match.amount) * (inbound ? Number(match.exchange_rate ?? 1) : 1)
+      return `${match.date} · transfer ${inbound ? `from ${accountName(match.account_id)}` : `to ${accountName(match.to_account_id)}`} · ${formatCurrency(amount, accountCurrency)}`
+    }
+    if (match.type === 'expense' && match.to_account_id) {
+      const inbound = match.account_id !== accountId
+      return `${match.date} · payment ${inbound ? `from ${accountName(match.account_id)}` : `to ${accountName(match.to_account_id)}`} · ${formatCurrency(Number(match.amount), accountCurrency)}`
+    }
+    return `${match.date} · ${match.description || EMPTY_DESCRIPTION} · ${formatCurrency(Number(match.amount), accountCurrency)}`
+  }
+
+  const firstShown = listed.length > 0 ? 1 : 0
+
   return (
     <Dialog
       open={open}
@@ -339,7 +421,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         onOpenChange(isOpen)
       }}
     >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] grid-cols-[minmax(0,1fr)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-4 h-4" />
@@ -349,7 +431,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
 
         {importResult ? (
           <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <div className="w-14 h-14 rounded-full bg-[oklch(0.660_0.150_155/0.15)] flex items-center justify-center">
+            <div className="w-14 h-14 rounded-full bg-income-container flex items-center justify-center">
               <FileText className="w-7 h-7 text-income" />
             </div>
             <div>
@@ -357,8 +439,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                 {importResult.imported} transaction{importResult.imported !== 1 ? 's' : ''} imported
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Added to <span className="font-medium">{importResult.account}</span>. You can
-                bulk re-categorize them from the transactions list.
+                Added to <span className="font-medium">{importResult.account}</span>.
               </p>
             </div>
             <Button
@@ -372,7 +453,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
           </div>
         ) : (
           <div className="space-y-4">
-            {!parsed && (
+            {!file && (
               <div
                 className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
                   dragOver
@@ -409,13 +490,14 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
               </div>
             )}
 
-            {parsed && (
+            {file && (
               <>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{FORMAT_LABELS[parsed.format]}</Badge>
+                    <Badge variant="secondary">{FORMAT_LABELS[file.format]}</Badge>
                     <span className="text-sm text-muted-foreground">
-                      {parsed.rows.length} transactions found
+                      {plural(rows.length, 'row')} parsed
+                      {built.ignored > 0 && ` · ${plural(built.ignored, 'balance or zero line')} ignored`}
                     </span>
                   </div>
                   <Button variant="ghost" size="sm" onClick={reset} className="gap-1.5 h-7">
@@ -424,74 +506,453 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                   </Button>
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label>Import to account</Label>
-                  <Select value={accountId} onValueChange={(value) => setAccountId(value ?? '')}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((account) => (
-                        <SelectItem key={account.id} value={account.id}>
-                          {account.name} ({account.currency})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="import-account">Import to</Label>
+                    <Select value={accountId} onValueChange={(value) => changeAccount(value ?? '')}>
+                      <SelectTrigger id="import-account" className="w-full">
+                        <SelectValue placeholder="Choose an account">
+                          {() =>
+                            selectedAccount
+                              ? `${selectedAccount.name} (${selectedAccount.currency})`
+                              : 'Choose an account'
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>
+                            {account.name} ({account.currency})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="import-currency">Statement currency</Label>
+                    <Select
+                      value={statementCurrency}
+                      onValueChange={(value) => setPickedCurrency(value ?? '')}
+                      disabled={!selectedAccount}
+                    >
+                      <SelectTrigger id="import-currency" className="w-full">
+                        <SelectValue placeholder="—" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CURRENCIES.map((item) => (
+                          <SelectItem key={item.code} value={item.code}>
+                            {item.code}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Preview - first {Math.min(parsed.rows.length, PREVIEW_ROW_COUNT)} of {parsed.rows.length}
+                {!selectedAccount && (
+                  <p className="text-xs text-muted-foreground">
+                    Choose the account this statement belongs to. Nothing is imported until you do.
                   </p>
-                  <div className="rounded-lg border overflow-hidden">
+                )}
+
+                {conversion.kind !== 'same' && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning-container px-3 py-2 text-sm">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-warning" />
+                    <span className="flex-1 min-w-48">
+                      Statement is in {statementCurrency}; {selectedAccount?.name} is in {accountCurrency}. Amounts
+                      convert at the rate below.
+                      {rateInput === null && suggestedRate && (
+                        <span className="block text-xs text-muted-foreground">
+                          {tableRate.kind === 'rate' && tableRate.source === 'override'
+                            ? 'Filled in from your rate in Settings.'
+                            : `Filled in from the exchange-rate feed${ratesAsOfLabel(rateTable) ? `, as of ${ratesAsOfLabel(rateTable)}` : ''}.`}{' '}
+                          Change it if your bank used another.
+                        </span>
+                      )}
+                      {rateInput === null && !suggestedRate && (
+                        <span className="block text-xs text-muted-foreground">
+                          No rate found for this pair. Enter the one your bank used.
+                        </span>
+                      )}
+                    </span>
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      1 {statementCurrency} =
+                      <Input
+                        inputMode="decimal"
+                        value={rateText}
+                        onChange={(event) => setRateInput(event.target.value)}
+                        aria-label={`${accountCurrency} per ${statementCurrency}`}
+                        aria-invalid={needsRate && rateText !== ''}
+                        placeholder="Rate"
+                        className="h-7 w-24 text-right tabular-nums"
+                      />
+                      {accountCurrency}
+                    </label>
+                  </div>
+                )}
+
+                {categoryMemory.error && (
+                  <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p>
+                        Couldn't load category suggestions. {categoryMemory.error} Rows import uncategorized unless you
+                        choose one.
+                      </p>
+                      {categoryMemory.errorDetail && <TechnicalDetail detail={categoryMemory.errorDetail} className="mt-1" />}
+                    </div>
+                    <Button variant="outline" size="sm" className="h-7" onClick={categoryMemory.retry}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                {dupeCheck.error && (
+                  <div className="flex items-start gap-2 p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p>Couldn't check for duplicates. {dupeCheck.error}</p>
+                      {dupeCheck.errorDetail && <TechnicalDetail detail={dupeCheck.errorDetail} className="mt-1" />}
+                    </div>
+                    <Button variant="outline" size="sm" className="h-7" onClick={dupeCheck.retry}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-lg border bg-border overflow-hidden">
+                  {[
+                    { label: 'Ready', value: summary.ready.toLocaleString(), tone: '' },
+                    { label: 'Errors · blocks import', value: summary.errors.toLocaleString(), tone: summary.errors > 0 ? 'text-destructive' : '' },
+                    { label: 'Warnings · imports anyway', value: summary.warnings.toLocaleString(), tone: '' },
+                    { label: 'Likely duplicates', value: dupeCheck.loading ? '…' : dupeCheck.error ? '—' : summary.duplicates.toLocaleString(), tone: '' },
+                  ].map((stat) => (
+                    <div key={stat.label} className="bg-popover px-3 py-2.5">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+                      <p className={cn('text-xl font-semibold tabular-nums mt-0.5', stat.tone)}>{stat.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {cause && (
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,15rem)_1fr] rounded-lg border p-3">
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Problems by cause</p>
+                      {causes.map((item) => {
+                        const { icon: Icon, className } = SEVERITY_ICON[item.severity]
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            aria-pressed={item.id === cause.id}
+                            onClick={() => setActiveCause(item.id)}
+                            className={cn(
+                              'w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left transition-colors',
+                              item.id === cause.id ? 'bg-muted font-medium' : 'hover:bg-muted/50',
+                            )}
+                          >
+                            <Icon className={cn('w-3.5 h-3.5 shrink-0', className)} />
+                            <span className={cn('flex-1 truncate', skipped.has(item.id) && 'line-through text-muted-foreground')}>
+                              {item.label}
+                            </span>
+                            <span className="tabular-nums text-muted-foreground">{item.lines.length.toLocaleString()}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    <div className="space-y-2 text-sm sm:border-l sm:pl-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {cause.severity === 'duplicate'
+                          ? `${plural(cause.lines.length, 'row')} already in Ledger`
+                          : `Fix all ${cause.lines.length.toLocaleString()} at once`}
+                      </p>
+
+                      {cause.id === 'bad-date' && (
+                        <>
+                          <p className="text-muted-foreground">
+                            Dates in these rows read <code className="text-foreground">{cause.sample || '(empty)'}</code>.
+                            {' '}Parse every slash date in the file as
+                          </p>
+                          <DateOrderToggle order={dateOrder} onChange={chooseDateOrder} />
+                          {fixableByOtherOrder(rows, dateOrder) === 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Switching the order won't fix these. Correct the dates in the file, or skip these rows.
+                            </p>
+                          )}
+                        </>
+                      )}
+
+                      {cause.id === 'ambiguous-date' && (
+                        <>
+                          <p className="text-muted-foreground">
+                            Every slash date in this file has a day and month at or below 12, so it reads either way
+                            (<code className="text-foreground">{cause.sample}</code> is a different day in each order).
+                            {' '}It is read as {ORDER_LABELS[dateOrder]}. Confirm the order the bank uses:
+                          </p>
+                          <DateOrderToggle order={dateOrder} onChange={chooseDateOrder} />
+                        </>
+                      )}
+
+                      {cause.id === 'bad-amount' && (
+                        <p className="text-muted-foreground">
+                          Amounts in these rows read <code className="text-foreground">{cause.sample || '(empty)'}</code>.
+                          Correct them in the file, or skip these rows.
+                        </p>
+                      )}
+
+                      {cause.id === 'no-category' && (
+                        <p className="text-muted-foreground">
+                          No rule or past transaction matches these payees. Choose a category in the table, or they
+                          import uncategorized.
+                        </p>
+                      )}
+
+                      {cause.id === 'empty-description' && (
+                        <p className="text-muted-foreground">These rows import as “{EMPTY_DESCRIPTION}”.</p>
+                      )}
+
+                      {cause.id === 'duplicate' ? (
+                        <p className="text-muted-foreground">
+                          Skipped unless you tick a row below to import it anyway.
+                        </p>
+                      ) : cause.id === 'ambiguous-date' ? null : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7"
+                          onClick={() => setSkipped((current) => flip(current, cause.id))}
+                        >
+                          {skipped.has(cause.id) ? 'Import these rows again' : 'Skip these rows'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {(similarOffer || similarApplied) && (
+                  <div role="status" className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                    {similarOffer ? (
+                      <>
+                        <span className="flex-1">
+                          Apply {categoryById.get(similarOffer.categoryId)?.name ?? 'this category'} to {plural(similarOffer.lines.length, 'similar row')} from the same payee?
+                        </span>
+                        <Button size="sm" className="h-7" onClick={applySimilar}>Apply</Button>
+                        <Button size="sm" variant="ghost" className="h-7" onClick={() => setSimilarOffer(null)}>Not now</Button>
+                      </>
+                    ) : similarApplied ? (
+                      <>
+                        <span className="flex-1">
+                          Applied {categoryById.get(similarApplied.categoryId)?.name ?? 'the category'} to {plural(similarApplied.lines.length, 'row')}.
+                        </span>
+                        <Button size="sm" variant="ghost" className="h-7" onClick={undoSimilar}>Undo</Button>
+                      </>
+                    ) : null}
+                  </div>
+                )}
+
+                <div>
+                  <div className="rounded-lg border overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-muted/50">
+                          <th className="w-8 px-2 py-2 text-center">
+                            <input
+                              type="checkbox"
+                              aria-label="Select every row that can be imported"
+                              checked={allSelected}
+                              disabled={selectableRows.length === 0}
+                              onChange={() => setToggled(selectAll(rows, selection, !allSelected))}
+                            />
+                          </th>
+                          <th className="text-right px-2 py-2 font-medium text-xs text-muted-foreground">Row</th>
                           <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Date</th>
                           <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Description</th>
+                          <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Category</th>
                           <th className="text-right px-3 py-2 font-medium text-xs text-muted-foreground">Amount</th>
-                          <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground">Type</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {parsed.rows.slice(0, PREVIEW_ROW_COUNT).map((row, index) => (
-                          <tr key={index} className="border-b last:border-0 hover:bg-muted/30">
-                            <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{row.date}</td>
-                            <td className="px-3 py-2 max-w-50 truncate">{row.description}</td>
-                            <td
-                              className={`px-3 py-2 text-right font-medium tabular-nums ${
-                                row.type === 'expense'
-                                  ? 'text-expense'
-                                  : 'text-income'
-                              }`}
+                        {listed.slice(0, rendered).map((row) => {
+                          const issues = rowIssues(row, duplicates)
+                          const match = duplicates.get(row.line)
+                          const selectable = isSelectable(row, selection)
+                          const selected = isSelected(row, selection)
+                          const transferTo = transfers.get(row.line)
+                          const suggestTransfer = !transferTo && looksLikeTransfer(row.description, categoryMemory.rules)
+                          const categoryId = categoryOf(row.line)
+                          const category = categoryId ? categoryById.get(categoryId) : undefined
+                          const auto = Boolean(category) && !picks.has(row.line)
+                          const reason = skipReason(row, selection)
+                          const fitting = categories.filter((item) => item.type === row.type || item.type === 'both')
+                          return (
+                            <tr
+                              key={row.line}
+                              className="border-b last:border-0 hover:bg-muted/30"
                             >
-                              {row.type === 'expense' ? '-' : '+'}
-                              {formatCurrency(row.amount, selectedAccount?.currency ?? 'PHP')}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <Badge
-                                variant={row.type === 'expense' ? 'destructive' : 'secondary'}
-                                className="text-xs capitalize"
-                              >
-                                {row.type}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
+                              <td className="px-2 py-2 text-center">
+                                {selectable && (
+                                  <input
+                                    type="checkbox"
+                                    aria-label={match ? `Import row ${row.line} anyway` : `Import row ${row.line}`}
+                                    checked={selected}
+                                    onChange={() => setToggled((current) => flip(current, row.line))}
+                                  />
+                                )}
+                              </td>
+                              <td className="px-2 py-2 text-right text-xs text-muted-foreground tabular-nums">{row.line}</td>
+                              <td className="px-3 py-2 text-xs whitespace-nowrap">
+                                {issues.includes('bad-date') ? (
+                                  <span className="flex items-center gap-1 text-destructive">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    {row.rawDate || '(empty)'}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">{row.date}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 max-w-72">
+                                <span className="flex items-center gap-1.5 min-w-0">
+                                  {match && <Copy className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+                                  {issues.includes('empty-description') ? (
+                                    <span className="flex items-center gap-1 italic text-muted-foreground">
+                                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                      {EMPTY_DESCRIPTION}
+                                    </span>
+                                  ) : (
+                                    <span className={cn('truncate', reason && 'line-through text-muted-foreground')}>{row.description}</span>
+                                  )}
+                                  {match && (
+                                    <Badge variant="secondary" className="text-[10px] shrink-0">already in Ledger</Badge>
+                                  )}
+                                </span>
+                                {match && (
+                                  <span className="block text-xs text-muted-foreground truncate">
+                                    Matches {describeMatch(match)}
+                                  </span>
+                                )}
+                                {reason && (
+                                  <span className="block text-xs font-medium text-muted-foreground">{reason}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {row.type !== null ? (
+                                  <Select
+                                    value={transferTo ? `to:${transferTo}` : categoryId ? `cat:${categoryId}` : NO_CATEGORY}
+                                    onValueChange={(value) => setKind(row.line, value ?? NO_CATEGORY)}
+                                  >
+                                    <SelectTrigger
+                                      size="sm"
+                                      aria-label={`Row ${row.line} category`}
+                                      className={cn(
+                                        'h-7 w-auto max-w-48 text-xs',
+                                        !transferTo && !category && 'border-dashed text-muted-foreground',
+                                      )}
+                                    >
+                                      <SelectValue>
+                                        {() =>
+                                          transferTo ? (
+                                            <span className="inline-flex items-center gap-1">
+                                              <ArrowLeftRight className="w-3 h-3" />
+                                              {row.type === 'expense' ? 'To' : 'From'} {accountName(transferTo)}
+                                            </span>
+                                          ) : category ? (
+                                            <span className="inline-flex items-center gap-1.5 min-w-0">
+                                              <span className="truncate">{category.name}</span>
+                                              {auto && <span className="text-[10px] text-muted-foreground">auto</span>}
+                                            </span>
+                                          ) : suggestTransfer && candidates.length > 0 ? (
+                                            'Make a transfer?'
+                                          ) : (
+                                            'Choose…'
+                                          )
+                                        }
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value={NO_CATEGORY}>No category</SelectItem>
+                                      {fitting.length > 0 && (
+                                        <SelectGroup>
+                                          <SelectLabel>Categories</SelectLabel>
+                                          {fitting.map((item) => (
+                                            <SelectItem key={item.id} value={`cat:${item.id}`}>
+                                              {item.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectGroup>
+                                      )}
+                                      {candidates.length > 0 && (
+                                        <>
+                                          <SelectSeparator />
+                                          <SelectGroup>
+                                            <SelectLabel>Transfer</SelectLabel>
+                                            {candidates.map((account) => (
+                                              <SelectItem key={account.id} value={`to:${account.id}`}>
+                                                {row.type === 'expense' ? 'Transfer to' : 'Transfer from'} {account.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectGroup>
+                                        </>
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">
+                                {issues.includes('bad-amount') ? (
+                                  <span className="inline-flex items-center gap-1 text-destructive">
+                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                    {row.rawAmount || '(empty)'}
+                                  </span>
+                                ) : (
+                                  <>
+                                    <span className={cn('block', transferTo ? 'text-foreground' : row.type === 'expense' ? 'text-expense' : 'text-income')}>
+                                      {row.type === 'expense' ? MINUS : '+'}
+                                      {statementCurrency
+                                        ? formatCurrency(row.amount ?? 0, statementCurrency)
+                                        : (row.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                    {conversion.kind === 'ok' && (
+                                      <span className="block text-xs font-normal text-muted-foreground">
+                                        {formatCurrency(convertAmount(row.amount ?? 0, rate), accountCurrency)}
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
+                    <div ref={sentinelRef} />
                   </div>
-                  {parsed.rows.length > PREVIEW_ROW_COUNT && (
-                    <p className="text-xs text-muted-foreground mt-1.5 text-center">
-                      +{parsed.rows.length - PREVIEW_ROW_COUNT} more transactions
+                  <div className="flex items-center justify-between mt-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        {summary.ready.toLocaleString()} of {rows.length.toLocaleString()} selected
+                      </span>
+                      {summary.excludedDuplicates > 0 && ` · ${plural(summary.excludedDuplicates, 'duplicate')} skipped`}
+                      {' · '}
+                      {causes.length > 0 ? 'problems first · ' : ''}
+                      showing {firstShown}–{rendered.toLocaleString()} of {listed.length.toLocaleString()}
                     </p>
-                  )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn('gap-1.5 h-7', onlyProblems && 'text-foreground bg-muted')}
+                      aria-pressed={onlyProblems}
+                      disabled={causes.length === 0}
+                      onClick={() => setOnlyProblems((value) => !value)}
+                    >
+                      <Filter className="w-3.5 h-3.5" />
+                      Only problems
+                    </Button>
+                  </div>
                 </div>
 
-                <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
-                  Transactions will be imported uncategorized. Use bulk re-categorize after import to assign categories quickly.
-                </p>
               </>
             )}
 
@@ -505,15 +966,31 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
               >
                 Cancel
               </Button>
-              {parsed && (
-                <Button onClick={handleImport} disabled={!accountId || importing}>
+              {file && (
+                <Button onClick={handleImport} disabled={!accountId || importing || blocked || toImport.length === 0}>
                   {importing ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
                       Importing...
                     </>
+                  ) : dupeCheck.loading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      Checking for duplicates...
+                    </>
+                  ) : categoryMemory.loading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      Matching categories...
+                    </>
+                  ) : summary.errors > 0 ? (
+                    `Fix or skip ${plural(summary.errors, 'error row')}`
+                  ) : !selectedAccount ? (
+                    'Choose an account'
+                  ) : needsRate ? (
+                    'Enter an exchange rate'
                   ) : (
-                    `Import ${parsed.rows.length} transaction${parsed.rows.length !== 1 ? 's' : ''}`
+                    `Import ${plural(toImport.length, 'row')}`
                   )}
                 </Button>
               )}

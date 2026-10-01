@@ -11,7 +11,7 @@ export interface TransactionFilters {
 
 export type TransactionUpsertValues = Omit<
   Transaction,
-  'id' | 'user_id' | 'created_at' | 'updated_at' | 'account' | 'to_account' | 'category' | 'subcategory'
+  'id' | 'user_id' | 'created_at' | 'updated_at' | 'account' | 'to_account' | 'category' | 'subcategory' | 'queued'
 >
 
 type TxShape = Pick<

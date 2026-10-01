@@ -1,6 +1,6 @@
 import { useEntryDetail } from '@/contexts/EntryContext'
-import { useEffect, useState } from 'react'
-import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal } from 'lucide-react'
+import { memo, useEffect, useState } from 'react'
+import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal, Clock } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency } from '@/lib/utils'
 import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
@@ -19,6 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { amountDisplay } from '@/lib/transactionWindow'
+import { inferTransactionKind } from '@/components/transactions/transactionKinds'
 import type { Transaction } from '@/types'
 
 interface TransactionRowProps {
@@ -40,9 +42,14 @@ interface TransactionRowProps {
    * relative to this account (used in AccountTransactionsPage).
    */
   contextAccountId?: string
+  /** Compact density from the result bar (LED-61): tighter padding and a smaller icon tile. */
+  dense?: boolean
 }
 
-export function TransactionRow({
+// Memoised (LED-164): a load step in the windowed list only mounts new rows,
+// so an already-rendered row must not re-render when the props callers pass
+// it are unchanged (tx, and stable callbacks — see the callers' useCallback wraps).
+function TransactionRowImpl({
   tx,
   onEdit,
   onDelete,
@@ -52,6 +59,7 @@ export function TransactionRow({
   selected,
   onSelect,
   contextAccountId,
+  dense,
 }: TransactionRowProps) {
   const openDetail = useEntryDetail()
   const [receiptOpen, setReceiptOpen] = useState(false)
@@ -59,7 +67,10 @@ export function TransactionRow({
   const [receiptLoading, setReceiptLoading] = useState(false)
   const Icon = TRANSACTION_TYPE_ICON[tx.type]
   const isIncoming = (tx.type === 'transfer' || tx.type === 'expense') && tx.to_account_id === contextAccountId
-  const isLoanRepayment = tx.type === 'expense' && Boolean(tx.to_account_id)
+  // An expense with a target is a payment against a liability; the target's account type says which,
+  // the same rule the form uses (inferTransactionKind).
+  const paymentKind = inferTransactionKind(tx.type, tx.to_account_id, tx.to_account?.type)
+  const isLoanRepayment = paymentKind === 'loan-repayment' || paymentKind === 'card-payment'
   const hasReceipt = !!tx.receipt_url && !isPendingReceiptReference(tx.receipt_url)
   const displayedReceiptUrl = receiptOpen ? resolvedReceiptUrl : null
 
@@ -89,20 +100,10 @@ export function TransactionRow({
         : TRANSACTION_TYPE_COLOR.transfer
     : TRANSACTION_TYPE_COLOR[tx.type]
 
-  const amountPrefix =
-    tx.type === 'income' || (contextAccountId !== undefined && isIncoming)
-      ? '+'
-      : tx.type === 'expense'
-        ? '-'
-        : ''
-
-  const displayAmount =
-    contextAccountId !== undefined && isIncoming
-      ? tx.amount * (tx.exchange_rate ?? 1)
-      : tx.amount
+  const { sign: amountPrefix, value: displayAmount, currency: displayCurrency } = amountDisplay(tx, contextAccountId)
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-card border hover:bg-accent/50 transition-colors group">
+    <div className={`flex items-center gap-3 ${dense ? 'px-3 py-2' : 'p-3'} rounded-lg bg-card border hover:bg-accent/50 transition-colors group`}>
       {/* Checkbox (bulk select) */}
       {selectable && (
         <input
@@ -116,7 +117,7 @@ export function TransactionRow({
       )}
       {/* Icon */}
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-base"
+        className={`${dense ? 'w-8 h-8' : 'w-10 h-10'} rounded-xl flex items-center justify-center shrink-0 text-base`}
         style={{ backgroundColor: 'var(--'+tx.type+'-container)' }}
       >
         {tx.category ? tx.category.icon : <Icon className={`w-4 h-4 ${TRANSACTION_TYPE_COLOR[tx.type]}`} />}
@@ -126,14 +127,23 @@ export function TransactionRow({
       <div className="flex-1 min-w-0 space-y-0.5">
         {/* Row 1: description | amount */}
         <div className="flex items-baseline justify-between gap-2">
-          <button type="button" className="text-sm font-medium truncate text-left py-1" onClick={()=>openDetail ? openDetail(tx,()=>onEdit(tx)) : onEdit(tx)}>{tx.description}</button>
+          <button type="button" className="text-sm font-medium truncate text-left py-1" onClick={()=>openDetail ? openDetail(tx,{
+            onEdit: ()=>onEdit(tx),
+            onDelete: ()=>void onDelete(tx.id),
+            onSplit: onSplit && tx.type !== 'transfer' ? ()=>onSplit(tx) : undefined,
+          }) : onEdit(tx)}>{tx.description}</button>
           <p className={`money text-sm font-semibold shrink-0 ${amountColorClass}`}>
-            {amountPrefix}{formatCurrency(displayAmount, tx.currency)}
+            {amountPrefix}{formatCurrency(displayAmount, displayCurrency)}
           </p>
         </div>
         {/* Row 2: labels | currency */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
+            {tx.queued && (
+              <span className="inline-flex items-center gap-1 text-xs text-warning">
+                <Clock className="w-3 h-3" />Not synced yet
+              </span>
+            )}
             {contextAccountId !== undefined ? (
               (tx.type === 'transfer' || isLoanRepayment) && (
                 <span className="text-xs text-muted-foreground">
@@ -302,3 +312,5 @@ export function TransactionRow({
     </div>
   )
 }
+
+export const TransactionRow = memo(TransactionRowImpl)

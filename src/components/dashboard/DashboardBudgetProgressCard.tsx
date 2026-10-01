@@ -1,5 +1,5 @@
-import { BUDGET_WARNING_THRESHOLD } from '@/constants/accounts'
-import { EXPENSE } from '@/constants/colors'
+import { BUDGET_TONE_BAR_CLASS, budgetTone } from '@/lib/budgetUsage'
+import { EXPENSE, WARNING_INK } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
 import type { Budget } from '@/types'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
@@ -12,15 +12,10 @@ interface DashboardBudgetProgressCardProps {
 }
 
 function getBudgetAmountColor(over: boolean, percentage: number) {
-  if (over) return EXPENSE
-  if (percentage > BUDGET_WARNING_THRESHOLD) return 'var(--primary)'
+  const tone = budgetTone(percentage, over)
+  if (tone === 'expense') return EXPENSE
+  if (tone === 'gold') return WARNING_INK
   return 'var(--muted-foreground)'
-}
-
-function getBudgetProgressClass(over: boolean, percentage: number) {
-  if (over) return '[&>div]:bg-expense'
-  if (percentage > BUDGET_WARNING_THRESHOLD) return '[&>div]:bg-primary'
-  return '[&>div]:bg-primary'
 }
 
 export function DashboardBudgetProgressCard({
@@ -51,7 +46,7 @@ export function DashboardBudgetProgressCard({
                   {formatCurrency(spent, budget.currency)} / {formatCurrency(budget.amount, budget.currency)}
                 </span>
               </div>
-              <Progress value={percentage} className={getBudgetProgressClass(over, percentage)} />
+              <Progress value={percentage} className={BUDGET_TONE_BAR_CLASS[budgetTone(percentage, over)]} />
             </div>
           )
         })}

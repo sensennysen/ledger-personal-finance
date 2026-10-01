@@ -59,6 +59,14 @@ function CommandDialog({
           className
         )}
         showCloseButton={showCloseButton}
+        // Search opens on its input: typing is the point (LED-91). An
+        // autoFocus input would take focus before the dialog records the
+        // trigger, and closing would drop focus on <body>.
+        initialFocus={() =>
+          document.querySelector<HTMLElement>(
+            '[data-slot="dialog-content"] [data-slot="command-input"]'
+          ) ?? true
+        }
       >
         {children}
       </DialogContent>
@@ -68,15 +76,31 @@ function CommandDialog({
 
 function CommandInput({
   className,
+  bare = false,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & {
+  // Bare drops the boxed search field, for a host that supplies its own header.
+  bare?: boolean
+}) {
+  if (bare) {
+    return (
+      <CommandPrimitive.Input
+        data-slot="command-input"
+        className={cn(
+          "min-w-0 flex-1 bg-transparent text-base font-medium outline-hidden placeholder:font-normal placeholder:text-muted-foreground",
+          className
+        )}
+        {...props}
+      />
+    )
+  }
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
       <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
-            "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50",
+            "w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:text-disabled-foreground",
             className
           )}
           {...props}
@@ -156,7 +180,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "group/command-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-muted data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
+        "group/command-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:text-disabled-foreground data-selected:bg-muted data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
         className
       )}
       {...props}

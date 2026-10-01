@@ -1,73 +1,95 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CalendarRange, Download, FileUp, KeyRound, Trash2, Wallet } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useTheme } from '@/contexts/ThemeContext'
+import { useInstallPrompt } from '@/hooks/useInstallPrompt'
+import { LedgerMark } from '@/components/brand/LedgerMark'
+import { Button } from '@/components/ui/button'
+import { oauthErrorFromSearch } from '@/lib/oauthErrors'
+
+// Design 11a: the page says what Ledger does. All three are true of the app as
+// built — multi-account net worth, pay-cycle budgets, bank CSV import.
+const CAPABILITIES = [
+  {
+    icon: Wallet,
+    title: 'Every account in one place',
+    body: 'Cash, cards, savings and loans, with net worth calculated across all of them.',
+  },
+  {
+    icon: CalendarRange,
+    title: 'Budgets that follow your pay cycle',
+    body: 'Not the calendar month — set the cycle to match when you actually get paid.',
+  },
+  {
+    icon: FileUp,
+    title: 'Import your bank statements',
+    body: 'BDO, BPI and Metrobank exports are recognised automatically.',
+  },
+]
 
 export default function LoginPage() {
-  const { signInWithGoogle, loading } = useAuth()
-  const { theme } = useTheme()
+  const { signInWithGoogle, loading, authError: sessionError } = useAuth()
+  const { canInstall, install } = useInstallPrompt()
+  // `loading` is the first session lookup, not a sign-in: the page renders during it (it sits outside
+  // ProtectedRoutes), so "Signing in…" belongs to the click alone (LED-144).
+  const [isSigningIn, setIsSigningIn] = useState(false)
 
-  const params = new URLSearchParams(window.location.search)
-  // Only show the error when Supabase supplies both `error` and `error_description`
-  // to prevent an attacker from crafting a URL that displays arbitrary text.
-  // Strip control characters as an extra layer of defense (React already escapes text nodes).
-  const authError =
-    params.has('error') && params.has('error_description')
-      ? (params.get('error_description') ?? '')
-          .replace(/\+/g, ' ')
-          .split('')
-          .filter((char) => {
-            const code = char.charCodeAt(0)
-            return !(code <= 31 || (code >= 127 && code <= 159))
-          })
-          .join('')
-          .slice(0, 200)
-      : null
+  const handleSignIn = async () => {
+    setIsSigningIn(true)
+    try {
+      await signInWithGoogle()
+    } finally {
+      setIsSigningIn(false)
+    }
+  }
+
+  // Only the `error` code is read; the provider's description is never shown.
+  const oauthError = oauthErrorFromSearch(window.location.search)
 
   return (
-    <div className="min-h-dvh bg-card flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-dvh bg-card lg:grid lg:grid-cols-2">
 
-      <div className="relative z-10 w-full max-w-100 px-6">
+      {/* ── Sign-in panel ── */}
+      <div className="flex items-center justify-center px-6 py-12 lg:py-16">
+        <div className="w-full max-w-100">
 
-        {/* ── Brand mark ── */}
-        <div className="text-center mb-10">
-          <div className="flex items-center justify-center mb-7">
-            <img
-              src={theme === 'dark' ? '/l-white.png' : '/l-black.png'}
-              alt="Ledger"
-              className="w-13 h-13 object-contain"
-            />
+          {/* ── Brand mark ── */}
+          <div className="mb-10">
+            <LedgerMark className="mb-7 size-13 text-foreground" />
+            <h1
+              className="text-[40px] font-semibold leading-none mb-3 tracking-tight"
+              style={{ fontFamily: 'Roboto, system-ui, sans-serif' }}
+            >
+              Ledger
+              <span style={{ color: 'var(--primary)' }}>.</span>
+            </h1>
+            <p className="text-muted-foreground text-[0.9375rem] leading-relaxed">
+              Your finances, clearly organized.
+            </p>
           </div>
 
-          <h1
-            className="text-[40px] font-semibold leading-none mb-3 tracking-tight"
-            style={{ fontFamily: 'Roboto, system-ui, sans-serif' }}
-          >
-            Ledger
-            <span style={{ color: 'var(--primary)' }}>.</span>
-          </h1>
-          <p className="text-muted-foreground text-[0.9375rem] leading-relaxed">
-            Your finances, clearly organized.
-          </p>
-        </div>
+          {/* ── Auth error ── */}
+          {(oauthError || sessionError) && (
+            <div
+              role="alert"
+              className="mb-5 rounded-xl border px-4 py-3 text-sm"
+              style={{
+                borderColor: 'var(--expense)',
+                background: 'var(--expense-container)',
+              }}
+            >
+              {oauthError ? (
+                <>
+                  <p className="font-semibold" style={{ color: 'var(--expense)' }}>{oauthError.title}</p>
+                  <p className="mt-0.5 text-foreground">{oauthError.body}</p>
+                </>
+              ) : (
+                <p style={{ color: 'var(--expense)' }}>{sessionError?.message}</p>
+              )}
+            </div>
+          )}
 
-        {/* ── Auth error ── */}
-        {authError && (
-          <div
-            className="mb-5 rounded-xl border px-4 py-3 text-sm"
-            style={{
-              borderColor: 'var(--expense)',
-              background: 'var(--expense-container)',
-              color: 'var(--expense)',
-            }}
-          >
-            {authError}
-          </div>
-        )}
-
-        {/* ── Sign-in card ── */}
-        <div
-          className="rounded-[20px] p-2"
-        >
+          {/* ── Sign-in card ── */}
           <p
             className="text-[1.0625rem] font-semibold mb-1 text-foreground"
             style={{ fontFamily: 'Roboto, system-ui, sans-serif' }}
@@ -80,15 +102,9 @@ export default function LoginPage() {
 
           {/* Google button */}
           <button
-            onClick={signInWithGoogle}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 px-5 h-12 rounded-full text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              background: 'var(--primary)',
-              border: '1px solid var(--primary)',
-              color: 'var(--primary-foreground)',
-            }}
-
+            onClick={() => void handleSignIn()}
+            disabled={loading || isSigningIn}
+            className="w-full flex items-center justify-center gap-3 px-5 h-12 rounded-full text-sm font-medium border border-google-line bg-google-surface text-google-ink transition-all duration-(--dur-base) enabled:hover:bg-google-surface-hover disabled:cursor-not-allowed disabled:border-disabled disabled:bg-disabled disabled:text-disabled-foreground"
           >
             {/* Google logo */}
             <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
@@ -97,21 +113,88 @@ export default function LoginPage() {
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
               <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
-            {loading ? 'Signing in…' : 'Continue with Google'}
+            {isSigningIn ? 'Signing in…' : 'Continue with Google'}
           </button>
-        </div>
 
-        <p className="text-center text-[0.6875rem] text-muted-foreground mt-6 leading-relaxed">
-          By signing in, you agree to our{' '}
-          <Link to="/terms" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
-            Terms of Service
-          </Link>
-          {' '}and{' '}
-          <Link to="/privacy" className="underline underline-offset-2 hover:text-muted-foreground transition-colors">
-            Privacy Policy
-          </Link>.
-        </p>
+          {/* ── Trust lines ── */}
+          <ul className="mt-5 space-y-2 text-[0.8125rem] text-muted-foreground">
+            <li className="flex items-center gap-2">
+              <KeyRound className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              Google sign-in only — no password to store
+            </li>
+            <li className="flex items-center gap-2">
+              <Trash2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <Link to="/data-deletion" className="underline underline-offset-2 hover:text-foreground transition-colors">
+                Delete your data any time
+              </Link>
+            </li>
+          </ul>
+
+          {/* 11a: offered only while the browser can install it, gone once it is installed. */}
+          {canInstall && (
+            <>
+              <div className="mt-7 flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-[0.6875rem] text-muted-foreground">Returning here often?</span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <div className="mt-4 flex items-start gap-3 rounded-2xl bg-muted px-4 py-3.5">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-card text-muted-foreground">
+                  <Download className="size-3.5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[0.8125rem] font-semibold text-foreground">Install Ledger</p>
+                  <p className="mt-0.5 text-[0.6875rem] leading-snug text-muted-foreground">
+                    Works offline. Entries you make without a connection sync when you're back.
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" className="shrink-0" onClick={() => void install()}>
+                  Install
+                </Button>
+              </div>
+            </>
+          )}
+
+          <p className="text-[0.6875rem] text-muted-foreground mt-6 leading-relaxed">
+            By signing in, you agree to our{' '}
+            <Link to="/terms" className="underline underline-offset-2 hover:text-foreground transition-colors">
+              Terms of Service
+            </Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground transition-colors">
+              Privacy Policy
+            </Link>.
+          </p>
+        </div>
       </div>
+
+      {/* ── What you get ── */}
+      <section
+        aria-labelledby="login-capabilities"
+        className="flex items-center justify-center bg-muted px-6 py-12 lg:py-16 border-t border-border/60 lg:border-t-0 lg:border-l dark:bg-background"
+      >
+        <div className="w-full max-w-100 lg:max-w-md">
+          <h2
+            id="login-capabilities"
+            className="text-xs font-medium uppercase tracking-[.14em] text-muted-foreground mb-6"
+          >
+            What you get
+          </h2>
+          <ul className="space-y-4 sm:space-y-6">
+            {CAPABILITIES.map(({ icon: Icon, title, body }) => (
+              <li key={title} className="flex gap-4">
+                <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-card border border-border/60 shrink-0">
+                  <Icon className="w-4 h-4 text-foreground" aria-hidden="true" />
+                </span>
+                <div className="pt-1.5">
+                  <p className="text-sm font-semibold text-foreground">{title}</p>
+                  <p className="hidden sm:block text-sm text-muted-foreground leading-relaxed mt-1">{body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
     </div>
   )
 }

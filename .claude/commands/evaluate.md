@@ -22,6 +22,7 @@ Note which communities/symbols and high-degree nodes are in the blast radius.
 ### 2 — Load context in priority order
 
 1. **CSV task** — if `docs/dev-tasks/` exists, load the matching row. Fields `user_story`, `description`, `acceptance_criteria`, `dependencies` are the context.
+   - If args name a phase (e.g. `epic 6 phase 1`), open `docs/dev-tasks/**/epic-<N>-build-order.md`, take the tickets under `## Phase <M>` in the listed order, and load each one's CSV row. Include that phase's "Why here" notes and any "Things to watch" that name its tickets.
 2. **AGENTS.md** — load coding standards from project root if present.
 3. **Architecture doc** — scan `docs/arch-docs/` for the relevant section.
 4. **knowledge/** — check `knowledge/rules/`, `knowledge/patterns/`, `knowledge/prompts/dev/` for prior patterns.

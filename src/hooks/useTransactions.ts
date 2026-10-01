@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
+import { editQueuedInsert, enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
@@ -152,13 +152,15 @@ export function useTransactions(filters: TransactionFilters = {}) {
     notifyAccountsRefresh()
   }, [user])
 
-  const enqueueInsert = useCallback((values: TransactionUpsertValues) => {
+  // `id` is chosen here, not by the database, so a queued create keeps one identity: a later edit of
+  // it finds the queued insert (LED-193) and a card payment's statement can name the row it came from.
+  const enqueueInsert = useCallback((values: TransactionUpsertValues, id?: string) => {
     if (!user) return
 
     enqueue({
       table: 'transactions',
       operation: 'insert',
-      payload: { ...withTransactionDefaults(values), user_id: user.id },
+      payload: { ...(id ? { id } : {}), ...withTransactionDefaults(values), user_id: user.id },
       userId: user.id,
     })
   }, [user])
@@ -169,6 +171,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const now = new Date().toISOString()
+      const queuedId = crypto.randomUUID()
       const cachedAccounts = readCache<Account[]>(`${user.id}:accounts`) ?? []
       const cachedCategories = readCache<Category[]>(`${user.id}:categories`) ?? []
       const optimistic: Transaction = {
@@ -176,7 +179,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
           values,
           userId: user.id,
           now,
-          id: crypto.randomUUID(),
+          id: queuedId,
           accounts: cachedAccounts,
           categories: cachedCategories,
         }),
@@ -188,8 +191,8 @@ export function useTransactions(filters: TransactionFilters = {}) {
       }
 
       optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
-      enqueueInsert(values)
-      return { error: null, queued: true }
+      enqueueInsert(values, queuedId)
+      return { error: null, queued: true, id: queuedId }
     }
     const { data, error } = await supabase
       .from('transactions')
@@ -216,16 +219,20 @@ export function useTransactions(filters: TransactionFilters = {}) {
           applyTxDelta(reverseTxDelta(accounts, existing), merged)
         )
       }
-      enqueue({
-        table: 'transactions',
-        operation: 'update',
-        payload: values as Record<string, unknown>,
-        rowId: id,
-        userId: user.id,
-        // The edit may not touch description (e.g. a category-only change), so
-        // the queue sheet title still has a name to show (LED-160).
-        label: existing?.description,
-      })
+      // A row that is still only a queued create is fixed in the queue; an update would target a
+      // row the database has not seen (LED-193).
+      if (!editQueuedInsert(id, values as Record<string, unknown>)) {
+        enqueue({
+          table: 'transactions',
+          operation: 'update',
+          payload: values as Record<string, unknown>,
+          rowId: id,
+          userId: user.id,
+          // The edit may not touch description (e.g. a category-only change), so
+          // the queue sheet title still has a name to show (LED-160).
+          label: existing?.description,
+        })
+      }
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').update(values).eq('id', id).eq('user_id', user.id)

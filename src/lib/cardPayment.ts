@@ -162,6 +162,19 @@ export function isCardPaymentTransaction<A extends Pick<Account, 'id' | 'type'>>
   return transferCard(tx, accounts) !== null
 }
 
+/**
+ * Which generated recurring rows take the card path (LED-190): a transfer into a credit card
+ * records the payment and moves the statement, as a payment made by hand does. Any other row
+ * is a plain insert. `accounts` need only contain the destination.
+ */
+export function generatedCardPayment<A extends Pick<Account, 'id' | 'type'>>(
+  tx: Pick<CardPaymentShape, 'type' | 'to_account_id'> & { amount: number; exchange_rate?: number | null },
+  accounts: A[],
+): { card: A; amount: number } | null {
+  const card = transferCard(tx, accounts)
+  return card ? { card, amount: creditedAmount(tx) } : null
+}
+
 /** What reaches the card: the amount, converted when the paying account is in another currency. */
 export function creditedAmount(values: { amount: number; exchange_rate?: number | null }): number {
   return round2(values.amount * (values.exchange_rate ?? 1))

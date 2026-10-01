@@ -6,6 +6,7 @@ import { notifyAccountsRefresh } from '@/lib/cacheEvents'
 import { creditedAmount, planStatementPayment, transferCard } from '@/lib/cardPayment'
 import type { MutationResult } from '@/lib/dataErrors'
 import type { TransactionUpsertValues } from '@/hooks/useTransactions.helpers'
+import type { CardPaymentHandler } from '@/hooks/useTransactions'
 import type { Account, CreditCardPayment } from '@/types'
 
 type CreateTransaction = (values: TransactionUpsertValues) => Promise<MutationResult & { queued?: boolean }>
@@ -83,5 +84,8 @@ export function useCardPayment(
     return result
   }
 
-  return { createWithStatement }
+  /** A recurring transfer into a card that `generateDueRecurring` just posted (LED-190): same statement steps. */
+  const recordGenerated: CardPaymentHandler = ({ card, amount, date }) => recordStatementPayment(card, amount, date, null)
+
+  return { createWithStatement, recordGenerated }
 }

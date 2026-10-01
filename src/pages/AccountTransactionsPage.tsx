@@ -126,9 +126,10 @@ export default function AccountTransactionsPage() {
   const [paymentsLoading, setPaymentsLoading] = useState(false)
   const [loanSection, setLoanSection] = useState<'summary' | 'purchases' | 'activity'>('summary')
 
-  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createTransaction, refetchAccounts)
   // Every card payment, from the header or the pane, saves the transfer, the payment record and the statement (LED-146).
   const { createWithStatement } = useCardPayment(createTransaction, (payment) => setPaymentHistory((prev) => [payment, ...prev]))
+  // Undo restores a deleted card payment through the same path, so its payment record and statement come back too (LED-191).
+  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createWithStatement, refetchAccounts)
 
   const account = accounts.find((a) => a.id === accountId)
   const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet

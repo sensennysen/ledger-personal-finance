@@ -181,6 +181,22 @@ export function creditedAmount(values: { amount: number; exchange_rate?: number 
 }
 
 /**
+ * The paid amount after a payment of `delta` (negative takes one back). Mirrors
+ * `card_statement_shift` in the LED-191 migration, which applies it when a card payment's
+ * transfer is edited or deleted: with no statement the paid amount is left alone, and it stays
+ * between 0 and the locked statement balance.
+ */
+export function shiftStatementPaid(
+  paid: number | null | undefined,
+  statementBalance: number | null | undefined,
+  delta: number,
+): number {
+  const current = paid ?? 0
+  if (statementBalance == null) return current
+  return round2(Math.max(0, Math.min(current + delta, statementBalance)))
+}
+
+/**
  * The statement fields after a payment of `amount` on `date`. The paid amount never exceeds
  * the locked statement balance, and with no statement it is left alone ("Amount to pay" then
  * follows the card's balance, which the transfer has already moved).
@@ -190,10 +206,8 @@ export function planStatementPayment(
   amount: number,
   date: string,
 ): Pick<Account, 'statement_paid_amount' | 'last_payment_amount' | 'last_payment_date'> {
-  const paid = card.statement_paid_amount ?? 0
   return {
-    statement_paid_amount:
-      card.statement_balance == null ? paid : round2(Math.min(paid + amount, card.statement_balance)),
+    statement_paid_amount: shiftStatementPaid(card.statement_paid_amount, card.statement_balance, amount),
     last_payment_amount: amount,
     last_payment_date: date,
   }

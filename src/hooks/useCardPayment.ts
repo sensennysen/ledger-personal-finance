@@ -61,7 +61,15 @@ export function useCardPayment(
       notifyCardPaymentsRefresh()
     }
 
-    const { error } = await updateAccount(card.id, planStatementPayment(card, amount, paymentDate))
+    // The statement as it is now, not the copy this closure was made with: an Undo or a Fix runs later,
+    // after the paid amount may have moved (a delete took the payment back, LED-191).
+    const { data: current, error: readError } = await supabase
+      .from('accounts')
+      .select('statement_balance, statement_paid_amount')
+      .eq('id', card.id)
+      .single()
+    if (readError || !current) return fix(payment)
+    const { error } = await updateAccount(card.id, planStatementPayment(current as Pick<Account, 'statement_balance' | 'statement_paid_amount'>, amount, paymentDate))
     if (error) return fix(payment)
     notifyAccountsRefresh()
     if (retrying) notify({ severity: 'success', title: `Statement updated for ${card.name}` })

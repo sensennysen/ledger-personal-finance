@@ -321,12 +321,13 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {!loading && !loadFailed && (
+      {(loading || !loadFailed) && (
         <div className="col-span-full empty:hidden" style={{ order: 0 }}>
           <DashboardFirstRunChecklist
             accounts={accounts}
             transactions={transactions}
             onAddTransaction={openAddTransactionModal}
+            loading={loading}
           />
         </div>
       )}

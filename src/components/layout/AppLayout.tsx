@@ -337,7 +337,7 @@ function LayoutShell() {
         {wide && sheet === 'detail' && entry && (
           <aside
             aria-label="Entry detail"
-            className="relative w-[340px] shrink-0 border-l border-border bg-sidebar p-5 overflow-y-auto animate-page-in"
+            className="relative w-[380px] shrink-0 border-l border-border bg-sidebar p-5 overflow-y-auto animate-page-in"
           >
             <div className="flex items-center justify-between mb-5">
               <h2 ref={detailHeading} tabIndex={-1} className="font-medium outline-none">

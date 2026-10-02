@@ -4,6 +4,7 @@ import {
   FIRST_RUN_STEPS,
   getStepStatus,
   isSetupComplete,
+  shouldReserveChecklist,
 } from '../src/lib/firstRunChecklist.ts'
 
 const base = { hasAccount: false, hasTransaction: false, cycleConfirmed: false }
@@ -45,4 +46,14 @@ test('cycle completion does not fall back to reading startDay === 1', () => {
   // deliberate choice — isSetupComplete must only trust the explicit flag.
   const status = getStepStatus({ hasAccount: true, hasTransaction: true, cycleConfirmed: false })
   assert.equal(status.find((s) => s.id === 'cycle').done, false)
+})
+
+test('Home reserves the checklist while loading only when it is certain to show (LED-199)', () => {
+  // Cycle not confirmed: setup cannot be complete, so the card shows whatever the reads say.
+  assert.equal(shouldReserveChecklist({ dismissed: false, cycleConfirmed: false }), true)
+  // Cycle confirmed: whether it shows depends on accounts and transactions, which are not known yet.
+  assert.equal(shouldReserveChecklist({ dismissed: false, cycleConfirmed: true }), false)
+  // Dismissed: never shown.
+  assert.equal(shouldReserveChecklist({ dismissed: true, cycleConfirmed: false }), false)
+  assert.equal(shouldReserveChecklist({ dismissed: true, cycleConfirmed: true }), false)
 })

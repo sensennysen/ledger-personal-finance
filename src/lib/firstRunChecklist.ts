@@ -57,3 +57,21 @@ export function isSetupComplete(
   if (loading) return true
   return progress.hasAccount && progress.hasTransaction
 }
+
+/**
+ * While accounts and transactions load, Home reserves the checklist's space only when the card is
+ * certain to show (LED-199). It shows unless setup is complete, and `isSetupComplete` is false for
+ * every user whose pay cycle is not confirmed, a flag stored on the device and known before paint.
+ * A user who confirmed the cycle may or may not see it until the reads answer, so nothing is
+ * reserved: a card that then does not show would shift Home the other way.
+ */
+export function shouldReserveChecklist({
+  dismissed,
+  cycleConfirmed,
+}: {
+  dismissed: boolean
+  cycleConfirmed: boolean
+}): boolean {
+  if (dismissed) return false
+  return !isSetupComplete({ hasAccount: false, hasTransaction: false, cycleConfirmed }, { loading: true })
+}

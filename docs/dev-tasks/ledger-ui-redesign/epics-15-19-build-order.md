@@ -64,6 +64,8 @@ After epics 8 to 13 (phases 1 to 13) and the epic 14 live-sweep findings were wr
 | LED-225 | LED-188 | Re-importing a converted statement at another rate re-imports its transfer rows |
 | LED-226 | LED-206 | Import dialog has no side gutter from 640 to 799px |
 | LED-227 | LED-206 | Top categories: "Other, 1 categories" for a single remaining category |
+| LED-228 | LED-207 | Inactive tab labels are 3.55:1 in the light theme |
+| LED-229 | LED-207 | Saved filter rows show focus only with a half-opacity ring (2.07:1) |
 
 ## Phase 5 — Decision-gated
 

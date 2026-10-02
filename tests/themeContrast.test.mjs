@@ -81,3 +81,14 @@ for (const [theme, map] of Object.entries(themes)) {
 test('dark on-primary is dark ink, not white', () => {
   assert.notEqual(resolve(themes.dark, '--primary-foreground').toUpperCase(), '#FFFFFF')
 })
+
+// Inactive tab labels (LED-228): an opacity on --foreground drew 3.55:1 on the page in light. The trigger
+// takes the --muted-foreground token, which the pairs above hold to 4.5:1 on the page, card and muted
+// surfaces a tab list sits on.
+test('inactive tab labels use the muted ink token, not an opacity of the foreground', () => {
+  const tabs = readFileSync(new URL('../src/components/ui/tabs.tsx', import.meta.url), 'utf8')
+  const trigger = tabs.slice(tabs.indexOf('function TabsTrigger'), tabs.indexOf('function TabsContent'))
+  assert.ok(trigger.length > 0, 'TabsTrigger not found')
+  assert.doesNotMatch(trigger, /(?<![\w:-])text-foreground\/\d+/)
+  assert.match(trigger, /(?<![\w:-])text-muted-foreground(?![\w/-])/)
+})

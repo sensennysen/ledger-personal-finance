@@ -311,7 +311,7 @@ export default function AccountTransactionsPage() {
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     refetchAccounts()
-    // The database moved the payment's history row and statement with the transfer (LED-191).
+    // The database moved, added or removed the payment's history row and statement with the transfer (LED-191, LED-230).
     if (isCardPaymentTransaction(editingTx, accounts) || isCardPaymentTransaction(values, accounts)) notifyCardPaymentsRefresh()
     setEditingTx(null)
   }

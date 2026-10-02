@@ -62,6 +62,8 @@ After epics 8 to 13 (phases 1 to 13) and the epic 14 live-sweep findings were wr
 |---|---|---|
 | LED-224 | LED-188 | Home Expenses by Category does not name the currencies it leaves out |
 | LED-225 | LED-188 | Re-importing a converted statement at another rate re-imports its transfer rows |
+| LED-226 | LED-206 | Import dialog has no side gutter from 640 to 799px |
+| LED-227 | LED-206 | Top categories: "Other, 1 categories" for a single remaining category |
 
 ## Phase 5 — Decision-gated
 

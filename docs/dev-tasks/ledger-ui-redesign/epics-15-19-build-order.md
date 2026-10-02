@@ -66,6 +66,7 @@ After epics 8 to 13 (phases 1 to 13) and the epic 14 live-sweep findings were wr
 | LED-227 | LED-206 | Top categories: "Other, 1 categories" for a single remaining category |
 | LED-228 | LED-207 | Inactive tab labels are 3.55:1 in the light theme |
 | LED-229 | LED-207 | Saved filter rows show focus only with a half-opacity ring (2.07:1) |
+| LED-230 | LED-208 | Editing a row into a transfer to a card records no card payment |
 
 ## Phase 5 — Decision-gated
 

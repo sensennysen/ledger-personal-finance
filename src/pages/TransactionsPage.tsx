@@ -29,6 +29,8 @@ import { FormError } from '@/components/ui/form-error'
 import type { FormErrorValue } from '@/lib/dataErrors'
 import { InteractiveRow } from '@/components/ui/interactive-row'
 import { resolveLoadState } from '@/lib/loadState'
+import { notifyAccountsRefresh, notifyCardPaymentsRefresh } from '@/lib/cacheEvents'
+import { isCardPaymentTransaction } from '@/lib/cardPayment'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { PageActions } from '@/components/layout/PageActions'
@@ -305,6 +307,11 @@ export default function TransactionsPage() {
     const { error, errorDetail } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
+    // The database moved, added or removed the card's payment row and statement with the edit (LED-191, LED-230).
+    if (isCardPaymentTransaction(editingTx, accounts) || isCardPaymentTransaction(values, accounts)) {
+      notifyAccountsRefresh()
+      notifyCardPaymentsRefresh()
+    }
     setEditingTx(null)
   }
 

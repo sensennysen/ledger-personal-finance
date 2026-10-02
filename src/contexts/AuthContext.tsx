@@ -14,7 +14,8 @@ interface AuthContextValue {
   loading: boolean
   authError: AuthError | null
   clearAuthError: () => void
-  signInWithGoogle: () => Promise<void>
+  /** `started` is false when the OAuth start failed; the page then shows why (LED-196). */
+  signInWithGoogle: () => Promise<{ started: boolean }>
   signOut: () => Promise<boolean>
   deleteAccount: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -94,10 +95,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signInWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    })
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      })
+      return { started: !error }
+    } catch {
+      return { started: false }
+    }
   }
 
   const signOut = async (): Promise<boolean> => {

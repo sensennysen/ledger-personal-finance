@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarRange, Download, FileUp, KeyRound, Trash2, Wallet } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -7,7 +7,8 @@ import { LedgerMark } from '@/components/brand/LedgerMark'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
-import { oauthErrorFromSearch } from '@/lib/oauthErrors'
+import { oauthErrorFromSearch, type OAuthErrorMessage } from '@/lib/oauthErrors'
+import { describeOAuthStartFailure } from '@/lib/authErrors'
 
 // Design 11a: the page says what Ledger does. All three are true of the app as
 // built — multi-account net worth, pay-cycle budgets, bank CSV import.
@@ -89,17 +90,29 @@ export default function LoginPage() {
   // ProtectedRoutes), so "Signing in…" belongs to the click alone (LED-144).
   const [isSigningIn, setIsSigningIn] = useState(false)
 
-  const handleSignIn = async () => {
-    setIsSigningIn(true)
-    try {
-      await signInWithGoogle()
-    } finally {
-      setIsSigningIn(false)
+  const [startError, setStartError] = useState<OAuthErrorMessage | null>(null)
+
+  // Back from Google out of the browser's page cache restores this state with the button still disabled.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setIsSigningIn(false)
     }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
+
+  const handleSignIn = async () => {
+    setStartError(null)
+    setIsSigningIn(true)
+    const { started } = await signInWithGoogle()
+    // On success the browser is leaving for Google, so the button stays disabled until it does (LED-196).
+    if (started) return
+    setStartError(describeOAuthStartFailure(navigator.onLine))
+    setIsSigningIn(false)
   }
 
   // Only the `error` code is read; the provider's description is never shown.
-  const oauthError = oauthErrorFromSearch(window.location.search)
+  const oauthError = startError ?? oauthErrorFromSearch(window.location.search)
 
   return (
     <div className="min-h-dvh bg-card lg:grid lg:grid-cols-2">

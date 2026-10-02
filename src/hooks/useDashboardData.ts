@@ -387,10 +387,10 @@ export function useDashboardData({
     [monthTransactionGroups]
   )
 
-  const expensesByCategory = useMemo<DashboardExpenseCategoryBreakdown[]>(
-    // Uncapped: the pie card ranks and rolls the tail into Other itself above 12 categories (LED-149).
-    // Currencies left out for having no rate are already named by stats.excludedFlowCurrencies (same rows).
-    () => groupExpensesByCategory(transactions, categories, monthStart, monthEnd, Infinity, baseCurrency, rateTable).rows,
+  // Uncapped: the pie card ranks and rolls the tail into Other itself above 12 categories (LED-149).
+  // The currencies it leaves out for having no rate are named on the card itself (LED-224).
+  const { rows: expensesByCategory, excludedCurrencies: expensesByCategoryExcluded } = useMemo(
+    () => groupExpensesByCategory(transactions, categories, monthStart, monthEnd, Infinity, baseCurrency, rateTable),
     [transactions, categories, monthStart, monthEnd, baseCurrency, rateTable]
   )
 
@@ -505,6 +505,7 @@ export function useDashboardData({
     monthIncomeTx,
     monthExpenseTx,
     expensesByCategory,
+    expensesByCategoryExcluded,
     expenseCategoryDetails,
     recentTx,
     upcomingBills,

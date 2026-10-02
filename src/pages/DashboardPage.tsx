@@ -174,6 +174,7 @@ export default function DashboardPage() {
     monthIncomeTx,
     monthExpenseTx,
     expensesByCategory,
+    expensesByCategoryExcluded,
     expenseCategoryDetails,
     recentTx,
     upcomingBills,
@@ -456,6 +457,7 @@ export default function DashboardPage() {
         {widgets.categoryPie && (
           <DashboardCategoryPieCard
             expensesByCategory={expensesByCategory}
+            excludedCurrencies={expensesByCategoryExcluded}
             monthLabel={monthLabel}
             currency={currency}
             loading={loading}
@@ -509,6 +511,7 @@ export default function DashboardPage() {
         monthIncomeTx={monthIncomeTx}
         monthExpenseTx={monthExpenseTx}
         expenseCategoryDetails={expenseCategoryDetails}
+        categoryExcludedCurrencies={expensesByCategoryExcluded}
         stats={stats}
         currency={currency}
       />

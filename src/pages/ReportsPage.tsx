@@ -52,7 +52,7 @@ import {
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import { buildReportCsv, downloadCsv } from '@/lib/transactionCsv'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
-import { abbreviateTick } from '@/lib/chartTicks'
+import { abbreviateTick, thinCategoryTicks } from '@/lib/chartTicks'
 import { REPORT_COLUMNS, defaultColumns, exportColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -600,6 +600,7 @@ export default function ReportsPage() {
 
   // Transaction table columns: all seven when there is room, session-only.
   const wide = useMediaQuery('(min-width: 768px)')
+  const narrow = useMediaQuery('(max-width: 639px)')
   const [visibleColumns, setVisibleColumns] = useState(() => defaultColumns(wide))
   const columns = REPORT_COLUMNS.filter((c) => visibleColumns.has(c.key))
   const tableHead = (
@@ -996,6 +997,9 @@ export default function ReportsPage() {
                       tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
                       tickLine={false}
                       axisLine={false}
+                      // Below sm every other month, newest last, all of them shown (LED-204); from sm up the chart picks.
+                      ticks={thinCategoryTicks(netWorthData.map((point) => point.month), narrow)}
+                      interval={narrow ? 0 : undefined}
                     />
                     <YAxis
                       tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}

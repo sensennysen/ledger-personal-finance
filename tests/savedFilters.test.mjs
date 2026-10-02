@@ -9,6 +9,7 @@ import {
   normalizeFilterName,
   parseFilter,
   parseSavedFilters,
+  restoreSavedFilterRow,
   serializeFilter,
   validateFilterName,
   EMPTY_FILTER,
@@ -99,4 +100,13 @@ test('a link with none of q, type or tag asks for no filter; a partial one reset
   assert.deepEqual(filterFromParams(new URLSearchParams('q=grab')), { type: 'all', search: 'grab', tag: null })
   assert.deepEqual(filterFromParams(new URLSearchParams('type=income')), { type: 'income', search: '', tag: null })
   assert.deepEqual(filterFromParams(new URLSearchParams('type=bogus&tag=')), { type: 'all', search: '', tag: null })
+})
+
+test('a deleted filter comes back as the same row: same id and name, filter in its stored form (LED-198)', () => {
+  const original = saved('f-1', 'Rideshare', { type: 'expense', search: ' grab ', tag: 'work' })
+  const row = restoreSavedFilterRow(original)
+  assert.equal(row.id, 'f-1')
+  assert.equal(row.name, 'Rideshare')
+  assert.deepEqual(row.filter, serializeFilter(original.filter))
+  assert.deepEqual(parseFilter(row.filter), { type: 'expense', search: 'grab', tag: 'work' })
 })

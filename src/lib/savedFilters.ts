@@ -66,6 +66,11 @@ export function parseSavedFilters(rows: SavedFilterRow[]): { filters: SavedFilte
   return { filters, skipped }
 }
 
+/** The row to insert to bring a deleted filter back. The same `id` keeps its place in the name-then-id order. */
+export function restoreSavedFilterRow(saved: SavedFilter): { id: string; name: string; filter: Record<string, unknown> } {
+  return { id: saved.id, name: saved.name, filter: serializeFilter(saved.filter) }
+}
+
 export function normalizeFilterName(name: string): string {
   return name.replace(/\s+/g, ' ').trim()
 }

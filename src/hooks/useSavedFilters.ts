@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotify } from '@/contexts/notificationState'
 import { supabase } from '@/lib/supabase'
 import { readAllPages } from '@/lib/pagedRead'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 import {
   normalizeFilterName,
   parseSavedFilters,
+  restoreSavedFilterRow,
   serializeFilter,
   type ActivityFilter,
   type SavedFilter,
@@ -19,6 +21,7 @@ import {
  */
 export function useSavedFilters(enabled = true) {
   const { user } = useAuth()
+  const notify = useNotify()
   const [filters, setFilters] = useState<SavedFilter[]>([])
   const [skipped, setSkipped] = useState(0)
   const [loading, setLoading] = useState(enabled)
@@ -83,14 +86,44 @@ export function useSavedFilters(enabled = true) {
     [refetch, user],
   )
 
+  /** Put a deleted filter back with its id, so it sorts where it was. A failure says it is still deleted. */
+  const restore = useCallback(
+    async function attempt(saved: SavedFilter): Promise<void> {
+      if (!user) return
+      const { error } = await supabase.from('saved_filters').insert({ ...restoreSavedFilterRow(saved), user_id: user.id })
+      if (!error) {
+        await refetch()
+        return
+      }
+      const result = toResult(error, { action: 'save', entity: 'saved filter' })
+      notify({
+        severity: 'failure',
+        title: `Couldn't restore "${saved.name}"`,
+        body: result.error ? `It is still deleted. ${result.error}` : 'It is still deleted. Try again.',
+        action: { label: 'Retry', run: () => void attempt(saved) },
+      })
+    },
+    [notify, refetch, user],
+  )
+
   const remove = useCallback(
     async (id: string): Promise<MutationResult> => {
       if (!user) return { error: 'Not authenticated' }
+      const deleted = filters.find((saved) => saved.id === id)
       const { error } = await supabase.from('saved_filters').delete().eq('id', id).eq('user_id', user.id)
-      if (!error) setFilters((prev) => prev.filter((saved) => saved.id !== id))
+      if (!error) {
+        setFilters((prev) => prev.filter((saved) => saved.id !== id))
+        if (deleted) {
+          notify({
+            severity: 'success',
+            title: `Deleted "${deleted.name}"`,
+            action: { label: 'Undo', run: () => void restore(deleted) },
+          })
+        }
+      }
       return toResult(error, { action: 'delete', entity: 'saved filter' })
     },
-    [user],
+    [filters, notify, restore, user],
   )
 
   return {

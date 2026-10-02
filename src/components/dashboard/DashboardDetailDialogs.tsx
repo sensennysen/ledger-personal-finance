@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { DashboardSummaryValueRow } from '@/components/dashboard/DashboardSummaryValueRow'
 import { DashboardTransactionRow } from '@/components/dashboard/DashboardTransactionRow'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 
 export type DashboardDetailView = 'balance' | 'income' | 'expenses' | 'categories' | null
 
@@ -25,6 +26,8 @@ interface DashboardDetailDialogsProps {
   monthIncomeTx: Transaction[]
   monthExpenseTx: Transaction[]
   expenseCategoryDetails: DashboardExpenseCategoryDetail[]
+  /** Currencies the category breakdown left out for having no rate (LED-224). */
+  categoryExcludedCurrencies: string[]
   stats: DashboardStatsSummary
   currency: string
 }
@@ -108,6 +111,7 @@ export function DashboardDetailDialogs({
   monthIncomeTx,
   monthExpenseTx,
   expenseCategoryDetails,
+  categoryExcludedCurrencies,
   stats,
   currency,
 }: DashboardDetailDialogsProps) {
@@ -202,6 +206,7 @@ export function DashboardDetailDialogs({
           <DialogHeader>
             <DialogTitle>Expenses by Category</DialogTitle>
             <p className="text-xs text-muted-foreground">{monthLabel} spending breakdown</p>
+            <UnratedCurrencyNotice currencies={categoryExcludedCurrencies} subject="expenses" />
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-3 pr-2">

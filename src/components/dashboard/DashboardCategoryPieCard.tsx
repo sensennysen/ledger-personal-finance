@@ -10,9 +10,12 @@ import { DASHBOARD_CHART_TOOLTIP_STYLE } from '@/components/dashboard/chartToolt
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 import { rollupBreakdown, type CategorySlice } from '@/lib/categoryBreakdown'
 import { RankedBars } from '@/components/reports/CategoryBreakdownCard'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 
 interface DashboardCategoryPieCardProps {
   expensesByCategory: DashboardExpenseCategoryBreakdown[]
+  /** Currencies left out of the breakdown for having no rate (LED-224). */
+  excludedCurrencies: string[]
   monthLabel: string
   currency: string
   loading: boolean
@@ -22,6 +25,7 @@ interface DashboardCategoryPieCardProps {
 
 export function DashboardCategoryPieCard({
   expensesByCategory,
+  excludedCurrencies,
   monthLabel,
   currency,
   loading,
@@ -50,6 +54,10 @@ export function DashboardCategoryPieCard({
       action={<ChevronRight className="w-4 h-4 text-muted-foreground/50 mt-0.5" />}
     />
   )
+  // Named, not converted at 1 (rules/foreign-currency-rate-of-one-is-not-a-rate).
+  const notice = excludedCurrencies.length > 0 && (
+    <div className="mb-3"><UnratedCurrencyNotice currencies={excludedCurrencies} subject="expenses" /></div>
+  )
 
   // Ranked mode holds a button of its own (the Other row), so only the header opens the details;
   // a button inside a button is not valid.
@@ -64,6 +72,7 @@ export function DashboardCategoryPieCard({
         >
           {header}
         </InteractiveRow>
+        {notice}
         <RankedBars top={rollup.top} other={rollup.other} currency={currency} grouped={false} resetKey={monthLabel} />
       </div>
     )
@@ -78,6 +87,7 @@ export function DashboardCategoryPieCard({
       onActivate={onClick}
     >
       {header}
+      {!loading && notice}
       {loading ? (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center" aria-busy="true">
           <div className="flex h-[200px] justify-center sm:w-[50%] sm:block 2xl:h-[168px]">

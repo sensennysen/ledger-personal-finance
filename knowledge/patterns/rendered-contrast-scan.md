@@ -11,3 +11,8 @@ Token tests (`themeContrast`) prove the pairs. They do not prove what a page ren
 4. Disabled controls (LED-119 tokens, 3:1) show up; they are exempt by design, so read the list, do not assert zero.
 
 **Watch:** an emulated `prefers-color-scheme` does not change the app's own theme; use its toggle (`aria-label="Switch to light theme"`) and set it back afterwards.
+
+**Blind spots (LED-205, LED-207):**
+- The walker covers text nodes only. SVG text (chart axes, the pie) needs a screenshot check.
+- Focus rings are not text either. Focus each control with the keyboard (`:focus-visible` true) and measure its `box-shadow`/outline against the surface: `ring-ring/50` alone is under 3:1 (LED-229).
+- A light-surface pass that reads `background-color` without the element's `opacity` flags decorative 10% fills (the Reports stat-card circles). Composite the opacity, or read the flag list rather than asserting zero.

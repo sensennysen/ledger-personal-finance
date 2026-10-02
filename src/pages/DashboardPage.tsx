@@ -112,6 +112,8 @@ function StatCard({
         <>
           <div className="mb-2 flex h-[1.75rem] items-center"><Skeleton className="h-6 w-32" /></div>
           {sub !== undefined && <div className="text-[0.6875rem]"><SkeletonText className="w-24" /></div>}
+          {/* The loaded tile always has this wrapper, empty or not, so the 8px is not data-dependent (LED-200). */}
+          {note && <div className="mt-2" />}
         </>
       ) : (
         <>

@@ -560,12 +560,17 @@ function CategoryPane({
         {rulesError ? (
           <p className="text-xs text-destructive">{rulesError}</p>
         ) : rulesLoading ? (
-          <ul className="space-y-1" aria-busy="true">
-            <li className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2.5 py-1.5 text-sm">
-              <SkeletonText className="w-24" />
-              <SkeletonText className="w-6" />
-            </li>
-          </ul>
+          // One rule, as the loaded list shows it: its count line over a 34px row. The runs sit in spans
+          // because a bare inline-block flex item is 9px, not the 20px text line (LED-200).
+          <>
+            <p className="text-xs"><SkeletonText className="w-48" /></p>
+            <ul className="space-y-1" aria-busy="true">
+              <li className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2.5 py-1.5 text-sm">
+                <span><SkeletonText className="w-24" /></span>
+                <span><SkeletonText className="w-6" /></span>
+              </li>
+            </ul>
+          </>
         ) : own.length === 0 ? (
           <p className="text-xs text-muted-foreground">No rules assign transactions to {category.name}.</p>
         ) : (

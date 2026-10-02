@@ -161,3 +161,25 @@ test('rows without an original still match as before, whatever the stored rows c
   assert.equal(match([row(1)], [existing('a')]).get(1)?.id, 'a')
   assert.equal(match([row(1)], [foreignExisting('a', 32.8)]).get(1)?.id, 'a')
 })
+
+test('a converted transfer out of the account is still a duplicate at another rate (LED-225)', () => {
+  // A USD statement imported into a PHP account at 62.6566: the transfer to the wallet kept its original.
+  const stored = [existing('t', { type: 'transfer', amount: 6265.66, to_account_id: 'gcash', original_amount: 100, original_currency: 'USD', description: 'Transfer to GCash wallet' })]
+  const again = row(1, { amount: 5800, original: { amount: 100, currency: 'USD' }, description: 'Transfer to GCash wallet' })
+  assert.equal(match([again], stored).get(1)?.id, 't', 'another rate matches on the original')
+  assert.equal(match([{ ...again, amount: 6265.66 }], stored).get(1)?.id, 't', 'the same rate still matches')
+  assert.equal(match([{ ...again, type: 'income' }], stored).size, 0, 'money in does not match a transfer out')
+})
+
+test('a converted transfer into the account is still a duplicate at another rate (LED-225)', () => {
+  const stored = [existing('t', { type: 'transfer', account_id: 'gcash', to_account_id: 'acc', amount: 3132.83, original_amount: 50, original_currency: 'USD' })]
+  const again = row(1, { type: 'income', amount: 2900, original: { amount: 50, currency: 'USD' }, description: 'FROM GCASH' })
+  assert.equal(match([again], stored).get(1)?.id, 't')
+  assert.equal(match([{ ...again, type: 'expense' }], stored).size, 0, 'money out does not match a transfer in')
+  assert.equal(match([{ ...again, original: { amount: 50, currency: 'EUR' } }], stored).size, 0, 'another currency does not match')
+})
+
+test('a transfer with no original still matches on the amount that moved (LED-225)', () => {
+  const stored = [existing('t', { type: 'transfer', account_id: 'usd', to_account_id: 'acc', amount: 10, exchange_rate: 3.28 })]
+  assert.equal(match([row(1, { type: 'income' })], stored).get(1)?.id, 't')
+})

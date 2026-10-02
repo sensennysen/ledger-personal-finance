@@ -56,6 +56,13 @@ After epics 8 to 13 (phases 1 to 13) and the epic 14 live-sweep findings were wr
 | 24 | LED-208 | Phone sheet fields, loan and card edits, offline saves per kind | 5 | Needs LED-191 for card edits. |
 | 25 | LED-209 | Card page at 1024 and the docked pane width | 2 | Small. |
 
+**Phase 4 findings.** Each FAIL in the phase 4 sweep retros is a ticket in `epic-20-phase-4-sweep-findings-tasks.csv`, numbered from LED-224:
+
+| Ticket | Found by | Summary |
+|---|---|---|
+| LED-224 | LED-188 | Home Expenses by Category does not name the currencies it leaves out |
+| LED-225 | LED-188 | Re-importing a converted statement at another rate re-imports its transfer rows |
+
 ## Phase 5 — Decision-gated
 
 Each ticket stays `Blocked` until its question is answered. The Fallback in the ticket says what ships today.

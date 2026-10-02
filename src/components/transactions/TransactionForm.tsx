@@ -26,8 +26,10 @@ import { TransactionGoalField } from '@/components/transactions/TransactionGoalF
 import { TransactionRecurringFields } from '@/components/transactions/TransactionRecurringFields'
 import { TransactionReceiptField } from '@/components/transactions/TransactionReceiptField'
 import { DEFAULT_CURRENCY, UNCATEGORIZED_VALUE } from '@/constants/accounts'
-import { CURRENCIES } from '@/types'
+import { ACCOUNT_TYPE_LABELS, CURRENCIES, type Account, type AccountType } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
+import { readCache } from '@/lib/dataCache'
+import { pickerGroupOrder, pickOfflineDefaultAccount } from '@/lib/accountDefault'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import { getLoanAmountOwed, loansOwed } from '@/lib/loans'
 import { canChangeSavedKind, resolveEditTarget } from '@/lib/editTarget'
@@ -77,7 +79,7 @@ export function TransactionForm({
   entryKind,
   isEditing = false,
 }: TransactionFormProps) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { accounts } = useAccounts()
   const { categories } = useCategories()
   const { goals } = useSavingsGoals()
@@ -102,19 +104,31 @@ export function TransactionForm({
   )
   const isCardPayment = entryKind === 'card-payment' || Boolean(lockedCardAccountId) || editTarget === 'card'
 
+  // Offline, the hook's own list fills a tick after the first render, so the form would open on
+  // "Select account". Read the cached list once instead and open on the first account the picker
+  // shows (LED-197). Online is untouched: the account stays for the user to choose.
+  const [offlineDefault] = useState<Account | null>(() => {
+    if (navigator.onLine || !user) return null
+    return pickOfflineDefaultAccount(
+      readCache<Account[]>(`${user.id}:accounts`),
+      pickerGroupOrder(profile?.account_group_order, Object.keys(ACCOUNT_TYPE_LABELS) as AccountType[]),
+    )
+  })
+
   const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
     // A card payment has no category (LED-146); every other kind keeps the full rules.
     resolver: (values, context, options) =>
       zodResolver(isCardPayment ? cardPaymentSchema : transactionSchema)(values, context, options),
     defaultValues: {
       type: entryKind && entryKind !== 'loan-repayment' && entryKind !== 'card-payment' ? entryKind : 'expense',
-      account_id: lockedAccountId ?? accounts[0]?.id ?? '',
+      account_id: lockedAccountId ?? offlineDefault?.id ?? accounts[0]?.id ?? '',
       to_account_id: lockedLoanAccountId ?? lockedCardAccountId ?? null,
       category_id: null,
       subcategory_id: null,
       amount: 0,
       currency:
         accounts.find((account) => account.id === lockedAccountId)?.currency ??
+        offlineDefault?.currency ??
         accounts[0]?.currency ??
         DEFAULT_CURRENCY,
       exchange_rate: 1,

@@ -56,3 +56,25 @@ export function computeNextDueDate(lastDate: string, interval: RecurringInterval
 
   return nextDate
 }
+
+type RecurringSource = {
+  date: string
+  recurrence_interval: RecurringInterval | null
+  recurrence_end_date: string | null
+}
+
+/**
+ * The recurring rows whose next occurrence is due by `today`, each with that date (LED-232).
+ * Whether it was already posted is the database's call: `post_recurring_transaction` decides.
+ */
+export function dueRecurringPosts<T extends RecurringSource>(rows: T[], today: string): { source: T; date: string }[] {
+  const due: { source: T; date: string }[] = []
+  for (const source of rows) {
+    if (!source.recurrence_interval) continue
+    const date = addRecurringIntervalToDateString(source.date, source.recurrence_interval)
+    if (date > today) continue
+    if (source.recurrence_end_date && date > source.recurrence_end_date) continue
+    due.push({ source, date })
+  }
+  return due
+}

@@ -39,3 +39,12 @@ test('every stored field survives the round trip', () => {
   assert.equal(input.description, 'Lunch')
   assert.equal(input.date, '2026-09-01')
 })
+
+test('a recurring row that already posted its next occurrence restores as posted (LED-232)', () => {
+  const input = restoreTransactionInput(tx({ is_recurring: true, recurrence_interval: 'monthly', recurrence_next_posted: true }))
+  assert.equal(input.recurrence_next_posted, true)
+})
+
+test('a row read before the posted flag existed restores as not posted', () => {
+  assert.equal(restoreTransactionInput(tx()).recurrence_next_posted, false)
+})

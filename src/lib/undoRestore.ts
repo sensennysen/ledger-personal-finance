@@ -18,6 +18,8 @@ export function restoreTransactionInput(tx: Transaction) {
     is_recurring: tx.is_recurring,
     recurrence_interval: tx.recurrence_interval,
     recurrence_end_date: tx.recurrence_end_date,
+    // A restored row that had posted its next occurrence must not post it again (LED-232).
+    recurrence_next_posted: tx.recurrence_next_posted ?? false,
     receipt_url: tx.receipt_url,
     tags: tx.tags ?? [],
     goal_id: tx.goal_id ?? null,

@@ -169,3 +169,32 @@ export function duplicateSpan(rows: { date: string | null }[]): { start: string;
   }
   return start && end ? { start, end } : null
 }
+
+/**
+ * Rows of one file that are identical to each other (LED-234, OD-13 item 2): same date, amount,
+ * direction and description. Unlike the saved-row check, the description is compared as written
+ * (trimmed, spaces collapsed, any case): two rows that differ only in a reference number are
+ * different rows. Each line maps to the other lines it repeats, in file order. Nothing is
+ * unticked; the preview only says so, since two identical coffees on one day are real.
+ */
+export function findIdenticalRows(rows: ImportCandidate[]): Map<number, number[]> {
+  const groups = new Map<string, number[]>()
+  for (const row of rows) {
+    if (row.date === null || row.amount === null || row.type === null) continue
+    const description = (row.description || EMPTY_DESCRIPTION).trim().replace(/\s+/g, ' ').toLowerCase()
+    push(groups, `${row.date}|${Math.round(row.amount * 100)}|${row.type}|${description}`, row.line)
+  }
+  const identical = new Map<number, number[]>()
+  for (const lines of groups.values()) {
+    if (lines.length < 2) continue
+    for (const line of lines) identical.set(line, lines.filter((other) => other !== line))
+  }
+  return identical
+}
+
+/** "Identical to row 5 in this file" / "Identical to rows 5 and 9 in this file". */
+export function identicalRowsLabel(others: number[]): string {
+  if (others.length === 1) return `Identical to row ${others[0]} in this file`
+  const list = others.length === 2 ? `${others[0]} and ${others[1]}` : `${others.slice(0, -1).join(', ')} and ${others[others.length - 1]}`
+  return `Identical to rows ${list} in this file`
+}

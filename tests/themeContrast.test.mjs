@@ -92,3 +92,44 @@ test('inactive tab labels use the muted ink token, not an opacity of the foregro
   assert.doesNotMatch(trigger, /(?<![\w:-])text-foreground\/\d+/)
   assert.match(trigger, /(?<![\w:-])text-muted-foreground(?![\w/-])/)
 })
+
+// Card hover (LED-246): a see-through hover:bg-accent/N replaced bg-card and showed the grey page through,
+// so --primary drew 4.27:1 and --transfer 4.41:1 in light. The hover is a solid sRGB mix of accent and card.
+function mixHex(a, b, weight) {
+  const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const [pa, pb] = [rgb(a), rgb(b)]
+  return '#' + pa.map((v, i) => Math.round(v * weight + pb[i] * (1 - weight)).toString(16).padStart(2, '0')).join('')
+}
+
+const hoverDecl = /--color-surface-hover:\s*color-mix\(in srgb, var\((--[\w-]+)\) (\d+)%, var\((--[\w-]+)\)\);/.exec(css)
+
+test('the card hover surface is a solid mix of two tokens', () => {
+  assert.ok(hoverDecl, '--color-surface-hover is not color-mix(in srgb, var(--a) N%, var(--b))')
+})
+
+for (const [theme, map] of Object.entries(themes)) {
+  for (const ink of ['--foreground', '--muted-foreground', '--primary', '--transfer', '--income', '--expense', '--warning']) {
+    test(`${theme}: ${ink} on the card hover surface holds 4.5:1`, () => {
+      const [, a, pct, b] = hoverDecl
+      const surface = mixHex(resolve(map, a), resolve(map, b), Number(pct) / 100)
+      const ratio = contrastRatio(resolve(map, ink), surface)
+      assert.ok(ratio >= 4.5, `${ratio.toFixed(2)}:1 on ${surface}`)
+    })
+  }
+}
+
+test('cards on the page hover to the solid surface, not a see-through accent', () => {
+  const sites = [
+    ['../src/components/transactions/TransactionRow.tsx', 'rounded-lg bg-card border'],
+    ['../src/pages/BudgetsPage.tsx', 'as={Card}'],
+    ['../src/pages/TransactionsPage.tsx', 'rounded-lg border border-border/60 bg-card'],
+  ]
+  for (const [file, anchor] of sites) {
+    const src = readFileSync(new URL(file, import.meta.url), 'utf8')
+    const at = src.indexOf(anchor)
+    assert.ok(at >= 0, `${file}: ${anchor} not found`)
+    const near = src.slice(at, at + 400)
+    assert.match(near, /hover:bg-surface-hover/, file)
+    assert.doesNotMatch(near.split('\n').slice(0, 3).join('\n'), /hover:bg-accent\/\d+/, file)
+  }
+})

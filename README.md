@@ -138,6 +138,7 @@ Prerequisites: the local stack and seed (`pnpm db:start`, `pnpm db:reset`), the 
 pnpm sweep                                    # app and legal routes, 390 and 1280, light and dark
 pnpm sweep --routes /,/reports --widths 390 --themes dark
 pnpm sweep --home-fold                        # also: which Home widgets sit above the fold at 390x844
+pnpm sweep --hover                            # also: hover each hover:bg-* element and scan its text
 ```
 
 Other flags: `--base-url` (default `http://127.0.0.1:5173`), `--out` (default `sweep-out`), `--email` and `--password` (default the demo user), `--relay-fonts` (fetch Google Fonts through Node, for containers whose proxy Chromium does not trust). The exit code is 1 when any check fails. What it does not see: SVG text such as chart labels, and focus rings (`knowledge/patterns/rendered-contrast-scan.md`).

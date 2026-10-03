@@ -190,6 +190,8 @@
 
   --color-surface: var(--surface);
   --color-elevated: var(--elevated);
+  /* Solid hover for cards: a see-through bg-accent/N swaps out bg-card and lets the grey page through (LED-246) */
+  --color-surface-hover: color-mix(in srgb, var(--accent) 50%, var(--card));
 
   /* Shadcn token mappings */
   --color-sidebar-ring: var(--sidebar-ring);

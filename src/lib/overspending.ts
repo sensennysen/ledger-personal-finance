@@ -20,6 +20,8 @@ export interface OverspendingRow {
   budgetId: string
   categoryId: string
   currency: string
+  /** A yearly row's spend is the year so far, not the selected cycle (LED-244). */
+  period: OverspendingBudget['period']
   spent: number
   limit: number
   over: number
@@ -94,7 +96,7 @@ export function computeOverspending(input: Input): OverspendingResult {
       const { spent, unrated: u } = sumBudgetSpend(txs, b, start, end, rates)
       u.forEach((c) => unrated.add(c))
       if (spent > b.amount) {
-        rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, spent, limit: b.amount, over: spent - b.amount, streak: 1, uncarried: 0 })
+        rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, period: b.period, spent, limit: b.amount, over: spent - b.amount, streak: 1, uncarried: 0 })
       }
       continue
     }
@@ -118,7 +120,7 @@ export function computeOverspending(input: Input): OverspendingResult {
         if (over > 0) {
           const uncarried =
             rolloverActive && behaviour === 'carry' ? Math.max(0, -unclamped - b.amount) : 0
-          rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, spent, limit, over, streak, uncarried })
+          rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, period: b.period, spent, limit, over, streak, uncarried })
         }
         break
       }
@@ -139,6 +141,14 @@ export function computeOverspending(input: Input): OverspendingResult {
     byCurrency.set(r.currency, t)
   }
   return { rows, totals: [...byCurrency.values()], unrated: [...unrated].sort() }
+}
+
+/**
+ * What a budget's spent figure covers when it is not the cycle: a yearly budget adds up the whole
+ * year, so wherever it sits beside cycle budgets it says so (LED-244, OD-13 item 12).
+ */
+export function spendWindowLabel(period: OverspendingBudget['period']): string | null {
+  return period === 'yearly' ? 'year to date' : null
 }
 
 export function streakLabel(streak: number): string {

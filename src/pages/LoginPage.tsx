@@ -235,6 +235,18 @@ export default function LoginPage() {
               Privacy Policy
             </Link>.
           </p>
+          {/* Every legal page from the login footer (LED-189). */}
+          <nav aria-label="Legal" className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.6875rem] text-muted-foreground">
+            {[
+              { to: '/data-deletion', label: 'Data deletion' },
+              { to: '/cookies', label: 'Cookies and storage' },
+              { to: '/notices', label: 'Notices' },
+            ].map((item) => (
+              <Link key={item.to} to={item.to} className="underline underline-offset-2 hover:text-foreground transition-colors">
+                {item.label}
+              </Link>
+            ))}
+          </nav>
         </div>
       </div>
 

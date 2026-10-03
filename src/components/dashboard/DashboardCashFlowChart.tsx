@@ -63,9 +63,9 @@ export function DashboardCashFlowChart({
       </div>
       <div className="px-2 pb-4">
         {loading ? (
-          <Skeleton className="h-60 w-full rounded-xl 2xl:h-48" aria-busy="true" />
+          <Skeleton className="h-40 w-full rounded-xl sm:h-60 2xl:h-48" aria-busy="true" />
         ) : (
-          <div className="h-60 2xl:h-48">
+          <div className="h-40 sm:h-60 2xl:h-48">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={cashFlowData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

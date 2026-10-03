@@ -6,7 +6,7 @@ import { useImportCategoryMemory } from '@/hooks/useImportCategoryMemory'
 import { useImportDuplicates } from '@/hooks/useImportDuplicates'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { similarRows } from '@/lib/importCategories'
-import { duplicateSpan, matchDuplicates, type ExistingTx } from '@/lib/importDuplicates'
+import { duplicateSpan, findIdenticalRows, identicalRowsLabel, matchDuplicates, type ExistingTx } from '@/lib/importDuplicates'
 import {
   buildRows,
   EMPTY_DESCRIPTION,
@@ -175,6 +175,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     [file, dateOrder],
   )
   const span = useMemo(() => duplicateSpan(built.rows), [built.rows])
+  // Rows repeated within the file (LED-234): marked in the preview, never unticked.
+  const identical = useMemo(() => findIdenticalRows(built.rows), [built.rows])
   const dupeCheck = useImportDuplicates(accountId, span)
   // Compare in the account's currency: that's what the existing rows are in.
   const duplicates = matchDuplicates(
@@ -832,6 +834,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                 {match && (
                                   <span className="block text-xs text-muted-foreground truncate">
                                     Matches {describeMatch(match)}
+                                  </span>
+                                )}
+                                {identical.has(row.line) && (
+                                  <span className="block text-xs text-muted-foreground">
+                                    {identicalRowsLabel(identical.get(row.line)!)}
                                   </span>
                                 )}
                                 {reason && (

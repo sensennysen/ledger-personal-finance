@@ -634,12 +634,13 @@ export default function AccountTransactionsPage() {
           </div>
         )}
 
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* Side column from xl: at lg the month rail is already beside the page, and a third column left the list 344px wide at 1024 (LED-231). */}
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         {account && (
           <aside
             className={account.type === 'loan' && loanSection === 'summary'
               ? 'space-y-4 lg:col-span-full lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0'
-              : 'space-y-4 lg:col-start-2 lg:row-start-1'}
+              : 'space-y-4 xl:col-start-2 xl:row-start-1'}
             aria-label="Account summary"
           >
             {account.type === 'credit_card' && (
@@ -704,9 +705,9 @@ export default function AccountTransactionsPage() {
                 </Button>
               </section>
             )}
-            {/* Account facts: beside the list from lg, behind a disclosure below it so a phone can reach them (LED-146). */}
-            <div className="hidden space-y-4 lg:block">{accountFacts}</div>
-            <details className="group lg:hidden">
+            {/* Account facts: beside the list from xl, behind a disclosure below that so a phone or tablet can reach them (LED-146). */}
+            <div className="hidden space-y-4 xl:block">{accountFacts}</div>
+            <details className="group xl:hidden">
               <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                 Account details
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
@@ -715,7 +716,7 @@ export default function AccountTransactionsPage() {
             </details>
           </aside>
         )}
-        <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
+        <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1">
         {account?.type === 'loan' && loanSection === 'purchases' && (
           <LoanPurchaseTracker
             account={account}

@@ -115,6 +115,8 @@ export interface Transaction {
   is_recurring: boolean
   recurrence_interval: RecurrenceInterval | null
   recurrence_end_date: string | null
+  /** Set by the database once this row's next occurrence is posted, on any device (LED-232). */
+  recurrence_next_posted?: boolean
   receipt_url: string | null
   tags?: string[]
   goal_id?: string | null

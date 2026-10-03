@@ -13,7 +13,7 @@ import {
   registerTransactionsListener,
 } from '@/lib/cacheEvents'
 import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/lib/splitState'
-import { addRecurringIntervalToDateString } from '@/lib/recurringTransactions'
+import { dueRecurringPosts } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
 import { generatedCardPayment } from '@/lib/cardPayment'
 import type { Transaction, Account, Category } from '@/types'
@@ -35,6 +35,9 @@ import { describeDataError, toResult, type DescribedError, type MutationResult }
 // ---------- hook ----------
 
 /** What a generated card payment hands back so the statement steps can run (LED-190). */
+/** What one run of the recurring generator did: rows it posted, and reads or posts that failed. */
+export type RecurringRun = { posted: number; failed: number }
+
 export type CardPaymentHandler = (payment: { card: Account; amount: number; date: string; transactionId: string }) => Promise<void>
 
 export interface UseTransactionsOptions {
@@ -380,12 +383,14 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
   }
 
   /**
-   * Posts every recurring row that has come due. `onCardPayment` runs for a generated transfer
+   * Posts every recurring row that has come due. The database decides whether a row's next
+   * occurrence is already posted (LED-232), so another browser or device never posts it twice;
+   * the localStorage marker only saves a call. `onCardPayment` runs for a generated transfer
    * into a credit card, with the card as it is now, so the statement steps follow (LED-190).
    * It is awaited, so two payments to one card never read the same statement.
    */
-  const generateDueRecurring = useCallback(async (onCardPayment?: CardPaymentHandler): Promise<number> => {
-    if (!user || !navigator.onLine) return 0
+  const generateDueRecurring = useCallback(async (onCardPayment?: CardPaymentHandler): Promise<RecurringRun> => {
+    if (!user || !navigator.onLine) return { posted: 0, failed: 0 }
     const today = getLocalDateString()
     const { rows: allRecurring, error: recurringError } = await readAllPages<Transaction>((from, to) =>
       supabase
@@ -393,54 +398,39 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         .select('*')
         .eq('user_id', user.id)
         .eq('is_recurring', true)
+        .eq('recurrence_next_posted', false)
         .order('date', { ascending: false })
         .order('id', { ascending: false })
         .range(from, to),
     )
     // A failed read means nothing is known to be due, and a partial list would skip series.
-    if (recurringError || allRecurring.length === 0) return 0
+    if (recurringError) return { posted: 0, failed: 0 }
 
-    let generated = 0
-    for (const tx of allRecurring) {
-      if (!tx.recurrence_interval) continue
-      const nextDate = addRecurringIntervalToDateString(tx.date, tx.recurrence_interval)
-      if (nextDate > today) continue
-      if (tx.recurrence_end_date && nextDate > tx.recurrence_end_date) continue
+    let posted = 0
+    let failed = 0
+    for (const { source: tx, date: nextDate } of dueRecurringPosts(allRecurring, today)) {
       if (wasRecurringGenerated(tx.id, nextDate)) continue
 
-      const { data: inserted, error } = await supabase.from('transactions').insert({
-        user_id: user.id,
-        account_id: tx.account_id,
-        to_account_id: tx.to_account_id,
-        category_id: tx.category_id,
-        subcategory_id: tx.subcategory_id,
-        type: tx.type,
-        amount: tx.amount,
-        currency: tx.currency,
-        exchange_rate: tx.exchange_rate,
-        description: tx.description,
-        notes: tx.notes,
-        date: nextDate,
-        transfer_fee: tx.transfer_fee,
-        is_recurring: true,
-        recurrence_interval: tx.recurrence_interval,
-        recurrence_end_date: tx.recurrence_end_date,
-        receipt_url: null,
-        tags: tx.tags ?? [],
-        goal_id: tx.goal_id ?? null,
-      }).select('id').single()
-      if (!error) {
-        markRecurringGenerated(tx.id, nextDate)
-        generated++
-        if (onCardPayment && inserted && tx.type === 'transfer' && tx.to_account_id) {
-          const { data: destination } = await supabase.from('accounts').select('*').eq('id', tx.to_account_id).maybeSingle()
-          const payment = destination ? generatedCardPayment(tx, [destination as Account]) : null
-          if (payment) await onCardPayment({ ...payment, date: nextDate, transactionId: inserted.id })
-        }
+      const { data: insertedId, error } = await supabase.rpc('post_recurring_transaction', {
+        p_source: tx.id,
+        p_date: nextDate,
+      })
+      if (error) {
+        failed++
+        continue
+      }
+      markRecurringGenerated(tx.id, nextDate)
+      // null: already posted, by this or another device.
+      if (typeof insertedId !== 'string') continue
+      posted++
+      if (onCardPayment && tx.type === 'transfer' && tx.to_account_id) {
+        const { data: destination } = await supabase.from('accounts').select('*').eq('id', tx.to_account_id).maybeSingle()
+        const payment = destination ? generatedCardPayment(tx, [destination as Account]) : null
+        if (payment) await onCardPayment({ ...payment, date: nextDate, transactionId: insertedId })
       }
     }
-    if (generated > 0) await fetch()
-    return generated
+    if (posted > 0) await fetch()
+    return { posted, failed }
   }, [user, fetch])
 
   const error = loadFailure?.message ?? null

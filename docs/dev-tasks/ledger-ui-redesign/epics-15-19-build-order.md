@@ -72,7 +72,7 @@ After epics 8 to 13 (phases 1 to 13) and the epic 14 live-sweep findings were wr
 
 ## Phase 5 — Decision-gated (answered 2026-10-03)
 
-All five questions are answered (see the Decision register); the tickets are `To Do`, and LED-214 is `Done`.
+All five questions are answered (see the Decision register). Phase 5 is done (2026-10-03, retro `knowledge/retros/2026-10-03-epics-15-19-phase-5.md`): LED-185, LED-189, LED-202 and LED-211 are `Done`, and LED-214 is `Done`. LED-202's decision was revised after measuring (see its row), and LED-211's first run filed LED-246 in epic 21.
 
 | # | Ticket | Summary | Pts | Decision |
 |---|---|---|---|---|

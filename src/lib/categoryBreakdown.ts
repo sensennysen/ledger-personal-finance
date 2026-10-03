@@ -139,13 +139,16 @@ export function previewOther(other: OtherSlice): { shown: CategorySlice[]; more:
   return { shown, more: { count: rest.length, amount: rest.reduce((sum, r) => sum + r.amount, 0) } }
 }
 
-/** The rail's "Top categories, this filter" (29a): the biggest few, the rest as one "Other" line. */
+/**
+ * The rail's "Top categories, this filter" (29a): the biggest few, the rest as one "Other" line.
+ * A single category left over is shown by name, so "Other" always stands for two or more (LED-227).
+ */
 export function topCategories(
   rows: CategorySlice[],
   count = 4,
 ): { top: CategorySlice[]; other: { count: number; amount: number } | null } {
+  if (rows.length <= count + 1) return { top: rows, other: null }
   const top = rows.slice(0, count)
   const tail = rows.slice(count)
-  if (tail.length === 0) return { top, other: null }
   return { top, other: { count: tail.length, amount: tail.reduce((sum, r) => sum + r.amount, 0) } }
 }

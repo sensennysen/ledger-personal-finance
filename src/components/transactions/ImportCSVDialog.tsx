@@ -56,6 +56,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { TechnicalDetail } from '@/components/ui/technical-detail'
+import { transferCredit } from '@/lib/transferCredit'
 
 export interface ImportTx {
   date: string
@@ -401,7 +402,9 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const describeMatch = (match: ExistingTx) => {
     if (match.type === 'transfer') {
       const inbound = match.account_id !== accountId
-      const amount = Number(match.amount) * (inbound ? Number(match.exchange_rate ?? 1) : 1)
+      const amount = inbound
+        ? transferCredit({ amount: Number(match.amount), exchange_rate: Number(match.exchange_rate ?? 1), destination_amount: match.destination_amount == null ? null : Number(match.destination_amount) })
+        : Number(match.amount)
       return `${match.date} · transfer ${inbound ? `from ${accountName(match.account_id)}` : `to ${accountName(match.to_account_id)}`} · ${formatCurrency(amount, accountCurrency)}`
     }
     if (match.type === 'expense' && match.to_account_id) {

@@ -9,6 +9,7 @@ import { formatCurrency, formatDateShort, cn } from '@/lib/utils'
 import { deficitSettingLabel, shiftMonthKey, streakLabel } from '@/lib/overspending'
 import type { Category } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 
 interface OverspendingCardProps {
   categories: Category[]
@@ -24,15 +25,13 @@ interface OverspendingCardProps {
  */
 export function OverspendingCard({ categories, month, report }: OverspendingCardProps) {
   const ink = useCategoryInk()
-  const { range, result, state, refetch, behaviour } = report
+  const { range, result, converted, currency, state, refetch, behaviour } = report
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const nextMonthLabel = new Date(`${shiftMonthKey(month, 1)}-01T00:00:00`).toLocaleDateString(
     'en-US',
     { month: 'long' },
   )
-  const uncarried = result.totals.filter((t) => t.uncarried > 0)
-
   return (
     <Card className={cn('p-5 gap-3', result.rows.length > 0 && 'border-warning/50')}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -115,25 +114,22 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
           <div className="flex items-baseline justify-between border-t pt-3 mt-1">
             <span className="text-sm font-medium">Total over</span>
             <span className="text-base font-bold tabular-nums text-warning">
-              {result.totals.map((t) => formatCurrency(t.over, t.currency)).join(' + ')}
+              {formatCurrency(converted.over, currency)}
             </span>
           </div>
-          {uncarried.length > 0 && (
+          {converted.uncarried > 0 && (
             <div className="flex items-baseline justify-between pt-2">
               <span className="text-sm text-muted-foreground">Not carried into {nextMonthLabel}</span>
               <span className="text-sm font-semibold tabular-nums">
-                {uncarried.map((t) => formatCurrency(t.uncarried, t.currency)).join(' + ')}
+                {formatCurrency(converted.uncarried, currency)}
               </span>
             </div>
           )}
         </div>
       )}
 
-      {result.unrated.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {result.unrated.join(', ')} spending has no exchange rate and isn't counted, so totals may be understated.
-        </p>
-      )}
+      {/* Named, not converted at 1 (rules/foreign-currency-rate-of-one-is-not-a-rate) */}
+      <UnratedCurrencyNotice currencies={converted.excludedCurrencies} subject="overspending" />
 
       {(state === 'ready' || state === 'stale-error') && (
         <div className="flex items-start gap-2.5 rounded-[14px] bg-muted px-3 py-2.5 text-xs leading-snug text-muted-foreground">

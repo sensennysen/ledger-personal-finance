@@ -10,8 +10,7 @@ import { useSavingsGoals } from '@/hooks/useSavingsGoals'
 import { useSubcategories } from '@/hooks/useSubcategories'
 import { useTransactionRules } from '@/hooks/useTransactionRules'
 import {
-  cardPaymentSchema,
-  transactionSchema,
+  buildTransactionSchema,
   type TransactionFormInput,
   type TransactionFormValues,
 } from '@/components/transactions/transactionFormSchema'
@@ -31,6 +30,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { readCache } from '@/lib/dataCache'
 import { pickerGroupOrder, pickOfflineDefaultAccount } from '@/lib/accountDefault'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
+import { destinationAmountFor, isCrossCurrencyTransfer } from '@/lib/transferCredit'
+import { amountInCurrency, ratesAsOfLabel } from '@/lib/exchangeRates'
+import { useOptionalExchangeRates } from '@/contexts/exchangeRatesState'
 import { getLoanAmountOwed, loansOwed } from '@/lib/loans'
 import { canChangeSavedKind, resolveEditTarget } from '@/lib/editTarget'
 import { applyKindChange } from '@/lib/transactionKindChange'
@@ -84,6 +86,7 @@ export function TransactionForm({
   const { categories } = useCategories()
   const { goals } = useSavingsGoals()
   const { matchRule } = useTransactionRules()
+  const rateTable = useOptionalExchangeRates()?.table ?? null
   const descriptionSuggestions = useDescriptionSuggestions()
   const today = getLocalDateString()
 
@@ -117,8 +120,14 @@ export function TransactionForm({
 
   const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
     // A card payment has no category (LED-146); every other kind keeps the full rules.
+    // A transfer into an account in another currency must say what arrived (LED-185).
     resolver: (values, context, options) =>
-      zodResolver(isCardPayment ? cardPaymentSchema : transactionSchema)(values, context, options),
+      zodResolver(
+        buildTransactionSchema({
+          destinationNeedsCategory: !isCardPayment,
+          accountCurrency: (id) => accounts.find((account) => account.id === id)?.currency,
+        }),
+      )(values, context, options),
     defaultValues: {
       type: entryKind && entryKind !== 'loan-repayment' && entryKind !== 'card-payment' ? entryKind : 'expense',
       account_id: lockedAccountId ?? offlineDefault?.id ?? accounts[0]?.id ?? '',
@@ -132,6 +141,7 @@ export function TransactionForm({
         accounts[0]?.currency ??
         DEFAULT_CURRENCY,
       exchange_rate: 1,
+      destination_amount: null,
       description: '',
       notes: null,
       date: today,
@@ -175,6 +185,23 @@ export function TransactionForm({
   const notes = useWatch({ control: form.control, name: 'notes' })
   const goalId = useWatch({ control: form.control, name: 'goal_id' })
   const amountValue = useWatch({ control: form.control, name: 'amount' })
+  const currencyValue = useWatch({ control: form.control, name: 'currency' })
+  // A transfer into an account in another currency carries the amount that arrived (LED-185).
+  const toAccountCurrency = accounts.find((account) => account.id === selectedLoanId)?.currency
+  const crossCurrency = isCrossCurrencyTransfer({ type, currency: currencyValue, to_account_id: selectedLoanId }, toAccountCurrency)
+  const suggestedDestination = useMemo(() => {
+    if (!crossCurrency || !toAccountCurrency) return null
+    const amount = Number(amountValue)
+    if (!Number.isFinite(amount) || amount <= 0) return null
+    const converted = amountInCurrency({ amount, currency: currencyValue, exchange_rate: null }, toAccountCurrency, rateTable)
+    return converted === null ? null : Math.round(converted * 100) / 100
+  }, [amountValue, crossCurrency, currencyValue, rateTable, toAccountCurrency])
+  // The suggestion follows the amount until the user types their own figure; a saved one is theirs already.
+  const [destinationTyped, setDestinationTyped] = useState(Boolean(defaultValues?.destination_amount))
+  useEffect(() => {
+    if (destinationTyped) return
+    form.setValue('destination_amount', suggestedDestination)
+  }, [destinationTyped, form, suggestedDestination])
   const loanAccounts = useMemo(() => accounts.filter((account) => account.type === 'loan'), [accounts])
   // Only loans that still owe something are offered when picking a new repayment (LED-181 item, OD-8);
   // `loanAccounts` stays the full list so editing an old repayment against a now-repaid loan still resolves it.
@@ -377,7 +404,14 @@ export function TransactionForm({
     }
     const receipt_url = await prepareReceiptForSubmit(values.receipt_url)
     // A new card payment is saved as a transfer into the card; see cardPaymentTransfer.
-    const submitted = { ...values, receipt_url }
+    const submitted = {
+      ...values,
+      receipt_url,
+      destination_amount: destinationAmountFor(
+        values,
+        accounts.find((account) => account.id === values.to_account_id)?.currency,
+      ),
+    }
     await onSubmit(isCardPayment && !isEditing ? cardPaymentTransfer(submitted) : submitted)
   }
 
@@ -846,6 +880,42 @@ export function TransactionForm({
         )}
 
         {!isCardPayment && amountFields}
+
+        {crossCurrency && toAccountCurrency && (
+          <FormField
+            control={form.control}
+            name="destination_amount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Amount received ({toAccountCurrency})</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    name={field.name}
+                    ref={field.ref}
+                    onBlur={field.onBlur}
+                    value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                    onChange={(event) => {
+                      setDestinationTyped(true)
+                      field.onChange(event.target.value === '' ? null : event.target.value)
+                    }}
+                  />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">
+                  {destinationTyped
+                    ? `What arrived in the ${toAccountCurrency} account.`
+                    : suggestedDestination !== null
+                      ? `Filled in from the exchange-rate feed${ratesAsOfLabel(rateTable) ? `, as of ${ratesAsOfLabel(rateTable)}` : ''}. Change it to what the account received.`
+                      : `No exchange rate for ${currencyValue} to ${toAccountCurrency}. Enter what the account received.`}
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         {type === 'transfer' && (
           <FormField

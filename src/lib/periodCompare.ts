@@ -9,6 +9,9 @@ export interface PeriodTransaction {
   exchange_rate?: number | null
   to_account_id?: string | null
   transfer_fee?: number | null
+  /** What a transfer between two currencies credited its destination, and that account's currency (LED-185). */
+  destination_amount?: number | null
+  to_account?: { currency?: string | null } | null
 }
 
 /** The cycle key ("YYYY-MM") before the given one. */
@@ -59,9 +62,10 @@ export function netWorthEffect(tx: PeriodTransaction): number {
 }
 
 /**
- * `netWorthEffect`, converted into `target`; null means no rate converts it (LED-184). A
- * transfer fee converts by its own currency, not the transfer's own cross-currency rate
- * (that rate is between the two accounts, not into `target` — LED-185, not decided here).
+ * `netWorthEffect`, converted into `target`; null means no rate converts it (LED-184). A transfer
+ * fee converts by its own currency. A transfer between two currencies (LED-185) also moves net
+ * worth by what arrived less what left, each converted into `target` by the rate table: sending
+ * 100 USD that arrives as 91.50 EUR is worth whatever those two figures are worth today.
  */
 export function convertedNetWorthEffect(tx: PeriodTransaction, target: string, table: RateTable | null): number | null {
   if (tx.type === 'income') return amountInCurrency({ ...tx, exchange_rate: tx.exchange_rate ?? null }, target, table)
@@ -69,9 +73,21 @@ export function convertedNetWorthEffect(tx: PeriodTransaction, target: string, t
     const amount = amountInCurrency({ ...tx, exchange_rate: tx.exchange_rate ?? null }, target, table)
     return amount === null ? null : -amount
   }
-  if (tx.type === 'transfer' && tx.transfer_fee) {
-    const fee = amountInCurrency({ amount: tx.transfer_fee, currency: tx.currency, exchange_rate: null }, target, table)
-    return fee === null ? null : -fee
+  if (tx.type === 'transfer') {
+    let effect = 0
+    if (tx.transfer_fee) {
+      const fee = amountInCurrency({ amount: tx.transfer_fee, currency: tx.currency, exchange_rate: null }, target, table)
+      if (fee === null) return null
+      effect -= fee
+    }
+    const toCurrency = tx.to_account?.currency
+    if (tx.destination_amount != null && toCurrency && toCurrency !== tx.currency) {
+      const sent = amountInCurrency({ amount: tx.amount, currency: tx.currency, exchange_rate: null }, target, table)
+      const received = amountInCurrency({ amount: tx.destination_amount, currency: toCurrency, exchange_rate: null }, target, table)
+      if (sent === null || received === null) return null
+      effect += received - sent
+    }
+    return effect
   }
   return 0
 }

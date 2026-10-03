@@ -2,6 +2,7 @@ import { nextRollover, canRollover, type DeficitBehaviour } from './budgetRollov
 import { sumBudgetSpend, type BudgetSpendTx } from './budgetSpend.ts'
 import { monthCycleRange, type DateRange as Range } from './cycleRange.ts'
 import type { RateTable } from './exchangeRates.ts'
+import { sumConverted } from './convertedTotals.ts'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -32,6 +33,30 @@ export interface OverspendingResult {
   rows: OverspendingRow[]
   totals: { currency: string; over: number; uncarried: number }[]
   unrated: string[]
+}
+
+/**
+ * The report's totals as one figure in `target` (LED-185): budgets in several currencies are no
+ * longer printed as "A + B". A currency no rate converts is left out and named with the
+ * currencies whose spending had no rate (rules/foreign-currency-rate-of-one-is-not-a-rate.md).
+ */
+export function convertOverspendingTotals(
+  result: Pick<OverspendingResult, 'totals' | 'unrated'>,
+  target: string,
+  table: RateTable | null,
+): { over: number; uncarried: number; excludedCurrencies: string[] } {
+  const over = sumConverted(result.totals.map((t) => ({ amount: t.over, currency: t.currency, exchange_rate: null })), target, table)
+  const uncarried = sumConverted(
+    result.totals.map((t) => ({ amount: t.uncarried, currency: t.currency, exchange_rate: null })),
+    target,
+    table,
+  )
+  const excluded = new Set([...over.excludedCurrencies, ...uncarried.excludedCurrencies, ...result.unrated])
+  return {
+    over: Math.round(over.total * 100) / 100,
+    uncarried: Math.round(uncarried.total * 100) / 100,
+    excludedCurrencies: [...excluded].sort(),
+  }
 }
 
 /** "YYYY-MM" of the first cycle a budget applies to, mirroring useBudgets' history walk. */

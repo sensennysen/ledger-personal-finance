@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   computeOverspending,
+  convertOverspendingTotals,
   streakLabel,
   shiftMonthKey,
 } from '../src/lib/overspending.ts'
@@ -109,4 +110,35 @@ test('a foreign expense is converted with the exchange-rate table before it is c
   assert.ok(Math.abs(converted.rows[0].spent - 560) < 1e-9)
   assert.ok(Math.abs(converted.rows[0].over - 60) < 1e-9)
   assert.deepEqual(converted.unrated, [])
+})
+
+// LED-185: one total in the default currency, never "A + B". 1 USD = 56 PHP.
+const rates = { base: 'PHP', rates: { USD: 1 / 56 }, overrides: {}, asOf: '2026-09-25', fetchedAt: '2026-09-26T08:00:00' }
+
+test('totals in two currencies become one figure in the target currency', () => {
+  const totals = [
+    { currency: 'PHP', over: 300, uncarried: 50 },
+    { currency: 'USD', over: 10, uncarried: 0 },
+  ]
+  assert.deepEqual(convertOverspendingTotals({ totals, unrated: [] }, 'PHP', rates), {
+    over: 860,
+    uncarried: 50,
+    excludedCurrencies: [],
+  })
+})
+
+test('a currency with no rate is left out and named, with the unrated spending', () => {
+  const totals = [
+    { currency: 'PHP', over: 300, uncarried: 0 },
+    { currency: 'EUR', over: 40, uncarried: 0 },
+  ]
+  assert.deepEqual(convertOverspendingTotals({ totals, unrated: ['JPY'] }, 'PHP', rates), {
+    over: 300,
+    uncarried: 0,
+    excludedCurrencies: ['EUR', 'JPY'],
+  })
+})
+
+test('nothing over is zero with nothing named', () => {
+  assert.deepEqual(convertOverspendingTotals({ totals: [], unrated: [] }, 'PHP', null), { over: 0, uncarried: 0, excludedCurrencies: [] })
 })

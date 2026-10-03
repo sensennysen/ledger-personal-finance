@@ -3,9 +3,10 @@ import { useOverspending } from '@/hooks/useOverspending'
 import { resolveLoadState } from '@/lib/loadState'
 import { monthCycleRange } from '@/lib/cycleRange'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
-import { computeOverspending, shiftMonthKey } from '@/lib/overspending'
+import { computeOverspending, convertOverspendingTotals, shiftMonthKey } from '@/lib/overspending'
 import type { DeficitBehaviour } from '@/lib/budgetRollover'
 import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { useAuth } from '@/contexts/AuthContext'
 
 /**
  * The Overspending report for the selected cycle and the one before it, from one
@@ -26,6 +27,7 @@ export function useOverspendingReport({
   const range = monthCycleRange(month, startDay)
   const { budgets, txs, loading, error, refetch } = useOverspending(range.end)
   const { table: rates, loading: ratesLoading } = useExchangeRates()
+  const currency = useAuth().profile?.default_currency ?? 'USD'
 
   const compute = (forMonth: string) =>
     computeOverspending({
@@ -42,13 +44,17 @@ export function useOverspendingReport({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- as above
   const previous = useMemo(() => compute(shiftMonthKey(month, -1)), [budgets, txs, month, startDay, behaviour, rates])
 
+  // One total in the default currency for the card and the stat card (LED-185), never "A + B".
+  const converted = useMemo(() => convertOverspendingTotals(result, currency, rates), [result, currency, rates])
+  const previousConverted = useMemo(() => convertOverspendingTotals(previous, currency, rates), [previous, currency, rates])
+
   const state = resolveLoadState({
     loading: loading || ratesLoading || !deficitBehaviour,
     error,
     hasData: budgets.length > 0 && Boolean(deficitBehaviour),
   })
 
-  return { range, result, previous, state, error, refetch, behaviour }
+  return { range, result, previous, converted, previousConverted, currency, state, error, refetch, behaviour }
 }
 
 export type OverspendingReport = ReturnType<typeof useOverspendingReport>

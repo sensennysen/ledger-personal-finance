@@ -1,4 +1,5 @@
 import { EMPTY_DESCRIPTION } from './csvImport.ts'
+import { transferCredit } from './transferCredit.ts'
 
 // Import duplicate detection (LED-73): a CSV row that matches a transaction
 // already in the account on date + amount + type + normalised description is
@@ -35,6 +36,8 @@ export interface ExistingTx {
   account_id: string
   to_account_id: string | null
   exchange_rate: number | null
+  /** What a transfer between two currencies credited its destination (LED-185). */
+  destination_amount?: number | null
   /** Set on a row imported from a statement in another currency. */
   original_amount?: number | null
   original_currency?: string | null
@@ -105,7 +108,9 @@ export function matchDuplicates<T extends ImportCandidate>(
       if (direction === 'expense') {
         push(transfers, transferKey(tx.date, Number(tx.amount), 'expense'), tx)
       } else if (direction === 'income') {
-        const received = tx.type === 'transfer' ? Number(tx.amount) * Number(tx.exchange_rate ?? 1) : Number(tx.amount)
+        const received = tx.type === 'transfer'
+          ? transferCredit({ amount: Number(tx.amount), exchange_rate: Number(tx.exchange_rate ?? 1), destination_amount: tx.destination_amount == null ? null : Number(tx.destination_amount) })
+          : Number(tx.amount)
         push(transfers, transferKey(tx.date, received, 'income'), tx)
       }
       // Imported from a statement in another currency: the statement's own amount, whichever leg the

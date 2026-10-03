@@ -99,6 +99,7 @@ All five questions are answered (see the Decision register); the tickets are `To
 | LED-243 | 11 | Each Home widget has its own error boundary | 3 |
 | LED-244 | 12 | A yearly budget in Overspending is labelled year to date | 1 |
 | LED-245 | OD-9 | Cookie and browser storage settings (after LED-189's wording) | 3 |
+| LED-246 | LED-211 | Hover tints drop two text colours below 4.5:1 in the light theme (found by the sweep script's first run) | 1 |
 
 ## Phase 6 — Hygiene (run last, so statuses reflect what shipped)
 

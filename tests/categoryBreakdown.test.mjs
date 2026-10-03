@@ -147,3 +147,18 @@ test('topCategories has no Other line when everything fits', () => {
   assert.equal(topCategories(spread(4)).other, null)
   assert.deepEqual(topCategories([]), { top: [], other: null })
 })
+
+test('topCategories names a single leftover category instead of an "Other" of one (LED-227)', () => {
+  const rows = spread(5)
+  const { top, other } = topCategories(rows)
+  assert.deepEqual(top.map((r) => r.key), ['c1', 'c2', 'c3', 'c4', 'c5'])
+  assert.equal(other, null)
+  assert.equal(topCategories(spread(6)).other.count, 2, 'two or more still roll into Other')
+})
+
+test('the Reports and Home Other line never stands for fewer than two categories (LED-227)', () => {
+  // Ranked mode starts above PIE_MAX_CATEGORIES, so its tail is at least that minus RANKED_TOP plus one.
+  const first = rollupBreakdown(spread(PIE_MAX_CATEGORIES + 1))
+  assert.equal(first.mode, 'ranked')
+  assert.ok(first.other.count >= 2, `Other holds ${first.other.count}`)
+})

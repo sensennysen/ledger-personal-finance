@@ -30,6 +30,7 @@ import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { RefreshingRegion } from '@/components/ui/refreshing-region'
+import { DashboardWidgetBoundary } from '@/components/dashboard/DashboardWidgetBoundary'
 import type { Budget } from '@/types'
 import { DashboardDetailDialogs, type DashboardDetailView } from '@/components/dashboard/DashboardDetailDialogs'
 import { DashboardWidgetSettingsSheet } from '@/components/dashboard/DashboardWidgetSettingsSheet'
@@ -370,137 +371,153 @@ export default function DashboardPage() {
       )}
 
       {widgets.upcomingBills && (
-        <DashboardUpcomingBillsCard
-          bills={upcomingBills}
-          isCurrentMonth={isCurrentMonth}
-          monthLabel={monthLabel}
-          loading={loading}
-          onPay={(payment) =>
-            openAddTransactionModal('loan-repayment', {
-              targetAccountId: payment.accountId,
-              prefill: { amount: payment.amount, date: payment.date },
-            })
-          }
-          style={widgetGridStyle('upcomingBills')}
-        />
+        <DashboardWidgetBoundary widget="upcomingBills" style={widgetGridStyle('upcomingBills')}>
+          <DashboardUpcomingBillsCard
+            bills={upcomingBills}
+            isCurrentMonth={isCurrentMonth}
+            monthLabel={monthLabel}
+            loading={loading}
+            onPay={(payment) =>
+              openAddTransactionModal('loan-repayment', {
+                targetAccountId: payment.accountId,
+                prefill: { amount: payment.amount, date: payment.date },
+              })
+            }
+            style={widgetGridStyle('upcomingBills')}
+          />
+        </DashboardWidgetBoundary>
       )}
 
-      {widgets.stats && <section className="md:hidden rounded-3xl bg-card p-4" style={widgetGridStyle('stats')}>
-        <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] leading-none mt-1.5">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
-        {/* Only when there is a notice: an empty wrapper still takes its margin (LED-202). */}
-        {!loading && stats.excludedCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" /></div>}
-        <div className="grid grid-cols-2 gap-3 mt-2.5">{([{view:'income',label:'↙ In',value:stats.income,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-1.5 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p></button>)}</div>
-        {!loading && stats.excludedFlowCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" /></div>}
-      </section>}
       {widgets.stats && (
-        <div className="hidden md:grid gap-4 grid-cols-3 col-span-full" style={widgetGridStyle('stats')}>
-          <StatCard
-            title="Net Worth"
-            value={formatCurrency(stats.totalBalance, currency)}
-            sub="Assets minus Liabilities"
-            note={<UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" />}
-            icon={Wallet}
-            variant="balance"
-            loading={loading}
-            onClick={() => setDetailView('balance')}
-            className="animate-fade-up"
-          />
-          <StatCard
-            title="Monthly Income"
-            value={formatCurrency(stats.income, currency)}
-            className="animate-fade-up anim-delay-1"
-            sub={isCurrentMonth ? 'This month' : monthLabel}
-            note={<UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" />}
-            icon={TrendingUp}
-            trend="up"
-            variant="income"
-            loading={loading}
-            onClick={() => setDetailView('income')}
-          />
-          <StatCard
-            title="Monthly Expenses"
-            value={formatCurrency(stats.expenses, currency)}
-            sub={isCurrentMonth ? 'This month' : monthLabel}
-            note={<UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" />}
-            icon={TrendingDown}
-            trend="down"
-            variant="expense"
-            loading={loading}
-            onClick={() => setDetailView('expenses')}
-            className="animate-fade-up anim-delay-2"
-          />
+        <DashboardWidgetBoundary widget="stats" style={widgetGridStyle('stats')}>
+          <section className="md:hidden rounded-3xl bg-card p-4" style={widgetGridStyle('stats')}>
+            <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] leading-none mt-1.5">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
+            {/* Only when there is a notice: an empty wrapper still takes its margin (LED-202). */}
+            {!loading && stats.excludedCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" /></div>}
+            <div className="grid grid-cols-2 gap-3 mt-2.5">{([{view:'income',label:'↙ In',value:stats.income,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-1.5 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p></button>)}</div>
+            {!loading && stats.excludedFlowCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" /></div>}
+          </section>
+          <div className="hidden md:grid gap-4 grid-cols-3 col-span-full" style={widgetGridStyle('stats')}>
+            <StatCard
+              title="Net Worth"
+              value={formatCurrency(stats.totalBalance, currency)}
+              sub="Assets minus Liabilities"
+              note={<UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" />}
+              icon={Wallet}
+              variant="balance"
+              loading={loading}
+              onClick={() => setDetailView('balance')}
+              className="animate-fade-up"
+            />
+            <StatCard
+              title="Monthly Income"
+              value={formatCurrency(stats.income, currency)}
+              className="animate-fade-up anim-delay-1"
+              sub={isCurrentMonth ? 'This month' : monthLabel}
+              note={<UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" />}
+              icon={TrendingUp}
+              trend="up"
+              variant="income"
+              loading={loading}
+              onClick={() => setDetailView('income')}
+            />
+            <StatCard
+              title="Monthly Expenses"
+              value={formatCurrency(stats.expenses, currency)}
+              sub={isCurrentMonth ? 'This month' : monthLabel}
+              note={<UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" />}
+              icon={TrendingDown}
+              trend="down"
+              variant="expense"
+              loading={loading}
+              onClick={() => setDetailView('expenses')}
+              className="animate-fade-up anim-delay-2"
+            />
 
-        </div>
+          </div>
+        </DashboardWidgetBoundary>
       )}
 
       {widgets.creditCards && creditCards.length > 0 && (
-        <DashboardCreditCardMonitor
-          creditCards={creditCardsWithState}
-          style={widgetGridStyle('creditCards')}
-        />
+        <DashboardWidgetBoundary widget="creditCards" style={widgetGridStyle('creditCards')}>
+          <DashboardCreditCardMonitor
+            creditCards={creditCardsWithState}
+            style={widgetGridStyle('creditCards')}
+          />
+        </DashboardWidgetBoundary>
       )}
 
       {widgets.cashflowChart && (
-        <DashboardCashFlowChart
-          chartPeriod={chartPeriod}
-          setChartPeriod={setChartPeriod}
-          cashFlowData={cashFlowData}
-          currency={currency}
-          currencySymbol={currencySymbol}
-          loading={loading}
-          monthLabel={monthLabel}
-          excludedCurrencies={excludedCashFlowCurrencies}
-          style={widgetGridStyle('cashflowChart')}
-        />
+        <DashboardWidgetBoundary widget="cashflowChart" style={widgetGridStyle('cashflowChart')}>
+          <DashboardCashFlowChart
+            chartPeriod={chartPeriod}
+            setChartPeriod={setChartPeriod}
+            cashFlowData={cashFlowData}
+            currency={currency}
+            currencySymbol={currencySymbol}
+            loading={loading}
+            monthLabel={monthLabel}
+            excludedCurrencies={excludedCashFlowCurrencies}
+            style={widgetGridStyle('cashflowChart')}
+          />
+        </DashboardWidgetBoundary>
       )}
 
       <div className="contents">
         {widgets.categoryPie && (
-          <DashboardCategoryPieCard
-            expensesByCategory={expensesByCategory}
-            excludedCurrencies={expensesByCategoryExcluded}
-            monthLabel={monthLabel}
-            currency={currency}
-            loading={loading}
-            onClick={() => setDetailView('categories')}
-            style={widgetGridStyle('categoryPie')}
-          />
+          <DashboardWidgetBoundary widget="categoryPie" style={widgetGridStyle('categoryPie')}>
+            <DashboardCategoryPieCard
+              expensesByCategory={expensesByCategory}
+              excludedCurrencies={expensesByCategoryExcluded}
+              monthLabel={monthLabel}
+              currency={currency}
+              loading={loading}
+              onClick={() => setDetailView('categories')}
+              style={widgetGridStyle('categoryPie')}
+            />
+          </DashboardWidgetBoundary>
         )}
 
         {widgets.recentTransactions && (
-          <DashboardRecentTransactionsCard
-            recentTransactions={recentTx}
-            isCurrentMonth={isCurrentMonth}
-            monthLabel={monthLabel}
-            loading={loading}
-            style={widgetGridStyle('recentTransactions')}
-          />
+          <DashboardWidgetBoundary widget="recentTransactions" style={widgetGridStyle('recentTransactions')}>
+            <DashboardRecentTransactionsCard
+              recentTransactions={recentTx}
+              isCurrentMonth={isCurrentMonth}
+              monthLabel={monthLabel}
+              loading={loading}
+              style={widgetGridStyle('recentTransactions')}
+            />
+          </DashboardWidgetBoundary>
         )}
       </div>
 
       <div className="contents">
         {widgets.budgets && budgets.length > 0 && (
-          <RefreshingRegion
-            refreshing={budgetsRefreshing}
-            label={`Loading ${monthLabel}…`}
-            style={widgetGridStyle('budgets')}
-          >
-            <DashboardBudgetProgressCard budgets={budgets} monthLabel={monthLabel} />
-          </RefreshingRegion>
+          <DashboardWidgetBoundary widget="budgets" style={widgetGridStyle('budgets')}>
+            <RefreshingRegion
+              refreshing={budgetsRefreshing}
+              label={`Loading ${monthLabel}…`}
+              style={widgetGridStyle('budgets')}
+            >
+              <DashboardBudgetProgressCard budgets={budgets} monthLabel={monthLabel} />
+            </RefreshingRegion>
+          </DashboardWidgetBoundary>
         )}
       </div>
 
       <div className="contents">
         {widgets.cashflowForecast && (
-          <DashboardCashFlowForecastCard
-            forecast={cashFlowForecast}
-            currentBalance={stats.totalBalance}
-            currency={currency}
-            isCurrentMonth={isCurrentMonth}
-            monthLabel={monthLabel}
-            loading={loading}
-            style={widgetGridStyle('cashflowForecast')}
-          />
+          <DashboardWidgetBoundary widget="cashflowForecast" style={widgetGridStyle('cashflowForecast')}>
+            <DashboardCashFlowForecastCard
+              forecast={cashFlowForecast}
+              currentBalance={stats.totalBalance}
+              currency={currency}
+              isCurrentMonth={isCurrentMonth}
+              monthLabel={monthLabel}
+              loading={loading}
+              style={widgetGridStyle('cashflowForecast')}
+            />
+          </DashboardWidgetBoundary>
         )}
       </div>
 

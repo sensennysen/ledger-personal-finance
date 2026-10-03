@@ -126,6 +126,21 @@ supabase/
 - `pnpm test` runs the node test suite.
 - `pnpm preview` serves the built app locally.
 - `pnpm db:*` manage the local database (see [Local development](#local-development)).
+- `pnpm sweep` runs the dev-only live sweep (see [Sweep script](#sweep-script)). CI does not run it.
+
+### Sweep script
+
+`scripts/sweep.mjs` signs in to a running local copy as the seeded demo user and, for each route, width and theme, scans the rendered page for text contrast (4.5:1, 3:1 for large text), lists light panels in the dark theme, checks for sideways scrolling and saves a full-page screenshot. It prints one PASS/FAIL line per check and writes `sweep-out/results.json` (git-ignored). It only talks to `--base-url`, never the linked remote.
+
+Prerequisites: the local stack and seed (`pnpm db:start`, `pnpm db:reset`), the dev server (`pnpm dev`, which has the dev sign-in form), and Playwright with Chromium installed locally or globally (`npm i -g playwright && npx playwright install chromium`). Playwright is not a dependency of this repo.
+
+```bash
+pnpm sweep                                    # app and legal routes, 390 and 1280, light and dark
+pnpm sweep --routes /,/reports --widths 390 --themes dark
+pnpm sweep --home-fold                        # also: which Home widgets sit above the fold at 390x844
+```
+
+Other flags: `--base-url` (default `http://127.0.0.1:5173`), `--out` (default `sweep-out`), `--email` and `--password` (default the demo user), `--relay-fonts` (fetch Google Fonts through Node, for containers whose proxy Chromium does not trust). The exit code is 1 when any check fails. What it does not see: SVG text such as chart labels, and focus rings (`knowledge/patterns/rendered-contrast-scan.md`).
 
 ## CI
 

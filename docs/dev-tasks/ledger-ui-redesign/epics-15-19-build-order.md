@@ -84,6 +84,12 @@ All five questions are answered (see the Decision register). Phase 5 is done (20
 
 **Epic 21 — from OD-13 and OD-9** (`epic-21-phase-5-decisions-tasks.csv`). Item 7 (deficit panel without rollover) is closed as is.
 
+Built in four phases (plan 2026-10-03), each validated before the next:
+- **A, quick and independent:** LED-246, 244, 234, 235, 243. **Done** (2026-10-03, retro `knowledge/retros/2026-10-03-epic-21-phase-a.md`).
+- **B, categories:** LED-233, then 236, 240, 239.
+- **C, cycle totals:** LED-238, then 237.
+- **D, Activity, loading, storage:** LED-241, 242, 245.
+
 | Ticket | Item | Summary | Pts |
 |---|---|---|---|
 | LED-233 | 1 | Category names are unique within their parent (case-insensitive; same subcategory name under different parents allowed) | 3 |
@@ -100,6 +106,9 @@ All five questions are answered (see the Decision register). Phase 5 is done (20
 | LED-244 | 12 | A yearly budget in Overspending is labelled year to date | 1 |
 | LED-245 | OD-9 | Cookie and browser storage settings (after LED-189's wording) | 3 |
 | LED-246 | LED-211 | Hover tints drop two text colours below 4.5:1 in the light theme (found by the sweep script's first run) | 1 |
+| LED-247 | LED-246 | Settings shows garbled characters in the currency list and the delete button (found in passing) | 1 |
+| LED-248 | LED-246 | Hovered primary and destructive buttons drop their label below 4.5:1 (found by `pnpm sweep --hover`) | 1 |
+| LED-249 | LED-235 | A completed goal card dims its text below 4.5:1 (found with a completed goal on the local stack) | 1 |
 
 ## Phase 6 — Hygiene (run last, so statuses reflect what shipped)
 
@@ -109,7 +118,7 @@ All five questions are answered (see the Decision register). Phase 5 is done (20
 | 32 | LED-212 | Merge route for the phase branches, `.claude/launch.json` | 2 | Do not push or merge without being asked. |
 | 33 | LED-213 | Release checklist: live CI and remote migrations | 2 | The remote step only when the owner asks. |
 
-Phase totals in points: 1 = 22, 2 = 22, 3 = 19, 4 = 21, 5 = 21 (LED-189 widened from 2 to 5), 6 = 6. Sum 111. Epic 21 adds 39.
+Phase totals in points: 1 = 22, 2 = 22, 3 = 19, 4 = 21, 5 = 21 (LED-189 widened from 2 to 5), 6 = 6. Sum 111. Epic 21 adds 42 (39, plus LED-247 to 249 filed during phase A).
 
 ## Decision register
 

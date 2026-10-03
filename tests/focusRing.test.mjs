@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 
 const read = (path) => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8')
 
@@ -43,3 +43,24 @@ for (const { label, file, marker } of SITES) {
     assert.match(block, new RegExp(RING))
   })
 }
+
+// LED-229: a ring of --ring at 50% is 2.07:1 on a dialog in light. The shared controls that use it
+// (input, select, tabs, switch, badge, textarea) also turn their border to --ring, which carries the
+// contrast; a control with no such border needs the solid ring.
+const listSources = (dir) =>
+  readdirSync(new URL(`../src/${dir}`, import.meta.url), { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? listSources(`${dir}/${entry.name}`) : /\.tsx?$/.test(entry.name) ? [`${dir}/${entry.name}`] : [],
+  )
+// The ScrollArea viewport: no keyboard path reaches it (LED-207 Backlog).
+const HALF_RING_ALLOWED = new Set(['components/ui/scroll-area.tsx'])
+
+test('a half-opacity focus ring always comes with a --ring border (LED-229)', () => {
+  const offenders = []
+  for (const file of listSources('components').concat(listSources('pages'))) {
+    if (HALF_RING_ALLOWED.has(file)) continue
+    for (const [className] of read(file).matchAll(/["'`][^"'`]*focus-visible:ring-ring\/50[^"'`]*["'`]/g)) {
+      if (!className.includes('focus-visible:border-ring')) offenders.push(`${file}: ${className.slice(0, 80)}`)
+    }
+  }
+  assert.deepEqual(offenders, [])
+})

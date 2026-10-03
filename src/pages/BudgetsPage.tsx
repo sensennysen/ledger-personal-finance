@@ -1377,7 +1377,7 @@ export default function BudgetsPage() {
                 <InteractiveRow
                   as={Card}
                   key={budget.id}
-                  className="animate-fade-up cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                  className="animate-fade-up cursor-pointer transition-colors hover:border-primary/40 hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
                   style={{ '--anim-delay': `${Math.min(idx * 60, 240)}ms` } as React.CSSProperties}
                   onActivate={() => setSelectedBudget(budget)}
                 >

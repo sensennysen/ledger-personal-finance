@@ -2,7 +2,10 @@
 // Dev-only live sweep (LED-211). Signs in to a local Ledger as the seeded demo user and, for each
 // route, width and theme, runs the rendered contrast scan, the dark-theme light-surface pass and a
 // horizontal-overflow check, saves a screenshot, and prints PASS/FAIL lines. `--home-fold` also
-// measures which Home widgets sit fully above the fold at 390x844 (LED-202).
+// measures which Home widgets sit fully above the fold at 390x844 (LED-202). `--hover` hovers one
+// element of each distinct `hover:bg-*` class string on each route and scans the text inside it
+// (first six of each; LED-246: the default scan parks the pointer, so hover states are otherwise
+// never measured).
 //
 // It is the committed form of knowledge/patterns/live-sweep-method.md,
 // browser-check-with-local-user.md and rendered-contrast-scan.md. It never touches the linked
@@ -12,7 +15,7 @@
 // else from the global install (`npm root -g`). CI does not run it, and nothing in src/ imports it.
 //
 //   pnpm sweep [--base-url http://127.0.0.1:5173] [--out sweep-out] [--routes /,/reports]
-//              [--widths 390,1280] [--themes light,dark] [--home-fold] [--relay-fonts]
+//              [--widths 390,1280] [--themes light,dark] [--home-fold] [--hover] [--relay-fonts]
 //              [--email demo@ledger.local --password ledger-demo-123]
 
 import { execSync } from 'node:child_process'
@@ -31,6 +34,7 @@ function parseArgs(argv) {
     widths: [390, 1280],
     themes: ['light', 'dark'],
     homeFold: false,
+    hover: false,
     relayFonts: false,
     email: 'demo@ledger.local',
     password: 'ledger-demo-123',
@@ -48,6 +52,7 @@ function parseArgs(argv) {
     else if (flag === '--widths') args.widths = next().split(',').map(Number).filter((n) => n > 0)
     else if (flag === '--themes') args.themes = next().split(',').map((t) => t.trim()).filter((t) => t === 'light' || t === 'dark')
     else if (flag === '--home-fold') args.homeFold = true
+    else if (flag === '--hover') args.hover = true
     else if (flag === '--relay-fonts') args.relayFonts = true
     else if (flag === '--email') args.email = next()
     else if (flag === '--password') args.password = next()
@@ -60,7 +65,7 @@ function parseArgs(argv) {
 }
 
 function readUsage() {
-  return 'Usage: pnpm sweep [--base-url URL] [--out DIR] [--routes a,b] [--widths 390,1280] [--themes light,dark] [--home-fold] [--relay-fonts] [--email E --password P]'
+  return 'Usage: pnpm sweep [--base-url URL] [--out DIR] [--routes a,b] [--widths 390,1280] [--themes light,dark] [--home-fold] [--hover] [--relay-fonts] [--email E --password P]'
 }
 
 async function loadPlaywright() {
@@ -85,7 +90,9 @@ async function loadPlaywright() {
  * "." (a logotype) are listed as exempt, not failed. SVG text and focus rings are not covered
  * (rendered-contrast-scan.md, blind spots).
  */
-function contrastScan() {
+function contrastScan(rootSelector = null) {
+  const root = rootSelector ? document.querySelector(rootSelector) : document.body
+  if (!root) return { checked: 0, failures: [], exempt: [], lightSurfaces: [], overflowX: false, main: null }
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = 1
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -139,7 +146,7 @@ function contrastScan() {
   const failures = []
   const exempt = []
   let checked = 0
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   for (let text = walker.nextNode(); text; text = walker.nextNode()) {
     const value = text.textContent.replace(/\s+/g, ' ').trim()
     if (!value) continue
@@ -169,7 +176,7 @@ function contrastScan() {
 
   // Dark theme only: a light panel (24x16 or more, luminance above 0.5) is likely a missed token.
   const lightSurfaces = []
-  if (document.documentElement.classList.contains('dark')) {
+  if (!rootSelector && document.documentElement.classList.contains('dark')) {
     for (const el of document.body.querySelectorAll('*')) {
       const rect = el.getBoundingClientRect()
       if (rect.width < 24 || rect.height < 16) continue
@@ -191,6 +198,24 @@ function contrastScan() {
     overflowX: document.documentElement.scrollWidth > window.innerWidth,
     main: main ? { scrollHeight: main.scrollHeight, clientHeight: main.clientHeight } : null,
   }
+}
+
+/**
+ * Tags the first six visible elements of each distinct class string that carries a `hover:bg-*`
+ * utility: rows share one class but not their ink (a transfer row's amount is --transfer).
+ */
+function tagHoverTargets() {
+  const perClass = new Map()
+  let count = 0
+  for (const el of document.querySelectorAll('main [class*="hover:bg-"]')) {
+    const key = el.getAttribute('class')
+    const rect = el.getBoundingClientRect()
+    if ((perClass.get(key) ?? 0) >= 6 || rect.width === 0 || rect.height === 0 || el.closest(':disabled, [aria-disabled="true"]')) continue
+    if (!el.textContent?.trim()) continue
+    perClass.set(key, (perClass.get(key) ?? 0) + 1)
+    el.setAttribute('data-sweep-hover', String(count++))
+  }
+  return count
 }
 
 /** Home widgets (grid children ordered 10+ by DashboardPage) against the bottom nav's top edge. */
@@ -260,6 +285,29 @@ async function settle(page) {
   await page.waitForTimeout(400)
 }
 
+async function hoverPass(page, item, record) {
+  const count = await page.evaluate(tagHoverTargets)
+  const failures = []
+  let checked = 0
+  for (let i = 0; i < count; i++) {
+    const selector = `[data-sweep-hover="${i}"]`
+    const target = page.locator(selector)
+    try {
+      await target.scrollIntoViewIfNeeded({ timeout: 2000 })
+      await target.hover({ timeout: 2000 })
+    } catch {
+      continue // covered or moved by an earlier hover; not measurable here
+    }
+    await page.waitForTimeout(300) // transition-colors
+    const scan = await page.evaluate(contrastScan, selector)
+    checked += scan.checked
+    failures.push(...scan.failures)
+  }
+  await page.mouse.move(0, 0)
+  if (failures.length) record('FAIL', `${item} hover`, failures.slice(0, 8))
+  else record('PASS', `${item} hover`, `${count} hover targets, ${checked} text nodes, 0 below the minimum`)
+}
+
 const slug = (route) => (route === '/' ? 'home' : route.replace(/^\//, '').replace(/[^a-z0-9]+/gi, '-'))
 
 async function main() {
@@ -295,6 +343,7 @@ async function main() {
           if (theme === 'dark' && scan.lightSurfaces.length) record('NOTE', `${item} light surfaces`, scan.lightSurfaces.slice(0, 6))
           if (scan.overflowX) record('FAIL', `${item} overflow`, 'the page scrolls sideways')
           Object.assign(results[contrastIndex], { screenshot: shot, main: scan.main })
+          if (args.hover) await hoverPass(page, item, record)
         }
         if (errors.length) record('NOTE', `page errors @${width} ${theme}`, errors.slice(0, 5))
         await context.close()

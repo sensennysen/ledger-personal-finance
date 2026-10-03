@@ -103,7 +103,7 @@ function TransactionRowImpl({
   const { sign: amountPrefix, value: displayAmount, currency: displayCurrency } = amountDisplay(tx, contextAccountId)
 
   return (
-    <div className={`flex items-center gap-3 ${dense ? 'px-3 py-2' : 'p-3'} rounded-lg bg-card border hover:bg-accent/50 transition-colors group`}>
+    <div className={`flex items-center gap-3 ${dense ? 'px-3 py-2' : 'p-3'} rounded-lg bg-card border hover:bg-surface-hover transition-colors group`}>
       {/* Checkbox (bulk select) */}
       {selectable && (
         <input

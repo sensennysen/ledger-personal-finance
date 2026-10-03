@@ -70,17 +70,35 @@ After epics 8 to 13 (phases 1 to 13) and the epic 14 live-sweep findings were wr
 | LED-231 | LED-209 | Card account page at 1024: the list column is squeezed to 344px |
 | LED-232 | epic 20 validation | Recurring rows are posted again by every browser that has not posted them |
 
-## Phase 5 — Decision-gated
+## Phase 5 — Decision-gated (answered 2026-10-03)
 
-Each ticket stays `Blocked` until its question is answered. The Fallback in the ticket says what ships today.
+All five questions are answered (see the Decision register); the tickets are `To Do`, and LED-214 is `Done`.
 
-| # | Ticket | Summary | Pts | Blocked on |
+| # | Ticket | Summary | Pts | Decision |
 |---|---|---|---|---|
-| 26 | LED-185 | Second rate for cross-currency transfers, Overspending totals | 5 | OD-10 |
-| 27 | LED-189 | Privacy Policy names the exchange-rate host | 2 | OD-9 |
-| 28 | LED-202 | First four widgets above the fold at 390 | 3 | OD-11 |
-| 29 | LED-211 | Sweep drivers as a repo script | 5 | OD-12 |
-| 30 | LED-214 | Parked items that need a call (bundle) | 3 | OD-13 |
+| 26 | LED-185 | Second rate for cross-currency transfers, Overspending totals | 5 | OD-10 (a): store the destination amount on the transfer |
+| 27 | LED-189 | Legal pages: Privacy Policy, Terms, data deletion, cookies and storage, other notices | 5 | OD-9, widened: every page drafted; you approve each before it is committed |
+| 28 | LED-202 | First four widgets above the fold at 390 | 3 | OD-11 (a): a shorter cash flow chart on phones |
+| 29 | LED-211 | Sweep drivers as a repo script | 5 | OD-12 (a): a dev-only script |
+| 30 | LED-214 | Parked items that need a call (bundle) | 3 | OD-13: answered per item; tickets in epic 21 below |
+
+**Epic 21 — from OD-13 and OD-9** (`epic-21-phase-5-decisions-tasks.csv`). Item 7 (deficit panel without rollover) is closed as is.
+
+| Ticket | Item | Summary | Pts |
+|---|---|---|---|
+| LED-233 | 1 | Category names are unique within their parent (case-insensitive; same subcategory name under different parents allowed) | 3 |
+| LED-234 | 2 | Import flags identical rows within one file, both stay ticked | 2 |
+| LED-235 | 3 | Savings goals show on track or behind by (straight-line pace) | 3 |
+| LED-236 | 4 | A category can count as salary | 3 |
+| LED-237 | 5 | Previous-period comparisons are like for like | 3 |
+| LED-238 | 6 | Future-dated rows count from their date | 5 |
+| LED-239 | 8 | Merge categories (after LED-233) | 5 |
+| LED-240 | 8 | One Reorder control on Categories | 3 |
+| LED-241 | 9 | Sort Activity by amount, flat while sorted | 3 |
+| LED-242 | 10 | A failed page load shows its error in about 2 s | 2 |
+| LED-243 | 11 | Each Home widget has its own error boundary | 3 |
+| LED-244 | 12 | A yearly budget in Overspending is labelled year to date | 1 |
+| LED-245 | OD-9 | Cookie and browser storage settings (after LED-189's wording) | 3 |
 
 ## Phase 6 — Hygiene (run last, so statuses reflect what shipped)
 
@@ -90,17 +108,17 @@ Each ticket stays `Blocked` until its question is answered. The Fallback in the 
 | 32 | LED-212 | Merge route for the phase branches, `.claude/launch.json` | 2 | Do not push or merge without being asked. |
 | 33 | LED-213 | Release checklist: live CI and remote migrations | 2 | The remote step only when the owner asks. |
 
-Phase totals in points: 1 = 22, 2 = 22, 3 = 19, 4 = 21, 5 = 18, 6 = 6. Sum 108.
+Phase totals in points: 1 = 22, 2 = 22, 3 = 19, 4 = 21, 5 = 21 (LED-189 widened from 2 to 5), 6 = 6. Sum 111. Epic 21 adds 39.
 
 ## Decision register
 
-| ID | Question | Options | Recommendation | Blocks |
-|---|---|---|---|---|
-| OD-9 | What does the Privacy Policy say about `api.frankfurter.dev`? | Wording approved by you, or the developer's draft (currency codes and the visitor's IP go to the host) | You approve the wording before it is committed (legal text, as OD-5) | LED-189 |
-| OD-10 | How does a cross-currency transfer carry its second value? | (a) store the destination amount on the transfer (migration); (b) store a rate on the transfer; (c) leave one amount and label Overspending per currency | (a) | LED-185 |
-| OD-11 | What does "first four widgets above the fold" mean at 390? | (a) a shorter cash flow chart on phones; (b) fewer widgets above it; (c) drop the claim | (a) | LED-202 |
-| OD-12 | Should the sweep drivers live in the repo? | (a) yes, a dev-only script; (b) no, keep the pattern file | (a) | LED-211 |
-| OD-13 | The twelve parked items in LED-214 | per item, each with a Fallback in the ticket | answer them in one pass; most stay as the Fallback | LED-214 |
+| ID | Question | Options | Recommendation | Blocks | Answer (2026-10-03) |
+|---|---|---|---|---|---|
+| OD-9 | What does the Privacy Policy say about `api.frankfurter.dev`? | Wording approved by you, or the developer's draft (currency codes and the visitor's IP go to the host) | You approve the wording before it is committed (legal text, as OD-5) | LED-189 | Widened: write up the Privacy Policy, Terms, data deletion instructions, a cookie and storage notice with settings (LED-245), and the other legal notices; you approve each page's wording before it is committed |
+| OD-10 | How does a cross-currency transfer carry its second value? | (a) store the destination amount on the transfer (migration); (b) store a rate on the transfer; (c) leave one amount and label Overspending per currency | (a) | LED-185 | (a) |
+| OD-11 | What does "first four widgets above the fold" mean at 390? | (a) a shorter cash flow chart on phones; (b) fewer widgets above it; (c) drop the claim | (a) | LED-202 | (a) |
+| OD-12 | Should the sweep drivers live in the repo? | (a) yes, a dev-only script; (b) no, keep the pattern file | (a) | LED-211 | (a), dev only |
+| OD-13 | The twelve parked items in LED-214 | per item, each with a Fallback in the ticket | answer them in one pass; most stay as the Fallback | LED-214 | Item 7 kept as is; the other eleven changed (LED-233 to LED-244) |
 
 Decisions inside a ticket (not blocking): LED-195 (Pay now for a past bill defaults to today; recommended).
 

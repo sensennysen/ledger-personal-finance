@@ -27,7 +27,7 @@ import { AddFromLastCycleDialog } from '@/components/budgets/AddFromLastCycleDia
 import { deficitSettingLabel, spendWindowLabel } from '@/lib/overspending'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { BUDGET_TONE_BAR_CLASS, budgetTone, budgetUsage } from '@/lib/budgetUsage'
-import { goalPace } from '@/lib/goalPace'
+import { goalPace, goalStatus, type GoalStatus } from '@/lib/goalPace'
 import { useCycle } from '@/contexts/cycleState'
 import { useNotify } from '@/contexts/notificationState'
 import { PageActions } from '@/components/layout/PageActions'
@@ -424,10 +424,13 @@ type GoalFormValues = z.output<typeof goalSchema>
 
 function GoalForm({
   defaultValues,
+  createdAt,
   onSubmit,
   onClose,
 }: {
   defaultValues?: Partial<GoalFormValues>
+  /** The saved goal's creation time; a new goal has no pace yet, so it shows no status. */
+  createdAt?: string
   onSubmit: (values: GoalFormValues) => Promise<void>
   onClose: () => void
 }) {
@@ -449,13 +452,16 @@ function GoalForm({
     },
   })
 
-  const [watchedTarget, watchedSaved, watchedDeadline, watchedCurrency] = useWatch({
+  const [watchedTarget, watchedSaved, watchedDeadline, watchedCurrency, watchedCompleted] = useWatch({
     control: form.control,
-    name: ['target_amount', 'current_amount', 'deadline', 'currency'],
+    name: ['target_amount', 'current_amount', 'deadline', 'currency', 'is_completed'],
   })
   const target = Number(watchedTarget) || 0
   const saved = Number(watchedSaved) || 0
   const pace = goalPace({ target, saved, deadline: watchedDeadline ?? null })
+  const status = createdAt
+    ? goalStatus({ target, saved, createdAt, deadline: watchedDeadline ?? null, isCompleted: Boolean(watchedCompleted) })
+    : null
 
   React.useEffect(() => {
     const currentIcon = form.getValues('icon')
@@ -614,6 +620,14 @@ function GoalForm({
                 {formatCurrency(saved, watchedCurrency)} of {formatCurrency(target, watchedCurrency)} · {Math.round(pace.pct)}%
               </span>
             </div>
+            {status && (
+              <div className="flex items-center gap-2">
+                <GoalStatusBadge status={status} currency={watchedCurrency} />
+                <span className="text-xs text-muted-foreground">
+                  {status.kind === 'on-track' ? 'At or ahead of' : 'Short of'} a steady pace to {formatTargetMonth(watchedDeadline!)}
+                </span>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-muted-foreground">Still needed</p>
@@ -969,6 +983,18 @@ function BudgetTransactionsDialog({
 
 // --- Savings goal card ---
 
+/** "On track" / "Behind by $X" (LED-235); nothing when the goal has no date or is complete. */
+function GoalStatusBadge({ status, currency }: { status: GoalStatus | null; currency: string }) {
+  if (!status) return null
+  return status.kind === 'on-track' ? (
+    <Badge variant="outline" className="text-xs border-income/40 text-income">On track</Badge>
+  ) : (
+    <Badge variant="outline" className="text-xs border-warning/40 text-warning">
+      Behind by {formatCurrency(status.by, currency)}
+    </Badge>
+  )
+}
+
 function SavingsGoalCard({
   goal,
   onEdit,
@@ -986,6 +1012,13 @@ function SavingsGoalCard({
   const [expanded, setExpanded] = useState(false)
   const pace = goalPace({ target: goal.target_amount, saved: goal.current_amount, deadline: goal.deadline })
   const { pct, remaining } = pace
+  const status = goalStatus({
+    target: goal.target_amount,
+    saved: goal.current_amount,
+    createdAt: goal.created_at,
+    deadline: goal.deadline,
+    isCompleted: goal.is_completed,
+  })
 
   const deadlineInfo = (() => {
     if (goal.is_completed) return null
@@ -1022,6 +1055,7 @@ function SavingsGoalCard({
                     {deadlineInfo.label}
                   </Badge>
                 )}
+                <GoalStatusBadge status={status} currency={goal.currency} />
               </div>
             </div>
           </div>
@@ -1662,6 +1696,7 @@ export default function BudgetsPage() {
           {editGoal && (
             <GoalForm
               defaultValues={editGoal}
+              createdAt={editGoal.created_at}
               onSubmit={handleEditGoal}
               onClose={() => { setEditGoal(null); setGoalFormError(null) }}
             />

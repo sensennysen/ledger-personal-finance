@@ -16,3 +16,4 @@ Token tests (`themeContrast`) prove the pairs. They do not prove what a page ren
 - The walker covers text nodes only. SVG text (chart axes, the pie) needs a screenshot check.
 - Focus rings are not text either. Focus each control with the keyboard (`:focus-visible` true) and measure its `box-shadow`/outline against the surface: `ring-ring/50` alone is under 3:1 (LED-229).
 - A light-surface pass that reads `background-color` without the element's `opacity` flags decorative 10% fills (the Reports stat-card circles). Composite the opacity, or read the flag list rather than asserting zero.
+- Computed colours are not always `rgb()`. Chromium reports a `ring-ring/50` shadow (and any `color-mix`) as `oklab(…)`, so a regex for `rgb()` silently measures nothing. Parse any CSS colour through a 1×1 canvas: set `fillStyle`, `fillRect`, read `getImageData` (epic 20 validation).

@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/ui/error-state'
 import type { OverspendingReport } from '@/hooks/useOverspendingReport'
 import { formatCurrency, formatDateShort, cn } from '@/lib/utils'
-import { deficitSettingLabel, shiftMonthKey, streakLabel } from '@/lib/overspending'
+import { deficitSettingLabel, shiftMonthKey, spendWindowLabel, streakLabel } from '@/lib/overspending'
 import type { Category } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
@@ -77,6 +77,8 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
           </div>
           {result.rows.map((row) => {
             const category = categoryById.get(row.categoryId)
+            // A yearly row is the year so far, so it names that instead of a cycle streak (LED-244)
+            const spendWindow = spendWindowLabel(row.period)
             return (
               <div
                 key={row.budgetId}
@@ -93,7 +95,7 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
                     <span className="block text-sm font-medium truncate">{category?.name ?? 'Uncategorised'}</span>
                     <span className="block text-xs text-muted-foreground tabular-nums">
                       {formatCurrency(row.spent, row.currency)} of {formatCurrency(row.limit, row.currency)}
-                      <span className="sm:hidden"> · {streakLabel(row.streak)}</span>
+                      {spendWindow ? <span className="whitespace-nowrap"> · {spendWindow}</span> : <span className="sm:hidden"> · {streakLabel(row.streak)}</span>}
                     </span>
                   </span>
                 </span>
@@ -103,10 +105,10 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
                 <span
                   className={cn(
                     'hidden sm:block w-24 justify-self-end text-center rounded-full px-2.5 py-0.5 text-[0.6875rem] font-bold',
-                    row.streak > 1 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground',
+                    row.streak > 1 && !spendWindow ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground',
                   )}
                 >
-                  {streakLabel(row.streak)}
+                  {spendWindow ? 'This year' : streakLabel(row.streak)}
                 </span>
               </div>
             )

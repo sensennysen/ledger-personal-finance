@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   computeOverspending,
   convertOverspendingTotals,
+  spendWindowLabel,
   streakLabel,
   shiftMonthKey,
 } from '../src/lib/overspending.ts'
@@ -141,4 +142,21 @@ test('a currency with no rate is left out and named, with the unrated spending',
 
 test('nothing over is zero with nothing named', () => {
   assert.deepEqual(convertOverspendingTotals({ totals: [], unrated: [] }, 'PHP', null), { over: 0, uncarried: 0, excludedCurrencies: [] })
+})
+
+test('a yearly row carries its period and is labelled year to date; cycle budgets are not (LED-244)', () => {
+  const yearly = budget({ id: 'y', period: 'yearly', amount: 1000 })
+  const monthly = budget({ id: 'm', category_id: 'c2' })
+  const txs = [tx('2026-03-05', 900), tx('2026-09-05', 300), tx('2026-09-06', 700, { category_id: 'c2' })]
+  const r = run({
+    budgets: [yearly, monthly],
+    txs,
+    rangeFor: (period) => (period === 'yearly' ? { start: '2026-01-01', end: '2026-12-31' } : { start: '2026-09-01', end: '2026-09-30' }),
+  })
+  const byId = new Map(r.rows.map((row) => [row.budgetId, row]))
+  assert.equal(byId.get('y').period, 'yearly')
+  assert.equal(byId.get('y').spent, 1200) // the year so far, not September's 300
+  assert.equal(byId.get('m').period, 'monthly')
+  assert.equal(spendWindowLabel('yearly'), 'year to date')
+  for (const period of ['weekly', 'monthly', 'quarterly']) assert.equal(spendWindowLabel(period), null)
 })

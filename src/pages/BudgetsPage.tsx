@@ -24,7 +24,7 @@ import { NeedsAttention } from '@/components/budgets/NeedsAttention'
 import { BudgetTable } from '@/components/budgets/BudgetTable'
 import { DeleteBudgetButton } from '@/components/budgets/DeleteBudgetButton'
 import { AddFromLastCycleDialog } from '@/components/budgets/AddFromLastCycleDialog'
-import { deficitSettingLabel } from '@/lib/overspending'
+import { deficitSettingLabel, spendWindowLabel } from '@/lib/overspending'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { BUDGET_TONE_BAR_CLASS, budgetTone, budgetUsage } from '@/lib/budgetUsage'
 import { goalPace } from '@/lib/goalPace'
@@ -1458,6 +1458,7 @@ export default function BudgetsPage() {
                     <div className="flex justify-between text-sm">
                       <span className={over ? 'text-destructive font-medium' : 'text-muted-foreground'}>
                         {formatCurrency(spent, budget.currency)} spent
+                        {spendWindowLabel(budget.period) && ` · ${spendWindowLabel(budget.period)}`}
                       </span>
                       <span className="font-medium">
                         {over

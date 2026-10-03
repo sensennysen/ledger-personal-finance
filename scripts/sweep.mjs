@@ -21,7 +21,7 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 
 const APP_ROUTES = ['/', '/accounts', '/transactions', '/budgets', '/categories', '/reports', '/thirteenth-month', '/settings']
-const PUBLIC_ROUTES = ['/login', '/privacy', '/terms', '/data-deletion']
+const PUBLIC_ROUTES = ['/login', '/privacy', '/terms', '/data-deletion', '/cookies', '/notices']
 
 function parseArgs(argv) {
   const args = {

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Sun, Moon, Monitor, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
+import { ChevronRight, Sun, Moon, Monitor, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing, FileText, Cookie, Info } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
@@ -596,6 +596,36 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3">
               <ShieldCheck className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm font-medium">Privacy Policy</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/terms"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-3">
+              <FileText className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Terms of Service</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/cookies"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-3">
+              <Cookie className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Cookies and Storage</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/notices"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-3">
+              <Info className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Notices</span>
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </Link>

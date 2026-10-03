@@ -267,7 +267,7 @@ export default function DashboardPage() {
 
   return (
     <WidgetDragContext.Provider value={{start:setDraggedWidget,drop:key=>{if(draggedWidget)reorderWidget(draggedWidget,key);setDraggedWidget(null)},end:()=>setDraggedWidget(null)}}>
-    <div className="grid w-full min-w-0 gap-4 overflow-x-hidden p-4 md:p-6 lg:grid-cols-2 2xl:grid-cols-3">
+    <div className="grid w-full min-w-0 gap-3 md:gap-4 overflow-x-hidden p-4 md:p-6 lg:grid-cols-2 2xl:grid-cols-3">
       <div className="hidden md:flex items-start justify-between gap-3 flex-wrap col-span-full">
         <div className="min-w-0 2xl:flex 2xl:items-baseline 2xl:gap-3">
           <h1 className="text-2xl font-bold leading-tight truncate">
@@ -386,10 +386,11 @@ export default function DashboardPage() {
       )}
 
       {widgets.stats && <section className="md:hidden rounded-3xl bg-card p-4" style={widgetGridStyle('stats')}>
-        <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] mt-1">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
-        {!loading && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" /></div>}
-        <div className="grid grid-cols-2 gap-3 mt-3">{([{view:'income',label:'↙ In',value:stats.income,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-2 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p></button>)}</div>
-        {!loading && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" /></div>}
+        <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] leading-none mt-1.5">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
+        {/* Only when there is a notice: an empty wrapper still takes its margin (LED-202). */}
+        {!loading && stats.excludedCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" /></div>}
+        <div className="grid grid-cols-2 gap-3 mt-2.5">{([{view:'income',label:'↙ In',value:stats.income,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-1.5 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p></button>)}</div>
+        {!loading && stats.excludedFlowCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" /></div>}
       </section>}
       {widgets.stats && (
         <div className="hidden md:grid gap-4 grid-cols-3 col-span-full" style={widgetGridStyle('stats')}>

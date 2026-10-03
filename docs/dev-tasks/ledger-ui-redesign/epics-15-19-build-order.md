@@ -78,7 +78,7 @@ All five questions are answered (see the Decision register); the tickets are `To
 |---|---|---|---|---|
 | 26 | LED-185 | Second rate for cross-currency transfers, Overspending totals | 5 | OD-10 (a): store the destination amount on the transfer |
 | 27 | LED-189 | Legal pages: Privacy Policy, Terms, data deletion, cookies and storage, other notices | 5 | OD-9, widened: every page drafted; you approve each before it is committed |
-| 28 | LED-202 | First four widgets above the fold at 390 | 3 | OD-11 (a): a shorter cash flow chart on phones |
+| 28 | LED-202 | First four widgets above the fold at 390 | 3 | OD-11 (a): a shorter cash flow chart on phones; revised 2026-10-03 after measuring (the chart is not in the default first four): compact the first four on phones as in 18a, and keep the shorter chart |
 | 29 | LED-211 | Sweep drivers as a repo script | 5 | OD-12 (a): a dev-only script |
 | 30 | LED-214 | Parked items that need a call (bundle) | 3 | OD-13: answered per item; tickets in epic 21 below |
 

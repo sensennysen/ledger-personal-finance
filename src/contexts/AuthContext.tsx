@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { readCache, writeCache, clearCacheByPrefix } from '@/lib/dataCache'
 import { clearOfflineQueue } from '@/lib/offlineQueue'
 import { clearPendingReceipts } from '@/lib/receiptStore'
+import { removeUserReceipts } from '@/lib/receiptCleanup'
 import { makeAuthError, type AuthError } from '@/lib/authErrors'
 import type { Profile } from '@/types'
 
@@ -135,6 +136,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const deleteAccount = async () => {
+    // Receipt images are files, not rows, so the cascade does not reach them (LED-189). They go
+    // first; if they cannot, this throws a ReceiptCleanupError and the account is left as it was.
+    if (user) await removeUserReceipts(supabase.storage.from('receipts'), user.id)
     const { error } = await supabase.rpc('delete_user')
     if (error) throw error
     // Clear all local data before signing out

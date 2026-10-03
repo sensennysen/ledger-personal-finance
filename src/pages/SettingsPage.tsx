@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ExchangeRatesCard } from '@/components/settings/ExchangeRatesCard'
 import { FormError } from '@/components/ui/form-error'
 import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
+import { ReceiptCleanupError } from '@/lib/receiptCleanup'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -126,7 +127,13 @@ export default function SettingsPage() {
       setDeleting(false)
       setDeleteOpen(false)
     } catch (err) {
-      setDeleteError(err instanceof Error ? describeDataError(err, { action: 'delete', entity: 'account' }) : 'Deletion failed. Please try again.')
+      setDeleteError(
+        err instanceof ReceiptCleanupError
+          ? { message: err.message, detail: describeDataError(err.cause as Error, { action: 'delete', entity: 'account' })?.detail ?? null }
+          : err instanceof Error
+            ? describeDataError(err, { action: 'delete', entity: 'account' })
+            : 'Deletion failed. Please try again.',
+      )
       setDeleting(false)
     }
   }

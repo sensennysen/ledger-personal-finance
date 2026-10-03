@@ -27,6 +27,7 @@ export const TRANSACTION_CSV_HEADERS = [
   'Amount',
   'Currency',
   'Exchange Rate',
+  'Amount Received',
   'Transfer Fee',
   'Standing Balance',
   'Notes',
@@ -47,6 +48,8 @@ export function buildTransactionsCsv(
     t.amount,
     t.currency,
     t.exchange_rate,
+    // A transfer between two currencies: what the destination received, in its currency (LED-185).
+    t.destination_amount ?? '',
     t.transfer_fee ?? '',
     balanceMap.get(t.id) ?? '',
     t.notes ?? '',

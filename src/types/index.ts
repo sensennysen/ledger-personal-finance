@@ -108,6 +108,11 @@ export interface Transaction {
   amount: number
   currency: string
   exchange_rate: number
+  /**
+   * What a transfer between two currencies credits its destination, in the destination's currency
+   * (LED-185). Null for every other row; the destination then receives the amount itself.
+   */
+  destination_amount?: number | null
   description: string
   notes: string | null
   date: string

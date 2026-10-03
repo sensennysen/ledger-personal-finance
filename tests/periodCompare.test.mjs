@@ -105,3 +105,16 @@ test('formatComparison wording', () => {
   assert.equal(formatComparison({ pct: null, direction: 'up' }, 'Aug'), 'Nothing in Aug to compare')
   assert.equal(formatComparison({ pct: null, direction: 'flat' }, 'Aug'), 'Same as Aug')
 })
+
+test('convertedNetWorthEffect: a transfer between two currencies moves net worth by what arrived less what left (LED-185)', () => {
+  // 1 USD = 56 PHP; sending 10 USD that arrives as 500 PHP loses 60 PHP, plus a 2 USD fee.
+  const transfer = {
+    date: '2026-09-10', type: 'transfer', amount: 10, currency: 'USD', exchange_rate: 1,
+    to_account_id: 'php', to_account: { currency: 'PHP' }, destination_amount: 500, transfer_fee: 2,
+  }
+  assert.ok(Math.abs(convertedNetWorthEffect(transfer, 'PHP', table) - (500 - 560 - 112)) < 1e-9)
+  // Within one currency, or with no destination amount, it is still only the fee.
+  assert.equal(convertedNetWorthEffect({ ...transfer, destination_amount: null, transfer_fee: null }, 'PHP', table), 0)
+  // A side no rate converts makes the whole effect unknown, never counted at 1.
+  assert.equal(convertedNetWorthEffect({ ...transfer, currency: 'EUR' }, 'PHP', table), null)
+})

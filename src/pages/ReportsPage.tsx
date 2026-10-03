@@ -496,18 +496,16 @@ export default function ReportsPage() {
 
   // Over budget stat card: the report's total in the display currency, against last cycle.
   const overspendingReady = overspending.state === 'ready' || overspending.state === 'stale-error'
-  const overNow = overspending.result.totals.find((total) => total.currency === currency)?.over ?? 0
-  const overPrevious = overspending.previous.totals.find((total) => total.currency === currency)?.over ?? 0
+  // The same converted total the Overspending card prints (LED-185), so the two cannot disagree.
+  const overNow = overspending.converted.over
+  const overPrevious = overspending.previousConverted.over
   const overCategories = overspending.result.rows.length
-  const overOtherCurrencies = overspending.result.totals.filter((total) => total.currency !== currency)
   const overspendingSub =
     overspending.state === 'error'
       ? "Couldn't load your budgets"
       : overspending.state === 'empty'
         ? 'No budgets set'
-        : `${overCategories} ${overCategories === 1 ? 'category' : 'categories'}${
-            overOtherCurrencies.length > 0 ? ` · plus ${overOtherCurrencies.map((total) => total.currency).join(', ')}` : ''
-          }`
+        : `${overCategories} ${overCategories === 1 ? 'category' : 'categories'}`
 
   const handleExport = () => {
     downloadCsv(buildReportCsv(sortedTransactions, exportColumns(visibleColumns), txBalanceMap), `ledger-report_${filenameLabel}.csv`)
@@ -736,6 +734,7 @@ export default function ReportsPage() {
           color={overNow > 0 ? 'var(--warning)' : 'var(--foreground)'}
           comparison={overspendingReady ? compare(overNow, overPrevious, 'down') : undefined}
           loading={overspending.state === 'loading'}
+          note={<UnratedCurrencyNotice currencies={overspending.converted.excludedCurrencies} subject="overspending" />}
         />
       </div>
 

@@ -1,5 +1,6 @@
 import type { Account } from '@/types'
 import { daysUntilDayOfMonth, nextDayOfMonthDate } from './creditCards.ts'
+import { transferCredit } from './transferCredit.ts'
 
 // Card balances are stored as liabilities: 0 = nothing owed, -1240 = owe 1,240,
 // positive = statement credit. Nothing here caps the amount; overpaying is allowed.
@@ -168,16 +169,16 @@ export function isCardPaymentTransaction<A extends Pick<Account, 'id' | 'type'>>
  * is a plain insert. `accounts` need only contain the destination.
  */
 export function generatedCardPayment<A extends Pick<Account, 'id' | 'type'>>(
-  tx: Pick<CardPaymentShape, 'type' | 'to_account_id'> & { amount: number; exchange_rate?: number | null },
+  tx: Pick<CardPaymentShape, 'type' | 'to_account_id'> & { amount: number; exchange_rate?: number | null; destination_amount?: number | null },
   accounts: A[],
 ): { card: A; amount: number } | null {
   const card = transferCard(tx, accounts)
   return card ? { card, amount: creditedAmount(tx) } : null
 }
 
-/** What reaches the card: the amount, converted when the paying account is in another currency. */
-export function creditedAmount(values: { amount: number; exchange_rate?: number | null }): number {
-  return round2(values.amount * (values.exchange_rate ?? 1))
+/** What reaches the card: what the balance trigger credits it (transferCredit), to the cent. */
+export function creditedAmount(values: { amount: number; exchange_rate?: number | null; destination_amount?: number | null }): number {
+  return round2(transferCredit(values))
 }
 
 /**

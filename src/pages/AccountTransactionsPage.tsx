@@ -54,6 +54,7 @@ import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import type { CreditCardPayment, Transaction } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
+import { transferCredit } from '@/lib/transferCredit'
 
 function bandCell(label: string, value: string, sub?: string, money = true, wrapValue = false) {
   return (
@@ -250,13 +251,13 @@ export default function AccountTransactionsPage() {
   const stats = useMemo(() => {
     const income = accountTransactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
     const expenses = accountTransactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    // Outgoing transfers debit amount + fee; incoming transfers credit amount * exchange_rate
+    // Outgoing transfers debit amount + fee; incoming transfers credit what the trigger credits (transferCredit)
     const transfersSent = accountTransactions
       .filter((t) => t.type === 'transfer' && t.account_id === accountId)
       .reduce((s, t) => s + t.amount + (t.transfer_fee ?? 0), 0)
     const transfersReceived = accountTransactions
       .filter((t) => t.type === 'transfer' && t.to_account_id === accountId)
-      .reduce((s, t) => s + t.amount * (t.exchange_rate ?? 1), 0)
+      .reduce((s, t) => s + transferCredit(t), 0)
     return { income, expenses, transfersSent, transfersReceived }
   }, [accountTransactions, accountId])
 
@@ -855,6 +856,7 @@ export default function AccountTransactionsPage() {
                   amount: editingTx.amount,
                   currency: editingTx.currency,
                   exchange_rate: editingTx.exchange_rate ?? 1,
+                  destination_amount: editingTx.destination_amount ?? null,
                   description: editingTx.description,
                   notes: editingTx.notes,
                   date: editingTx.date,

@@ -1,4 +1,5 @@
 import type { Account, Category, Transaction } from '@/types'
+import { transferCredit } from '@/lib/transferCredit'
 
 export interface TransactionFilters {
   accountId?: string
@@ -16,7 +17,7 @@ export type TransactionUpsertValues = Omit<
 
 type TxShape = Pick<
   Transaction,
-  'account_id' | 'to_account_id' | 'type' | 'amount' | 'exchange_rate' | 'transfer_fee'
+  'account_id' | 'to_account_id' | 'type' | 'amount' | 'exchange_rate' | 'destination_amount' | 'transfer_fee'
 >
 
 const RECURRING_KEY = 'ledger-recurring-generated'
@@ -35,7 +36,7 @@ export function applyTxDelta(accounts: Account[], tx: TxShape): Account[] {
     }
 
     if ((tx.type === 'transfer' || tx.type === 'expense') && account.id === tx.to_account_id) {
-      const destinationAmount = tx.type === 'transfer' ? tx.amount * (tx.exchange_rate ?? 1) : tx.amount
+      const destinationAmount = tx.type === 'transfer' ? transferCredit(tx) : tx.amount
       return { ...account, balance: account.balance + destinationAmount }
     }
 
@@ -57,7 +58,7 @@ export function reverseTxDelta(accounts: Account[], tx: TxShape): Account[] {
     }
 
     if ((tx.type === 'transfer' || tx.type === 'expense') && account.id === tx.to_account_id) {
-      const destinationAmount = tx.type === 'transfer' ? tx.amount * (tx.exchange_rate ?? 1) : tx.amount
+      const destinationAmount = tx.type === 'transfer' ? transferCredit(tx) : tx.amount
       return { ...account, balance: account.balance - destinationAmount }
     }
 

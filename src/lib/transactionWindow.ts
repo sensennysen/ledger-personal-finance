@@ -1,4 +1,5 @@
 import { signPrefix } from './netSign.ts'
+import { transferCredit } from './transferCredit.ts'
 
 // Transaction lists render a window of rows that grows on scroll (spec §7 V1):
 // 60 rows per step on desktop, 30 on mobile. Day headers always describe the
@@ -11,6 +12,7 @@ interface WindowedTx {
   amount: number
   currency: string
   exchange_rate?: number | null
+  destination_amount?: number | null
   to_account_id?: string | null
   to_account?: { currency?: string | null } | null
 }
@@ -26,13 +28,14 @@ export interface DayGroup<T> {
 /**
  * Signed amount as the row displays it. Without an account context a transfer
  * moves money between the user's own accounts and nets to zero. Inside an
- * account, money arriving (transfer or loan repayment into it) is positive and
- * carried at the exchange rate, matching TransactionRow.
+ * account, money arriving (transfer or loan repayment into it) is positive and is what the
+ * destination was credited (transferCredit: the destination amount of a transfer between two
+ * currencies), matching TransactionRow.
  */
 export function signedAmount(tx: WindowedTx, contextAccountId?: string): number {
   if (contextAccountId !== undefined) {
     const incoming = (tx.type === 'transfer' || tx.type === 'expense') && tx.to_account_id === contextAccountId
-    if (incoming) return tx.amount * (tx.exchange_rate ?? 1)
+    if (incoming) return tx.type === 'transfer' ? transferCredit(tx) : tx.amount * (tx.exchange_rate ?? 1)
     if (tx.type === 'income') return tx.amount
     return -tx.amount
   }

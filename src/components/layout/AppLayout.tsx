@@ -36,7 +36,7 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useCardPayment } from '@/hooks/useCardPayment'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
-import { isSetupComplete } from '@/lib/firstRunChecklist'
+import { isNavUnlocked } from '@/lib/firstRunChecklist'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { NetworkStatusProvider } from '@/contexts/NetworkStatusContext'
 import { ExchangeRatesProvider } from '@/contexts/ExchangeRatesContext'
@@ -107,12 +107,14 @@ function LayoutShell() {
   const accountRouteId = useMatch('/accounts/:accountId')?.params.accountId
   const routeAccount = accounts.find((account) => account.id === accountRouteId)
   const currentAccount = routeAccount ? { id: routeAccount.id, name: routeAccount.name } : null
-  const { cycleConfirmed } = useFirstRunChecklist()
-  const setupComplete = isSetupComplete(
+  const { cycleConfirmed, dismissed } = useFirstRunChecklist()
+  // "Skip setup" unlocks the nav too; only the checklist cares about real completion.
+  const setupComplete = isNavUnlocked(
     {
       hasAccount: accounts.length > 0,
       hasTransaction: transactions.length > 0,
       cycleConfirmed,
+      dismissed,
     },
     { loading: accountsLoading || transactionsLoading },
   )

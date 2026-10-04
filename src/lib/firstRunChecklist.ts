@@ -59,6 +59,18 @@ export function isSetupComplete(
 }
 
 /**
+ * The nav's advisory locks. They lift when setup is complete or when the user
+ * chose "skip setup": skipping says "let me explore", so keeping Activity,
+ * Budgets, Categories and Reports locked would contradict it.
+ */
+export function isNavUnlocked(
+  progress: FirstRunProgress & { dismissed: boolean },
+  options: { loading?: boolean } = {},
+): boolean {
+  return progress.dismissed || isSetupComplete(progress, options)
+}
+
+/**
  * While accounts and transactions load, Home reserves the checklist's space only when the card is
  * certain to show (LED-199). It shows unless setup is complete, and `isSetupComplete` is false for
  * every user whose pay cycle is not confirmed, a flag stored on the device and known before paint.

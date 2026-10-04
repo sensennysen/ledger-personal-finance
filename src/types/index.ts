@@ -82,6 +82,8 @@ export interface Category {
   color: string
   icon: string
   is_default: boolean
+  /** Counts as basic salary on the 13th Month page (LED-236). */
+  counts_as_salary: boolean
   sort_order?: number
   created_at: string
   updated_at: string

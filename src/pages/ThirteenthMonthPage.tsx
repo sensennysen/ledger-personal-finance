@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarCheck, CheckSquare, SquareMinus, Square, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
+import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatCurrency, formatDate, getLocalDateString, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -81,6 +82,14 @@ export default function ThirteenthMonthPage() {
   const transactions = useMemo(() => (failed ? [] : fetched), [failed, fetched])
   const shownYear = refreshing ? dataYear : year
   const { transactions: anyIncomeEver, loading: anyIncomeLoading } = useTransactions({ type: 'income', limit: 1 })
+  // The categories the user marked as salary (LED-236), by id.
+  const { categories, loading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useCategories()
+  // Without the categories the flag can't be read; say so rather than auto-select nothing.
+  const salaryFlagsUnavailable = categoriesLoading || (!!categoriesError && categories.length === 0)
+  const salaryCategoryIds = useMemo(
+    () => new Set(categories.filter((category) => category.counts_as_salary).map((category) => category.id)),
+    [categories]
+  )
 
   const handleYearChange = (v: string) => {
     if (!v) return
@@ -155,8 +164,8 @@ export default function ThirteenthMonthPage() {
     [transactions, effectiveIncluded, shownYear]
   )
   const checklist = useMemo(
-    () => pd851Checklist(transactions, effectiveIncluded),
-    [transactions, effectiveIncluded]
+    () => pd851Checklist(transactions, effectiveIncluded, salaryCategoryIds),
+    [transactions, effectiveIncluded, salaryCategoryIds]
   )
 
   const includedCount = transactions.filter((t) => effectiveIncluded.has(t.id)).length
@@ -245,7 +254,8 @@ export default function ThirteenthMonthPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => updateIncluded(salaryOnlySelection(transactions))}
+                disabled={salaryFlagsUnavailable}
+                onClick={() => updateIncluded(salaryOnlySelection(transactions, salaryCategoryIds))}
               >
                 Auto-select salary only
               </Button>
@@ -260,6 +270,18 @@ export default function ThirteenthMonthPage() {
                 Clear
               </Button>
             </div>
+          )}
+          {!showSkeleton && transactions.length > 0 && categoriesError && categories.length === 0 && (
+            <InlineLoadError
+              message="Couldn't load your categories, so Auto-select salary only can't tell which count as salary."
+              onRetry={() => void refetchCategories()}
+            />
+          )}
+          {!showSkeleton && transactions.length > 0 && !salaryFlagsUnavailable && salaryCategoryIds.size === 0 && (
+            <p className="pt-1 text-xs text-muted-foreground">
+              No category counts as salary yet. Tick "Counts as salary" on one in{' '}
+              <Link to="/categories" className="underline underline-offset-2">Categories</Link>.
+            </p>
           )}
           {!showSkeleton && excluded.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-muted-foreground">

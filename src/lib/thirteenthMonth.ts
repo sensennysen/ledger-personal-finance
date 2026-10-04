@@ -1,24 +1,25 @@
 // 13th Month Pay selection helpers (LED-97). Under PD 851 only basic salary
 // counts, and the category is already on every income record, so one click can
-// pre-tick the salary rows and turn a manual pass into a review.
+// pre-tick the salary rows and turn a manual pass into a review. Which categories
+// are salary is the user's flag, categories.counts_as_salary (LED-236), passed in
+// as a set of category ids.
 
 export interface IncomeRecord {
   id: string
   date: string
+  category_id?: string | null
   category?: { name: string } | null
 }
 
 export const UNCATEGORISED = 'Uncategorised'
 
-const SALARY_PATTERN = /\b(salary|salaries|wages?|basic pay|payroll)\b/i
-
-export function isSalaryCategory(name: string | null | undefined): boolean {
-  return !!name && SALARY_PATTERN.test(name)
+function isSalary(record: IncomeRecord, salaryCategoryIds: ReadonlySet<string>): boolean {
+  return !!record.category_id && salaryCategoryIds.has(record.category_id)
 }
 
-/** Ids of the records whose category reads as basic salary. */
-export function salaryOnlySelection(records: IncomeRecord[]): Set<string> {
-  return new Set(records.filter((r) => isSalaryCategory(r.category?.name)).map((r) => r.id))
+/** Ids of the records whose category counts as salary. */
+export function salaryOnlySelection(records: IncomeRecord[], salaryCategoryIds: ReadonlySet<string>): Set<string> {
+  return new Set(records.filter((r) => isSalary(r, salaryCategoryIds)).map((r) => r.id))
 }
 
 /** Records left out of the selection, counted by category, most first. */
@@ -109,7 +110,8 @@ export interface Pd851Row {
   selected: number
 }
 
-// Matched on the category name only; a per-user "counts as salary" flag is a product decision.
+// The excluded kinds are matched on the category name: they only warn that a ticked record
+// looks like pay PD 851 leaves out. Basic salary is the user's flag.
 const PD851_PATTERNS: Record<Exclude<Pd851RowId, 'basic'>, RegExp> = {
   overtime: /\b(overtime|holiday|night|premium|differential)\b/i,
   allowances: /\b(allowances?|bonus(es)?|commission|incentives?|benefits?|13th|thirteenth)\b/i,
@@ -128,17 +130,23 @@ const PD851_LABELS: Record<Pd851RowId, string> = {
  * records that look like it, so a cross row with `selected > 0` is a warning
  * that the estimate includes pay PD 851 leaves out.
  */
-export function pd851Checklist(records: IncomeRecord[], included: Set<string>): Pd851Row[] {
+export function pd851Checklist(
+  records: IncomeRecord[],
+  included: Set<string>,
+  salaryCategoryIds: ReadonlySet<string>,
+): Pd851Row[] {
   const ticked = records.filter((record) => included.has(record.id))
-  const count = (test: (name: string | null | undefined) => boolean) =>
-    ticked.filter((record) => test(record.category?.name)).length
+  const count = (test: (record: IncomeRecord) => boolean) => ticked.filter(test).length
   return [
-    { id: 'basic', label: PD851_LABELS.basic, counts: true, selected: count(isSalaryCategory) },
+    { id: 'basic', label: PD851_LABELS.basic, counts: true, selected: count((r) => isSalary(r, salaryCategoryIds)) },
     ...(['overtime', 'allowances', 'other'] as const).map((id) => ({
       id,
       label: PD851_LABELS[id],
       counts: false,
-      selected: count((name) => !!name && !isSalaryCategory(name) && PD851_PATTERNS[id].test(name)),
+      selected: count((r) => {
+        const name = r.category?.name
+        return !!name && !isSalary(r, salaryCategoryIds) && PD851_PATTERNS[id].test(name)
+      }),
     })),
   ]
 }

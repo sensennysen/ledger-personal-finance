@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
@@ -66,6 +66,7 @@ import { resolveLoadState } from '@/lib/loadState'
 import type { Category, Subcategory } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 import { SWATCHES } from '@/lib/swatches'
+import { Switch } from '@/components/ui/switch'
 import { clashSentence, findNameClash } from '@/lib/categoryNames'
 
 const DEFAULT_CATEGORY_ICON = '\u{1F3F7}\uFE0F'
@@ -76,6 +77,7 @@ const schema = z.object({
   type: z.enum(['income', 'expense', 'both']),
   color: z.string(),
   icon: z.string(),
+  counts_as_salary: z.boolean(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -125,9 +127,12 @@ function CategoryForm({
       type: 'expense',
       color: SWATCHES[0],
       icon: DEFAULT_CATEGORY_ICON,
+      counts_as_salary: false,
       ...defaultValues,
     },
   })
+  // Salary is income: an expense-only category can't count as salary (LED-236).
+  const canCountAsSalary = useWatch({ control: form.control, name: 'type' }) !== 'expense'
 
   React.useEffect(() => {
     const currentIcon = form.getValues('icon')
@@ -138,7 +143,10 @@ function CategoryForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form
+        onSubmit={form.handleSubmit((values) => onSubmit({ ...values, counts_as_salary: canCountAsSalary && values.counts_as_salary }))}
+        className="space-y-4"
+      >
         <FormField
           control={form.control}
           name="name"
@@ -174,6 +182,23 @@ function CategoryForm({
             </FormItem>
           )}
         />
+        {canCountAsSalary && (
+          <FormField
+            control={form.control}
+            name="counts_as_salary"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <FormLabel className="cursor-pointer">Counts as salary</FormLabel>
+                  <p className="text-xs text-muted-foreground">13th Month pay counts income in this category as basic salary.</p>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name="icon"

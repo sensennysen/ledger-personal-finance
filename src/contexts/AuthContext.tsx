@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { readCache, writeCache, clearCacheByPrefix } from '@/lib/dataCache'
+import { readWithPolicy } from '@/lib/readRetry'
 import { clearOfflineQueue } from '@/lib/offlineQueue'
 import { clearPendingReceipts } from '@/lib/receiptStore'
 import { removeUserReceipts } from '@/lib/receiptCleanup'
@@ -39,11 +40,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cached = readCache<Profile>(cacheKey)
     if (cached) setProfile(cached)
     if (!navigator.onLine) return
-    const { data, error } = await supabase
+    // Budgets waits on the profile, so a first load fails fast like the list reads (LED-242).
+    const { data, error } = await readWithPolicy((retry) => supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single()
+      .retry(retry), { background: cached !== null })
     if (error) {
       console.error('Failed to fetch profile:', error.message)
       // With a cached profile on screen nothing is missing, so there is nothing to warn about.

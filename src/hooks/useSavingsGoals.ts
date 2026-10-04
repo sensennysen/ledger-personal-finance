@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
+import { readWithPolicy } from '@/lib/readRetry'
 import type { SavingsGoal, Transaction } from '@/types'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
@@ -32,11 +33,14 @@ export function useSavingsGoals() {
     }
     if (!navigator.onLine) return
 
-    const { data, error } = await supabase
+    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
+    const background = cached !== null
+    const { data, error } = await readWithPolicy((retry) => supabase
       .from('savings_goals')
       .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
+      .retry(retry), { background })
 
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load' }))
@@ -48,7 +52,7 @@ export function useSavingsGoals() {
     const goalIds = (data as SavingsGoal[]).map((g) => g.id)
     let linkedTxs: Transaction[] = []
     if (goalIds.length > 0) {
-      const { rows, error: txError } = await readAllPages<Transaction>((from, to) =>
+      const { rows, error: txError } = await readWithPolicy((retry) => readAllPages<Transaction>((from, to) =>
         supabase
           .from('transactions')
           .select('*, category:categories(id,name,color,icon), account:accounts!transactions_account_id_fkey(id,name,color,currency)')
@@ -56,8 +60,9 @@ export function useSavingsGoals() {
           .in('goal_id', goalIds)
           .order('date', { ascending: false })
           .order('id', { ascending: false })
-          .range(from, to),
-      )
+          .range(from, to)
+          .retry(retry),
+      ), { background })
       if (txError) {
         setLoadFailure(describeDataError(txError, { action: 'load' }))
         setLoading(false)

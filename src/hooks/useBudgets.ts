@@ -11,6 +11,7 @@ import { sumBudgetSpend } from '@/lib/budgetSpend'
 import { countedEnd } from '@/lib/countsYet'
 import { shiftMonthKey } from '@/lib/overspending'
 import { readAllPages } from '@/lib/pagedRead'
+import { readWithPolicy } from '@/lib/readRetry'
 import { canRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 import { buildBudgetHistory, type PeriodSpend } from '@/lib/budgetHistory'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
@@ -97,12 +98,15 @@ export function useBudgets(
       return
     }
 
-    const { data: budgetData, error: budgetError } = await supabase
+    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
+    const background = cached !== null
+    const { data: budgetData, error: budgetError } = await readWithPolicy((retry) => supabase
       .from('budgets')
       .select('*, category:categories(id, name, color, icon, type)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: true })
+      .retry(retry), { background })
 
     if (request !== requestId.current) return
     if (budgetError) {
@@ -125,7 +129,7 @@ export function useBudgets(
       new Date(now.getFullYear() + 1, 0, Math.max(1, startDay - 1)),
     )
 
-    const { rows: spentData, error: spentError } = await readAllPages(
+    const { rows: spentData, error: spentError } = await readWithPolicy((retry) => readAllPages(
       (from, to) =>
         supabase
           .from('transactions')
@@ -136,10 +140,11 @@ export function useBudgets(
           .lte('date', fetchEnd)
           .order('date', { ascending: true })
           .order('id', { ascending: true })
-          .range(from, to),
+          .range(from, to)
+          .retry(retry),
       undefined,
       () => request !== requestId.current,
-    )
+    ), { background })
 
     if (request !== requestId.current) return
     if (spentError) {

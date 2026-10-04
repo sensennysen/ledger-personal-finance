@@ -50,6 +50,7 @@ import {
   type TransactionFormValues,
 } from '@/components/transactions/TransactionForm'
 import { TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
+import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { entryDialogWidthClass, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { SearchPalette } from '@/components/search/SearchPalette'
 import { EntryDetail } from '@/components/transactions/EntryDetail'
@@ -372,19 +373,27 @@ function LayoutShell() {
             The FAB comes before the nav in the DOM, so Tab reaches the page's
             primary action before Home (27a). */}
         {mobile && !sheet && location.pathname !== '/settings' && (
-          <button
-            ref={fabRef}
-            aria-label="Add transaction"
-            onClick={() => openAddTransactionModal('expense')}
-            aria-hidden={fabHidden}
-            tabIndex={fabHidden ? -1 : 0}
-            className={cn(
-              'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] [body:has([data-month-jump-bar])_&]:bottom-[calc(160px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-(--dur-base)',
-              fabHidden && 'opacity-0 pointer-events-none',
-            )}
-          >
-            <Plus className="size-7" />
-          </button>
+          // Same action as the page's Add button: pick a kind, then the entry dialog.
+          <TransactionKindMenu
+            onSelect={(kind) => {
+              openAddTransactionModal(kind)
+              trigger.current = 'fab'
+            }}
+            trigger={
+              <button
+                ref={fabRef}
+                aria-label="Add transaction"
+                aria-hidden={fabHidden}
+                tabIndex={fabHidden ? -1 : 0}
+                className={cn(
+                  'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] [body:has([data-month-jump-bar])_&]:bottom-[calc(160px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-(--dur-base)',
+                  fabHidden && 'opacity-0 pointer-events-none',
+                )}
+              >
+                <Plus className="size-7" />
+              </button>
+            }
+          />
         )}
         <BottomNav setupComplete={setupComplete} />
         <PWAInstallBanner hidden={sheet !== null} />
@@ -434,13 +443,15 @@ function LayoutShell() {
         >
           <DialogContent
             finalFocus={triggerFocus}
+            // Add matches the Activity page's entry dialog; only the account sheet is a bottom sheet.
             className={cn(
-              'max-h-[90dvh] overflow-y-auto',
-              sheet === 'add' ? entryDialogWidthClass(transactionKind) : 'max-w-md',
-              mobile && 'm3-bottom-sheet',
+              sheet === 'add'
+                ? `max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`
+                : 'max-h-[90dvh] max-w-md overflow-y-auto',
+              mobile && sheet === 'account' && 'm3-bottom-sheet',
             )}
           >
-            {mobile && (
+            {mobile && sheet === 'account' && (
               <div
                 className="flex justify-center h-5 touch-none"
                 onTouchStart={(event) => {

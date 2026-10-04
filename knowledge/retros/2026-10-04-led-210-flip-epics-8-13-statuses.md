@@ -53,6 +53,11 @@ Epic rows set to Done: EPIC-ADD-TRANSACTION, EPIC-SEMANTIC-COLOUR, EPIC-DISABLED
 | (c) `git diff --stat` shows only STATUS cells | PASS. 6 files, 48 lines in and 48 out. A row-by-row comparison with `HEAD` finds 48 changes, each only STATUS from To Do to Done. |
 | (d) The round trip passes on every CSV | PASS. Every CSV under `docs/dev-tasks/` round-trips byte for byte, has no BOM, and keeps its `HEAD` line ending. The six edited files have 20 columns. |
 
+## Validation
+- `pnpm lint` and `pnpm build` are clean. `pnpm test`: 1001 passing, 0 failing, plus `tests/redesign.mjs`. No test reads these CSVs.
+- The graph query on the epic 8 to 13 statuses reaches the retros and `epics-8-13-build-order.md`. That file has no status column or "Remaining" count to update.
+- The gate rule is now step 6 of `knowledge/patterns/edit-ticket-csvs-without-noise.md`.
+
 ## What went well
 - **The script asserts the exceptions.** It stops unless LED-142 comes out "no commit", LED-145 "FAIL" and LED-153 "Won't Do". If a retro were misread, it would stop instead of quietly flipping or skipping a row.
 

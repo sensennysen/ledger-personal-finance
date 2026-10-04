@@ -1,7 +1,9 @@
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { type KeyboardEvent, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   ArrowLeftRight,
+  CalendarDays,
+  Ellipsis,
   FileBarChart2,
   LayoutDashboard,
   Lock,
@@ -36,6 +38,8 @@ const ICONS: Record<NavIconKey, LucideIcon> = {
   categories: Tag,
   reports: FileBarChart2,
   settings: Settings,
+  'thirteenth-month': CalendarDays,
+  more: Ellipsis,
 }
 
 // Arrow keys move focus within a tab row; Tab leaves it (LED-90).
@@ -54,37 +58,22 @@ function moveTabFocus(event: KeyboardEvent<HTMLDivElement>) {
 
 export function TopBar({
   avatar,
+  mobileAvatar,
   onAvatarClick,
   onSearch,
   mobileTitle,
-  mobileStatus,
+  titleIsHeading,
   setupComplete = true,
 }: {
   avatar: ReactNode
+  mobileAvatar: ReactNode
   onAvatarClick: () => void
   onSearch: () => void
   mobileTitle: string
-  mobileStatus: string
+  titleIsHeading: boolean
   setupComplete?: boolean
 }) {
   const { pathname } = useLocation()
-  const tabStrip = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    // Keep the active tab visible without Element.scrollIntoView: in Chrome it
-    // moves the page's sequential-focus starting point to wherever it scrolled,
-    // which put a fresh Tab press after the header instead of at the skip link
-    // (LED-155). A manual scrollLeft has no such side effect.
-    const strip = tabStrip.current
-    const active = strip?.querySelector<HTMLElement>('[aria-current="page"]')
-    if (!strip || !active) return
-    const activeLeft = active.offsetLeft - strip.offsetLeft
-    const activeRight = activeLeft + active.offsetWidth
-    if (activeLeft < strip.scrollLeft) {
-      strip.scrollLeft = activeLeft
-    } else if (activeRight > strip.scrollLeft + strip.clientWidth) {
-      strip.scrollLeft = activeRight - strip.clientWidth
-    }
-  }, [pathname])
   const { theme, toggleTheme } = useTheme()
   const tabStop = rovingTabStop(NAV_TABS, pathname)
   const SettingsIcon = ICONS[SETTINGS_DESTINATION.icon]
@@ -182,72 +171,38 @@ export function TopBar({
         </button>
       </div>
     </header>
+    {/* Phones: one title and two actions. Sections live in the bottom nav
+        and More (M-01); OfflineBanner below carries sync status (M-03). */}
     <header className="md:hidden shrink-0 bg-background">
-      <div className="flex items-center justify-between gap-3 h-16 px-4">
+      <div className="flex items-center justify-between gap-3 h-14 pl-4 pr-2">
         <div className="min-w-0">
-          <p className="text-lg font-medium truncate">{mobileTitle}</p>
-          <p className="text-xs text-muted-foreground">{mobileStatus}</p>
+          {titleIsHeading ? (
+            <h1 className="text-[22px] font-medium tracking-[-0.01em] truncate">{mobileTitle}</h1>
+          ) : (
+            <p className="text-[22px] font-medium tracking-[-0.01em] truncate">{mobileTitle}</p>
+          )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center">
           <div id="mobile-dashboard-tools" />
           <Button
             variant="ghost"
             size="icon"
             onClick={onSearch}
             aria-label="Search"
+            className="size-12 [&_svg]:size-5"
           >
             <Search />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            onClick={toggleTheme}
-          >
-            {theme === 'dark' ? <Sun /> : <Moon />}
           </Button>
           <button
             type="button"
             aria-label="Open account menu"
             onClick={onAvatarClick}
-            className="rounded-full focus-visible:ring-3 focus-visible:ring-ring"
+            className="flex size-12 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
           >
-            {avatar}
+            {mobileAvatar}
           </button>
         </div>
       </div>
-      <nav aria-label="Sections">
-        <div
-          ref={tabStrip}
-          role="tablist"
-          aria-label="Sections"
-          onKeyDown={moveTabFocus}
-          className="flex gap-1 overflow-x-auto px-4 pb-2 [scrollbar-width:none]"
-        >
-        {NAV_TABS.map((tab, index) => {
-          const active = isDestinationActive(pathname, tab)
-          return (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              end={tab.exact}
-              role="tab"
-              aria-selected={active}
-              aria-current={active ? 'page' : undefined}
-              tabIndex={index === tabStop ? 0 : -1}
-              className={cn(
-                'shrink-0 rounded-full px-4 py-2 text-[0.8125rem] font-medium transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
-                active
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-semibold'
-                  : 'text-muted-foreground',
-              )}
-            >
-              {tab.label}
-            </NavLink>
-          )
-        })}
-        </div>
-      </nav>
     </header>
     </>
   )

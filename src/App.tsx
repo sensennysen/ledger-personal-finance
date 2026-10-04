@@ -18,6 +18,7 @@ import CookiesStoragePage from '@/pages/CookiesStoragePage'
 import LegalNoticesPage from '@/pages/LegalNoticesPage'
 import ReportsPage from '@/pages/ReportsPage'
 import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
+import MorePage from '@/pages/MorePage'
 
 type RouteMetaEntry = {
   test: (pathname: string) => boolean
@@ -60,6 +61,11 @@ const routeMeta: RouteMetaEntry[] = [
     test: (pathname) => pathname === '/settings',
     title: 'Settings',
     description: 'Manage your profile, preferences, and application settings.',
+  },
+  {
+    test: (pathname) => pathname === '/more',
+    title: 'More',
+    description: 'Categories, reports, 13th month pay, settings and your account.',
   },
   {
     test: (pathname) => pathname === '/reports',
@@ -212,6 +218,7 @@ function ProtectedRoutes() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="thirteenth-month" element={<ThirteenthMonthPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="more" element={<MorePage />} />
         </Route>
       </Routes>
     </ErrorBoundary>

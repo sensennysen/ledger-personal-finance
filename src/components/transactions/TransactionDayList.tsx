@@ -24,6 +24,11 @@ export function WindowFooter({
   )
 }
 
+/** The phone list's card: one per day, or one around a flat list (M-06). */
+export function DayCard({ children }: { children: ReactNode }) {
+  return <div className="overflow-hidden rounded-[20px] border border-border bg-card">{children}</div>
+}
+
 /**
  * Day-grouped transaction list. Headers stick below `--tx-list-sticky-top`
  * (the height of the LED-61 result bar, set by ResultBarLayout) and always carry the
@@ -40,7 +45,7 @@ export function TransactionDayList<T extends { id: string }>({
 }) {
   const today = getLocalDateString()
   return (
-    <div className="space-y-4">
+    <div className={compact ? 'space-y-3' : 'space-y-4'}>
       {groups.map((group) => (
         <section
           key={group.date}
@@ -58,7 +63,12 @@ export function TransactionDayList<T extends { id: string }>({
                 : `${group.count} item${group.count === 1 ? '' : 's'} · ${formatNet(group.net)}`}
             </p>
           </div>
-          <div className="space-y-1">{group.items.map(renderRow)}</div>
+          {compact ? (
+            // Phones (M-06): one card per day, flat rows inside.
+            <DayCard>{group.items.map(renderRow)}</DayCard>
+          ) : (
+            <div className="space-y-1">{group.items.map(renderRow)}</div>
+          )}
         </section>
       ))}
     </div>

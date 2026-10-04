@@ -38,9 +38,9 @@ import { TransactionEditHeader, TransactionEntryHeader } from '@/components/tran
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { entryDialogWidthClass, inferTransactionKind, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
-import { TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
+import { DayCard, TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
 import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
-import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
+import { MonthRail } from '@/components/transactions/MonthJump'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { ACTIVITY_SORTS, effectiveDensity, groupByDay, isAmountSort, sliceGroups, sortByAmount, sortByDate, sumByCurrency, WINDOW_STEP, type ActivitySort } from '@/lib/transactionWindow'
@@ -469,6 +469,8 @@ export default function TransactionsPage() {
       onSelect={toggleSelect}
       dense={density === 'compact'}
       showDate={amountSorted}
+      variant={compactList ? 'list' : 'card'}
+      baseCurrency={baseCurrency}
     />
   )
 
@@ -497,6 +499,9 @@ export default function TransactionsPage() {
         canSave: isFilterActive(currentFilter),
         onOpen: () => setSavedFiltersOpen(true),
       }}
+      onSelect={toggleSelectMode}
+      selecting={selectMode}
+      onImport={() => setImportOpen(true)}
       compact={compactList}
     />
   )
@@ -505,9 +510,9 @@ export default function TransactionsPage() {
     <div className="flex justify-center gap-6 lg:pr-6">
       <div ref={pageTopRef} className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto min-w-0 flex-1">
         {/* Header */}
-        <div className="flex items-center justify-between gap-2">
+        {/* The phone header is the page title; the FAB is the phone's Add (M-03). */}
+        <div className="flex items-center justify-between gap-2 max-sm:hidden">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold md:hidden">Activity</h1>
             <span
               className="hidden sm:inline-flex items-center gap-1 text-[0.625rem] text-muted-foreground border border-border rounded px-1.5 py-0.5 select-none"
               title="Keyboard shortcuts: N = new transaction"
@@ -515,7 +520,7 @@ export default function TransactionsPage() {
               <Keyboard className="w-2.5 h-2.5" />N
             </span>
           </div>
-          <PageActions>
+          <PageActions desktopOnly>
             <Button
               variant="ghost"
               size="sm"
@@ -538,20 +543,20 @@ export default function TransactionsPage() {
                 </Button>
               }
             />
-            <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
-              <DialogContent className={`max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
-                <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
-                <FormError error={formError} />
-                <TransactionForm
-                  entryKind={transactionKind}
-                  defaultValues={templateDefaults}
-                  onSubmit={handleCreate}
-                  onClose={() => { setCreateOpen(false); setTemplateDefaults(undefined); setFormError(null) }}
-                />
-              </DialogContent>
-            </Dialog>
           </PageActions>
         </div>
+        <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
+          <DialogContent className={`max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
+            <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
+            <FormError error={formError} />
+            <TransactionForm
+              entryKind={transactionKind}
+              defaultValues={templateDefaults}
+              onSubmit={handleCreate}
+              onClose={() => { setCreateOpen(false); setTemplateDefaults(undefined); setFormError(null) }}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* Bulk action bar / Filter row */}
         {selectMode && selectedIds.size > 0 ? (
@@ -589,16 +594,16 @@ export default function TransactionsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search transactions..."
+                placeholder={compactList ? 'Search this cycle' : 'Search transactions...'}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-9 max-md:h-11 max-md:rounded-full max-md:bg-card"
               />
             </div>
             <Button
               type="button"
               variant={activeFilterCount > 0 ? 'secondary' : 'outline'}
-              className="relative shrink-0 gap-1.5 sm:hidden"
+              className={`relative h-11 shrink-0 gap-1.5 sm:hidden ${activeFilterCount > 0 ? '' : 'bg-card'}`}
               aria-label={`Filter transactions${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
               onClick={() => setFiltersOpen(true)}
             >
@@ -763,15 +768,6 @@ export default function TransactionsPage() {
                   </Button>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-2 border-t pt-4">
-                <Button variant="outline" onClick={() => { setFiltersOpen(false); setImportOpen(true) }}>
-                  <Upload /> Import CSV
-                </Button>
-                <Button variant="outline" onClick={() => { setFiltersOpen(false); toggleSelectMode() }}>
-                  <CheckSquare /> Select multiple
-                </Button>
-              </div>
             </div>
             <SheetFooter>
               <Button onClick={() => setFiltersOpen(false)}>Show {filtered.length} transaction{filtered.length === 1 ? '' : 's'}</Button>
@@ -835,7 +831,11 @@ export default function TransactionsPage() {
           />
         ) : prefs.txView === 'flat' || amountSorted ? (
           <ResultBarLayout bar={resultBar}>
-            <div className="space-y-1">{flatSorted.slice(0, rendered).map(renderRow)}</div>
+            {compactList ? (
+              <DayCard>{flatSorted.slice(0, rendered).map(renderRow)}</DayCard>
+            ) : (
+              <div className="space-y-1">{flatSorted.slice(0, rendered).map(renderRow)}</div>
+            )}
             <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
           </ResultBarLayout>
         ) : (
@@ -980,7 +980,6 @@ export default function TransactionsPage() {
         />
 
 
-        {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} onSelect={toggleSelectMode} selecting={selectMode} />}
       </div>
       {showMonthJump && !amountSorted && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} baseCurrency={baseCurrency} rateTable={rateTable} />} />}
     </div>

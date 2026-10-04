@@ -6,12 +6,16 @@ export type NavIconKey =
   | 'categories'
   | 'reports'
   | 'settings'
+  | 'thirteenth-month'
+  | 'more'
 
 export interface NavDestination {
   to: string
   label: string
   icon: NavIconKey
   exact?: boolean
+  // Other routes this destination stands for, so it shows as active there.
+  also?: string[]
 }
 
 export const NAV_TABS: NavDestination[] = [
@@ -29,10 +33,21 @@ export const SETTINGS_DESTINATION: NavDestination = {
   icon: 'settings',
 }
 
-// The four destinations the mobile bottom nav keeps.
-export const BOTTOM_NAV_TABS: NavDestination[] = NAV_TABS.filter((tab) =>
-  ['/', '/accounts', '/transactions', '/budgets'].includes(tab.to),
-)
+// Below md, More holds every destination the bottom nav has no room for.
+export const MORE_DESTINATION: NavDestination = {
+  to: '/more',
+  label: 'More',
+  icon: 'more',
+  also: ['/categories', '/reports', '/thirteenth-month', '/settings'],
+}
+
+// The four destinations the mobile bottom nav keeps, then More.
+export const BOTTOM_NAV_TABS: NavDestination[] = [
+  ...NAV_TABS.filter((tab) =>
+    ['/', '/accounts', '/transactions', '/budgets'].includes(tab.to),
+  ),
+  MORE_DESTINATION,
+]
 
 // Destinations that can't do anything useful until first-run setup is done
 // (an account, a transaction, a pay cycle). Advisory only — never blocks.
@@ -55,8 +70,8 @@ export function isDestinationActive(
   destination: NavDestination,
 ): boolean {
   if (destination.exact) return pathname === destination.to
-  return (
-    pathname === destination.to || pathname.startsWith(destination.to + '/')
+  return [destination.to, ...(destination.also ?? [])].some(
+    (to) => pathname === to || pathname.startsWith(to + '/'),
   )
 }
 

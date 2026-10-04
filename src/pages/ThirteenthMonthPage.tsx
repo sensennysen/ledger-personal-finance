@@ -182,9 +182,6 @@ export default function ThirteenthMonthPage() {
         <span aria-current="page" className="truncate text-foreground">13th Month Pay</span>
       </nav>
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold md:hidden">
-          13th Month Pay Estimator
-        </h1>
         <p className="text-sm text-muted-foreground max-w-prose">
           Computed under PD 851 – Select which income records count as basic salary
         </p>

@@ -1,3 +1,6 @@
+import { InteractiveRow } from '@/components/ui/interactive-row'
+import { SkeletonText } from '@/components/ui/skeleton'
+
 interface DashboardTransactionRowProps {
   onClick?: () => void
   icon: React.ReactNode
@@ -17,12 +20,13 @@ export function DashboardTransactionRow({
   subtitle,
   amount,
   rightDetail,
-  className = 'hover:bg-white/3',
+  className = 'hover:bg-foreground/3',
 }: DashboardTransactionRowProps) {
-  return (
-    <div role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onClick={onClick} onKeyDown={event=>{if(onClick && (event.key==='Enter'||event.key===' ')){event.preventDefault();onClick()}}} className={`grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 transition-colors ${className}`}>
+  const rowClassName = `grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 text-left transition-colors 2xl:py-1 ${className}`
+  const content = (
+    <>
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-sm shrink-0"
+        className="w-10 h-10 2xl:w-8 2xl:h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
         style={{ backgroundColor: iconBackgroundColor }}
       >
         {icon}
@@ -35,6 +39,33 @@ export function DashboardTransactionRow({
         <div className="money whitespace-nowrap text-[0.8125rem] font-semibold">{amount}</div>
         {rightDetail}
       </div>
+    </>
+  )
+
+  if (!onClick) {
+    return <div className={rowClassName}>{content}</div>
+  }
+
+  return (
+    <InteractiveRow as="button" onActivate={onClick} className={rowClassName}>
+      {content}
+    </InteractiveRow>
+  )
+}
+
+/** The loading twin of DashboardTransactionRow: same grid and icon tile, grey text runs only (LED-150). */
+export function DashboardTransactionRowSkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2.5 2xl:py-1"
+    >
+      <div className="w-10 h-10 2xl:w-8 2xl:h-8 rounded-xl bg-muted shrink-0" />
+      <div className="min-w-0 overflow-hidden">
+        <div className="text-[0.8125rem]"><SkeletonText className="w-32 max-w-full" /></div>
+        <div className="text-[0.6875rem]"><SkeletonText className="w-20" /></div>
+      </div>
+      <div className="text-right text-[0.8125rem]"><SkeletonText className="w-16" /></div>
     </div>
   )
 }

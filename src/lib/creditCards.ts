@@ -1,5 +1,5 @@
 import type { Account } from '@/types'
-import { getLoanAmountOwed, normalizeLiabilityBalanceForStorage } from '@/lib/loans'
+import { getLoanAmountOwed, normalizeLiabilityBalanceForStorage } from './loans.ts'
 
 export interface BalanceSummary {
   totalAssets: number
@@ -69,24 +69,31 @@ export function getCreditUtilizationPct(account: Account): number {
   return Math.max(0, Math.min((getCreditCardSpending(account) / account.credit_limit) * 100, 999))
 }
 
-export function daysUntilDayOfMonth(day: number | null | undefined): number | null {
+/**
+ * The next date (today counts) a day-of-month falls on, clamped to short months. Null for an
+ * unset or out-of-range day. The statement and due copy on the card payment form reads this.
+ */
+export function nextDayOfMonthDate(day: number | null | undefined, today: Date = new Date()): Date | null {
   if (!day || day < 1 || day > 31) return null
 
-  const today = new Date()
   const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
   const thisMonthDate = new Date(now.getFullYear(), now.getMonth(), Math.min(day, getDaysInMonth(now.getFullYear(), now.getMonth())))
-  if (thisMonthDate >= now) {
-    return Math.round((thisMonthDate.getTime() - now.getTime()) / 86400000)
-  }
+  if (thisMonthDate >= now) return thisMonthDate
 
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-  const nextMonthDate = new Date(
+  return new Date(
     nextMonth.getFullYear(),
     nextMonth.getMonth(),
     Math.min(day, getDaysInMonth(nextMonth.getFullYear(), nextMonth.getMonth()))
   )
-  return Math.round((nextMonthDate.getTime() - now.getTime()) / 86400000)
+}
+
+export function daysUntilDayOfMonth(day: number | null | undefined, today: Date = new Date()): number | null {
+  const next = nextDayOfMonthDate(day, today)
+  if (!next) return null
+  const now = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  return Math.round((next.getTime() - now.getTime()) / 86400000)
 }
 
 function getDaysInMonth(year: number, monthIndex: number): number {

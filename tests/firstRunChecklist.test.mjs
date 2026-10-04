@@ -1,0 +1,59 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import {
+  FIRST_RUN_STEPS,
+  getStepStatus,
+  isSetupComplete,
+  shouldReserveChecklist,
+} from '../src/lib/firstRunChecklist.ts'
+
+const base = { hasAccount: false, hasTransaction: false, cycleConfirmed: false }
+
+test('steps follow the real dependency chain: account, transaction, cycle', () => {
+  assert.deepEqual(
+    FIRST_RUN_STEPS.map((s) => s.id),
+    ['account', 'transaction', 'cycle'],
+  )
+})
+
+test('each step reflects its own condition independently', () => {
+  const status = getStepStatus({ ...base, hasAccount: true })
+  assert.equal(status.find((s) => s.id === 'account').done, true)
+  assert.equal(status.find((s) => s.id === 'transaction').done, false)
+  assert.equal(status.find((s) => s.id === 'cycle').done, false)
+})
+
+test('setup is not complete until all three are done', () => {
+  assert.equal(isSetupComplete(base), false)
+  assert.equal(isSetupComplete({ ...base, hasAccount: true }), false)
+  assert.equal(isSetupComplete({ ...base, hasAccount: true, hasTransaction: true }), false)
+  assert.equal(
+    isSetupComplete({ hasAccount: true, hasTransaction: true, cycleConfirmed: true }),
+    true,
+  )
+})
+
+test('nav is not locked on a first frame whose reads have not answered yet', () => {
+  assert.equal(isSetupComplete({ ...base, cycleConfirmed: true }, { loading: true }), true)
+})
+
+test('a locally unconfirmed cycle still locks while reads load', () => {
+  assert.equal(isSetupComplete(base, { loading: true }), false)
+})
+
+test('cycle completion does not fall back to reading startDay === 1', () => {
+  // month_start_day defaults to 1 in the DB, which is indistinguishable from a
+  // deliberate choice — isSetupComplete must only trust the explicit flag.
+  const status = getStepStatus({ hasAccount: true, hasTransaction: true, cycleConfirmed: false })
+  assert.equal(status.find((s) => s.id === 'cycle').done, false)
+})
+
+test('Home reserves the checklist while loading only when it is certain to show (LED-199)', () => {
+  // Cycle not confirmed: setup cannot be complete, so the card shows whatever the reads say.
+  assert.equal(shouldReserveChecklist({ dismissed: false, cycleConfirmed: false }), true)
+  // Cycle confirmed: whether it shows depends on accounts and transactions, which are not known yet.
+  assert.equal(shouldReserveChecklist({ dismissed: false, cycleConfirmed: true }), false)
+  // Dismissed: never shown.
+  assert.equal(shouldReserveChecklist({ dismissed: true, cycleConfirmed: false }), false)
+  assert.equal(shouldReserveChecklist({ dismissed: true, cycleConfirmed: true }), false)
+})

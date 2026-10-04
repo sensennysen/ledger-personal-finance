@@ -1,450 +1,59 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useForm, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Plus, Pencil, Trash2, Wallet, MoreHorizontal, TriangleAlert, GripVertical, ArrowUp, ArrowDown, Check, LayoutList, AlignJustify } from 'lucide-react'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { Plus, Pencil, Trash2, Wallet, MoreHorizontal, GripVertical, ArrowUp, ArrowDown, Check, LayoutList, AlignJustify, CreditCard, Banknote } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotify } from '@/contexts/notificationState'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { converterTo, ratesAsOfLabel } from '@/lib/exchangeRates'
 import { useAccounts } from '@/hooks/useAccounts'
+import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { usePreferences } from '@/hooks/usePreferences'
 import { useFlipReorder } from '@/hooks/useFlipReorder'
 import { supabase } from '@/lib/supabase'
-import { ACCOUNT_TYPE_LABELS, ACCOUNT_COLORS, CURRENCIES, type AccountType } from '@/types'
-import { ColorPicker } from '@/components/ui/color-picker'
-import { cn, formatCurrency } from '@/lib/utils'
+import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/types'
+import { cn, formatCurrency, getLocalDateString } from '@/lib/utils'
+import { useTransactions } from '@/hooks/useTransactions'
+import { afterScheduledLabel, scheduledByAccount, scheduledNetWorth } from '@/lib/scheduledBalances'
 
-import { DEFAULT_CURRENCY } from '@/constants/accounts'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Textarea } from '@/components/ui/textarea'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
+import { FormError } from '@/components/ui/form-error'
+import type { FormErrorValue } from '@/lib/dataErrors'
+import { resolveLoadState } from '@/lib/loadState'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
-import { daysUntilDayOfMonth, getBalanceSummary, getCreditCardSpending, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
-import { formatLoanSchedule, getLoanAmountOwed, LOAN_PAY_PERIOD_LABELS, WEEKDAY_LABELS } from '@/lib/loans'
+import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
+import { normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
+import { formatLoanSchedule, loansOwed } from '@/lib/loans'
+import { buildAccountsOverview, formatShare, isLiability, type AssetRow, type LiabilityRow } from '@/lib/accountsOverview'
+import type { AppLayoutContext } from '@/components/layout/AppLayout'
+import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
-const schema = z.object({
-  name: z.string().min(1, 'Name is required').max(50),
-  type: z.enum(['cash', 'digital_wallet', 'credit_card', 'savings', 'checking', 'investment', 'loan', 'other']),
-  currency: z.string().min(1),
-  balance: z.coerce.number(),
-  color: z.string(),
-  credit_limit: z.coerce.number().nullable(),
-  statement_day: z.coerce.number().int().min(1).max(31).nullable(),
-  due_day: z.coerce.number().int().min(1).max(31).nullable(),
-  utilization_target_pct: z.coerce.number().min(1).max(100).nullable(),
-  payment_reminder_days: z.coerce.number().int().min(0).max(30).nullable(),
-  loan_pay_period: z.enum(['monthly', 'twice_monthly', 'weekly', 'daily', 'quarterly', 'bi_yearly', 'yearly']).nullable(),
-  loan_due_days: z.array(z.number().int().min(1).max(31)).nullable(),
-  loan_due_weekday: z.number().int().min(0).max(6).nullable(),
-  notes: z.string().nullable(),
-}).superRefine((data, ctx) => {
-  if (data.type !== 'loan') return
-  if (data.loan_pay_period === 'twice_monthly' && data.loan_due_days?.length !== 2) {
-    ctx.addIssue({ code: 'custom', message: 'Enter both monthly due days', path: ['loan_due_days'] })
-  }
-  if (data.loan_pay_period === 'twice_monthly' && data.loan_due_days?.[0] === data.loan_due_days?.[1]) {
-    ctx.addIssue({ code: 'custom', message: 'Choose two different due days', path: ['loan_due_days'] })
-  }
-  if (data.loan_pay_period === 'weekly' && data.loan_due_weekday == null) {
-    ctx.addIssue({ code: 'custom', message: 'Select a due weekday', path: ['loan_due_weekday'] })
-  }
-  if (data.loan_pay_period && !['daily', 'weekly', 'twice_monthly'].includes(data.loan_pay_period) && !data.loan_due_days?.[0]) {
-    ctx.addIssue({ code: 'custom', message: 'Enter a due day', path: ['loan_due_days'] })
-  }
-})
-
-type FormValues = z.output<typeof schema>
-
-function AccountForm({
-  defaultValues,
-  onSubmit,
-  onClose,
-  originalBalance,
-}: {
-  defaultValues?: Partial<FormValues>
-  onSubmit: (values: FormValues) => Promise<void>
-  onClose: () => void
-  originalBalance?: number
-}) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const form = useForm<FormValues, any, FormValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(schema) as any,
-    defaultValues: {
-      name: '',
-      type: 'cash',
-      currency: DEFAULT_CURRENCY,
-      balance: 0,
-      color: ACCOUNT_COLORS[0],
-      credit_limit: null,
-      statement_day: null,
-      due_day: null,
-      utilization_target_pct: 30,
-      payment_reminder_days: 3,
-      loan_pay_period: null,
-      loan_due_days: null,
-      loan_due_weekday: null,
-      notes: null,
-      ...defaultValues,
-    },
-  })
-  const type = useWatch({ control: form.control, name: 'type' })
-  const loanPayPeriod = useWatch({ control: form.control, name: 'loan_pay_period' })
-  const watchedBalance = useWatch({ control: form.control, name: 'balance' })
-  const normalizedWatchedBalance = (type === 'credit_card' || type === 'loan') && Number(watchedBalance) > 0
-    ? -Number(watchedBalance)
-    : Number(watchedBalance)
-  const balanceChanged = originalBalance !== undefined && normalizedWatchedBalance !== originalBalance
-
-  return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{type === 'loan' ? 'Loan Name' : 'Account Name'}</FormLabel>
-              <FormControl><Input placeholder={type === 'loan' ? 'e.g. Home loan' : 'e.g. My Savings'} {...field} /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="type"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Type</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue>{(v: string | null) => v ? ACCOUNT_TYPE_LABELS[v as AccountType] : 'Select type'}</SelectValue></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {Object.entries(ACCOUNT_TYPE_LABELS).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="currency"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Currency</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl><SelectTrigger><SelectValue>{(v: string | null) => v ?? 'Select currency'}</SelectValue></SelectTrigger></FormControl>
-                  <SelectContent>
-                    {CURRENCIES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>{c.code} — {c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        <FormField
-          control={form.control}
-          name="balance"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{type === 'loan' ? 'Loan Amount' : type === 'credit_card' ? 'Current Debt' : 'Current Balance'}</FormLabel>
-              <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
-              <FormMessage />
-              {balanceChanged && (
-                <div className="flex items-start gap-2 rounded-md border border-yellow-400/60 bg-yellow-50 dark:bg-yellow-950/30 p-2.5 text-sm text-yellow-800 dark:text-yellow-300">
-                  <TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>
-                    Changing the balance will create a <strong>Balance Adjustment</strong> transaction for the difference ({normalizedWatchedBalance > originalBalance! ? '+' : ''}{formatCurrency(normalizedWatchedBalance - originalBalance!, defaultValues?.currency ?? 'USD')}). This keeps your transaction history accurate.
-                  </span>
-                </div>
-              )}
-              {(type === 'credit_card' || type === 'loan') && (
-                <p className="text-xs text-muted-foreground">
-                  {type === 'loan'
-                    ? 'Use 0 when you will add financed purchases separately. Any amount entered here is treated as additional unitemized opening debt.'
-                    : 'Enter the amount owed. It will reduce net worth instead of increasing total assets.'}
-                </p>
-              )}
-            </FormItem>
-          )}
-        />
-        {type === 'credit_card' && (
-          <div className="space-y-4 rounded-lg border border-border/60 p-3">
-            <FormField
-              control={form.control}
-              name="credit_limit"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Credit Limit</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={field.value ?? ''}
-                      onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="statement_day"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Statement Day</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={31}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="due_day"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Due Day</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={31}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="utilization_target_pct"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Utilization Target %</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="payment_reminder_days"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Remind Days Before Due</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={30}
-                        value={field.value ?? ''}
-                        onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-        )}
-        {type === 'loan' && (
-          <div className="space-y-4 rounded-lg border border-border/60 p-3">
-            <FormField
-              control={form.control}
-              name="loan_pay_period"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Pay Period <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value === 'no_schedule' ? null : value)
-                      form.setValue('loan_due_days', null)
-                      form.setValue('loan_due_weekday', null)
-                    }}
-                    value={field.value ?? 'no_schedule'}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue>
-                          {field.value ? LOAN_PAY_PERIOD_LABELS[field.value] : 'No shared schedule'}
-                        </SelectValue>
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="no_schedule">No shared schedule</SelectItem>
-                      {Object.entries(LOAN_PAY_PERIOD_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                  {!loanPayPeriod && (
-                    <p className="text-xs text-muted-foreground">Each financed purchase can keep its own first due date and repayment term.</p>
-                  )}
-                </FormItem>
-              )}
-            />
-            {loanPayPeriod === 'weekly' && (
-              <FormField
-                control={form.control}
-                name="loan_due_weekday"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Due</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(Number(value))} value={field.value == null ? '' : String(field.value)}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select weekday">
-                            {field.value == null ? 'Select weekday' : WEEKDAY_LABELS[field.value]}
-                          </SelectValue>
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {WEEKDAY_LABELS.map((day, index) => <SelectItem key={day} value={String(index)}>{day}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            {loanPayPeriod === 'twice_monthly' && (
-              <FormField
-                control={form.control}
-                name="loan_due_days"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payments Due</FormLabel>
-                    <div className="grid grid-cols-2 gap-4">
-                      {[0, 1].map((index) => (
-                        <Input
-                          key={index}
-                          type="number"
-                          min={1}
-                          max={31}
-                          placeholder={index === 0 ? 'First day' : 'Second day'}
-                          value={field.value?.[index] || ''}
-                          onChange={(event) => {
-                            const next = [...(field.value ?? [])]
-                            next[index] = event.target.value ? Number(event.target.value) : 0
-                            field.onChange(next)
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-            {loanPayPeriod && !['daily', 'weekly', 'twice_monthly'].includes(loanPayPeriod) && (
-              <FormField
-                control={form.control}
-                name="loan_due_days"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Due Day</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} max={31} placeholder="Day of month" value={field.value?.[0] ?? ''} onChange={(event) => field.onChange(event.target.value ? [Number(event.target.value)] : null)} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-          </div>
-        )}
-        <FormField
-          control={form.control}
-          name="color"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Color</FormLabel>
-              <FormControl>
-                <ColorPicker
-                  value={field.value}
-                  onChange={field.onChange}
-                  palette={ACCOUNT_COLORS}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes (optional)</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Any notes about this account..."
-                  value={field.value ?? ''}
-                  onChange={(e) => field.onChange(e.target.value || null)}
-                  rows={2}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-        <div className="flex gap-2 justify-end pt-2">
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? 'Saving...' : 'Save Account'}
-          </Button>
-        </div>
-      </form>
-    </Form>
-  )
+function formatDueIn(days: number) {
+  if (days < 0) return `${-days}d overdue`
+  if (days === 0) return 'today'
+  return `in ${days} day${days === 1 ? '' : 's'}`
 }
 
 export default function AccountsPage() {
+  const ink = useCategoryInk()
   const { user, profile, refreshProfile } = useAuth()
-  const { accounts, loading, createAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder } = useAccounts()
+  const { accounts, loading, error, errorDetail, refetch, createAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder } = useAccounts()
+  const loadState = resolveLoadState({ loading, error, hasData: accounts.length > 0 })
   const { prefs, set: setPref } = usePreferences()
+  const notify = useNotify()
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const [editAccount, setEditAccount] = useState<Account | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null)
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<FormErrorValue>(null)
   const [draggedAccountId, setDraggedAccountId] = useState<string | null>(null)
   const [dropTargetAccountId, setDropTargetAccountId] = useState<string | null>(null)
   const [draggedGroupType, setDraggedGroupType] = useState<AccountType | null>(null)
@@ -455,8 +64,35 @@ export default function AccountsPage() {
     typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
   )
 
-  const balanceSummary = getBalanceSummary(accounts)
+  const { openAddTransactionModal } = useOutletContext<AppLayoutContext>()
+  const { purchases: loanPurchases, allocations: loanAllocations, error: loansError, refetch: refetchLoans } = useLoanPurchases()
   const defaultCurrency = profile?.default_currency ?? 'USD'
+  const { table: rateTable } = useExchangeRates()
+  const convertToDefault = useMemo(() => converterTo(rateTable, defaultCurrency), [rateTable, defaultCurrency])
+  const overview = buildAccountsOverview(
+    accounts,
+    defaultCurrency,
+    { purchases: loanPurchases, allocations: loanAllocations },
+    new Date(),
+    convertToDefault,
+  )
+  // Balances are stored, so rows dated after today are already in them: show that part beside them (LED-251).
+  const today = getLocalDateString()
+  const tomorrow = useMemo(() => {
+    const [year, month, day] = today.split('-').map(Number)
+    return getLocalDateString(new Date(year, month - 1, day + 1))
+  }, [today])
+  const { transactions: laterRows, error: scheduledError, refetch: refetchScheduled } = useTransactions({ startDate: tomorrow })
+  const scheduled = useMemo(() => scheduledByAccount(accounts, laterRows, today), [accounts, laterRows, today])
+  const netWorthScheduled = useMemo(
+    () => scheduledNetWorth(accounts, laterRows, today, defaultCurrency, convertToDefault),
+    [accounts, laterRows, today, defaultCurrency, convertToDefault],
+  )
+  const afterScheduled = (account: Account) => {
+    const label = afterScheduledLabel(scheduled.get(account.id) ?? 0, account.currency, formatCurrency)
+    return label && <p className="text-xs text-muted-foreground">{label}</p>
+  }
+  const ratesAsOf = ratesAsOfLabel(rateTable)
   const defaultGroupOrder = useMemo(() => Object.keys(ACCOUNT_TYPE_LABELS) as AccountType[], [])
   const accountGroupOrder = useMemo(() => {
     const valid = new Set(defaultGroupOrder)
@@ -527,6 +163,11 @@ export default function AccountsPage() {
       })
   }
 
+  const saveAccountOrder = async (next: string[]) => {
+    const { error: orderError } = await updateAccountOrder(next)
+    if (orderError) notify({ severity: 'failure', title: "Couldn't change the order", body: orderError })
+  }
+
   const reorderAccount = (fromId: string, toId: string) => {
     const base = accounts.map((account) => account.id)
     const from = base.indexOf(fromId)
@@ -535,280 +176,547 @@ export default function AccountsPage() {
     const next = [...base]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    updateAccountOrder(next)
+    void saveAccountOrder(next)
   }
 
-  const moveAccount = (id: string, direction: -1 | 1) => {
-    const index = accounts.findIndex((account) => account.id === id)
+  // Arrows swap with the neighbour in the same column, not in the whole list.
+  const moveAccount = (id: string, direction: -1 | 1, columnIds: string[]) => {
+    const neighbour = columnIds[columnIds.indexOf(id) + direction]
+    if (!neighbour) return
     const next = accounts.map((account) => account.id)
-    const targetIndex = index + direction
-    if (index < 0 || targetIndex < 0 || targetIndex >= next.length) return
-    const current = next[index]
-    next[index] = next[targetIndex]
-    next[targetIndex] = current
-    updateAccountOrder(next)
+    const from = next.indexOf(id)
+    const to = next.indexOf(neighbour)
+    next[from] = neighbour
+    next[to] = id
+    void saveAccountOrder(next)
   }
 
-  const moveGroup = (type: AccountType, direction: -1 | 1) => {
-    const index = groupedAccounts.findIndex(([groupType]) => groupType === type)
-    const target = groupedAccounts[index + direction]?.[0]
+  const moveGroup = (type: AccountType, direction: -1 | 1, columnTypes: AccountType[]) => {
+    const target = columnTypes[columnTypes.indexOf(type) + direction]
     if (target) reorderGroup(type, target)
   }
 
-  const handleCreate = async (values: FormValues) => {
-    const { error } = await createAccount({ ...normalizeCreditCardBalanceForStorage(values), is_active: true, icon: null })
-    if (error) { setFormError(error); return }
+  const handleCreate = async (values: AccountFormValues) => {
+    const { error, errorDetail } = await createAccount({ ...normalizeCreditCardBalanceForStorage(values), is_active: true, icon: null })
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setCreateOpen(false)
   }
 
-  const handleEdit = async (values: FormValues) => {
+  const handleEdit = async (values: AccountFormValues) => {
     if (!editAccount) return
-    const { error } = await updateAccountWithAdjustment(editAccount.id, normalizeCreditCardBalanceForStorage(values), editAccount.balance)
-    if (error) { setFormError(error); return }
+    const { error, errorDetail } = await updateAccountWithAdjustment(editAccount.id, normalizeCreditCardBalanceForStorage(values), editAccount.balance)
+    if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     setEditAccount(null)
   }
 
-  const renderAccountCard = (account: Account, idx: number, options?: { flatRearrange?: boolean }) => {
-    const flatRearrange = options?.flatRearrange ?? false
-    const Icon = ACCOUNT_ICONS[account.type]
-    const statementDays = account.type === 'credit_card' ? daysUntilDayOfMonth(account.statement_day) : null
-    const dueDays = account.type === 'credit_card' ? daysUntilDayOfMonth(account.due_day) : null
-    const dueReminderDays = account.payment_reminder_days ?? 3
-    const showStatementReminder = statementDays !== null && statementDays <= 2
-    const showDueReminder = dueDays !== null && dueDays <= dueReminderDays
-    const reminderLabel = showDueReminder
-      ? `Due: ${dueDays === 0 ? 'today' : `${dueDays} ${dueDays === 1 ? 'day' : 'days'}`}`
-      : showStatementReminder
-        ? `Statement: ${statementDays === 0 ? 'today' : `${statementDays} ${statementDays === 1 ? 'day' : 'days'}`}`
-        : null
+  const dragProps = (account: Account, flatRearrange: boolean) => ({
+    draggable: isDesktopDrag && flatRearrange,
+    onDragStart: () => {
+      if (flatRearrange) {
+        setDraggedAccountId(account.id)
+        setDropTargetAccountId(null)
+      }
+    },
+    onDragEnter: () => {
+      if (flatRearrange && draggedAccountId && draggedAccountId !== account.id) setDropTargetAccountId(account.id)
+    },
+    onDragOver: (event: React.DragEvent) => {
+      if (flatRearrange) {
+        event.preventDefault()
+        if (draggedAccountId && draggedAccountId !== account.id) setDropTargetAccountId(account.id)
+      }
+    },
+    onDrop: (event: React.DragEvent) => {
+      if (!flatRearrange) return
+      event.preventDefault()
+      if (draggedAccountId) reorderAccount(draggedAccountId, account.id)
+      setDraggedAccountId(null)
+      setDropTargetAccountId(null)
+    },
+    onDragEnd: () => {
+      if (flatRearrange) setDraggedAccountId(null)
+      setDropTargetAccountId(null)
+    },
+    ref: flatRearrange ? setAccountCardRef(account.id) : undefined,
+  })
 
+  const openProps = (account: Account, flatRearrange: boolean) => flatRearrange ? {} : {
+    role: 'link',
+    tabIndex: 0,
+    'aria-label': `Open ${account.name}`,
+    onClick: () => navigate(`/accounts/${account.id}`),
+    onKeyDown: (event: React.KeyboardEvent) => {
+      if (event.target === event.currentTarget && event.key === 'Enter') navigate(`/accounts/${account.id}`)
+    },
+  }
+
+  const rearrangeControls = (account: Account, flatRearrange: boolean, columnIds: string[]) => {
+    const idx = columnIds.indexOf(account.id)
     return (
-      <Card
+      <>
+        <button
+          type="button"
+          className={`reorder-handle hidden text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted ${flatRearrange ? 'md:block' : ''}`}
+          onClick={(event) => event.stopPropagation()}
+          aria-label={`Drag to rearrange ${account.name}`}
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className={flatRearrange ? 'md:hidden' : 'hidden'}
+          aria-label={`Move ${account.name} up`}
+          onClick={(e) => { e.stopPropagation(); moveAccount(account.id, -1, columnIds) }}
+          disabled={idx === 0}
+        >
+          <ArrowUp className="w-3 h-3" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className={flatRearrange ? 'md:hidden' : 'hidden'}
+          aria-label={`Move ${account.name} down`}
+          onClick={(e) => { e.stopPropagation(); moveAccount(account.id, 1, columnIds) }}
+          disabled={idx === columnIds.length - 1}
+        >
+          <ArrowDown className="w-3 h-3" />
+        </Button>
+      </>
+    )
+  }
+
+  const accountMenu = (account: Account) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Actions for ${account.name}`} onClick={(e) => e.stopPropagation()} />}>
+        <MoreHorizontal className="w-4 h-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditAccount(account) }}>
+          <Pencil className="w-4 h-4 mr-2" />Edit
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+          onClick={(e) => {
+            e.stopPropagation()
+            setDeleteTarget(account)
+          }}
+        >
+          <Trash2 className="w-4 h-4 mr-2" />Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
+  const accountIcon = (account: Account) => {
+    const Icon = ACCOUNT_ICONS[account.type]
+    return (
+      <span
+        className="flex size-8 shrink-0 items-center justify-center rounded-lg"
+        style={{ backgroundColor: ink(account.color) + '20', color: ink(account.color) }}
+      >
+        <Icon className="w-4 h-4" />
+      </span>
+    )
+  }
+
+  const renderAssetRow = (row: AssetRow, idx: number, columnIds: string[], flatRearrange: boolean) => {
+    const { account } = row
+    return (
+      <div
         key={account.id}
-        role={flatRearrange ? undefined : 'link'}
-        tabIndex={flatRearrange ? undefined : 0}
-        aria-label={flatRearrange ? undefined : `Open ${account.name}`}
-        draggable={isDesktopDrag && flatRearrange}
-        onDragStart={() => {
-          if (flatRearrange) {
-            setDraggedAccountId(account.id)
-            setDropTargetAccountId(null)
-          }
-        }}
-        onDragEnter={() => {
-          if (flatRearrange && draggedAccountId && draggedAccountId !== account.id) setDropTargetAccountId(account.id)
-        }}
-        onDragOver={(event) => {
-          if (flatRearrange) {
-            event.preventDefault()
-            if (draggedAccountId && draggedAccountId !== account.id) setDropTargetAccountId(account.id)
-          }
-        }}
-        onDrop={(event) => {
-          if (!flatRearrange) return
-          event.preventDefault()
-          if (draggedAccountId) reorderAccount(draggedAccountId, account.id)
-          setDraggedAccountId(null)
-          setDropTargetAccountId(null)
-        }}
-        onDragEnd={() => {
-          if (flatRearrange) setDraggedAccountId(null)
-          setDropTargetAccountId(null)
-        }}
-        ref={flatRearrange ? setAccountCardRef(account.id) : undefined}
+        {...dragProps(account, flatRearrange)}
+        {...openProps(account, flatRearrange)}
         className={cn(
-          'reorder-motion relative overflow-hidden cursor-pointer hover:shadow-md transition-shadow animate-fade-up hover-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'reorder-motion grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 px-4 py-2.5 animate-fade-up md:grid-cols-[minmax(0,1.5fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem]',
+          'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
+          flatRearrange ? 'cursor-grab' : 'cursor-pointer hover:bg-muted/50',
+          draggedAccountId === account.id && 'is-dragging',
+          dropTargetAccountId === account.id && 'is-drop-target'
+        )}
+        style={{ '--anim-delay': `${Math.min(idx * 40, 240)}ms` } as React.CSSProperties}
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          {rearrangeControls(account, flatRearrange, columnIds)}
+          {accountIcon(account)}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{account.name}</p>
+            <p className="truncate text-xs text-muted-foreground md:hidden">
+              {ACCOUNT_TYPE_LABELS[account.type]}
+              {row.excluded ? ' · Not in totals' : row.sharePct !== null ? ` · ${formatShare(row.sharePct)}` : ''}
+            </p>
+            <p className="hidden truncate text-xs text-muted-foreground md:block 2xl:hidden">{ACCOUNT_TYPE_LABELS[account.type]}</p>
+          </div>
+        </div>
+        <span className="hidden truncate text-xs text-muted-foreground 2xl:block">{ACCOUNT_TYPE_LABELS[account.type]}</span>
+        <span className="hidden text-xs text-muted-foreground md:block">{account.currency}</span>
+        <div className="hidden items-center gap-2 md:flex">
+          {row.excluded ? (
+            <span className="text-xs text-muted-foreground">No {account.currency} rate — not in totals</span>
+          ) : (
+            <>
+              <Progress value={row.sharePct ?? 0} className="flex-1" aria-label={`${account.name} share of assets`} />
+              <span className="w-9 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{formatShare(row.sharePct ?? 0)}</span>
+            </>
+          )}
+        </div>
+        <div className="text-right">
+          <p className="money text-sm font-semibold" style={{ color: account.balance < 0 ? 'var(--destructive)' : undefined }}>
+            {formatCurrency(row.balance, account.currency)}
+          </p>
+          {row.converted !== null && (
+            <p className="money text-xs text-muted-foreground">≈ {formatCurrency(row.converted, defaultCurrency)}</p>
+          )}
+          {afterScheduled(account)}
+        </div>
+        {accountMenu(account)}
+      </div>
+    )
+  }
+
+  const renderLiabilityCard = (row: LiabilityRow, idx: number, columnIds: string[], flatRearrange: boolean) => {
+    const { account } = row
+    const isCard = account.type === 'credit_card'
+    const schedule = formatLoanSchedule(account)
+    const target = account.utilization_target_pct ?? 30
+    return (
+      <div
+        key={account.id}
+        {...dragProps(account, flatRearrange)}
+        className={cn(
+          'reorder-motion relative overflow-hidden rounded-xl border border-border bg-card p-4 animate-fade-up',
           flatRearrange && 'cursor-grab',
           draggedAccountId === account.id && 'is-dragging',
           dropTargetAccountId === account.id && 'is-drop-target'
         )}
-        style={{ '--anim-delay': `${Math.min(idx * 60, 480)}ms` } as React.CSSProperties}
-        onClick={() => {
-          if (!flatRearrange) navigate(`/accounts/${account.id}`)
-        }}
-        onKeyDown={(event) => {
-          if (!flatRearrange && event.target === event.currentTarget && event.key === 'Enter') {
-            navigate(`/accounts/${account.id}`)
-          }
-        }}
+        style={{ '--anim-delay': `${Math.min(idx * 60, 240)}ms` } as React.CSSProperties}
       >
-        <div
-          className="absolute top-0 left-0 right-0 h-1 rounded-t-xl"
-          style={{ backgroundColor: account.color }}
-        />
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between">
-            <div className="flex items-stretch gap-2 min-w-0">
-              <button
-                type="button"
-                className={`reorder-handle hidden mt-1 text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted ${flatRearrange ? 'md:block' : ''}`}
-                onClick={(event) => event.stopPropagation()}
-                aria-label={`Drag to rearrange ${account.name}`}
-              >
-                <GripVertical className="w-3.5 h-3.5" />
-              </button>
-              <div
-                className="rounded-lg shrink-0 px-3 flex items-center justify-center"
-                style={{ backgroundColor: account.color + '20', color: account.color }}
-              >
-                <Icon className="w-4 h-4" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <CardTitle className="text-base">{account.name}</CardTitle>
-                <div className="flex items-center gap-1.5">
-                  <Badge variant="secondary" className="text-xs w-fit">
-                    {ACCOUNT_TYPE_LABELS[account.type]}
-                  </Badge>
-                  {account.type === 'credit_card' && reminderLabel && (
-                    <Badge
-                      variant="outline"
-                      className="text-[0.65rem] px-1.5 py-0.5 h-auto"
-                    >
-                      {reminderLabel}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className={flatRearrange ? 'md:hidden' : 'hidden'}
-                onClick={(e) => { e.stopPropagation(); moveAccount(account.id, -1) }}
-                disabled={idx === 0}
-              >
-                <ArrowUp className="w-3 h-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className={flatRearrange ? 'md:hidden' : 'hidden'}
-                onClick={(e) => { e.stopPropagation(); moveAccount(account.id, 1) }}
-                disabled={idx === accounts.length - 1}
-              >
-                <ArrowDown className="w-3 h-3" />
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Actions for ${account.name}`} onClick={(e) => e.stopPropagation()} />}>
-                  <MoreHorizontal className="w-4 h-4" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditAccount(account) }}>
-                    <Pencil className="w-4 h-4 mr-2" />Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDeleteTarget(account)
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+        <div className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: ink(account.color) }} />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {rearrangeControls(account, flatRearrange, columnIds)}
+            {accountIcon(account)}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{account.name}</p>
+              <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[account.type]}</p>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <p className="money text-[1.375rem] font-bold" style={{ color: account.balance < 0 ? 'var(--destructive)' : 'var(--foreground)' }}>
-            {formatCurrency(
-              account.type === 'credit_card'
-                ? getCreditCardSpending(account)
-                : account.type === 'loan'
-                  ? getLoanAmountOwed(account)
-                  : account.balance,
-              account.currency
-            )}
-          </p>
-          {account.type === 'credit_card' && (
-            <div className="space-y-1.5 mt-1">
-              <p className="text-xs text-muted-foreground">
-                {account.balance < 0 ? 'Owed. Subtracted from net worth.' : 'Credit balance. Added to net worth.'}
-              </p>
-              {account.credit_limit != null && (
+          <div className="flex shrink-0 items-center gap-1">
+            <div className="text-right">
+              <p className="money text-base font-bold">{row.owed > 0 ? '−' : ''}{formatCurrency(row.owed, account.currency)}</p>
+              {row.convertedOwed !== null && (
+                <p className="money text-xs text-muted-foreground">≈ {row.convertedOwed > 0 ? '−' : ''}{formatCurrency(row.convertedOwed, defaultCurrency)}</p>
+              )}
+              {afterScheduled(account)}
+            </div>
+            {accountMenu(account)}
+          </div>
+        </div>
+        <div className="mt-3 space-y-1.5">
+          {isCard ? (
+            row.utilizationPct !== null ? (
+              <>
+                <Progress
+                  value={Math.min(row.utilizationPct, 100)}
+                  className={TONED_PROGRESS_CLASS}
+                  style={utilizationToneStyle(row.utilizationPct, target) as React.CSSProperties}
+                  aria-label={`${account.name} utilisation`}
+                />
                 <p className="text-xs text-muted-foreground">
-                  Limit: {formatCurrency(account.credit_limit, account.currency)}
+                  Limit {formatCurrency(account.credit_limit ?? 0, account.currency)} · {row.utilizationPct.toFixed(1)}% used
                 </p>
-              )}
-            </div>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">No credit limit set, so utilisation isn't tracked.</p>
+            )
+          ) : row.loanProgress ? (
+            <>
+              <Progress value={row.loanProgress.pct} aria-label={`${account.name} repayment progress`} />
+              <p className="text-xs text-muted-foreground">
+                {schedule ? `${schedule} · ` : ''}{row.loanProgress.paidInstallments} of {row.loanProgress.totalInstallments} paid
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">{schedule ?? 'No financed purchases yet.'}</p>
           )}
-          {account.type === 'loan' && (
-            <div className="space-y-1.5 mt-1">
-              <p className="text-xs text-muted-foreground">Outstanding. Subtracted from net worth.</p>
-              {formatLoanSchedule(account) && (
-                <p className="text-xs text-muted-foreground">{formatLoanSchedule(account)}</p>
-              )}
-            </div>
+          {row.excluded && (
+            <p className="text-xs text-muted-foreground">No {account.currency} rate — not in totals</p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+        {!flatRearrange && (
+          <div className="mt-3 flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => openAddTransactionModal(isCard ? 'card-payment' : 'loan-repayment', { targetAccountId: account.id })}
+            >
+              {isCard ? <CreditCard className="w-3.5 h-3.5" /> : <Banknote className="w-3.5 h-3.5" />}
+              {isCard ? 'Pay card' : 'Repay loan'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => navigate(`/accounts/${account.id}`)}>View</Button>
+          </div>
+        )}
+      </div>
     )
   }
 
+  const assetRows = new Map(overview.assets.map((row) => [row.account.id, row]))
+  const liabilityRows = new Map(overview.liabilities.map((row) => [row.account.id, row]))
+
+  const renderColumn = (column: 'assets' | 'liabilities') => {
+    const inColumn = (type: AccountType) => isLiability({ type }) === (column === 'liabilities')
+    const renderItem = (account: Account, idx: number, columnIds: string[], flatRearrange: boolean) =>
+      column === 'assets'
+        ? renderAssetRow(assetRows.get(account.id)!, idx, columnIds, flatRearrange)
+        : renderLiabilityCard(liabilityRows.get(account.id)!, idx, columnIds, flatRearrange)
+    const wrap = (children: React.ReactNode) =>
+      column === 'assets'
+        ? <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border bg-card">{children}</div>
+        : <div className="grid gap-3 2xl:grid-cols-2">{children}</div>
+
+    if (prefs.accView === 'flat') {
+      const columnAccounts = accounts.filter((account) => inColumn(account.type))
+      if (columnAccounts.length === 0) return null
+      const ids = columnAccounts.map((account) => account.id)
+      return wrap(columnAccounts.map((account, idx) => renderItem(account, idx, ids, rearrangeMode)))
+    }
+
+    const groups = groupedAccounts.filter(([type]) => inColumn(type))
+    const groupTypes = groups.map(([type]) => type)
+    return (
+      <div className="space-y-4">
+        {groups.map(([type, groupAccounts], groupIndex) => (
+          <div
+            key={type}
+            ref={setGroupRef(type)}
+            draggable={isDesktopDrag && rearrangeMode}
+            onDragStart={() => {
+              setDraggedGroupType(type)
+              setDropTargetGroupType(null)
+            }}
+            onDragEnter={() => {
+              if (draggedGroupType && draggedGroupType !== type) setDropTargetGroupType(type)
+            }}
+            onDragOver={(event) => {
+              event.preventDefault()
+              if (draggedGroupType && draggedGroupType !== type) setDropTargetGroupType(type)
+            }}
+            onDrop={(event) => {
+              event.preventDefault()
+              if (draggedGroupType) reorderGroup(draggedGroupType, type)
+              setDraggedGroupType(null)
+              setDropTargetGroupType(null)
+            }}
+            onDragEnd={() => {
+              setDraggedGroupType(null)
+              setDropTargetGroupType(null)
+            }}
+            className={cn(
+              rearrangeMode && 'reorder-motion rounded-xl border border-dashed border-border/80 p-3 hover:border-primary/50 cursor-grab',
+              draggedGroupType === type && 'is-dragging',
+              dropTargetGroupType === type && 'is-drop-target'
+            )}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  type="button"
+                  className={`reorder-handle hidden text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted ${rearrangeMode ? 'md:block' : ''}`}
+                  aria-label={`Drag to rearrange ${ACCOUNT_TYPE_LABELS[type]} group`}
+                >
+                  <GripVertical className="w-3.5 h-3.5" />
+                </button>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {ACCOUNT_TYPE_LABELS[type]}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className={rearrangeMode ? 'md:hidden' : 'hidden'}
+                  onClick={() => moveGroup(type, -1, groupTypes)}
+                  disabled={groupIndex === 0}
+                >
+                  <ArrowUp className="w-3 h-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className={rearrangeMode ? 'md:hidden' : 'hidden'}
+                  onClick={() => moveGroup(type, 1, groupTypes)}
+                  disabled={groupIndex === groups.length - 1}
+                >
+                  <ArrowDown className="w-3 h-3" />
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  {groupAccounts.length} account{groupAccounts.length > 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            {wrap(groupAccounts.map((account, idx) => renderItem(account, idx, [], false)))}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const cardCount = accounts.filter((account) => account.type === 'credit_card').length
+  // A fully repaid loan does not count (LED-181 item, OD-8), matching the search palette
+  // and the Add Transaction kind menu's shared loansOwed() definition (LED-156).
+  const loanCount = loansOwed(accounts).length
+  const liabilityMix = [
+    cardCount > 0 && `${cardCount} card${cardCount > 1 ? 's' : ''}`,
+    loanCount > 0 && `${loanCount} loan${loanCount > 1 ? 's' : ''}`,
+  ].filter(Boolean).join(' · ') || 'None'
+  const currencyCount = new Set(accounts.map((account) => account.currency)).size
+  const assetCount = overview.assets.length
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 lg:px-8 space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Accounts</h1>
-          <p className="text-muted-foreground text-sm">
-            Total net worth: <span className="font-semibold text-foreground">{formatCurrency(balanceSummary.netWorth, defaultCurrency)}</span>
-          </p>
+          <h1 className="text-2xl font-bold md:hidden">Accounts</h1>
+          {accounts.length > 0 && (
+            <p className="text-muted-foreground text-sm">
+              {accounts.length} account{accounts.length > 1 ? 's' : ''} · {currencyCount} currenc{currencyCount > 1 ? 'ies' : 'y'}
+            </p>
+          )}
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger render={<Button className="gap-2" size="sm" />}>
-            <Plus className="w-4 h-4" />Add Account
-          </DialogTrigger>
-          <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
-            <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
-            {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
-            <AccountForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} defaultValues={{ currency: defaultCurrency }} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          {accounts.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button variant={rearrangeMode ? 'secondary' : 'outline'} size="sm" className="gap-1.5" />}>
+                {rearrangeMode ? <Check className="w-3.5 h-3.5" /> : <MoreHorizontal className="w-3.5 h-3.5" />}
+                {rearrangeMode ? 'Done arranging' : 'View options'}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => {
+                  setPref('accView', prefs.accView === 'grouped' ? 'flat' : 'grouped')
+                  setRearrangeMode(false)
+                  setDraggedAccountId(null)
+                  setDropTargetAccountId(null)
+                  setDraggedGroupType(null)
+                  setDropTargetGroupType(null)
+                }}>
+                  {prefs.accView === 'grouped' ? <AlignJustify className="mr-2 h-4 w-4" /> : <LayoutList className="mr-2 h-4 w-4" />}
+                  Switch to {prefs.accView === 'grouped' ? 'flat' : 'grouped'} view
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  setRearrangeMode((value) => !value)
+                  setDraggedAccountId(null)
+                  setDropTargetAccountId(null)
+                  setDraggedGroupType(null)
+                  setDropTargetGroupType(null)
+                }}>
+                  <GripVertical className="mr-2 h-4 w-4" />
+                  {rearrangeMode ? 'Finish arranging' : 'Rearrange accounts'}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger render={<Button className="gap-2" size="sm" />}>
+              <Plus className="w-4 h-4" />Add Account
+            </DialogTrigger>
+            <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
+              <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
+              <FormError error={formError} />
+              <AccountForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} defaultValues={{ currency: defaultCurrency }} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {accounts.length > 0 && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">{prefs.accView === 'grouped' ? 'Grouped by account type' : 'Flat account view'}</p>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant={rearrangeMode ? 'secondary' : 'outline'} size="sm" className="gap-1.5" />}>
-              {rearrangeMode ? <Check className="w-3.5 h-3.5" /> : <MoreHorizontal className="w-3.5 h-3.5" />}
-              {rearrangeMode ? 'Done arranging' : 'View options'}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => {
-                setPref('accView', prefs.accView === 'grouped' ? 'flat' : 'grouped')
-                setRearrangeMode(false)
-                setDraggedAccountId(null)
-                setDropTargetAccountId(null)
-                setDraggedGroupType(null)
-                setDropTargetGroupType(null)
-              }}>
-                {prefs.accView === 'grouped' ? <AlignJustify className="mr-2 h-4 w-4" /> : <LayoutList className="mr-2 h-4 w-4" />}
-                Switch to {prefs.accView === 'grouped' ? 'flat' : 'grouped'} view
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => {
-                setRearrangeMode((value) => !value)
-                setDraggedAccountId(null)
-                setDropTargetAccountId(null)
-                setDraggedGroupType(null)
-                setDropTargetGroupType(null)
-              }}>
-                <GripVertical className="mr-2 h-4 w-4" />
-                {rearrangeMode ? 'Finish arranging' : 'Rearrange accounts'}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+      {loadState === 'stale-error' && (
+        <InlineLoadError message="Couldn't refresh your accounts. Showing what was last loaded." onRetry={() => void refetch()} />
       )}
-
-      {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
+      {loadState === 'error' ? (
+        <ErrorState title="Couldn't load your accounts" description={error} detail={errorDetail} onRetry={() => void refetch()} />
+      ) : loading ? (
+        <div className="space-y-6" aria-busy="true" aria-label="Loading accounts">
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[1fr_1fr_1fr_1.4fr]">
+            {['Assets', 'Liabilities', 'Net Worth', 'Coming up'].map((label, index) => (
+              <div
+                key={label}
+                className={cn(
+                  'p-4',
+                  index < 2 && 'border-b border-border/60 lg:border-b-0',
+                  index === 0 && 'border-r',
+                  index === 2 && 'col-span-2 border-b border-border/60 lg:col-span-1 lg:border-b-0 lg:border-r',
+                  index === 3 && 'col-span-2 lg:col-span-1',
+                  index === 1 && 'lg:border-r',
+                )}
+              >
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1 text-lg"><SkeletonText className="w-24" /></p>
+                <p className="text-xs"><SkeletonText className="w-16" /></p>
+              </div>
+            ))}
+          </div>
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            {['Assets', 'Liabilities'].map((heading) => (
+              <section key={heading} className="min-w-0 space-y-3">
+                <div className="flex items-baseline justify-between">
+                  <h2 className="text-sm font-semibold">{heading}</h2>
+                  <p className="text-sm"><SkeletonText className="w-20" /></p>
+                </div>
+                {heading === 'Liabilities' ? (
+                  // A liability is a card, not a row: a group heading over a 148px card (a card, then a
+                  // loan). Which liabilities there are is not known yet, so this shows one of each (LED-200).
+                  <div className="space-y-4">
+                    {[0, 1].map((group) => (
+                      <div key={group}>
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-xs"><SkeletonText className="w-20" /></p>
+                          <p className="text-xs"><SkeletonText className="w-12" /></p>
+                        </div>
+                        <div className="rounded-xl border border-border bg-card p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <span className="size-8 shrink-0 rounded-lg bg-muted" />
+                              <div className="min-w-0">
+                                <p className="text-sm"><SkeletonText className="w-28" /></p>
+                                <p className="text-xs"><SkeletonText className="w-20" /></p>
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <p className="text-base"><SkeletonText className="w-24" /></p>
+                              <span className="size-7" />
+                            </div>
+                          </div>
+                          <div className="mt-3 space-y-1.5">
+                            <div className="h-1 w-full rounded-full bg-muted" />
+                            <p className="text-xs"><SkeletonText className="w-40" /></p>
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <Skeleton className="h-7 w-[92px] rounded-full" />
+                            <Skeleton className="h-7 w-[50px] rounded-full" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border bg-card">
+                    {[0, 1, 2].map((row) => (
+                      <div key={row} className="flex items-center gap-2.5 px-4 py-2.5">
+                        <span className="size-8 shrink-0 rounded-lg bg-muted" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm"><SkeletonText className="w-32" /></p>
+                          <p className="text-xs"><SkeletonText className="w-20" /></p>
+                        </div>
+                        <span className="text-sm"><SkeletonText className="w-20" /></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
         </div>
       ) : accounts.length === 0 ? (
         <EmptyState
@@ -816,107 +724,117 @@ export default function AccountsPage() {
           title="No accounts yet"
           description="Add your first account to get started"
         />
-      ) : prefs.accView === 'flat' ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {accounts.map((account, idx) => renderAccountCard(account, idx, { flatRearrange: rearrangeMode }))}
-        </div>
       ) : (
-        <div className="space-y-6">
-          {groupedAccounts.map(([type, groupAccounts], groupIndex) => (
-            <div
-              key={type}
-              ref={setGroupRef(type)}
-              draggable={isDesktopDrag && rearrangeMode}
-              onDragStart={() => {
-                setDraggedGroupType(type)
-                setDropTargetGroupType(null)
-              }}
-              onDragEnter={() => {
-                if (draggedGroupType && draggedGroupType !== type) setDropTargetGroupType(type)
-              }}
-              onDragOver={(event) => {
-                event.preventDefault()
-                if (draggedGroupType && draggedGroupType !== type) setDropTargetGroupType(type)
-              }}
-              onDrop={(event) => {
-                event.preventDefault()
-                if (draggedGroupType) reorderGroup(draggedGroupType, type)
-                setDraggedGroupType(null)
-                setDropTargetGroupType(null)
-              }}
-              onDragEnd={() => {
-                setDraggedGroupType(null)
-                setDropTargetGroupType(null)
-              }}
-              className={cn(
-                rearrangeMode && 'reorder-motion rounded-xl border border-dashed border-border/80 p-3 hover:border-primary/50 cursor-grab',
-                draggedGroupType === type && 'is-dragging',
-                dropTargetGroupType === type && 'is-drop-target'
-              )}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <button
-                    type="button"
-                    className={`reorder-handle hidden text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted ${rearrangeMode ? 'md:block' : ''}`}
-                    aria-label={`Drag to rearrange ${ACCOUNT_TYPE_LABELS[type]} group`}
-                  >
-                    <GripVertical className="w-3.5 h-3.5" />
-                  </button>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    {ACCOUNT_TYPE_LABELS[type]}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    className={rearrangeMode ? 'md:hidden' : 'hidden'}
-                    onClick={() => moveGroup(type, -1)}
-                    disabled={groupIndex === 0}
-                  >
-                    <ArrowUp className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    className={rearrangeMode ? 'md:hidden' : 'hidden'}
-                    onClick={() => moveGroup(type, 1)}
-                    disabled={groupIndex === groupedAccounts.length - 1}
-                  >
-                    <ArrowDown className="w-3 h-3" />
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    {groupAccounts.length} account{groupAccounts.length > 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {groupAccounts.map((account, idx) => renderAccountCard(account, idx))}
-              </div>
+        <>
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[1fr_1fr_1fr_1.4fr]">
+            <div className="border-b border-r border-border/60 p-4 lg:border-b-0">
+              <p className="text-xs text-muted-foreground">Assets</p>
+              <p className="money mt-1 text-lg font-semibold">{formatCurrency(overview.totals.assets, defaultCurrency)}</p>
+              <p className="text-xs text-muted-foreground">{assetCount} account{assetCount === 1 ? '' : 's'}</p>
             </div>
-          ))}
-        </div>
+            <div className="border-b border-border/60 p-4 lg:border-b-0 lg:border-r">
+              <p className="text-xs text-muted-foreground">Liabilities</p>
+              <p className="money mt-1 text-lg font-semibold">{formatCurrency(overview.totals.liabilities, defaultCurrency)}</p>
+              <p className="text-xs text-muted-foreground">{liabilityMix}</p>
+            </div>
+            <div className="col-span-2 border-b border-border/60 p-4 lg:col-span-1 lg:border-b-0 lg:border-r">
+              <p className="text-xs text-muted-foreground">Net Worth</p>
+              <p className="money mt-1 text-lg font-bold">{formatCurrency(overview.totals.netWorth, defaultCurrency)}</p>
+              {netWorthScheduled !== 0 && (
+                <p className="text-xs text-muted-foreground">{afterScheduledLabel(netWorthScheduled, defaultCurrency, formatCurrency)}</p>
+              )}
+              {overview.excludedCurrencies.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {overview.convertedCurrencies.length > 0
+                    ? `Leaves out ${overview.excludedCurrencies.join(', ')}`
+                    : `${defaultCurrency} accounts only`}
+                </p>
+              ) : overview.convertedCurrencies.length > 0 ? (
+                <p className="text-xs text-muted-foreground">Includes {overview.convertedCurrencies.join(', ')} converted</p>
+              ) : null}
+            </div>
+            <div className="col-span-2 p-4 lg:col-span-1">
+              <p className="text-xs text-muted-foreground">Coming up</p>
+              {loansError ? (
+                <p className="mt-1 text-xs text-muted-foreground">Loan dates didn't load.</p>
+              ) : overview.comingUp.length === 0 ? (
+                <p className="mt-1 text-sm text-muted-foreground">Nothing due</p>
+              ) : (
+                <ul className="mt-1 space-y-1">
+                  {overview.comingUp.slice(0, 3).map((item) => (
+                    <li key={item.account.id} className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="truncate">{item.label}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        <span className="money font-medium text-foreground">{formatCurrency(item.amount, item.account.currency)}</span>
+                        {' '}{formatDueIn(item.days)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          {scheduledError && (
+            <InlineLoadError message="Couldn't load scheduled transactions, so balances don't show what is still scheduled." onRetry={() => void refetchScheduled()} />
+          )}
+
+          <div className="grid items-start gap-6 lg:grid-cols-2">
+            {overview.assets.length > 0 && (
+              <section className="min-w-0 space-y-3">
+                <div className="flex items-baseline justify-between">
+                  <h2 className="text-sm font-semibold">Assets</h2>
+                  <p className="money text-sm font-semibold">{formatCurrency(overview.totals.assets, defaultCurrency)}</p>
+                </div>
+                {prefs.accView === 'flat' && (
+                  <div className="hidden grid-cols-[minmax(0,1.5fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] gap-x-3 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] px-4 text-[0.6875rem] uppercase tracking-wide text-muted-foreground md:grid">
+                    <span>Account</span><span className="hidden 2xl:block">Type</span><span>Currency</span><span>Share</span><span className="text-right">Balance</span><span />
+                  </div>
+                )}
+                {renderColumn('assets')}
+                {overview.convertedCurrencies.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Totals are in {defaultCurrency}. {overview.convertedCurrencies.join(', ')} accounts are converted
+                    {ratesAsOf ? ` at rates as of ${ratesAsOf}` : ''}.{' '}
+                    <Link to="/settings" className="underline">Exchange rates</Link>
+                  </p>
+                )}
+                {overview.excludedCurrencies.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Totals are in {defaultCurrency} and leave out {overview.excludedCurrencies.join(', ')} accounts — Ledger has no exchange rate for them.{' '}
+                    <Link to="/settings" className="underline">Add a rate</Link>
+                  </p>
+                )}
+              </section>
+            )}
+            {overview.liabilities.length > 0 && (
+              <section className="min-w-0 space-y-3">
+                <div className="flex items-baseline justify-between">
+                  <h2 className="text-sm font-semibold">Liabilities</h2>
+                  <p className="money text-sm font-semibold">
+                    {overview.totals.liabilities > 0 ? '−' : ''}{formatCurrency(overview.totals.liabilities, defaultCurrency)}
+                  </p>
+                </div>
+                {loansError && (
+                  <InlineLoadError message="Couldn't load loan progress and due dates." onRetry={() => void refetchLoans()} />
+                )}
+                {renderColumn('liabilities')}
+              </section>
+            )}
+          </div>
+        </>
       )}
 
       {/* Edit dialog */}
       <Dialog open={!!editAccount} onOpenChange={(o) => { if (!o) { setEditAccount(null); setFormError(null) } }}>
         <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
-          {formError && <p className="text-sm text-destructive px-1 -mt-2">{formError}</p>}
+          <FormError error={formError} />
           {editAccount && (
             <AccountForm
-              defaultValues={{
-                ...editAccount,
-                balance: editAccount.type === 'credit_card'
-                  ? getCreditCardSpending(editAccount)
-                  : editAccount.type === 'loan'
-                    ? getLoanAmountOwed(editAccount)
-                    : editAccount.balance,
-              }}
+              account={editAccount}
               onSubmit={handleEdit}
               onClose={() => setEditAccount(null)}
-              originalBalance={editAccount.balance}
             />
           )}
         </DialogContent>

@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/cloud-setup.sh\""
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": ".*",
@@ -7,6 +18,16 @@
           {
             "type": "command",
             "command": "graphify update . --force 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"$CLAUDE_CODE_REMOTE\" = \"true\" ] && cat \"$CLAUDE_PROJECT_DIR/docs/claude-cloud.md\" || true"
           }
         ]
       }

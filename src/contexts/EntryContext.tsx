@@ -6,6 +6,7 @@ export interface EntryActions {
   onEdit?: () => void
   onDelete?: () => void
   onSplit?: () => void
+  onSaveTemplate?: () => void
 }
 
 export const EntryContext = createContext<

@@ -31,8 +31,15 @@ export function DashboardCreditCardMonitor({
         subtitleOnPhone={false}
         icon={<CreditCard className="w-3.5 h-3.5 text-muted-foreground" />}
         iconOnPhone={false}
-        className="mb-1"
+        className="mb-1 max-md:hidden"
       />
+      {/* Phones (M-08): a short title and the count. */}
+      <div className="mb-1 flex items-baseline justify-between gap-3 md:hidden">
+        <h3 className="text-[0.9375rem] font-semibold">Credit cards</h3>
+        <span className="text-xs text-muted-foreground">
+          {creditCards.length} {creditCards.length === 1 ? 'card' : 'cards'}
+        </span>
+      </div>
       <ul className="divide-y divide-border/60">
         {creditCards.map((card) => (
           <li key={card.acc.id} className="space-y-2 py-3 last:pb-0 max-md:first:pt-2">

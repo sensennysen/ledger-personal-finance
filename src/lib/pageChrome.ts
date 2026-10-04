@@ -18,6 +18,7 @@ const TITLES: Record<string, string> = {
   '/reports': 'Reports',
   '/thirteenth-month': '13th Month',
   '/settings': 'Settings',
+  '/more': 'More',
 }
 
 // Budgets' Goals view is not per-cycle, so the stepper would move nothing on screen.

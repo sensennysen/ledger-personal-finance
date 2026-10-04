@@ -4,6 +4,7 @@ import {
   Wallet,
   ArrowLeftRight,
   PieChart,
+  Ellipsis,
   Lock,
   type LucideIcon,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ const ICONS: Partial<Record<NavIconKey, LucideIcon>> = {
   accounts: Wallet,
   activity: ArrowLeftRight,
   budgets: PieChart,
+  more: Ellipsis,
 }
 export default function BottomNav({
   setupComplete = true,
@@ -30,7 +32,7 @@ export default function BottomNav({
   return (
     <nav
       aria-label="Main navigation"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 flex h-[calc(88px+env(safe-area-inset-bottom))] rounded-t-[28px] border-t border-sidebar-border bg-sidebar pt-3 pb-[env(safe-area-inset-bottom)]"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 flex h-[calc(80px+env(safe-area-inset-bottom))] border-t border-sidebar-border bg-sidebar pt-3 pb-[env(safe-area-inset-bottom)]"
     >
       {BOTTOM_NAV_TABS.map((tab) => {
         const { to, label, exact } = tab
@@ -48,13 +50,15 @@ export default function BottomNav({
         >
           <span
             className={cn(
-              'flex flex-col items-center gap-1 text-xs font-medium',
-              !locked && active ? 'text-foreground' : 'text-muted-foreground',
+              'flex flex-col items-center gap-1 text-xs',
+              !locked && active
+                ? 'font-semibold text-foreground'
+                : 'font-medium text-muted-foreground',
             )}
           >
             <span
               className={cn(
-                'flex h-8 w-[60px] items-center justify-center rounded-full transition-colors duration-(--dur-base)',
+                'flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-(--dur-base)',
                 !locked &&
                   active &&
                   'bg-sidebar-accent text-sidebar-accent-foreground',

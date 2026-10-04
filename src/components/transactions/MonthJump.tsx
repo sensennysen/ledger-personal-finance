@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { CalendarRange, CheckSquare, Square } from 'lucide-react'
+import { CalendarRange } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { formatNet } from '@/lib/formatNet'
 import type { MonthNet } from '@/lib/monthJump'
@@ -90,20 +90,51 @@ export function MonthRail({
   )
 }
 
-/** Mobile and tablet: a bottom-bar action that opens the same month list in a sheet. */
+/** Phones: the month list in a bottom sheet, opened from the cycle dates (M-04). */
+export function MonthJumpSheet({
+  open,
+  onOpenChange,
+  months,
+  activeKey,
+  onPick,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  months: MonthNet[]
+  activeKey: string | null
+  onPick: (key: string) => void
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom" className="max-h-[80dvh] pb-[env(safe-area-inset-bottom)]">
+        <SheetHeader>
+          <SheetTitle>Jump to month</SheetTitle>
+          <SheetDescription>Each month with its net.</SheetDescription>
+        </SheetHeader>
+        <div className="overflow-y-auto border-t border-border">
+          <MonthList
+            months={months}
+            activeKey={activeKey}
+            onPick={(key) => {
+              onOpenChange(false)
+              onPick(key)
+            }}
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+/** Account pages below lg: a bottom-bar action that opens the month sheet. */
 export function MonthJumpBar({
   months,
   activeKey,
   onPick,
-  onSelect,
-  selecting,
 }: {
   months: MonthNet[]
   activeKey: string | null
   onPick: (key: string) => void
-  /** Phone-only bulk select (29a): the toolbar's Select is hidden below sm. */
-  onSelect?: () => void
-  selecting?: boolean
 }) {
   const [open, setOpen] = useState(false)
 
@@ -111,8 +142,7 @@ export function MonthJumpBar({
     <>
       {/* <main>'s bottom padding already clears the fixed BottomNav and a sticky offset is measured
           inside that padding, so bottom-0 sits the bar on the nav. An extra 88px floated it 88px
-          above the nav (LED-149, measured at 390x844). data-month-jump-bar lets the add FAB lift
-          itself clear of the bar. */}
+          above the nav (LED-149, measured at 390x844). */}
       <div data-month-jump-bar className="sticky bottom-0 z-20 -mx-4 flex h-14 items-center gap-5 border-t border-border bg-muted px-4 md:-mx-6 md:px-6 lg:hidden">
         <button
           type="button"
@@ -122,36 +152,8 @@ export function MonthJumpBar({
           <CalendarRange className="size-4" />
           Jump to month
         </button>
-        {onSelect && (
-          <button
-            type="button"
-            onClick={onSelect}
-            aria-pressed={selecting}
-            className="flex items-center gap-2 text-xs font-semibold text-muted-foreground aria-pressed:text-primary sm:hidden"
-          >
-            {selecting ? <CheckSquare className="size-4" /> : <Square className="size-4" />}
-            Select
-          </button>
-        )}
       </div>
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="bottom" className="max-h-[80dvh] pb-[env(safe-area-inset-bottom)]">
-          <SheetHeader>
-            <SheetTitle>Jump to month</SheetTitle>
-            <SheetDescription>Each month with its net.</SheetDescription>
-          </SheetHeader>
-          <div className="overflow-y-auto border-t border-border">
-            <MonthList
-              months={months}
-              activeKey={activeKey}
-              onPick={(key) => {
-                setOpen(false)
-                onPick(key)
-              }}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+      <MonthJumpSheet open={open} onOpenChange={setOpen} months={months} activeKey={activeKey} onPick={onPick} />
     </>
   )
 }

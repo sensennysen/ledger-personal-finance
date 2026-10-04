@@ -89,6 +89,40 @@ export function sortByDate<T extends { date: string }>(txs: T[], sort: TxSort): 
   return [...txs].sort((a, b) => compareDates(a.date, b.date, sort))
 }
 
+/**
+ * Activity's sort (LED-241): the two date orders, plus amount largest or smallest first. An amount
+ * sort lists rows flat, since day groups would break its order.
+ */
+export type ActivitySort = TxSort | 'largest' | 'smallest'
+
+export const ACTIVITY_SORTS: readonly ActivitySort[] = ['newest', 'oldest', 'largest', 'smallest']
+
+export function isAmountSort(sort: ActivitySort): sort is 'largest' | 'smallest' {
+  return sort === 'largest' || sort === 'smallest'
+}
+
+/**
+ * Sorted copy by size. `magnitude` gives a row's amount in one currency, or null when it has no
+ * rate: those rows are never compared one to one with the rest, so they come last, ordered by their
+ * own amount. Equal sizes keep the newest first.
+ */
+export function sortByAmount<T extends { date: string; amount: number }>(
+  txs: T[],
+  sort: 'largest' | 'smallest',
+  magnitude: (tx: T) => number | null,
+): T[] {
+  const sign = sort === 'largest' ? -1 : 1
+  const keyed = txs.map((tx) => ({ tx, size: magnitude(tx) }))
+  keyed.sort((a, b) => {
+    if ((a.size === null) !== (b.size === null)) return a.size === null ? 1 : -1
+    const left = Math.abs(a.size ?? a.tx.amount)
+    const right = Math.abs(b.size ?? b.tx.amount)
+    if (left !== right) return sign * (left - right)
+    return b.tx.date.localeCompare(a.tx.date)
+  })
+  return keyed.map((entry) => entry.tx)
+}
+
 /** Sum of the signed amounts per currency, as the rows and day headers sign them. */
 export function sumByCurrency(txs: WindowedTx[], contextAccountId?: string): Record<string, number> {
   const sum: Record<string, number> = {}

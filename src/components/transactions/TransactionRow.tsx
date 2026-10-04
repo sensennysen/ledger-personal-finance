@@ -2,7 +2,7 @@ import { useEntryDetail } from '@/contexts/EntryContext'
 import { memo, useEffect, useState } from 'react'
 import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal, Clock } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
-import { formatCurrency, getLocalDateString } from '@/lib/utils'
+import { formatCurrency, formatDateShort, getLocalDateString } from '@/lib/utils'
 import { countsYet } from '@/lib/countsYet'
 import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
 import { Button } from '@/components/ui/button'
@@ -45,6 +45,8 @@ interface TransactionRowProps {
   contextAccountId?: string
   /** Compact density from the result bar (LED-61): tighter padding and a smaller icon tile. */
   dense?: boolean
+  /** Shows the date on the row, for a flat list sorted by amount (LED-241). */
+  showDate?: boolean
 }
 
 // Memoised (LED-164): a load step in the windowed list only mounts new rows,
@@ -61,6 +63,7 @@ function TransactionRowImpl({
   onSelect,
   contextAccountId,
   dense,
+  showDate,
 }: TransactionRowProps) {
   const openDetail = useEntryDetail()
   const [receiptOpen, setReceiptOpen] = useState(false)
@@ -140,6 +143,9 @@ function TransactionRowImpl({
         {/* Row 2: labels | currency */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
+            {showDate && (
+              <time dateTime={tx.date} className="text-xs text-muted-foreground">{formatDateShort(tx.date)}</time>
+            )}
             {tx.queued && (
               <span className="inline-flex items-center gap-1 text-xs text-warning">
                 <Clock className="w-3 h-3" />Not synced yet

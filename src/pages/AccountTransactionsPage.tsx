@@ -812,7 +812,7 @@ export default function AccountTransactionsPage() {
                 rangeLabel={historyRange}
                 sum={matchSum}
                 sort={sort}
-                onSortChange={setSort}
+                onSortChange={(next) => setSort(next as TxSort)}
                 density={density}
                 onDensityChange={(next) => setPref('txDensity', next)}
                 onExport={exportMatch}

@@ -10,6 +10,8 @@ import {
   nextRowCount,
   dayLabel,
   sortByDate,
+  sortByAmount,
+  isAmountSort,
   sumByCurrency,
   dateSpan,
 } from '../src/lib/transactionWindow.ts'
@@ -186,4 +188,47 @@ test('an incoming cross-currency transfer is labelled and netted in the destinat
   // From the source account it is still money out, in the source currency.
   assert.deepEqual(amountDisplay(t, 'usd'), { sign: '', value: 100, currency: 'USD' })
   assert.deepEqual(sumByCurrency([t], 'usd'), { USD: -100 })
+})
+
+// LED-241: Activity sorted by amount.
+const usd = (tx) => (tx.currency === 'USD' ? tx.amount : tx.currency === 'EUR' ? tx.amount * 2 : null)
+
+test('amount sorts rank by size, income and expense alike, largest or smallest first', () => {
+  const rows = [
+    tx({ id: 'a', amount: 20 }),
+    tx({ id: 'b', type: 'income', amount: 500 }),
+    tx({ id: 'c', amount: 75 }),
+  ]
+  assert.deepEqual(sortByAmount(rows, 'largest', usd).map((t) => t.id), ['b', 'c', 'a'])
+  assert.deepEqual(sortByAmount(rows, 'smallest', usd).map((t) => t.id), ['a', 'c', 'b'])
+  assert.deepEqual(rows.map((t) => t.id), ['a', 'b', 'c'], 'the input is not reordered')
+})
+
+test('amount sorts compare in one currency, and rows with no rate come last in either direction', () => {
+  const rows = [
+    tx({ id: 'usd', amount: 150 }),
+    tx({ id: 'eur', currency: 'EUR', amount: 100 }), // 200 in USD
+    tx({ id: 'jpy-big', currency: 'JPY', amount: 90000 }),
+    tx({ id: 'jpy-small', currency: 'JPY', amount: 500 }),
+  ]
+  assert.deepEqual(sortByAmount(rows, 'largest', usd).map((t) => t.id), ['eur', 'usd', 'jpy-big', 'jpy-small'])
+  assert.deepEqual(sortByAmount(rows, 'smallest', usd).map((t) => t.id), ['usd', 'eur', 'jpy-small', 'jpy-big'])
+})
+
+test('equal amounts keep the newest first', () => {
+  const rows = [tx({ id: 'old', date: '2026-09-01' }), tx({ id: 'new', date: '2026-09-20' })]
+  assert.deepEqual(sortByAmount(rows, 'largest', usd).map((t) => t.id), ['new', 'old'])
+  assert.deepEqual(sortByAmount(rows, 'smallest', usd).map((t) => t.id), ['new', 'old'])
+})
+
+test('an amount sort orders the whole set past 1,000 rows, not a first page', () => {
+  const rows = Array.from({ length: 2500 }, (_, i) => tx({ id: `r${i}`, amount: i + 1 }))
+  const sorted = sortByAmount(rows, 'largest', usd)
+  assert.equal(sorted.length, 2500)
+  assert.equal(sorted[0].id, 'r2499')
+  assert.equal(sorted.at(-1).id, 'r0')
+})
+
+test('only largest and smallest are amount sorts', () => {
+  assert.deepEqual(['newest', 'oldest', 'largest', 'smallest'].map(isAmountSort), [false, false, true, true])
 })

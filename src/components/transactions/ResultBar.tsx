@@ -156,8 +156,8 @@ export function ResultBar({
   }
 
   return (
-    <div className="relative -mx-4 flex items-center justify-between gap-3 border-y border-border bg-muted px-4 py-2 md:-mx-6 md:px-6">
-      <span aria-hidden className="absolute inset-x-0 -top-px h-0.5 bg-primary" />
+    <div className="relative flex items-center justify-between gap-3 overflow-hidden rounded-md border border-border bg-muted px-4 py-2">
+      <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 bg-primary" />
       <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-0.5">
         <span className="text-sm font-bold">
           <span className="money">{matchCount.toLocaleString()}</span>{' '}

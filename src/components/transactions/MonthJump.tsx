@@ -35,8 +35,8 @@ function MonthList({
                 active ? 'bg-accent font-bold text-accent-foreground' : 'text-muted-foreground hover:bg-muted',
               )}
             >
-              <span className={active ? undefined : 'text-foreground/80'}>{monthLabel(month.key)}</span>
-              <span className="money">{month.count === 0 ? '—' : formatNet(month.net)}</span>
+              <span className={cn('shrink-0 whitespace-nowrap', !active && 'text-foreground/80')}>{monthLabel(month.key)}</span>
+              <span className="money text-right">{month.count === 0 ? '—' : formatNet(month.net)}</span>
             </button>
           </li>
         )
@@ -69,7 +69,7 @@ export function MonthRail({
   const hidden = months.length - shown.length
 
   return (
-    <aside aria-label="Month jump" className="sticky top-4 hidden w-60 shrink-0 self-start pt-4 md:pt-6 lg:block">
+    <aside aria-label="Month jump" className="sticky top-4 hidden w-64 shrink-0 self-start lg:block">
       <p className="mb-2 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">Month jump</p>
       <div className="overflow-hidden rounded-md border border-border bg-card">
         <div className={cn(showAll && 'max-h-[60vh] overflow-y-auto')}>

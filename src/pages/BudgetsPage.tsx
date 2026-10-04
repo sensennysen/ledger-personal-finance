@@ -30,7 +30,6 @@ import { BUDGET_TONE_BAR_CLASS, budgetTone, budgetUsage } from '@/lib/budgetUsag
 import { goalPace, goalStatus, type GoalStatus } from '@/lib/goalPace'
 import { useCycle } from '@/contexts/cycleState'
 import { useNotify } from '@/contexts/notificationState'
-import { PageActions } from '@/components/layout/PageActions'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useSavingsGoals, type GoalWithContributions } from '@/hooks/useSavingsGoals'
 import { useCategories } from '@/hooks/useCategories'
@@ -1327,42 +1326,44 @@ export default function BudgetsPage() {
           {/* The phone header is the page's one h1 (M-03). */}
           <p className="text-muted-foreground text-sm">Track spending limits and savings targets</p>
         </div>
-        <PageActions>
-          {activeTab === 'budgets' && (
-            <>
-              <Button
-                variant="outline"
-                className="gap-2"
-                size="sm"
-                disabled={addFromLastReason !== null}
-                aria-describedby={addFromLastReason ? 'add-from-last-reason' : undefined}
-                onClick={() => setAddFromLastOpen(true)}
-              >
-                <CopyPlus className="w-4 h-4" />Add from last cycle
-              </Button>
-              {addFromLastReason && <span id="add-from-last-reason" className="sr-only">{addFromLastReason}</span>}
-              <Button className="gap-2" size="sm" onClick={() => setCreateOpen(true)}>
-                <Plus className="w-4 h-4" />Add Budget
-              </Button>
-            </>
-          )}
-          {activeTab === 'goals' && (
-            <Button className="gap-2" size="sm" onClick={() => setCreateGoalOpen(true)}>
-              <Plus className="w-4 h-4" />Add Goal
-            </Button>
-          )}
-        </PageActions>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-xs grid-cols-2">
-          <TabsTrigger value="budgets" className="gap-1.5">
-            <Target className="w-3.5 h-3.5" />Budgets
-          </TabsTrigger>
-          <TabsTrigger value="goals" className="gap-1.5">
-            <PiggyBank className="w-3.5 h-3.5" />Goals
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <TabsList className="grid w-full max-w-xs grid-cols-2">
+            <TabsTrigger value="budgets" className="gap-1.5">
+              <Target className="w-3.5 h-3.5" />Budgets
+            </TabsTrigger>
+            <TabsTrigger value="goals" className="gap-1.5">
+              <PiggyBank className="w-3.5 h-3.5" />Goals
+            </TabsTrigger>
+          </TabsList>
+          <div className="flex items-center gap-2">
+            {activeTab === 'budgets' && (
+              <>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  size="sm"
+                  disabled={addFromLastReason !== null}
+                  aria-describedby={addFromLastReason ? 'add-from-last-reason' : undefined}
+                  onClick={() => setAddFromLastOpen(true)}
+                >
+                  <CopyPlus className="w-4 h-4" />Add from last cycle
+                </Button>
+                {addFromLastReason && <span id="add-from-last-reason" className="sr-only">{addFromLastReason}</span>}
+                <Button className="gap-2" size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="w-4 h-4" />Add Budget
+                </Button>
+              </>
+            )}
+            {activeTab === 'goals' && (
+              <Button className="gap-2" size="sm" onClick={() => setCreateGoalOpen(true)}>
+                <Plus className="w-4 h-4" />Add Goal
+              </Button>
+            )}
+          </div>
+        </div>
 
         {/* Budgets view */}
         <TabsContent value="budgets" className="mt-4 space-y-4">

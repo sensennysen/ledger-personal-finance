@@ -62,7 +62,8 @@ function storageKeys() {
 }
 
 test('the Cookies and storage page lists every key the code keeps in the browser', () => {
-  const page = read('src/pages/CookiesStoragePage.tsx')
+  // The page and Settings → Browser storage both render these rows (LED-245).
+  const page = read('src/lib/browserStorage.ts')
   const keys = storageKeys()
   for (const expected of ['ledger-theme', 'ledger_offline_queue', 'ledger_cache:', 'ledger_receipts', 'cc-notifs-sent', '13th-month-selection']) {
     assert.ok(keys.includes(expected), `the key scan missed ${expected}; update storageKeys()`)
@@ -76,6 +77,7 @@ test('the Cookies and storage page lists every key the code keeps in the browser
 test('the pages make no claim the code contradicts', () => {
   const pages = ['PrivacyPolicyPage', 'TermsOfServicePage', 'DataDeletionPage', 'CookiesStoragePage', 'LegalNoticesPage']
     .map((name) => read(`src/pages/${name}.tsx`))
+    .concat(read('src/lib/browserStorage.ts'))
     .join('\n')
   // No analytics exists, and Ledger is MIT licensed (LICENSE).
   assert.doesNotMatch(pages, /analytics(?! and no usage)/i)

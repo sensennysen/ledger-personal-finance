@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
+import { readWithPolicy } from '@/lib/readRetry'
 import type { Category, Subcategory } from '@/types'
 import { parseMergeResult, planSubcategoryMerge, type MergePreview } from '@/lib/categoryMerge'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
@@ -26,7 +27,8 @@ export function useCategories() {
       setLoading(true)
     }
     if (!navigator.onLine) return
-    const { data, error } = await supabase
+    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
+    const { data, error } = await readWithPolicy((retry) => supabase
       .from('categories')
       .select('*')
       .eq('user_id', user.id)
@@ -34,6 +36,7 @@ export function useCategories() {
       .order('is_default', { ascending: false })
       .order('name', { ascending: true })
       .order('created_at', { ascending: true })
+      .retry(retry), { background: cached !== null })
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load' }))
     } else {

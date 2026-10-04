@@ -5,6 +5,7 @@ import { editQueuedInsert, enqueue, pendingCount as queueSize } from '@/lib/offl
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
+import { readWithPolicy } from '@/lib/readRetry'
 import { dedupeAsync } from '@/lib/inFlightRequest'
 import {
   notifyAccountsRefresh,
@@ -127,16 +128,17 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       return query
     }
 
-    // An explicit limit is one request; otherwise page past PostgREST's 1,000-row cap.
+    // An explicit limit is one request; otherwise page past PostgREST's 1,000-row cap. A first load
+    // fails fast; with the cache on screen the library retries as before (LED-242).
     // Shared per cache key: AppLayout, the page, palette hooks and dashboard
     // cards mounting with the same filters in the same tick read the table once (LED-166).
-    const { rows, error } = await dedupeAsync(cacheKey, async () => {
+    const { rows, error } = await dedupeAsync(cacheKey, () => readWithPolicy(async (retry) => {
       if (filters.limit) {
-        const { data, error } = await buildQuery().limit(filters.limit)
+        const { data, error } = await buildQuery().limit(filters.limit).retry(retry)
         return { rows: (data ?? []) as Transaction[], error: error?.message ?? null }
       }
-      return readAllPages<Transaction>((from, to) => buildQuery().range(from, to))
-    })
+      return readAllPages<Transaction>((from, to) => buildQuery().range(from, to).retry(retry))
+    }, { background: cached !== null }))
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load' }))
     } else {

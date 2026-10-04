@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/contexts/notificationState'
 import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { readCache, writeCache } from '@/lib/dataCache'
+import { readWithPolicy } from '@/lib/readRetry'
 import { registerAccountsListener } from '@/lib/cacheEvents'
 import { getLocalDateString } from '@/lib/utils'
 import { planAccountSave, type BalanceAdjustment } from '@/lib/accountAdjustment'
@@ -31,13 +32,15 @@ export function useAccounts() {
       setLoading(true)
     }
     if (!navigator.onLine) return
-    const { data, error } = await supabase
+    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
+    const { data, error } = await readWithPolicy((retry) => supabase
       .from('accounts')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
+      .retry(retry), { background: cached !== null })
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load' }))
     } else {

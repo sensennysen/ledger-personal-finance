@@ -30,6 +30,9 @@ function formatDaysUntil(daysUntil: number) {
 }
 
 const STRIP_LIMIT = 4
+// A phone shows the next bill only, as design 18a's strip does, so Home's first four widgets fit
+// above the bottom nav at 390x844 (LED-202); the rest are counted in "+N more".
+const PHONE_LIMIT = 1
 
 // A strip, not a grid cell (LED-78): one line of the next few bills, full width.
 export function DashboardUpcomingBillsCard({
@@ -42,16 +45,20 @@ export function DashboardUpcomingBillsCard({
 }: DashboardUpcomingBillsCardProps) {
   const shown = bills.slice(0, STRIP_LIMIT)
   const more = bills.length - shown.length
+  const phoneMore = bills.length - Math.min(bills.length, PHONE_LIMIT)
   return (
     <section
       aria-label="Upcoming bills"
-      className="col-span-full flex min-w-0 max-w-full flex-col gap-2 rounded-[20px] border border-border bg-card px-4 py-3 md:flex-row md:items-center md:gap-5 md:px-5"
+      className="col-span-full flex min-w-0 max-w-full flex-col gap-2 rounded-[20px] border border-border bg-card px-4 py-2.5 md:py-3 md:flex-row md:items-center md:gap-5 md:px-5"
       style={style}
     >
       <DashboardCardHeader
         title="Upcoming Bills"
         subtitle={isCurrentMonth ? undefined : monthLabel}
         className="mb-0 shrink-0 md:w-40"
+        action={
+          !loading && phoneMore > 0 ? <span className="text-xs text-muted-foreground md:hidden">+{phoneMore} more</span> : undefined
+        }
       />
       {loading ? (
         <ul className="flex min-w-0 flex-1 flex-col gap-1 md:flex-row md:flex-wrap md:gap-x-6" aria-busy="true">
@@ -68,8 +75,8 @@ export function DashboardUpcomingBillsCard({
         <p className="flex-1 text-sm text-muted-foreground">No upcoming bills this cycle</p>
       ) : (
         <ul className="flex min-w-0 flex-1 flex-col gap-1 md:flex-row md:flex-wrap md:gap-x-6">
-          {shown.map(({ key, source, title, icon, color, amount, currency, daysUntil, nextDue, payment }) => (
-            <li key={key} className="flex min-w-0 items-center gap-2 text-sm">
+          {shown.map(({ key, source, title, icon, color, amount, currency, daysUntil, nextDue, payment }, index) => (
+            <li key={key} className={`flex min-w-0 items-center gap-2 text-sm ${index >= PHONE_LIMIT ? 'max-md:hidden' : ''}`}>
               <span
                 className="flex size-6 shrink-0 items-center justify-center rounded-md text-xs"
                 style={{ backgroundColor: `${color}22` }}
@@ -95,7 +102,7 @@ export function DashboardUpcomingBillsCard({
               )}
             </li>
           ))}
-          {more > 0 && <li className="text-xs text-muted-foreground md:self-center">+{more} more</li>}
+          {more > 0 && <li className="text-xs text-muted-foreground max-md:hidden md:self-center">+{more} more</li>}
         </ul>
       )}
     </section>

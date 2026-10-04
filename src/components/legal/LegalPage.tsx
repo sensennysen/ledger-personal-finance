@@ -4,22 +4,24 @@ import { ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { legalSectionId, type LegalSection, type LegalTocItem } from '@/lib/legalSections'
 
-// One document layout for Privacy, Terms and Data deletion (LED-88, design 24a).
-// A tab row cross-links the three; the article keeps a reading measure, and at
+// One document layout for the legal pages (LED-88, design 24a; Cookies and Notices added by LED-189).
+// A tab row cross-links them; the article keeps a reading measure, and at
 // xl the freed width carries an "On this page" rail plus an optional aside.
 
-export type LegalDoc = 'privacy' | 'terms' | 'data-deletion'
+export type LegalDoc = 'privacy' | 'terms' | 'data-deletion' | 'cookies' | 'notices'
 
 const DOCS: { id: LegalDoc; label: string; to: string }[] = [
   { id: 'privacy', label: 'Privacy', to: '/privacy' },
   { id: 'terms', label: 'Terms', to: '/terms' },
   { id: 'data-deletion', label: 'Data deletion', to: '/data-deletion' },
+  { id: 'cookies', label: 'Cookies', to: '/cookies' },
+  { id: 'notices', label: 'Notices', to: '/notices' },
 ]
 
 interface LegalPageProps {
   current: LegalDoc
   title: string
-  intro: ReactNode
+  intro?: ReactNode
   lastUpdated: string
   toc: LegalTocItem[]
   /** Rendered in the rail at xl, and above the document below it. */
@@ -35,7 +37,7 @@ export function LegalPage({ current, title, intro, lastUpdated, toc, aside, chil
           <Link to="/" className="text-lg font-semibold tracking-tight text-foreground">
             Ledger<span style={{ color: 'var(--primary)' }}>.</span>
           </Link>
-          <nav aria-label="Legal documents" className="flex items-center gap-1">
+          <nav aria-label="Legal documents" className="flex flex-wrap items-center gap-1">
             {DOCS.map((doc) => (
               <NavLink
                 key={doc.id}
@@ -74,7 +76,7 @@ export function LegalPage({ current, title, intro, lastUpdated, toc, aside, chil
           <p className="mt-3 text-sm text-muted-foreground">
             Last updated <span className="font-medium text-foreground">{lastUpdated}</span>
           </p>
-          <div className="mt-4 leading-relaxed text-muted-foreground">{intro}</div>
+          {intro && <div className="mt-4 leading-relaxed text-muted-foreground">{intro}</div>}
           {toc.length > 0 && (
             <nav aria-label="On this page" className="mt-5 flex flex-wrap gap-2 xl:hidden">
               {toc.map((item) => (
@@ -128,6 +130,24 @@ export function LegalPage({ current, title, intro, lastUpdated, toc, aside, chil
         </article>
       </div>
     </div>
+  )
+}
+
+/** An outside link in legal text. */
+export function LegalLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2 transition-colors hover:text-foreground">
+      {children}
+    </a>
+  )
+}
+
+/** A link to another page of the app in legal text. */
+export function LegalPageLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link to={to} className="underline underline-offset-2 transition-colors hover:text-foreground">
+      {children}
+    </Link>
   )
 }
 

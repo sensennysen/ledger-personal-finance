@@ -6,9 +6,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/ui/error-state'
 import type { OverspendingReport } from '@/hooks/useOverspendingReport'
 import { formatCurrency, formatDateShort, cn } from '@/lib/utils'
-import { deficitSettingLabel, shiftMonthKey, streakLabel } from '@/lib/overspending'
+import { deficitSettingLabel, shiftMonthKey, spendWindowLabel, streakLabel } from '@/lib/overspending'
 import type { Category } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 
 interface OverspendingCardProps {
   categories: Category[]
@@ -24,15 +25,13 @@ interface OverspendingCardProps {
  */
 export function OverspendingCard({ categories, month, report }: OverspendingCardProps) {
   const ink = useCategoryInk()
-  const { range, result, state, refetch, behaviour } = report
+  const { range, result, converted, currency, state, refetch, behaviour } = report
 
   const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
   const nextMonthLabel = new Date(`${shiftMonthKey(month, 1)}-01T00:00:00`).toLocaleDateString(
     'en-US',
     { month: 'long' },
   )
-  const uncarried = result.totals.filter((t) => t.uncarried > 0)
-
   return (
     <Card className={cn('p-5 gap-3', result.rows.length > 0 && 'border-warning/50')}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -78,6 +77,8 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
           </div>
           {result.rows.map((row) => {
             const category = categoryById.get(row.categoryId)
+            // A yearly row is the year so far, so it names that instead of a cycle streak (LED-244)
+            const spendWindow = spendWindowLabel(row.period)
             return (
               <div
                 key={row.budgetId}
@@ -94,7 +95,7 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
                     <span className="block text-sm font-medium truncate">{category?.name ?? 'Uncategorised'}</span>
                     <span className="block text-xs text-muted-foreground tabular-nums">
                       {formatCurrency(row.spent, row.currency)} of {formatCurrency(row.limit, row.currency)}
-                      <span className="sm:hidden"> · {streakLabel(row.streak)}</span>
+                      {spendWindow ? <span className="whitespace-nowrap"> · {spendWindow}</span> : <span className="sm:hidden"> · {streakLabel(row.streak)}</span>}
                     </span>
                   </span>
                 </span>
@@ -104,10 +105,10 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
                 <span
                   className={cn(
                     'hidden sm:block w-24 justify-self-end text-center rounded-full px-2.5 py-0.5 text-[0.6875rem] font-bold',
-                    row.streak > 1 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground',
+                    row.streak > 1 && !spendWindow ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground',
                   )}
                 >
-                  {streakLabel(row.streak)}
+                  {spendWindow ? 'This year' : streakLabel(row.streak)}
                 </span>
               </div>
             )
@@ -115,25 +116,22 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
           <div className="flex items-baseline justify-between border-t pt-3 mt-1">
             <span className="text-sm font-medium">Total over</span>
             <span className="text-base font-bold tabular-nums text-warning">
-              {result.totals.map((t) => formatCurrency(t.over, t.currency)).join(' + ')}
+              {formatCurrency(converted.over, currency)}
             </span>
           </div>
-          {uncarried.length > 0 && (
+          {converted.uncarried > 0 && (
             <div className="flex items-baseline justify-between pt-2">
               <span className="text-sm text-muted-foreground">Not carried into {nextMonthLabel}</span>
               <span className="text-sm font-semibold tabular-nums">
-                {uncarried.map((t) => formatCurrency(t.uncarried, t.currency)).join(' + ')}
+                {formatCurrency(converted.uncarried, currency)}
               </span>
             </div>
           )}
         </div>
       )}
 
-      {result.unrated.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {result.unrated.join(', ')} spending has no exchange rate and isn't counted, so totals may be understated.
-        </p>
-      )}
+      {/* Named, not converted at 1 (rules/foreign-currency-rate-of-one-is-not-a-rate) */}
+      <UnratedCurrencyNotice currencies={converted.excludedCurrencies} subject="overspending" />
 
       {(state === 'ready' || state === 'stale-error') && (
         <div className="flex items-start gap-2.5 rounded-[14px] bg-muted px-3 py-2.5 text-xs leading-snug text-muted-foreground">

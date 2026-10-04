@@ -1,14 +1,17 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
 import type { Budget } from '@/types'
 import type { BudgetSpendTx } from '@/lib/budgetSpend'
-import { getCurrentCycleMonthKey } from '@/lib/utils'
+import type { RateTable } from '@/lib/exchangeRates'
+import { getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { sumBudgetSpend } from '@/lib/budgetSpend'
+import { countedEnd } from '@/lib/countsYet'
 import { shiftMonthKey } from '@/lib/overspending'
 import { readAllPages } from '@/lib/pagedRead'
+import { readWithPolicy } from '@/lib/readRetry'
 import { canRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
 import { buildBudgetHistory, type PeriodSpend } from '@/lib/budgetHistory'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
@@ -95,12 +98,15 @@ export function useBudgets(
       return
     }
 
-    const { data: budgetData, error: budgetError } = await supabase
+    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
+    const background = cached !== null
+    const { data: budgetData, error: budgetError } = await readWithPolicy((retry) => supabase
       .from('budgets')
       .select('*, category:categories(id, name, color, icon, type)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: true })
+      .retry(retry), { background })
 
     if (request !== requestId.current) return
     if (budgetError) {
@@ -123,7 +129,7 @@ export function useBudgets(
       new Date(now.getFullYear() + 1, 0, Math.max(1, startDay - 1)),
     )
 
-    const { rows: spentData, error: spentError } = await readAllPages(
+    const { rows: spentData, error: spentError } = await readWithPolicy((retry) => readAllPages(
       (from, to) =>
         supabase
           .from('transactions')
@@ -134,10 +140,11 @@ export function useBudgets(
           .lte('date', fetchEnd)
           .order('date', { ascending: true })
           .order('id', { ascending: true })
-          .range(from, to),
+          .range(from, to)
+          .retry(retry),
       undefined,
       () => request !== requestId.current,
-    )
+    ), { background })
 
     if (request !== requestId.current) return
     if (spentError) {
@@ -146,6 +153,8 @@ export function useBudgets(
     }
 
     const allTx = spentData
+    // Rows dated after today are scheduled: shown apart, counted from their date (LED-238).
+    const today = getLocalDateString()
     const currentMonthStart = new Date(
       now.getFullYear(),
       now.getMonth(),
@@ -162,7 +171,12 @@ export function useBudgets(
       const computeSpent = (rangeStart: string, rangeEnd: string) =>
         sumBudgetSpend(allTx, b, rangeStart, rangeEnd, rateTable)
 
-      const { spent, unrated } = computeSpent(start, end)
+      const counted = countedEnd(end, today)
+      const { spent, unrated } = computeSpent(start, counted)
+      // The day after `counted` to the period's end; nothing when the period is closed.
+      const { spent: scheduled, unrated: scheduledUnrated } = counted < end
+        ? sumBudgetSpend(allTx.filter((tx) => tx.date > counted), b, start, end, rateTable)
+        : { spent: 0, unrated: [] as string[] }
 
       // Compute monthly rollover and history
       const rolloverActive = b.rollover_enabled && canRollover(b.period)
@@ -203,7 +217,8 @@ export function useBudgets(
       return {
         ...b,
         spent,
-        unrated_currencies: unrated,
+        scheduled,
+        unrated_currencies: [...new Set([...unrated, ...scheduledUnrated])].sort(),
         rollover_amount: rolloverAmount,
         effective_amount: effectiveAmount,
         history: recentHistory,
@@ -243,6 +258,7 @@ export function useBudgets(
       | 'updated_at'
       | 'category'
       | 'spent'
+      | 'scheduled'
       | 'unrated_currencies'
       | 'rollover_amount'
       | 'effective_amount'
@@ -261,7 +277,7 @@ export function useBudgets(
 
   /** Inserts every budget in one call: all of them are created or none. */
   const createBudgets = async (
-    rows: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'spent' | 'unrated_currencies' | 'rollover_amount' | 'effective_amount' | 'history' | 'period_spends'>[],
+    rows: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'spent' | 'scheduled' | 'unrated_currencies' | 'rollover_amount' | 'effective_amount' | 'history' | 'period_spends'>[],
   ): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add budgets.' }
@@ -320,5 +336,79 @@ export function useBudgets(
     createBudgets,
     updateBudget,
     deleteBudget,
+  }
+}
+
+export interface BudgetExportRow extends Budget {
+  spent: number
+  unrated_currencies: string[]
+}
+
+/**
+ * Every budget, active or not, with this cycle's converted spend, for the deletion-page export only
+ * (LED-186). That page renders outside `ExchangeRatesProvider`, so `useBudgets` cannot convert there;
+ * the caller passes the rates it read itself. No rollover or history is needed, so this is its own
+ * simple read against `expenseTx` the caller already has loaded.
+ */
+export function useBudgetsForExport(expenseTx: BudgetSpendTx[], rateTable: RateTable | null) {
+  const { user, profile } = useAuth()
+  const startDay = profile?.month_start_day ?? 1
+  const [budgets, setBudgets] = useState<Budget[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
+  const requestId = useRef(0)
+
+  const fetch = useCallback(async () => {
+    const request = ++requestId.current
+    if (!user) {
+      setLoading(false)
+      return
+    }
+    setLoadFailure(null)
+    setLoading(true)
+    if (!navigator.onLine) {
+      setLoadFailure({ message: 'Budgets are not cached for export. Reconnect to load them.', detail: null })
+      setLoading(false)
+      return
+    }
+    const { data, error } = await supabase
+      .from('budgets')
+      .select('*, category:categories(id, name, color, icon, type)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
+    if (request !== requestId.current) return
+    if (error) {
+      setLoadFailure(describeDataError(error, { action: 'load' }))
+      setLoading(false)
+      return
+    }
+    setBudgets(data as Budget[])
+    setLoading(false)
+  }, [user])
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetch()
+    })
+  }, [fetch])
+
+  const monthKey = getCurrentCycleMonthKey(startDay)
+  const enriched = useMemo<BudgetExportRow[]>(
+    () =>
+      budgets.map((b) => {
+        const { start, end } = getBudgetCycleRange(b.period, monthKey, startDay)
+        // Same "spent so far" as the Budgets page: rows after today are not counted yet (LED-238).
+        const { spent, unrated } = sumBudgetSpend(expenseTx, b, start, countedEnd(end, getLocalDateString()), rateTable)
+        return { ...b, spent, unrated_currencies: unrated }
+      }),
+    [budgets, expenseTx, rateTable, monthKey, startDay]
+  )
+
+  return {
+    budgets: enriched,
+    loading,
+    error: loadFailure?.message ?? null,
+    errorDetail: loadFailure?.detail ?? null,
+    refetch: fetch,
   }
 }

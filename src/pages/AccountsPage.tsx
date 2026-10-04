@@ -11,14 +11,16 @@ import { usePreferences } from '@/hooks/usePreferences'
 import { useFlipReorder } from '@/hooks/useFlipReorder'
 import { supabase } from '@/lib/supabase'
 import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/types'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency, getLocalDateString } from '@/lib/utils'
+import { useTransactions } from '@/hooks/useTransactions'
+import { afterScheduledLabel, scheduledByAccount, scheduledNetWorth } from '@/lib/scheduledBalances'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { SkeletonText } from '@/components/ui/skeleton'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
@@ -74,6 +76,22 @@ export default function AccountsPage() {
     new Date(),
     convertToDefault,
   )
+  // Balances are stored, so rows dated after today are already in them: show that part beside them (LED-251).
+  const today = getLocalDateString()
+  const tomorrow = useMemo(() => {
+    const [year, month, day] = today.split('-').map(Number)
+    return getLocalDateString(new Date(year, month - 1, day + 1))
+  }, [today])
+  const { transactions: laterRows, error: scheduledError, refetch: refetchScheduled } = useTransactions({ startDate: tomorrow })
+  const scheduled = useMemo(() => scheduledByAccount(accounts, laterRows, today), [accounts, laterRows, today])
+  const netWorthScheduled = useMemo(
+    () => scheduledNetWorth(accounts, laterRows, today, defaultCurrency, convertToDefault),
+    [accounts, laterRows, today, defaultCurrency, convertToDefault],
+  )
+  const afterScheduled = (account: Account) => {
+    const label = afterScheduledLabel(scheduled.get(account.id) ?? 0, account.currency, formatCurrency)
+    return label && <p className="text-xs text-muted-foreground">{label}</p>
+  }
   const ratesAsOf = ratesAsOfLabel(rateTable)
   const defaultGroupOrder = useMemo(() => Object.keys(ACCOUNT_TYPE_LABELS) as AccountType[], [])
   const accountGroupOrder = useMemo(() => {
@@ -351,6 +369,7 @@ export default function AccountsPage() {
           {row.converted !== null && (
             <p className="money text-xs text-muted-foreground">≈ {formatCurrency(row.converted, defaultCurrency)}</p>
           )}
+          {afterScheduled(account)}
         </div>
         {accountMenu(account)}
       </div>
@@ -390,6 +409,7 @@ export default function AccountsPage() {
               {row.convertedOwed !== null && (
                 <p className="money text-xs text-muted-foreground">≈ {row.convertedOwed > 0 ? '−' : ''}{formatCurrency(row.convertedOwed, defaultCurrency)}</p>
               )}
+              {afterScheduled(account)}
             </div>
             {accountMenu(account)}
           </div>
@@ -644,18 +664,56 @@ export default function AccountsPage() {
                   <h2 className="text-sm font-semibold">{heading}</h2>
                   <p className="text-sm"><SkeletonText className="w-20" /></p>
                 </div>
-                <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border bg-card">
-                  {[0, 1, 2].map((row) => (
-                    <div key={row} className="flex items-center gap-2.5 px-4 py-2.5">
-                      <span className="size-8 shrink-0 rounded-lg bg-muted" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm"><SkeletonText className="w-32" /></p>
-                        <p className="text-xs"><SkeletonText className="w-20" /></p>
+                {heading === 'Liabilities' ? (
+                  // A liability is a card, not a row: a group heading over a 148px card (a card, then a
+                  // loan). Which liabilities there are is not known yet, so this shows one of each (LED-200).
+                  <div className="space-y-4">
+                    {[0, 1].map((group) => (
+                      <div key={group}>
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-xs"><SkeletonText className="w-20" /></p>
+                          <p className="text-xs"><SkeletonText className="w-12" /></p>
+                        </div>
+                        <div className="rounded-xl border border-border bg-card p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <span className="size-8 shrink-0 rounded-lg bg-muted" />
+                              <div className="min-w-0">
+                                <p className="text-sm"><SkeletonText className="w-28" /></p>
+                                <p className="text-xs"><SkeletonText className="w-20" /></p>
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <p className="text-base"><SkeletonText className="w-24" /></p>
+                              <span className="size-7" />
+                            </div>
+                          </div>
+                          <div className="mt-3 space-y-1.5">
+                            <div className="h-1 w-full rounded-full bg-muted" />
+                            <p className="text-xs"><SkeletonText className="w-40" /></p>
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <Skeleton className="h-7 w-[92px] rounded-full" />
+                            <Skeleton className="h-7 w-[50px] rounded-full" />
+                          </div>
+                        </div>
                       </div>
-                      <span className="text-sm"><SkeletonText className="w-20" /></span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/60 overflow-hidden rounded-xl border border-border bg-card">
+                    {[0, 1, 2].map((row) => (
+                      <div key={row} className="flex items-center gap-2.5 px-4 py-2.5">
+                        <span className="size-8 shrink-0 rounded-lg bg-muted" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm"><SkeletonText className="w-32" /></p>
+                          <p className="text-xs"><SkeletonText className="w-20" /></p>
+                        </div>
+                        <span className="text-sm"><SkeletonText className="w-20" /></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
             ))}
           </div>
@@ -682,6 +740,9 @@ export default function AccountsPage() {
             <div className="col-span-2 border-b border-border/60 p-4 lg:col-span-1 lg:border-b-0 lg:border-r">
               <p className="text-xs text-muted-foreground">Net Worth</p>
               <p className="money mt-1 text-lg font-bold">{formatCurrency(overview.totals.netWorth, defaultCurrency)}</p>
+              {netWorthScheduled !== 0 && (
+                <p className="text-xs text-muted-foreground">{afterScheduledLabel(netWorthScheduled, defaultCurrency, formatCurrency)}</p>
+              )}
               {overview.excludedCurrencies.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
                   {overview.convertedCurrencies.length > 0
@@ -713,6 +774,10 @@ export default function AccountsPage() {
               )}
             </div>
           </div>
+
+          {scheduledError && (
+            <InlineLoadError message="Couldn't load scheduled transactions, so balances don't show what is still scheduled." onRetry={() => void refetchScheduled()} />
+          )}
 
           <div className="grid items-start gap-6 lg:grid-cols-2">
             {overview.assets.length > 0 && (

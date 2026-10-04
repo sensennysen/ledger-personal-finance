@@ -1,6 +1,12 @@
 // Section anchors for the legal pages (LED-88): each numbered section gets a
 // stable id so the "On this page" rail and chips can link to it.
 
+import type { ReactNode } from 'react'
+
+/** The GitHub repository and its issues: the contact the legal pages give (LED-189). */
+export const LEDGER_REPO_URL = 'https://github.com/sensennysen/ledger-personal-finance'
+export const LEDGER_ISSUES_URL = `${LEDGER_REPO_URL}/issues`
+
 export interface LegalTocItem {
   id: string
   label: string
@@ -8,7 +14,8 @@ export interface LegalTocItem {
 
 export interface LegalSection {
   title: string
-  content: string | string[]
+  /** A paragraph, or a list of points; either may hold links (LED-189). */
+  content: ReactNode | ReactNode[]
 }
 
 export function legalSectionId(title: string): string {

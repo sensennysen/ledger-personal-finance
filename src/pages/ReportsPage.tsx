@@ -36,9 +36,10 @@ import { useCycle } from '@/contexts/cycleState'
 import { getReportRange } from '@/lib/reportCycle'
 import {
   compareToPrevious,
-  cycleMonthLabel,
+  comparisonLabel,
+  convertedNetWorthEffect,
   formatComparison,
-  netWorthEffect,
+  likeForLikeWindows,
   previousCycleKey,
   summarizeRange,
 } from '@/lib/periodCompare'
@@ -49,10 +50,12 @@ import {
   getLookbackSubtitle,
   type Lookback,
 } from '@/lib/reportLookback'
-import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, getLocalDateString, cn } from '@/lib/utils'
+import { countedEnd, countsYet, scheduledIn } from '@/lib/countsYet'
+import { afterScheduledLabel, scheduledNetWorth } from '@/lib/scheduledBalances'
 import { buildReportCsv, downloadCsv } from '@/lib/transactionCsv'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
-import { abbreviateTick } from '@/lib/chartTicks'
+import { abbreviateTick, thinCategoryTicks } from '@/lib/chartTicks'
 import { REPORT_COLUMNS, defaultColumns, exportColumns, toggleColumn, type ReportColumn } from '@/lib/reportColumns'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -321,12 +324,14 @@ function IncomeExpenseCard({
   onLookbackChange,
   loading,
   currency,
+  excludedCurrencies = [],
 }: {
   data: { month: string; income: number; expenses: number }[]
   lookback: Lookback
   onLookbackChange: (value: Lookback) => void
   loading: boolean
   currency: string
+  excludedCurrencies?: string[]
 }) {
   return (
     <div className="h-full rounded-[20px] border border-border bg-card p-4 flex flex-col gap-3">
@@ -348,6 +353,7 @@ function IncomeExpenseCard({
           ))}
         </select>
       </div>
+      {!loading && <UnratedCurrencyNotice currencies={excludedCurrencies} subject="income and expenses" />}
   {loading ? (
         <div className="relative flex-1 min-h-60 lg:min-h-72"><Skeleton className="absolute inset-0 rounded-lg" /></div>
       ) : (
@@ -444,6 +450,11 @@ export default function ReportsPage() {
     })
   }, [transactions, start, end])
 
+  // Rows dated after today are scheduled: listed, but not in the totals until their date (LED-238).
+  const today = getLocalDateString()
+  const countedTo = countedEnd(end, today)
+  const counted = useMemo(() => filtered.filter((t) => countsYet(t.date, today)), [filtered, today])
+
   const goToPreviousPeriod = () => {
     setSelectedMonth(previousCycleKey(selectedMonth))
   }
@@ -459,20 +470,30 @@ export default function ReportsPage() {
   )
 
   // Summary stats
-  const { income: totalIncome, expenses: totalExpenses, net: netChange } = useMemo(
-    () => summarizeRange(transactions, start, end),
-    [transactions, start, end]
+  const { income: totalIncome, expenses: totalExpenses, net: netChange, excludedCurrencies: summaryExcludedCurrencies } = useMemo(
+    () => summarizeRange(transactions, start, countedTo, currency, rateTable),
+    [transactions, start, countedTo, currency, rateTable]
   )
+  const scheduledTotals = useMemo(
+    () => summarizeRange(scheduledIn(transactions, start, end, today), start, end, currency, rateTable),
+    [transactions, start, end, today, currency, rateTable]
+  )
+  const scheduledSub = (amount: number) => (amount > 0 ? `+ ${formatCurrency(amount, currency)} scheduled` : undefined)
 
-  // Same figures for the previous cycle, so each stat card has a reference point.
-  const previousLabel = cycleMonthLabel(previousCycleKey(selectedMonth))
-  const previousTotals = useMemo(() => {
-    const range = getReportRange(previousCycleKey(selectedMonth), startDay)
-    return summarizeRange(transactions, range.start, range.end)
-  }, [transactions, selectedMonth, startDay])
+  // Same figures for the previous cycle, so each stat card has a reference point. While this
+  // cycle is open, only its first N days are set against the first N of the last one (LED-237).
+  const previousWindows = useMemo(() => {
+    const previous = getReportRange(previousCycleKey(selectedMonth), startDay)
+    return likeForLikeWindows({ start, end }, { start: previous.start, end: previous.end }, today)
+  }, [selectedMonth, startDay, start, end, today])
+  const previousLabel = comparisonLabel(previousCycleKey(selectedMonth), previousWindows)
+  const previousTotals = useMemo(
+    () => summarizeRange(transactions, previousWindows.previous.start, previousWindows.previous.end, currency, rateTable),
+    [transactions, previousWindows, currency, rateTable]
+  )
   const netWorthChange = useMemo(
-    () => filtered.reduce((sum, t) => sum + netWorthEffect(t), 0),
-    [filtered]
+    () => counted.reduce((sum, t) => sum + (convertedNetWorthEffect(t, currency, rateTable) ?? 0), 0),
+    [counted, currency, rateTable]
   )
   // good: which direction is good news for this figure. Hidden when a read
   // failed, since partial data would produce a false comparison.
@@ -486,25 +507,23 @@ export default function ReportsPage() {
   }
 
   // Category breakdown (expenses only)
-  const categoryBreakdown = useMemo(
-    () => buildCategoryBreakdown(filtered, categoryById),
-    [filtered, categoryById]
+  const { rows: categoryBreakdown, excludedCurrencies: categoryExcludedCurrencies } = useMemo(
+    () => buildCategoryBreakdown(counted, categoryById, currency, rateTable),
+    [counted, categoryById, currency, rateTable]
   )
 
   // Over budget stat card: the report's total in the display currency, against last cycle.
   const overspendingReady = overspending.state === 'ready' || overspending.state === 'stale-error'
-  const overNow = overspending.result.totals.find((total) => total.currency === currency)?.over ?? 0
-  const overPrevious = overspending.previous.totals.find((total) => total.currency === currency)?.over ?? 0
+  // The same converted total the Overspending card prints (LED-185), so the two cannot disagree.
+  const overNow = overspending.converted.over
+  const overPrevious = overspending.previousConverted.over
   const overCategories = overspending.result.rows.length
-  const overOtherCurrencies = overspending.result.totals.filter((total) => total.currency !== currency)
   const overspendingSub =
     overspending.state === 'error'
       ? "Couldn't load your budgets"
       : overspending.state === 'empty'
         ? 'No budgets set'
-        : `${overCategories} ${overCategories === 1 ? 'category' : 'categories'}${
-            overOtherCurrencies.length > 0 ? ` · plus ${overOtherCurrencies.map((total) => total.currency).join(', ')}` : ''
-          }`
+        : `${overCategories} ${overCategories === 1 ? 'category' : 'categories'}`
 
   const handleExport = () => {
     downloadCsv(buildReportCsv(sortedTransactions, exportColumns(visibleColumns), txBalanceMap), `ledger-report_${filenameLabel}.csv`)
@@ -527,7 +546,7 @@ export default function ReportsPage() {
   }
 
   // ── Net Worth Over Time (last 13 months) ──
-  const netWorthData = useMemo(() => {
+  const { netWorthData, netWorthExcludedCurrencies } = useMemo(() => {
     const now = new Date()
     const currentNetWorth = summarizeBalances(accounts, currency, convertToDefault).netWorth
     const boundaries: { date: string; label: string }[] = []
@@ -543,42 +562,42 @@ export default function ReportsPage() {
     }
     let netWorth = currentNetWorth
     let txIdx = 0
+    const excluded = new Set<string>()
     const data: { month: string; netWorth: number }[] = []
     for (let i = 12; i >= 0; i--) {
       const boundary = boundaries[i].date
       while (txIdx < allTransactionsSorted.length && allTransactionsSorted[txIdx].date > boundary) {
         const tx = allTransactionsSorted[txIdx]
-        netWorth -= netWorthEffect(tx)
+        const effect = convertedNetWorthEffect(tx, currency, rateTable)
+        if (effect === null) excluded.add(tx.currency)
+        else netWorth -= effect
         txIdx++
       }
       data.unshift({ month: boundaries[i].label, netWorth: Math.round(netWorth * 100) / 100 })
     }
-    return data
-  }, [accounts, allTransactionsSorted, convertToDefault, currency])
+    return { netWorthData: data, netWorthExcludedCurrencies: [...excluded].sort() }
+  }, [accounts, allTransactionsSorted, convertToDefault, currency, rateTable])
 
   // ── Income vs Expenses trend (own lookback, independent of the cycle) ──
   const [lookback, setLookback] = useState<Lookback>(DEFAULT_LOOKBACK)
-  const monthlyData = useMemo(() => {
-    return getLookbackBuckets(lookback, new Date()).map((bucket) => {
-      let income = 0
-      let expenses = 0
-      for (const t of transactions) {
-        if (t.date < bucket.start || t.date > bucket.end) continue
-        if (t.type === 'income') income += t.amount * (t.exchange_rate ?? 1)
-        else if (t.type === 'expense') expenses += t.amount * (t.exchange_rate ?? 1)
-      }
+  const { monthlyData, monthlyExcludedCurrencies } = useMemo(() => {
+    const excluded = new Set<string>()
+    const monthlyData = getLookbackBuckets(lookback, new Date()).map((bucket) => {
+      const { income, expenses, excludedCurrencies } = summarizeRange(transactions, bucket.start, countedEnd(bucket.end, today), currency, rateTable)
+      for (const code of excludedCurrencies) excluded.add(code)
       return {
         month: bucket.label,
         income: Math.round(income * 100) / 100,
         expenses: Math.round(expenses * 100) / 100,
       }
     })
-  }, [transactions, lookback])
+    return { monthlyData, monthlyExcludedCurrencies: [...excluded].sort() }
+  }, [transactions, lookback, currency, rateTable, today])
 
   // ── Spending by Merchant (top 10 from filtered period) ──
   const merchantBreakdown = (() => {
     const map = new Map<string, { displayName: string; amount: number; count: number }>()
-    for (const t of filtered) {
+    for (const t of counted) {
       if (t.type !== 'expense') continue
       const key = t.description.trim().toLowerCase()
       if (!key) continue
@@ -597,6 +616,7 @@ export default function ReportsPage() {
 
   // Transaction table columns: all seven when there is room, session-only.
   const wide = useMediaQuery('(min-width: 768px)')
+  const narrow = useMediaQuery('(max-width: 639px)')
   const [visibleColumns, setVisibleColumns] = useState(() => defaultColumns(wide))
   const columns = REPORT_COLUMNS.filter((c) => visibleColumns.has(c.key))
   const tableHead = (
@@ -618,6 +638,15 @@ export default function ReportsPage() {
   )
   const balanceSummary = summarizeBalances(activeAccounts, currency, convertToDefault)
   const totalBalance = balanceSummary.netWorth
+  // Stored balances already hold rows dated after today (LED-251). The chart's last point does not.
+  const netWorthAfterScheduled = afterScheduledLabel(
+    scheduledNetWorth(activeAccounts, transactions, today, currency, convertToDefault),
+    currency,
+    formatCurrency,
+  )
+  const netWorthSub = balanceSummary.totalCreditCardDebt > 0
+    ? `Assets minus Liabilities`
+    : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`
 
   // Sorted transactions for table (newest first)
   const sortedTransactions = [...filtered].sort(
@@ -683,16 +712,20 @@ export default function ReportsPage() {
           value={formatCurrency(totalIncome, currency)}
           icon={TrendingUp}
           color={INCOME}
+          sub={scheduledSub(scheduledTotals.income)}
           comparison={compare(totalIncome, previousTotals.income, 'up')}
           loading={loading}
+          note={<UnratedCurrencyNotice currencies={[...new Set([...summaryExcludedCurrencies, ...scheduledTotals.excludedCurrencies])].sort()} subject="income and expenses" />}
         />
         <StatCard
           title="Total Expenses"
           value={formatCurrency(totalExpenses, currency)}
           icon={TrendingDown}
           color={EXPENSE}
+          sub={scheduledSub(scheduledTotals.expenses)}
           comparison={compare(totalExpenses, previousTotals.expenses, 'down')}
           loading={loading}
+          note={<UnratedCurrencyNotice currencies={[...new Set([...summaryExcludedCurrencies, ...scheduledTotals.excludedCurrencies])].sort()} subject="income and expenses" />}
         />
         <StatCard
           title="Net Change"
@@ -708,9 +741,7 @@ export default function ReportsPage() {
         <StatCard
           title="Net Worth"
           value={formatCurrency(totalBalance, currency)}
-          sub={balanceSummary.totalCreditCardDebt > 0
-            ? `Assets minus Liabilities`
-            : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
+          sub={netWorthAfterScheduled ? `${netWorthSub} · ${netWorthAfterScheduled}` : netWorthSub}
           icon={Wallet}
           color={'var(--foreground)'}
           note={<UnratedCurrencyNotice currencies={balanceSummary.excludedCurrencies} subject="balances" />}
@@ -730,6 +761,7 @@ export default function ReportsPage() {
           color={overNow > 0 ? 'var(--warning)' : 'var(--foreground)'}
           comparison={overspendingReady ? compare(overNow, overPrevious, 'down') : undefined}
           loading={overspending.state === 'loading'}
+          note={<UnratedCurrencyNotice currencies={overspending.converted.excludedCurrencies} subject="overspending" />}
         />
       </div>
 
@@ -741,6 +773,7 @@ export default function ReportsPage() {
             onLookbackChange={setLookback}
             loading={loading}
             currency={currency}
+            excludedCurrencies={monthlyExcludedCurrencies}
           />
 
 
@@ -803,6 +836,11 @@ export default function ReportsPage() {
 
         {/* Category breakdown */}
         <CategoryBreakdownCard rows={categoryBreakdown} loading={loading} currency={currency} />
+        {!loading && (
+          <div className="px-3">
+            <UnratedCurrencyNotice currencies={categoryExcludedCurrencies} />
+          </div>
+        )}
       </div>
 
       {/* Transactions table */}
@@ -885,6 +923,7 @@ export default function ReportsPage() {
                         return (
                           <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-muted-foreground whitespace-nowrap">
                             {formatDate(t.date)}
+                            {!countsYet(t.date, today) && <span className="block text-[0.6875rem]">Scheduled</span>}
                           </td>
                         )
                       case 'description':
@@ -972,6 +1011,7 @@ export default function ReportsPage() {
               <TrendingUp className="w-3.5 h-3.5" style={{ color: INCOME }} />
               <p className="text-[0.6875rem] font-medium uppercase tracking-widest text-muted-foreground">Net Worth Over Time — Last 13 months · monthly</p>
             </div>
+            {!loading && <UnratedCurrencyNotice currencies={netWorthExcludedCurrencies} />}
             {loading ? (
               <div className="h-52 md:h-72 xl:h-80"><Skeleton className="h-full w-full rounded-lg" /></div>
             ) : (
@@ -984,6 +1024,9 @@ export default function ReportsPage() {
                       tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
                       tickLine={false}
                       axisLine={false}
+                      // Below sm every other month, newest last, all of them shown (LED-204); from sm up the chart picks.
+                      ticks={thinCategoryTicks(netWorthData.map((point) => point.month), narrow)}
+                      interval={narrow ? 0 : undefined}
                     />
                     <YAxis
                       tick={{ fontSize: 10, fill: 'currentColor', opacity: 0.55 }}
@@ -1023,6 +1066,7 @@ export default function ReportsPage() {
             onLookbackChange={setLookback}
             loading={loading}
             currency={currency}
+            excludedCurrencies={monthlyExcludedCurrencies}
           />
 
           {/* Spending by Merchant */}

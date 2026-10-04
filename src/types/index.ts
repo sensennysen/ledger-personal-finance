@@ -82,6 +82,8 @@ export interface Category {
   color: string
   icon: string
   is_default: boolean
+  /** Counts as basic salary on the 13th Month page (LED-236). */
+  counts_as_salary: boolean
   sort_order?: number
   created_at: string
   updated_at: string
@@ -108,6 +110,11 @@ export interface Transaction {
   amount: number
   currency: string
   exchange_rate: number
+  /**
+   * What a transfer between two currencies credits its destination, in the destination's currency
+   * (LED-185). Null for every other row; the destination then receives the amount itself.
+   */
+  destination_amount?: number | null
   description: string
   notes: string | null
   date: string
@@ -115,6 +122,8 @@ export interface Transaction {
   is_recurring: boolean
   recurrence_interval: RecurrenceInterval | null
   recurrence_end_date: string | null
+  /** Set by the database once this row's next occurrence is posted, on any device (LED-232). */
+  recurrence_next_posted?: boolean
   receipt_url: string | null
   tags?: string[]
   goal_id?: string | null
@@ -158,6 +167,8 @@ export interface Budget {
   // joined / computed
   category?: Category
   spent?: number
+  /** Spend dated later in the open period: scheduled, not in `spent` yet (LED-238). */
+  scheduled?: number
   unrated_currencies?: string[]
   rollover_amount?: number
   effective_amount?: number
@@ -189,6 +200,8 @@ export interface CreditCardPayment {
   amount: number
   payment_date: string
   notes: string | null
+  /** The transfer this payment came from. Null on payments made before LED-191 that could not be matched. */
+  transaction_id: string | null
   created_at: string
 }
 

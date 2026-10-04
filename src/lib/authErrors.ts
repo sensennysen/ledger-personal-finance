@@ -1,3 +1,5 @@
+import type { OAuthErrorMessage } from './oauthErrors.ts'
+
 export type AuthErrorKind = 'profile' | 'session' | 'signout'
 
 export interface AuthError {
@@ -24,4 +26,22 @@ export function makeAuthError(kind: AuthErrorKind, detail?: string | null): Auth
 
 export function authErrorActionLabel(kind: AuthErrorKind): string {
   return ACTION_LABELS[kind]
+}
+
+/**
+ * Google sign-in could not start (LED-196): `signInWithOAuth` returned an error or threw before
+ * the redirect. Provider and library text is never shown; the message depends only on whether the
+ * device is online.
+ */
+export function describeOAuthStartFailure(online: boolean): OAuthErrorMessage {
+  if (!online) {
+    return {
+      title: "Couldn't start Google sign-in",
+      body: "You're offline. Connect to the internet and try again.",
+    }
+  }
+  return {
+    title: "Couldn't start Google sign-in",
+    body: 'Something went wrong before we could reach Google. Try again in a moment.',
+  }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { registerSyncedListener } from '@/lib/offlineQueue'
 import { isNearScrollEnd } from '@/lib/scrollEnd'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import {
@@ -19,6 +20,7 @@ import { resolveHeaderMeta } from '@/lib/pageChrome'
 import { CycleProvider } from '@/contexts/CycleContext'
 import { EntryContext, type EntryActions } from '@/contexts/EntryContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
+import { useNotify } from '@/contexts/notificationState'
 import { useAuth } from '@/contexts/AuthContext'
 import { InlineLoadError } from '@/components/ui/error-state'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
@@ -92,7 +94,8 @@ function LayoutShell() {
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
   const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
-  const { createWithStatement } = useCardPayment(createTransaction)
+  const { createWithStatement, recordGenerated, recordSynced } = useCardPayment(createTransaction)
+  const notify = useNotify()
   const { accounts, loading: accountsLoading } = useAccounts()
   // ⌘F in search scopes to the account page it opened over.
   const accountRouteId = useMatch('/accounts/:accountId')?.params.accountId
@@ -197,12 +200,24 @@ function LayoutShell() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
   useCreditCardNotifications()
+  // A card payment made offline records its statement when the queue drains (LED-193). One owner: here.
+  useEffect(() => registerSyncedListener((item) => void recordSynced(item)), [recordSynced])
   useEffect(() => {
-    if (!hasGenerated.current) {
-      hasGenerated.current = true
-      void generateDueRecurring()
+    if (hasGenerated.current) return
+    hasGenerated.current = true
+    // A recurring row that could not be posted is reported, with Retry, not skipped silently (LED-232).
+    const run = async () => {
+      const { failed } = await generateDueRecurring(recordGenerated)
+      if (failed === 0) return
+      notify({
+        severity: 'failure',
+        title: 'Recurring transactions not posted',
+        body: `${failed} recurring ${failed === 1 ? 'transaction is' : 'transactions are'} due but could not be posted.`,
+        action: { label: 'Retry', run: () => void run() },
+      })
     }
-  }, [generateDueRecurring])
+    void run()
+  }, [generateDueRecurring, recordGenerated, notify])
   const handleCreate = async (values: TransactionFormValues) => {
     const { error, errorDetail } = await createWithStatement(
       values as Parameters<typeof createTransaction>[0],
@@ -334,7 +349,7 @@ function LayoutShell() {
         {wide && sheet === 'detail' && entry && (
           <aside
             aria-label="Entry detail"
-            className="relative w-[340px] shrink-0 border-l border-border bg-sidebar p-5 overflow-y-auto animate-page-in"
+            className="relative w-[380px] shrink-0 border-l border-border bg-sidebar p-5 overflow-y-auto animate-page-in"
           >
             <div className="flex items-center justify-between mb-5">
               <h2 ref={detailHeading} tabIndex={-1} className="font-medium outline-none">

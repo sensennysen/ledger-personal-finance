@@ -243,6 +243,27 @@ export function ratesAsOfLabel(table: RateTable | null): string | null {
   return new Date(year, month - 1, date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+/** "Sep 25, 3:14 PM" for when a table was last fetched, or null when it never has been. */
+export function fetchedAtLabel(table: RateTable | null): string | null {
+  if (!table?.fetchedAt) return null
+  const at = new Date(table.fetchedAt)
+  if (Number.isNaN(at.getTime())) return null
+  return at.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+/**
+ * Settings' rate-status line. With nothing needing a rate, the feed is never called
+ * (see `refresh`'s `needed.length > 0` guard), so this never claims a fetch happened,
+ * even when `table.fetchedAt` is stale from before a foreign account was removed (LED-187).
+ */
+export function rateStatusLabel(table: RateTable | null, neededCount: number): string {
+  if (neededCount === 0) return 'Rates · nothing to fetch'
+  if (!table?.fetchedAt) return 'No rates fetched yet.'
+  const asOf = ratesAsOfLabel(table)
+  const fetched = fetchedAtLabel(table)
+  return `Rates${asOf ? ` as of ${asOf}` : ''} · fetched ${fetched ?? 'earlier'}`
+}
+
 /** The most useful rate to show for a currency against the base: 1 base = N currency. */
 export function displayRate(table: RateTable, code: string): { rate: number; source: 'feed' | 'override' } | null {
   if (isUsableRate(table.overrides[code])) return { rate: table.overrides[code], source: 'override' }

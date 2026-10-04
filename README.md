@@ -52,6 +52,8 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 Run the Supabase schema in `supabase/schema.sql`, then apply any migrations in `supabase/migrations` that match your deployment state.
 
+**Upgrading a self-hosted database.** Apply every file in `supabase/migrations/` that your database does not have yet, in filename order, *before* you deploy the new client. Each file is idempotent. A database missing a column the client writes rejects every transaction save, not only the new feature's. `knowledge/checklists/release.md` lists each migration and what fails without it.
+
 Start the app:
 
 ```bash
@@ -93,6 +95,13 @@ Run `pnpm db:status` for the local API URL and anon key, then put them in `.env.
 | `pnpm db:diff` | Show schema changes in the local database not yet in a migration |
 | `pnpm db:push:remote` | Push migrations to the **linked remote** project. Prod-facing, never run by another script |
 
+`supabase/seed.sql` creates a demo user with accounts, about three months of transactions, budgets, savings goals, a financed car loan and categorization rules. Dates are relative to today, so the data stays current after each `pnpm db:reset`. In dev builds the login page shows an email/password form prefilled with the demo credentials (it is not included in production builds):
+
+- Email: `demo@ledger.local`
+- Password: `ledger-demo-123`
+
+The first-run checklist's pay-cycle step is stored in the browser, not the database, so a fresh browser still shows it and keeps the Activity, Budgets, Categories and Reports tabs locked until you confirm the cycle on the dashboard. Automated tests can skip it by setting `localStorage['ledger-first-run']` to `{"cycleConfirmed":true}` before loading the app.
+
 Schema changes ship only as timestamped, idempotent files in `supabase/migrations/`; do not edit prod by hand. All `db:*` commands except `db:push:remote` target the local stack only.
 
 ## Project Structure
@@ -119,10 +128,26 @@ supabase/
 - `pnpm test` runs the node test suite.
 - `pnpm preview` serves the built app locally.
 - `pnpm db:*` manage the local database (see [Local development](#local-development)).
+- `pnpm sweep` runs the dev-only live sweep (see [Sweep script](#sweep-script)). CI does not run it.
+
+### Sweep script
+
+`scripts/sweep.mjs` signs in to a running local copy as the seeded demo user and, for each route, width and theme, scans the rendered page for text contrast (4.5:1, 3:1 for large text), lists light panels in the dark theme, checks for sideways scrolling and saves a full-page screenshot. It prints one PASS/FAIL line per check and writes `sweep-out/results.json` (git-ignored). It only talks to `--base-url`, never the linked remote.
+
+Prerequisites: the local stack and seed (`pnpm db:start`, `pnpm db:reset`), the dev server (`pnpm dev`, which has the dev sign-in form), and Playwright with Chromium installed locally or globally (`npm i -g playwright && npx playwright install chromium`). Playwright is not a dependency of this repo.
+
+```bash
+pnpm sweep                                    # app and legal routes, 390 and 1280, light and dark
+pnpm sweep --routes /,/reports --widths 390 --themes dark
+pnpm sweep --home-fold                        # also: which Home widgets sit above the fold at 390x844
+pnpm sweep --hover                            # also: hover each hover:bg-* element and scan its text
+```
+
+Other flags: `--base-url` (default `http://127.0.0.1:5173`), `--out` (default `sweep-out`), `--email` and `--password` (default the demo user), `--relay-fonts` (fetch Google Fonts through Node, for containers whose proxy Chromium does not trust). The exit code is 1 when any check fails. What it does not see: SVG text such as chart labels, and focus rings (`knowledge/patterns/rendered-contrast-scan.md`).
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and on pushes to `main`. A separate `db` job starts a fresh local Supabase, applies all migrations and the seed, lints database functions and replays the migrations from scratch, so a migration that fails on an empty database fails CI. Contributor conventions are in `AGENTS.md`.
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and on pushes to `main`. A separate `db` job starts a fresh local Supabase, applies all migrations and the seed, lints database functions and replays the migrations from scratch, so a migration that fails on an empty database fails CI. CI cannot see the hosted database or the headers Vercel serves; `knowledge/checklists/release.md` covers those before a release. Contributor conventions are in `AGENTS.md`.
 
 ## Philosophy
 

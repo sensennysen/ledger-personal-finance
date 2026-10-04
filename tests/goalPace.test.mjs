@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { goalPace } from '../src/lib/goalPace.ts'
+import { goalPace, goalStatus } from '../src/lib/goalPace.ts'
 
 const today = new Date(2026, 8, 25) // Sep 25 2026
 
@@ -35,4 +35,40 @@ test('no date, and reached goals', () => {
   assert.equal(done.status, 'done')
   assert.equal(done.remaining, 0)
   assert.equal(done.pct, 100)
+})
+
+// LED-235: on track / behind by, straight line from creation to the target date
+const status = (o) => goalStatus({ target: 1200, saved: 0, createdAt: '2026-01-01T09:00:00', deadline: '2026-12-31', isCompleted: false, today, ...o })
+
+test('saved at the straight-line amount is on track; below it is behind by the difference', () => {
+  // Jan 1 to Dec 31 is 364 days; Sep 25 is day 267, so 1200 × 267/364 = 880.22 is expected.
+  assert.deepEqual(status({ saved: 900 }), { kind: 'on-track' })
+  assert.deepEqual(status({ saved: 880.22 }), { kind: 'on-track' })
+  assert.deepEqual(status({ saved: 800 }), { kind: 'behind', by: 80.22 })
+})
+
+test('no target date, complete, or reached: nothing is shown', () => {
+  assert.equal(status({ deadline: null }), null)
+  assert.equal(status({ isCompleted: true }), null)
+  assert.equal(status({ saved: 1200 }), null)
+  assert.equal(status({ saved: 1500 }), null)
+})
+
+test('a target date in the past and not reached is behind by what remains', () => {
+  assert.deepEqual(status({ deadline: '2026-09-24', saved: 1000 }), { kind: 'behind', by: 200 })
+})
+
+test('the day the goal was created, nothing is expected yet', () => {
+  assert.deepEqual(status({ createdAt: '2026-09-25T23:30:00', saved: 0 }), { kind: 'on-track' })
+})
+
+test('expected is capped at the target, and a date before creation asks for all of it', () => {
+  assert.deepEqual(status({ deadline: '2026-09-25', saved: 1199 }), { kind: 'behind', by: 1 })
+  assert.deepEqual(status({ createdAt: '2026-09-25T08:00:00', deadline: '2026-09-20', saved: 0 }), { kind: 'behind', by: 1200 })
+})
+
+test('the created timestamp is read as a local date', () => {
+  // 23:30 local on Sep 24 is one elapsed day by Sep 25, whatever the UTC date of the instant.
+  const local = new Date(2026, 8, 24, 23, 30).toISOString()
+  assert.deepEqual(goalStatus({ target: 100, saved: 0, createdAt: local, deadline: '2026-10-04', isCompleted: false, today }), { kind: 'behind', by: 10 })
 })

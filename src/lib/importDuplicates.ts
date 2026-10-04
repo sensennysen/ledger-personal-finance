@@ -1,4 +1,5 @@
 import { EMPTY_DESCRIPTION } from './csvImport.ts'
+import { transferCredit } from './transferCredit.ts'
 
 // Import duplicate detection (LED-73): a CSV row that matches a transaction
 // already in the account on date + amount + type + normalised description is
@@ -12,7 +13,8 @@ import { EMPTY_DESCRIPTION } from './csvImport.ts'
 // A row imported from a statement in another currency is stored converted, at the rate of the
 // day (LED-136), together with the statement's own amount and currency. Importing the same
 // statement again at a different rate converts to different amounts, so those rows also match on
-// the original amount and currency: the same statement is caught whatever the rate.
+// the original amount and currency: the same statement is caught whatever the rate. A transfer
+// imported that way keeps its original too, and matches on it by direction (LED-225).
 
 export interface ImportCandidate {
   /** 1-based data row number in the file. */
@@ -34,6 +36,8 @@ export interface ExistingTx {
   account_id: string
   to_account_id: string | null
   exchange_rate: number | null
+  /** What a transfer between two currencies credited its destination (LED-185). */
+  destination_amount?: number | null
   /** Set on a row imported from a statement in another currency. */
   original_amount?: number | null
   original_currency?: string | null
@@ -65,6 +69,10 @@ function transferKey(date: string, amount: number, direction: 'income' | 'expens
   return `${date}|${Math.round(amount * 100)}|${direction}`
 }
 
+function originalTransferKey(date: string, amount: number, currency: string, direction: 'income' | 'expense'): string {
+  return `${currency}|${transferKey(date, amount, direction)}`
+}
+
 /** Money moved between two of the user's accounts: a transfer, or an expense paid to a loan. */
 function isMovement(tx: ExistingTx): boolean {
   return tx.type === 'transfer' || (tx.type === 'expense' && tx.to_account_id !== null)
@@ -91,15 +99,24 @@ export function matchDuplicates<T extends ImportCandidate>(
   const buckets = new Map<string, ExistingTx[]>()
   const originals = new Map<string, ExistingTx[]>()
   const transfers = new Map<string, ExistingTx[]>()
+  const originalTransfers = new Map<string, ExistingTx[]>()
   for (const tx of existing) {
     // A loan repayment is an expense with a target account (LED-147); the loan's statement words it
     // differently from the payer's, so it matches like a transfer: date, amount and direction.
     if (isMovement(tx)) {
-      if (tx.account_id === importAccountId) {
+      const direction = tx.account_id === importAccountId ? 'expense' : tx.to_account_id === importAccountId ? 'income' : null
+      if (direction === 'expense') {
         push(transfers, transferKey(tx.date, Number(tx.amount), 'expense'), tx)
-      } else if (tx.to_account_id === importAccountId) {
-        const received = tx.type === 'transfer' ? Number(tx.amount) * Number(tx.exchange_rate ?? 1) : Number(tx.amount)
+      } else if (direction === 'income') {
+        const received = tx.type === 'transfer'
+          ? transferCredit({ amount: Number(tx.amount), exchange_rate: Number(tx.exchange_rate ?? 1), destination_amount: tx.destination_amount == null ? null : Number(tx.destination_amount) })
+          : Number(tx.amount)
         push(transfers, transferKey(tx.date, received, 'income'), tx)
+      }
+      // Imported from a statement in another currency: the statement's own amount, whichever leg the
+      // account is on (an imported transfer only goes between accounts in the same currency).
+      if (direction && tx.original_amount != null && tx.original_currency) {
+        push(originalTransfers, originalTransferKey(tx.date, Number(tx.original_amount), tx.original_currency, direction), tx)
       }
       continue
     }
@@ -131,7 +148,8 @@ export function matchDuplicates<T extends ImportCandidate>(
     const description = row.description || EMPTY_DESCRIPTION
     const match =
       (row.original
-        ? take(originals.get(originalKey(row.date, row.original.amount, row.original.currency, row.type, description)))
+        ? take(originals.get(originalKey(row.date, row.original.amount, row.original.currency, row.type, description))) ??
+          take(originalTransfers.get(originalTransferKey(row.date, row.original.amount, row.original.currency, row.type)))
         : undefined) ??
       take(buckets.get(matchKey(row.date, row.amount, row.type, description))) ??
       take(transfers.get(transferKey(row.date, row.amount, row.type)))
@@ -150,4 +168,33 @@ export function duplicateSpan(rows: { date: string | null }[]): { start: string;
     if (end === null || date > end) end = date
   }
   return start && end ? { start, end } : null
+}
+
+/**
+ * Rows of one file that are identical to each other (LED-234, OD-13 item 2): same date, amount,
+ * direction and description. Unlike the saved-row check, the description is compared as written
+ * (trimmed, spaces collapsed, any case): two rows that differ only in a reference number are
+ * different rows. Each line maps to the other lines it repeats, in file order. Nothing is
+ * unticked; the preview only says so, since two identical coffees on one day are real.
+ */
+export function findIdenticalRows(rows: ImportCandidate[]): Map<number, number[]> {
+  const groups = new Map<string, number[]>()
+  for (const row of rows) {
+    if (row.date === null || row.amount === null || row.type === null) continue
+    const description = (row.description || EMPTY_DESCRIPTION).trim().replace(/\s+/g, ' ').toLowerCase()
+    push(groups, `${row.date}|${Math.round(row.amount * 100)}|${row.type}|${description}`, row.line)
+  }
+  const identical = new Map<number, number[]>()
+  for (const lines of groups.values()) {
+    if (lines.length < 2) continue
+    for (const line of lines) identical.set(line, lines.filter((other) => other !== line))
+  }
+  return identical
+}
+
+/** "Identical to row 5 in this file" / "Identical to rows 5 and 9 in this file". */
+export function identicalRowsLabel(others: number[]): string {
+  if (others.length === 1) return `Identical to row ${others[0]} in this file`
+  const list = others.length === 2 ? `${others[0]} and ${others[1]}` : `${others.slice(0, -1).join(', ')} and ${others[others.length - 1]}`
+  return `Identical to rows ${list} in this file`
 }

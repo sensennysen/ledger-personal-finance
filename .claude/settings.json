@@ -21,6 +21,16 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ \"$CLAUDE_CODE_REMOTE\" = \"true\" ] && cat \"$CLAUDE_PROJECT_DIR/docs/claude-cloud.md\" || true"
+          }
+        ]
+      }
     ]
   }
 }

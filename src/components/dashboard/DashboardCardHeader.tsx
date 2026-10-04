@@ -18,6 +18,10 @@ interface DashboardCardHeaderProps {
   action?: React.ReactNode
   icon?: React.ReactNode
   className?: string
+  /** False hides the subtitle below md, where Home keeps its first four widgets above the fold (LED-202). */
+  subtitleOnPhone?: boolean
+  /** False hides the decorative icon box below md, for the same reason. */
+  iconOnPhone?: boolean
 }
 
 export function DashboardCardHeader({
@@ -26,6 +30,8 @@ export function DashboardCardHeader({
   action,
   icon,
   className = 'mb-4',
+  subtitleOnPhone = true,
+  iconOnPhone = true,
 }: DashboardCardHeaderProps) {
   const drag = useContext(WidgetDragContext)
   const key = widgetKeys[title]
@@ -59,13 +65,13 @@ export function DashboardCardHeader({
       <div className="min-w-0 flex-1">
         <h2 className="font-semibold text-[0.9375rem]">{title}</h2>
         {subtitle && (
-          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+          <p className={`text-xs text-muted-foreground mt-0.5 ${subtitleOnPhone ? '' : 'max-md:hidden'}`}>{subtitle}</p>
         )}
       </div>
       <div className="shrink-0">
         {action ??
           (icon ? (
-            <div className="w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border">
+            <div className={`w-7 h-7 rounded-md flex items-center justify-center bg-muted border border-border ${iconOnPhone ? '' : 'max-md:hidden'}`}>
               {icon}
             </div>
           ) : null)}

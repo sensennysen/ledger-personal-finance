@@ -1,14 +1,21 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  isSalaryCategory,
   salaryOnlySelection,
   excludedByCategory,
   groupByMonth,
   UNCATEGORISED,
 } from '../src/lib/thirteenthMonth.ts'
 
-const rec = (id, date, name) => ({ id, date, category: name === undefined ? null : { name } })
+// Each name stands for one category; its id is derived from the name.
+const rec = (id, date, name, categoryId) => ({
+  id,
+  date,
+  category_id: name === undefined ? null : categoryId ?? `cat-${name}`,
+  category: name === undefined ? null : { name },
+})
+// The categories flagged counts_as_salary (LED-236).
+const salaryIds = new Set(['cat-Salary', 'cat-Wages'])
 
 const records = [
   rec('a', '2026-08-08', 'Salary'),
@@ -19,21 +26,29 @@ const records = [
   rec('f', '2026-07-10', 'Wages'),
 ]
 
-test('salary-like category names match, others do not', () => {
-  for (const n of ['Salary', 'salary', 'Monthly Salary', 'Wages', 'Wage', 'Basic Pay', 'Payroll']) {
-    assert.equal(isSalaryCategory(n), true, n)
-  }
-  for (const n of ['Bonus', 'Allowance', 'Freelance', 'Salaryman fund', '', null, undefined]) {
-    assert.equal(isSalaryCategory(n), false, String(n))
-  }
+test('salary-only selection ticks flagged categories and skips uncategorised', () => {
+  assert.deepEqual([...salaryOnlySelection(records, salaryIds)].sort(), ['a', 'c', 'f'])
 })
 
-test('salary-only selection ticks salary records and skips uncategorised', () => {
-  assert.deepEqual([...salaryOnlySelection(records)].sort(), ['a', 'c', 'f'])
+test('the flag decides, not the name', () => {
+  const rows = [
+    rec('p', '2026-08-15', 'Acme pay', 'cat-acme'), // flagged, name not salary-like
+    rec('q', '2026-08-15', 'Salary', 'cat-old-salary'), // salary-like name, not flagged
+  ]
+  assert.deepEqual([...salaryOnlySelection(rows, new Set(['cat-acme']))], ['p'])
+  assert.deepEqual([...salaryOnlySelection(rows, new Set())], [])
+})
+
+test('renaming a flagged category keeps it salary', () => {
+  const before = [rec('r', '2026-08-15', 'Salary', 'cat-1')]
+  const after = [rec('r', '2026-08-15', 'Main job', 'cat-1')]
+  const flagged = new Set(['cat-1'])
+  assert.deepEqual([...salaryOnlySelection(before, flagged)], ['r'])
+  assert.deepEqual([...salaryOnlySelection(after, flagged)], ['r'])
 })
 
 test('excluded records are counted by category, uncategorised grouped', () => {
-  const included = salaryOnlySelection(records)
+  const included = salaryOnlySelection(records, salaryIds)
   assert.deepEqual(excludedByCategory(records, included), [
     { name: 'Bonus', count: 1 },
     { name: 'Freelance', count: 1 },
@@ -89,7 +104,7 @@ test('a past year has no future months and a later year is all future', () => {
 })
 
 test('pd851Checklist ticks basic salary and crosses the three excluded kinds', () => {
-  const rows = pd851Checklist([], inc())
+  const rows = pd851Checklist([], inc(), salaryIds)
   assert.deepEqual(rows.map((r) => [r.id, r.counts]), [
     ['basic', true],
     ['overtime', false],
@@ -110,12 +125,13 @@ test('pd851Checklist counts ticked records that look like an excluded kind', () 
       rec('f', '2026-09-04', undefined),
     ],
     inc('a', 'b', 'c', 'd', 'f'),
+    salaryIds,
   )
   const by = Object.fromEntries(rows.map((r) => [r.id, r.selected]))
   assert.deepEqual(by, { basic: 1, overtime: 1, allowances: 1, other: 1 })
 })
 
 test('an unticked record never counts toward a row', () => {
-  const rows = pd851Checklist([rec('b', '2026-08-30', 'Bonus')], inc())
+  const rows = pd851Checklist([rec('b', '2026-08-30', 'Bonus')], inc(), salaryIds)
   assert.equal(rows.every((r) => r.selected === 0), true)
 })

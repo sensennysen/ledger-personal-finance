@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normaliseDescription, matchDuplicates, duplicateSpan } from '../src/lib/importDuplicates.ts'
+import { normaliseDescription, matchDuplicates, duplicateSpan, findIdenticalRows, identicalRowsLabel } from '../src/lib/importDuplicates.ts'
 import { EMPTY_DESCRIPTION } from '../src/lib/csvImport.ts'
 
 const row = (line, overrides = {}) => ({
@@ -160,4 +160,69 @@ test('a stored original is used once, even when it also matches on the converted
 test('rows without an original still match as before, whatever the stored rows carry', () => {
   assert.equal(match([row(1)], [existing('a')]).get(1)?.id, 'a')
   assert.equal(match([row(1)], [foreignExisting('a', 32.8)]).get(1)?.id, 'a')
+})
+
+test('a converted transfer out of the account is still a duplicate at another rate (LED-225)', () => {
+  // A USD statement imported into a PHP account at 62.6566: the transfer to the wallet kept its original.
+  const stored = [existing('t', { type: 'transfer', amount: 6265.66, to_account_id: 'gcash', original_amount: 100, original_currency: 'USD', description: 'Transfer to GCash wallet' })]
+  const again = row(1, { amount: 5800, original: { amount: 100, currency: 'USD' }, description: 'Transfer to GCash wallet' })
+  assert.equal(match([again], stored).get(1)?.id, 't', 'another rate matches on the original')
+  assert.equal(match([{ ...again, amount: 6265.66 }], stored).get(1)?.id, 't', 'the same rate still matches')
+  assert.equal(match([{ ...again, type: 'income' }], stored).size, 0, 'money in does not match a transfer out')
+})
+
+test('a converted transfer into the account is still a duplicate at another rate (LED-225)', () => {
+  const stored = [existing('t', { type: 'transfer', account_id: 'gcash', to_account_id: 'acc', amount: 3132.83, original_amount: 50, original_currency: 'USD' })]
+  const again = row(1, { type: 'income', amount: 2900, original: { amount: 50, currency: 'USD' }, description: 'FROM GCASH' })
+  assert.equal(match([again], stored).get(1)?.id, 't')
+  assert.equal(match([{ ...again, type: 'expense' }], stored).size, 0, 'money out does not match a transfer in')
+  assert.equal(match([{ ...again, original: { amount: 50, currency: 'EUR' } }], stored).size, 0, 'another currency does not match')
+})
+
+test('a transfer with no original still matches on the amount that moved (LED-225)', () => {
+  const stored = [existing('t', { type: 'transfer', account_id: 'usd', to_account_id: 'acc', amount: 10, exchange_rate: 3.28 })]
+  assert.equal(match([row(1, { type: 'income' })], stored).get(1)?.id, 't')
+})
+
+// LED-234: identical rows within one file
+test('two identical rows in one file point at each other', () => {
+  const identical = findIdenticalRows([row(2), row(3, { description: 'Other' }), row(5)])
+  assert.deepEqual([...identical.entries()], [[2, [5]], [5, [2]]])
+})
+
+test('three identical rows list the other two, in file order', () => {
+  const identical = findIdenticalRows([row(4), row(7), row(9)])
+  assert.deepEqual(identical.get(7), [4, 9])
+  assert.equal(identicalRowsLabel(identical.get(7)), 'Identical to rows 4 and 9 in this file')
+  assert.equal(identicalRowsLabel([2]), 'Identical to row 2 in this file')
+  assert.equal(identicalRowsLabel([2, 3, 8]), 'Identical to rows 2, 3 and 8 in this file')
+})
+
+test('rows that differ in date, amount, direction or description are not marked', () => {
+  for (const other of [
+    { date: '2026-09-15' },
+    { amount: 32.81 },
+    { type: 'income' },
+    { description: 'GRABFOOD TOYO EATERY 8842' }, // a different reference number is a different row
+  ]) {
+    assert.equal(findIdenticalRows([row(2), row(3, other)]).size, 0, JSON.stringify(other))
+  }
+})
+
+test('case and spacing in the description do not make rows different', () => {
+  assert.equal(findIdenticalRows([row(2), row(3, { description: '  grabfood   toyo eatery ' })]).size, 2)
+})
+
+test('two description-less rows are identical; rows with no date, amount or direction are skipped', () => {
+  assert.deepEqual(findIdenticalRows([row(2, { description: '' }), row(3, { description: EMPTY_DESCRIPTION })]).get(2), [3])
+  assert.equal(findIdenticalRows([row(2, { date: null }), row(3, { date: null })]).size, 0)
+  assert.equal(findIdenticalRows([row(2, { amount: null }), row(3, { amount: null })]).size, 0)
+  assert.equal(findIdenticalRows([row(2, { type: null }), row(3, { type: null })]).size, 0)
+})
+
+test('the in-file check does not change the saved-row duplicate check', () => {
+  // Two identical rows, one existing: only one is a duplicate of it; the other is still importable.
+  const rows = [row(2), row(3)]
+  assert.deepEqual([...match(rows, [existing('a')]).keys()], [2])
+  assert.equal(findIdenticalRows(rows).size, 2)
 })

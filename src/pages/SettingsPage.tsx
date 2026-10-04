@@ -256,7 +256,7 @@ export default function SettingsPage() {
                       <SelectContent>
                         {CURRENCIES.map((c) => (
                           <SelectItem key={c.code} value={c.code}>
-                            {c.symbol} {c.code} â€” {c.name}
+                            {c.symbol} {c.code} — {c.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -582,7 +582,7 @@ export default function SettingsPage() {
 
       <ExchangeRatesCard />
 
-      {/* Customization â€” visible on mobile where BottomNav omits Categories */}
+      {/* Customization — visible on mobile where BottomNav omits Categories */}
       {/* Legal */}
       <Card>
         <CardHeader>
@@ -645,7 +645,7 @@ export default function SettingsPage() {
 
       <BrowserStorageCard />
 
-      {/* Account / Danger zone â€” always last to prevent accidental destructive actions */}
+      {/* Account / Danger zone — always last to prevent accidental destructive actions */}
       <Card className="border-destructive/30">
         <CardHeader>
           <CardTitle className="text-destructive">Account</CardTitle>
@@ -707,7 +707,7 @@ export default function SettingsPage() {
               disabled={deleteConfirm !== 'DELETE' || deleting}
               onClick={handleDeleteAccount}
             >
-              {deleting ? 'Deletingâ€¦' : 'Delete Forever'}
+              {deleting ? 'Deleting…' : 'Delete Forever'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

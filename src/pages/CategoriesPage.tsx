@@ -12,6 +12,7 @@ import {
   ListTree,
   Zap,
   GripVertical,
+  GitMerge,
   ArrowUp,
   ArrowDown,
   Check,
@@ -67,6 +68,8 @@ import { SWATCHES } from '@/lib/swatches'
 import { Switch } from '@/components/ui/switch'
 import { clashSentence, findNameClash } from '@/lib/categoryNames'
 import { mergeSubsetOrder, moveAnnouncement, moveId, reorderIds } from '@/lib/reorder'
+import { budgetNote, mergedSentence, mergeSentence, mergeTargets, type MergePreview } from '@/lib/categoryMerge'
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 
 const DEFAULT_CATEGORY_ICON = '\u{1F3F7}\uFE0F'
 const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
@@ -540,6 +543,7 @@ function CategoryPane({
   rulesError,
   onManageRules,
   header,
+  onMerge,
 }: {
   category: Category
   /** Null while usage is not available: figures show a dash, never zero. */
@@ -553,6 +557,8 @@ function CategoryPane({
   rulesError: string | null
   onManageRules: () => void
   header?: React.ReactNode
+  /** Opens Merge into… (LED-239); omitted when no category can take this one's rows. */
+  onMerge?: () => void
 }) {
   const share = row ? shareOf(row.spend[side], total) : null
   const own = rules.filter((rule) => rule.category_id === category.id)
@@ -612,14 +618,110 @@ function CategoryPane({
           </>
         )}
       </div>
+      {onMerge && (
+        <div className="flex justify-end border-t px-3 py-3">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={onMerge}>
+            <GitMerge className="w-3.5 h-3.5" />Merge into…
+          </Button>
+        </div>
+      )}
     </div>
+  )
+}
+
+// Merge into… (LED-239, design 8a item 6). One rpc moves everything and deletes the source;
+// the confirmation first reads what will move so the user sees the counts.
+function MergeCategoryDialog({
+  source,
+  targets,
+  previewMerge,
+  onConfirm,
+  onClose,
+}: {
+  source: Category
+  targets: Category[]
+  previewMerge: (sourceId: string, targetId: string) => Promise<{ preview: MergePreview | null; error: string | null }>
+  /** Runs the merge; a failure is reported on the notification surface with Retry. */
+  onConfirm: (target: Category) => Promise<void>
+  onClose: () => void
+}) {
+  const { isOnline } = useNetworkStatus()
+  const [targetId, setTargetId] = useState('')
+  const [preview, setPreview] = useState<{ targetId: string; data: MergePreview | null; error: string | null } | null>(null)
+  const [merging, setMerging] = useState(false)
+  const target = targets.find((category) => category.id === targetId) ?? null
+  const current = preview && preview.targetId === targetId ? preview : null
+
+  const choose = async (id: string) => {
+    setTargetId(id)
+    if (!id) return
+    const result = await previewMerge(source.id, id)
+    setPreview({ targetId: id, data: result.preview, error: result.error })
+  }
+
+  const merge = async () => {
+    if (!target) return
+    setMerging(true)
+    await onConfirm(target)
+    setMerging(false)
+  }
+
+  const note = current?.data && target ? budgetNote(current.data.budgets, current.data.targetActiveBudgets, target.name) : null
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open && !merging) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Merge {source.name} into…</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <Select value={targetId} onValueChange={(value) => void choose(value ?? '')}>
+            <SelectTrigger aria-label="Category to merge into">
+              <SelectValue>
+                {(value: string | null) => {
+                  const chosen = targets.find((category) => category.id === value)
+                  return chosen ? `${chosen.icon} ${chosen.name}` : 'Choose a category'
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {targets.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.icon} {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!isOnline ? (
+            <p className="text-sm text-muted-foreground">Connect to the internet to merge categories.</p>
+          ) : !target ? (
+            <p className="text-sm text-muted-foreground">
+              Everything in {source.name} moves to the category you choose, then {source.name} is deleted.
+            </p>
+          ) : !current ? (
+            <p className="text-sm" aria-busy="true"><SkeletonText className="w-64" /></p>
+          ) : current.error ? (
+            <InlineLoadError message={`Couldn't count what would move. ${current.error}`} onRetry={() => void choose(targetId)} />
+          ) : current.data ? (
+            <div className="space-y-1.5 text-sm" aria-live="polite">
+              <p>{mergeSentence(current.data, source.name, target.name)}</p>
+              {note && <p className="text-muted-foreground">{note}</p>}
+              <p className="text-muted-foreground">This can't be undone.</p>
+            </div>
+          ) : null}
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose} disabled={merging}>Cancel</Button>
+          <Button onClick={() => void merge()} disabled={!isOnline || !current?.data || merging}>
+            {merging ? 'Merging…' : 'Merge'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 export default function CategoriesPage() {
   const ink = useCategoryInk()
   const notify = useNotify()
-  const { categories, loading, error, errorDetail, refetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder } = useCategories()
+  const { categories, loading, error, errorDetail, refetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder, previewMerge, mergeCategory } = useCategories()
   const loadState = resolveLoadState({ loading, error, hasData: categories.length > 0 })
   const [createOpen, setCreateOpen] = useState(false)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
@@ -630,6 +732,7 @@ export default function CategoriesPage() {
   const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null)
   const [dropTargetCategoryId, setDropTargetCategoryId] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState('')
+  const [mergeSource, setMergeSource] = useState<Category | null>(null)
   const [rulesOpen, setRulesOpen] = useState(false)
   // Rules load with the page: the button states their count and each category's pane lists its own.
   const { rules, loading: rulesLoading, error: rulesError, refetch: refetchRules, createRule, deleteRule } = useTransactionRules(true)
@@ -714,6 +817,39 @@ export default function CategoriesPage() {
     if (nextIds === visibleCategoryIds) return
     void persistCategoryOrder(nextIds, id)
     refocusMove('category', id, direction)
+  }
+
+  const mergeHandler = (category: Category) =>
+    mergeTargets(categories, category).length > 0 ? () => setMergeSource(category) : undefined
+
+  const runMerge = async (source: Category, target: Category) => {
+    const { error, result } = await mergeCategory(source.id, target.id)
+    if (error || !result) {
+      setMergeSource(null)
+      notify({
+        severity: 'failure',
+        title: `Couldn't merge ${source.name}`,
+        body: error ?? 'Try again.',
+        action: { label: 'Retry', run: () => void runMerge(source, target) },
+      })
+      return
+    }
+    handleMerged(source, target, result)
+  }
+
+  const handleMerged = (source: Category, target: Category, result: MergePreview) => {
+    setMergeSource(null)
+    setSelectedCategoryId(target.id)
+    void usageData.refetch()
+    void refetchRules()
+    notify({
+      severity: 'success',
+      title: `Merged ${source.name} into ${target.name}`,
+      body: [
+        mergedSentence(result, source.name, target.name),
+        budgetNote(result.budgets, result.targetActiveBudgets, target.name)?.replace(' will have ', ' now has '),
+      ].filter(Boolean).join(' '),
+    })
   }
 
   const toggleReorder = () => {
@@ -872,6 +1008,7 @@ export default function CategoriesPage() {
             rulesLoading={rulesLoading}
             rulesError={rulesError}
             onManageRules={() => setRulesOpen(true)}
+            onMerge={mergeHandler(cat)}
           />
         )}
       </div>
@@ -1041,6 +1178,7 @@ export default function CategoriesPage() {
                 rulesLoading={rulesLoading}
                 rulesError={rulesError}
                 onManageRules={() => setRulesOpen(true)}
+                onMerge={mergeHandler(paneCategory)}
                 header={
                   <div className="flex items-center gap-3 p-3">
                     <div
@@ -1064,6 +1202,16 @@ export default function CategoriesPage() {
           </aside>
         )}
         </div>
+      )}
+
+      {mergeSource && (
+        <MergeCategoryDialog
+          source={mergeSource}
+          targets={mergeTargets(categories, mergeSource)}
+          previewMerge={previewMerge}
+          onConfirm={(target) => runMerge(mergeSource, target)}
+          onClose={() => setMergeSource(null)}
+        />
       )}
 
       <Dialog open={!!editCategory} onOpenChange={(o) => { if (!o) { setEditCategory(null); setFormError(null) } }}>

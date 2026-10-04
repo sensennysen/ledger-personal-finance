@@ -5,9 +5,10 @@ import { readCache, writeCache } from '@/lib/dataCache'
 import type { Budget } from '@/types'
 import type { BudgetSpendTx } from '@/lib/budgetSpend'
 import type { RateTable } from '@/lib/exchangeRates'
-import { getCurrentCycleMonthKey } from '@/lib/utils'
+import { getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { sumBudgetSpend } from '@/lib/budgetSpend'
+import { countedEnd } from '@/lib/countsYet'
 import { shiftMonthKey } from '@/lib/overspending'
 import { readAllPages } from '@/lib/pagedRead'
 import { canRollover, type DeficitBehaviour } from '@/lib/budgetRollover'
@@ -147,6 +148,8 @@ export function useBudgets(
     }
 
     const allTx = spentData
+    // Rows dated after today are scheduled: shown apart, counted from their date (LED-238).
+    const today = getLocalDateString()
     const currentMonthStart = new Date(
       now.getFullYear(),
       now.getMonth(),
@@ -163,7 +166,12 @@ export function useBudgets(
       const computeSpent = (rangeStart: string, rangeEnd: string) =>
         sumBudgetSpend(allTx, b, rangeStart, rangeEnd, rateTable)
 
-      const { spent, unrated } = computeSpent(start, end)
+      const counted = countedEnd(end, today)
+      const { spent, unrated } = computeSpent(start, counted)
+      // The day after `counted` to the period's end; nothing when the period is closed.
+      const { spent: scheduled, unrated: scheduledUnrated } = counted < end
+        ? sumBudgetSpend(allTx.filter((tx) => tx.date > counted), b, start, end, rateTable)
+        : { spent: 0, unrated: [] as string[] }
 
       // Compute monthly rollover and history
       const rolloverActive = b.rollover_enabled && canRollover(b.period)
@@ -204,7 +212,8 @@ export function useBudgets(
       return {
         ...b,
         spent,
-        unrated_currencies: unrated,
+        scheduled,
+        unrated_currencies: [...new Set([...unrated, ...scheduledUnrated])].sort(),
         rollover_amount: rolloverAmount,
         effective_amount: effectiveAmount,
         history: recentHistory,
@@ -244,6 +253,7 @@ export function useBudgets(
       | 'updated_at'
       | 'category'
       | 'spent'
+      | 'scheduled'
       | 'unrated_currencies'
       | 'rollover_amount'
       | 'effective_amount'
@@ -262,7 +272,7 @@ export function useBudgets(
 
   /** Inserts every budget in one call: all of them are created or none. */
   const createBudgets = async (
-    rows: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'spent' | 'unrated_currencies' | 'rollover_amount' | 'effective_amount' | 'history' | 'period_spends'>[],
+    rows: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'spent' | 'scheduled' | 'unrated_currencies' | 'rollover_amount' | 'effective_amount' | 'history' | 'period_spends'>[],
   ): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add budgets.' }
@@ -382,7 +392,8 @@ export function useBudgetsForExport(expenseTx: BudgetSpendTx[], rateTable: RateT
     () =>
       budgets.map((b) => {
         const { start, end } = getBudgetCycleRange(b.period, monthKey, startDay)
-        const { spent, unrated } = sumBudgetSpend(expenseTx, b, start, end, rateTable)
+        // Same "spent so far" as the Budgets page: rows after today are not counted yet (LED-238).
+        const { spent, unrated } = sumBudgetSpend(expenseTx, b, start, countedEnd(end, getLocalDateString()), rateTable)
         return { ...b, spent, unrated_currencies: unrated }
       }),
     [budgets, expenseTx, rateTable, monthKey, startDay]

@@ -2,6 +2,7 @@ import { nextRollover, canRollover, type DeficitBehaviour } from './budgetRollov
 import { sumBudgetSpend, type BudgetSpendTx } from './budgetSpend.ts'
 import { monthCycleRange, type DateRange as Range } from './cycleRange.ts'
 import type { RateTable } from './exchangeRates.ts'
+import { countedEnd } from './countsYet.ts'
 import { sumConverted } from './convertedTotals.ts'
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -77,6 +78,11 @@ interface Input {
   rangeFor: (period: OverspendingBudget['period']) => Range
   /** Exchange rates for spend in a currency other than the budget's (LED-136). */
   rates?: RateTable | null
+  /**
+   * Last date that counts, "YYYY-MM-DD": today for the open cycle, so a row dated later is not
+   * spent yet (LED-238). Every range is cut at it; a closed range is unchanged. Omitted, nothing is cut.
+   */
+  countUntil?: string
 }
 
 /**
@@ -86,14 +92,15 @@ interface Input {
  * Budgets page shows; other periods only report the selected cycle.
  */
 export function computeOverspending(input: Input): OverspendingResult {
-  const { budgets, txs, month, startDay, behaviour, rangeFor, rates = null } = input
+  const { budgets, txs, month, startDay, behaviour, rangeFor, rates = null, countUntil } = input
+  const cut = (end: string) => (countUntil ? countedEnd(end, countUntil) : end)
   const rows: OverspendingRow[] = []
   const unrated = new Set<string>()
 
   for (const b of budgets) {
     if (!canRollover(b.period)) {
       const { start, end } = rangeFor(b.period)
-      const { spent, unrated: u } = sumBudgetSpend(txs, b, start, end, rates)
+      const { spent, unrated: u } = sumBudgetSpend(txs, b, start, cut(end), rates)
       u.forEach((c) => unrated.add(c))
       if (spent > b.amount) {
         rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, period: b.period, spent, limit: b.amount, over: spent - b.amount, streak: 1, uncarried: 0 })
@@ -109,7 +116,7 @@ export function computeOverspending(input: Input): OverspendingResult {
 
     for (;;) {
       const { start, end } = monthCycleRange(key, startDay)
-      const { spent, unrated: u } = sumBudgetSpend(txs, b, start, end, rates)
+      const { spent, unrated: u } = sumBudgetSpend(txs, b, start, cut(end), rates)
       const limit = Math.max(0, b.amount + (rolloverActive ? rollover : 0))
       const over = Math.max(0, spent - limit)
       streak = over > 0 ? streak + 1 : 0

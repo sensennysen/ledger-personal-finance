@@ -7,6 +7,7 @@ import { computeOverspending, convertOverspendingTotals, shiftMonthKey } from '@
 import type { DeficitBehaviour } from '@/lib/budgetRollover'
 import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { useAuth } from '@/contexts/AuthContext'
+import { getLocalDateString } from '@/lib/utils'
 
 /**
  * The Overspending report for the selected cycle and the one before it, from one
@@ -29,7 +30,9 @@ export function useOverspendingReport({
   const { table: rates, loading: ratesLoading } = useExchangeRates()
   const currency = useAuth().profile?.default_currency ?? 'USD'
 
-  const compute = (forMonth: string) =>
+  // A row dated after today is scheduled and not over anything yet (LED-238).
+  const today = getLocalDateString()
+  const compute = (forMonth: string, countUntil: string) =>
     computeOverspending({
       budgets,
       txs,
@@ -38,11 +41,12 @@ export function useOverspendingReport({
       behaviour,
       rangeFor: (period) => getBudgetCycleRange(period, forMonth, startDay),
       rates,
+      countUntil,
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `compute` only closes over the listed inputs
-  const result = useMemo(() => compute(month), [budgets, txs, month, startDay, behaviour, rates])
+  const result = useMemo(() => compute(month, today), [budgets, txs, month, startDay, behaviour, rates, today])
   // eslint-disable-next-line react-hooks/exhaustive-deps -- as above
-  const previous = useMemo(() => compute(shiftMonthKey(month, -1)), [budgets, txs, month, startDay, behaviour, rates])
+  const previous = useMemo(() => compute(shiftMonthKey(month, -1), today), [budgets, txs, month, startDay, behaviour, rates, today])
 
   // One total in the default currency for the card and the stat card (LED-185), never "A + B".
   const converted = useMemo(() => convertOverspendingTotals(result, currency, rates), [result, currency, rates])

@@ -167,6 +167,8 @@ export interface Budget {
   // joined / computed
   category?: Category
   spent?: number
+  /** Spend dated later in the open period: scheduled, not in `spent` yet (LED-238). */
+  scheduled?: number
   unrated_currencies?: string[]
   rollover_amount?: number
   effective_amount?: number

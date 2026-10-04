@@ -35,6 +35,7 @@ export function BudgetSummaryTiles({
         </Tile>
         <Tile label="Spent" value={formatCurrency(summary.spent, currency)}>
           {usedPct === null ? 'no budget set' : `${usedPct}% of plan`}
+          {summary.scheduled > 0 && ` · + ${formatCurrency(summary.scheduled, currency)} scheduled`}
         </Tile>
         <Tile label="Remaining" value={formatCurrency(summary.remaining, currency)} valueClassName={remainingTone}>
           {left ?? 'this cycle'}

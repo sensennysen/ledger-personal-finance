@@ -32,6 +32,13 @@ test('summarizeBudgets adds monthly budgets in the currency and names what is ov
   assert.deepEqual(s.overNames, ['Dining', 'Transport'])
 })
 
+test('scheduled spend is added apart and left out of spent and remaining (LED-238)', () => {
+  const s = summarizeBudgets([budget('dining', 100, 600, { scheduled: 250 }), budget('rent', 0, 900, { currency: 'USD', scheduled: 900 })], 'PHP')
+  assert.equal(s.spent, 100)
+  assert.equal(s.scheduled, 250)
+  assert.equal(s.remaining, 500)
+})
+
 test('rollover raises the limit the tiles add up', () => {
   const s = summarizeBudgets([budget('dining', 700, 600, { effective_amount: 750 })], 'PHP')
   assert.equal(s.budgeted, 750)

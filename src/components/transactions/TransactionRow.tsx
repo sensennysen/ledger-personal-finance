@@ -2,7 +2,8 @@ import { useEntryDetail } from '@/contexts/EntryContext'
 import { memo, useEffect, useState } from 'react'
 import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal, Clock } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getLocalDateString } from '@/lib/utils'
+import { countsYet } from '@/lib/countsYet'
 import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -173,6 +174,10 @@ function TransactionRowImpl({
                 # {tag}
               </Badge>
             ))}
+            {!countsYet(tx.date, getLocalDateString()) && (
+              // Dated later: listed now, counted in totals from its date (LED-238).
+              <Badge variant="outline" className="text-xs py-0 px-1.5">Scheduled</Badge>
+            )}
             {tx.is_recurring && (
               <Badge variant="outline" className="text-xs py-0 px-1.5 gap-1">
                 <RepeatIcon className="w-2.5 h-2.5" />{tx.recurrence_interval}

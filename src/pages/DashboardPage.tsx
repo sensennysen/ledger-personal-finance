@@ -48,6 +48,11 @@ import type { AppLayoutContext } from '@/components/layout/AppLayout'
 import { PageActions } from '@/components/layout/PageActions'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 
+/** "This month · + ₱1,200.00 scheduled" when rows later in the cycle are not counted yet (LED-238). */
+function withScheduled(sub: string, upcoming: number, currency: string): string {
+  return upcoming > 0 ? `${sub} · + ${formatCurrency(upcoming, currency)} scheduled` : sub
+}
+
 function StatCard({
   title,
   value,
@@ -394,7 +399,7 @@ export default function DashboardPage() {
             <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] leading-none mt-1.5">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
             {/* Only when there is a notice: an empty wrapper still takes its margin (LED-202). */}
             {!loading && stats.excludedCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" /></div>}
-            <div className="grid grid-cols-2 gap-3 mt-2.5">{([{view:'income',label:'↙ In',value:stats.income,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-1.5 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p></button>)}</div>
+            <div className="grid grid-cols-2 gap-3 mt-2.5">{([{view:'income',label:'↙ In',value:stats.income,upcoming:stats.upcomingIncome,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,upcoming:stats.upcomingExpenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-1.5 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p>{!loading && item.upcoming > 0 && <p className="text-[11px] mt-0.5 truncate">+ {formatCurrency(item.upcoming,currency)} scheduled</p>}</button>)}</div>
             {!loading && stats.excludedFlowCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" /></div>}
           </section>
           <div className="hidden md:grid gap-4 grid-cols-3 col-span-full" style={widgetGridStyle('stats')}>
@@ -413,7 +418,7 @@ export default function DashboardPage() {
               title="Monthly Income"
               value={formatCurrency(stats.income, currency)}
               className="animate-fade-up anim-delay-1"
-              sub={isCurrentMonth ? 'This month' : monthLabel}
+              sub={withScheduled(isCurrentMonth ? 'This month' : monthLabel, stats.upcomingIncome, currency)}
               note={<UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" />}
               icon={TrendingUp}
               trend="up"
@@ -424,7 +429,7 @@ export default function DashboardPage() {
             <StatCard
               title="Monthly Expenses"
               value={formatCurrency(stats.expenses, currency)}
-              sub={isCurrentMonth ? 'This month' : monthLabel}
+              sub={withScheduled(isCurrentMonth ? 'This month' : monthLabel, stats.upcomingExpenses, currency)}
               note={<UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" />}
               icon={TrendingDown}
               trend="down"

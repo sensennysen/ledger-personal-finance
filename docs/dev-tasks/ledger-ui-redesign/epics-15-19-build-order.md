@@ -122,6 +122,8 @@ Built in four phases (plan 2026-10-03), each validated before the next:
 | 32 | LED-212 | Merge route for the phase branches, `.claude/launch.json` | 2 | Do not push or merge without being asked. |
 | 33 | LED-213 | Release checklist: live CI and remote migrations | 2 | The remote step only when the owner asks. |
 
+- **LED-210 Done** (2026-10-04, retro `knowledge/retros/2026-10-04-led-210-flip-epics-8-13-statuses.md`). LED-142 and LED-145 stay To Do, so EPIC-DESIGN-PARITY does too.
+
 Phase totals in points: 1 = 22, 2 = 22, 3 = 19, 4 = 21, 5 = 21 (LED-189 widened from 2 to 5), 6 = 6. Sum 111. Epic 21 adds 48 (39, plus LED-247 to 249 filed during phase A, LED-250 during phase B and LED-251 during phase C).
 
 ## Decision register

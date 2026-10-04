@@ -99,7 +99,7 @@ export function TopBar({
         >
         {NAV_TABS.map((tab, index) => {
           const locked = isLocked(tab, setupComplete)
-          const Icon = locked ? Lock : ICONS[tab.icon]
+          const Icon = ICONS[tab.icon]
           const active = isDestinationActive(pathname, tab)
           return (
             <NavLink
@@ -120,8 +120,19 @@ export function TopBar({
                     : 'text-muted-foreground hover:text-foreground hover:bg-foreground/4',
               )}
             >
-              <Icon className="size-4 shrink-0" />
+              {/* Keep the destination's own icon: below xl the tabs are icon-only,
+                  so a plain Lock made every locked tab look the same. */}
+              <span className="relative shrink-0">
+                <Icon className="size-4" />
+                {locked && (
+                  <Lock
+                    aria-hidden
+                    className="absolute -right-1.5 -bottom-1 size-2.5 rounded-full bg-sidebar p-px text-muted-foreground"
+                  />
+                )}
+              </span>
               <span className="sr-only xl:not-sr-only">{tab.label}</span>
+              {locked && <span className="sr-only"> (locked until setup is done)</span>}
             </NavLink>
           )
         })}

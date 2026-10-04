@@ -7,3 +7,4 @@ The ticket CSVs mix line endings (`epic-0`, `epic-1` and `epic-5` are LF; the re
 3. Edit fields in memory and assert each string replacement matches exactly once.
 4. After writing, re-run the round trip on every CSV: 20 columns, no BOM, same line ending as `git show HEAD:<file>`, and `git diff --stat` shows only the intended rows.
 5. Stage files by name. `git add <directory>` also stages untracked files in it (a planning retro went in this way once and had to be unstaged).
+6. When a status flip is gated on "a retro without a FAIL" (LED-121, LED-210), read the retro's `## Acceptance` section and count only FAIL results (`: FAIL`, `**FAIL`). Prose such as "without FAIL: PASS" does not count. Some retros have no Acceptance section (LED-114, 134, 136, 138); for those, scan the whole file. Make the script assert the rows you expect it to skip, so a misread stops it instead of producing a wrong flip.

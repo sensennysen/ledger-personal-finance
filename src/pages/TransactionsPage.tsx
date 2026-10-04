@@ -33,7 +33,6 @@ import { notifyAccountsRefresh, notifyCardPaymentsRefresh } from '@/lib/cacheEve
 import { isCardPaymentTransaction } from '@/lib/cardPayment'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
-import { PageActions } from '@/components/layout/PageActions'
 import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { entryDialogWidthClass, inferTransactionKind, type TransactionKind } from '@/components/transactions/transactionKinds'
@@ -507,44 +506,8 @@ export default function TransactionsPage() {
   )
 
   return (
-    <div className="flex justify-center gap-6 lg:pr-6">
-      <div ref={pageTopRef} className="p-4 md:p-6 space-y-4 max-w-3xl mx-auto min-w-0 flex-1">
-        {/* Header */}
-        {/* The phone header is the page title; the FAB is the phone's Add (M-03). */}
-        <div className="flex items-center justify-between gap-2 max-sm:hidden">
-          <div className="flex items-center gap-2">
-            <span
-              className="hidden sm:inline-flex items-center gap-1 text-[0.625rem] text-muted-foreground border border-border rounded px-1.5 py-0.5 select-none"
-              title="Keyboard shortcuts: N = new transaction"
-            >
-              <Keyboard className="w-2.5 h-2.5" />N
-            </span>
-          </div>
-          <PageActions desktopOnly>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="hidden gap-2 sm:inline-flex"
-              onClick={() => setImportOpen(true)}
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Import</span>
-            </Button>
-            <TransactionKindMenu
-              onSelect={(kind) => {
-                setTemplateDefaults(undefined)
-                setFormError(null)
-                setTransactionKind(kind)
-                setCreateOpen(true)
-              }}
-              trigger={
-                <Button className="gap-2" size="sm">
-                  <Plus className="w-4 h-4" />Add
-                </Button>
-              }
-            />
-          </PageActions>
-        </div>
+    <div className="mx-auto flex w-full max-w-6xl gap-6 p-4 md:p-6">
+      <div ref={pageTopRef} className="min-w-0 flex-1 space-y-4">
         <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
           <DialogContent className={`max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
             <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
@@ -616,11 +579,11 @@ export default function TransactionsPage() {
               )}
             </Button>
             <Tabs value={filterType} onValueChange={setFilterType} className="hidden w-auto sm:block">
-              <TabsList className="w-full sm:w-auto">
-                <TabsTrigger value="all" className="flex-1 sm:flex-none">All</TabsTrigger>
-                <TabsTrigger value="income" className="flex-1 sm:flex-none">Income</TabsTrigger>
-                <TabsTrigger value="expense" className="flex-1 sm:flex-none">Expense</TabsTrigger>
-                <TabsTrigger value="transfer" className="flex-1 sm:flex-none">Transfer</TabsTrigger>
+              <TabsList className="w-full group-data-horizontal/tabs:h-12 sm:w-auto">
+                <TabsTrigger value="all" className="flex-1 px-3 sm:flex-none">All</TabsTrigger>
+                <TabsTrigger value="income" className="flex-1 px-3 sm:flex-none">Income</TabsTrigger>
+                <TabsTrigger value="expense" className="flex-1 px-3 sm:flex-none">Expense</TabsTrigger>
+                <TabsTrigger value="transfer" className="flex-1 px-3 sm:flex-none">Transfer</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -669,30 +632,63 @@ export default function TransactionsPage() {
         )}
 
         {/* View controls row */}
-        <div className="hidden items-center justify-between gap-2 sm:flex">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => setPref('txView', prefs.txView === 'grouped' ? 'flat' : 'grouped')}
-            title={prefs.txView === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
-          >
-            {prefs.txView === 'grouped' ? <LayoutList className="w-3.5 h-3.5" /> : <AlignJustify className="w-3.5 h-3.5" />}
-            <span>{prefs.txView === 'grouped' ? 'Grouped' : 'Flat'}</span>
-          </Button>
-          <Button
-            variant={selectMode ? 'secondary' : 'ghost'}
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={toggleSelectMode}
-          >
-            {selectMode ? (
-              <CheckSquare className="w-3.5 h-3.5" />
-            ) : (
-              <Square className="w-3.5 h-3.5" />
-            )}
-            <span>Select</span>
-          </Button>
+        {/* The phone's Add is the FAB (M-03), so Import and Add are desktop-only. */}
+        <div className="hidden flex-wrap items-center justify-between gap-x-3 gap-y-2 sm:flex">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setPref('txView', prefs.txView === 'grouped' ? 'flat' : 'grouped')}
+              title={prefs.txView === 'grouped' ? 'Switch to flat view' : 'Switch to grouped view'}
+            >
+              {prefs.txView === 'grouped' ? <LayoutList className="w-3.5 h-3.5" /> : <AlignJustify className="w-3.5 h-3.5" />}
+              <span>{prefs.txView === 'grouped' ? 'Grouped' : 'Flat'}</span>
+            </Button>
+            <span
+              className="inline-flex items-center gap-1 text-[0.625rem] text-muted-foreground border border-border rounded px-1.5 py-0.5 select-none"
+              title="Keyboard shortcuts: N = new transaction"
+            >
+              <Keyboard className="w-2.5 h-2.5" />N
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={selectMode ? 'secondary' : 'ghost'}
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={toggleSelectMode}
+            >
+              {selectMode ? (
+                <CheckSquare className="w-3.5 h-3.5" />
+              ) : (
+                <Square className="w-3.5 h-3.5" />
+              )}
+              <span>Select</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 max-md:hidden"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Import</span>
+            </Button>
+            <TransactionKindMenu
+              onSelect={(kind) => {
+                setTemplateDefaults(undefined)
+                setFormError(null)
+                setTransactionKind(kind)
+                setCreateOpen(true)
+              }}
+              trigger={
+                <Button className="gap-2 max-md:hidden" size="sm">
+                  <Plus className="w-4 h-4" />Add Transaction
+                </Button>
+              }
+            />
+          </div>
         </div>
 
         {/* Tag filter chips */}

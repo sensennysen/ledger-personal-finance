@@ -48,7 +48,6 @@ import { getCreditCardSpending } from '@/lib/creditCards'
 import { afterScheduledLabel } from '@/lib/scheduledBalances'
 import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
-import { PageActions } from '@/components/layout/PageActions'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 
 /** "This month · + ₱1,200.00 scheduled" when rows later in the cycle are not counted yet (LED-238). */
@@ -306,37 +305,37 @@ export default function DashboardPage() {
             })}
           </p>
         </div>
-        <DashboardWidgetSettingsSheet
-          widgetOrder={widgetOrder}
-          widgets={widgets}
-          isDesktopDrag={isDesktopDrag}
-          draggedWidget={draggedWidget}
-          dropTargetWidget={dropTargetWidget}
-          setDraggedWidget={setDraggedWidget}
-          setDropTargetWidget={setDropTargetWidget}
-          moveWidget={moveWidget}
-          reorderWidget={reorderWidget}
-          toggleWidget={toggle}
-          setWidgetControlRef={setWidgetControlRef}
-        />
+        <div className="flex items-center gap-2">
+          <DashboardWidgetSettingsSheet
+            widgetOrder={widgetOrder}
+            widgets={widgets}
+            isDesktopDrag={isDesktopDrag}
+            draggedWidget={draggedWidget}
+            dropTargetWidget={dropTargetWidget}
+            setDraggedWidget={setDraggedWidget}
+            setDropTargetWidget={setDropTargetWidget}
+            moveWidget={moveWidget}
+            reorderWidget={reorderWidget}
+            toggleWidget={toggle}
+            setWidgetControlRef={setWidgetControlRef}
+          />
+          {/* The phone's Add is the FAB; this row is already desktop-only. */}
+          <TransactionKindMenu
+            onSelect={openAddTransactionModal}
+            trigger={
+              <Button size="sm" className="gap-2 shrink-0 max-md:hidden">
+                <Plus className="w-4 h-4" />
+                Add Transaction
+              </Button>
+            }
+          />
+        </div>
       </div>
 
       <div
         className="hidden md:block 2xl:hidden h-px col-span-full"
         style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }}
       />
-
-      <PageActions desktopOnly>
-        <TransactionKindMenu
-          onSelect={openAddTransactionModal}
-          trigger={
-            <Button className="gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0">
-              <Plus className="w-3.5 h-3.5" />
-              Add Transaction
-            </Button>
-          }
-        />
-      </PageActions>
 
       {loadFailed && !loading && (
         <div className="col-span-full" style={{ order: -1 }}>

@@ -442,8 +442,8 @@ export default function AccountTransactionsPage() {
   ) : null
 
   return (
-    <div className="flex justify-center gap-6 lg:pr-6">
-      <div className="p-4 md:p-6 space-y-4 max-w-3xl lg:max-w-6xl mx-auto min-w-0 flex-1">
+    <div className="mx-auto flex w-full max-w-6xl gap-6 p-4 md:p-6">
+      <div className="min-w-0 flex-1 space-y-4">
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Link to="/accounts" className="rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring">Accounts</Link>
           <ChevronRight className="w-3.5 h-3.5" aria-hidden />
@@ -468,12 +468,13 @@ export default function AccountTransactionsPage() {
             <h1 className="text-xl font-bold flex-1">Account Transactions</h1>
           )}
           {account && (
-            <Button variant="outline" className="gap-2 shrink-0 max-sm:size-9 max-sm:px-0" aria-label="Edit account" onClick={() => setEditAccountOpen(true)}>
+            <Button variant="outline" size="sm" className="gap-2 shrink-0 max-sm:size-9 max-sm:px-0" aria-label="Edit account" onClick={() => setEditAccountOpen(true)}>
               <Pencil className="w-4 h-4" /><span className="max-sm:hidden">Edit account</span>
             </Button>
           )}
           {account?.type === 'loan' ? (
             <Button
+              size="sm"
               className="gap-2 shrink-0"
               onClick={openLoanPayment}
             >
@@ -484,6 +485,7 @@ export default function AccountTransactionsPage() {
             {account?.type === 'credit_card' && (
               <Button
                 variant="outline"
+                size="sm"
                 className="gap-2 shrink-0"
                 onClick={openCardPayment}
               >
@@ -503,8 +505,8 @@ export default function AccountTransactionsPage() {
                 setCreateOpen(true)
               }}
               trigger={
-                <Button className="gap-2 shrink-0">
-                  <Plus className="w-4 h-4" />Add
+                <Button size="sm" className="gap-2 shrink-0">
+                  <Plus className="w-4 h-4" />Add Transaction
                 </Button>
               }
             />

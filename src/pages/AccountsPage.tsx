@@ -576,7 +576,7 @@ export default function AccountsPage() {
   const assetCount = overview.assets.length
 
   return (
-    <div className="p-4 md:p-6 lg:px-8 space-y-6">
+    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           {accounts.length > 0 && (

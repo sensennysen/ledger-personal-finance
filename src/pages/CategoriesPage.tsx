@@ -1018,11 +1018,11 @@ export default function CategoriesPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-3xl xl:max-w-6xl mx-auto">
-      <div className="space-y-3">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0">
           <p className="text-muted-foreground text-sm">Customize your transaction categories</p>
         </div>
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setRulesOpen(true)}>
             <Zap className="w-3.5 h-3.5" />Auto-categorize
             <Badge variant="secondary" className="text-xs tabular-nums">

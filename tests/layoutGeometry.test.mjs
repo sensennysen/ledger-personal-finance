@@ -29,17 +29,18 @@ test('FAB, toast and install banner clear the bottom nav', () => {
 
 test('entry-detail pane docks only where it fits beside the full-width Activity list', () => {
   const activity = read('pages/TransactionsPage.tsx')
-  // Tailwind max-w-3xl = 48rem = 768px, plus md:p-6 on both sides.
-  assert.match(activity, /p-4 md:p-6 space-y-4 max-w-3xl mx-auto/)
-  const list = 768 + 2 * 24
+  // Activity shares the Budgets/Categories container: Tailwind max-w-6xl = 72rem = 1152px,
+  // with md:p-6 inside it. The list column and the month rail share that width.
+  assert.match(activity, /mx-auto flex w-full max-w-6xl gap-6 p-4 md:p-6/)
+  const container = 1152
   const pane = px(layout, /aria-label="Entry detail"\s+className="relative w-\[(\d+)px\]/)
   const dock = px(layout, /const wide = useMediaQuery\('\(min-width: (\d+)px\)'\)/)
   assert.equal(dock, 1920)
-  // Activity's month rail (LED-62) sits beside the list at lg+: Tailwind w-60 = 240px.
-  const rail = 240
-  assert.match(read('components/transactions/MonthJump.tsx'), /aria-label="Month jump" className="sticky top-4 hidden w-60/)
-  assert.ok(dock - pane >= list + rail, 'docked at 1920 the list and month rail keep their width')
-  assert.ok(1024 - pane < list, 'at lg a docked column would squeeze the list')
+  // Activity's month rail (LED-62) sits beside the list at lg+: Tailwind w-64 = 256px.
+  const rail = 256
+  assert.match(read('components/transactions/MonthJump.tsx'), /aria-label="Month jump" className="sticky top-4 hidden w-64/)
+  assert.ok(dock - pane >= container, 'docked at 1920 the whole Activity container keeps its width')
+  assert.ok(1024 - pane - 2 * 24 - 24 - rail < 768, 'at lg a docked column would squeeze the list')
   // Below the dock width the pane is an overlay sheet, never a column.
   assert.match(layout, /\{wide && sheet === 'detail' && entry && \(\s*<aside/)
   assert.match(layout, /open=\{!wide && sheet === 'detail'/)

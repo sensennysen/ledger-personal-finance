@@ -146,6 +146,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         '--sidebar-accent',
         '--sidebar-accent-foreground',
         '--sidebar-ring',
+        '--primary-hover',
       ]
       if (accentColor.toLowerCase() === DEFAULT_ACCENT) {
         names.forEach((name) => root.style.removeProperty(name))
@@ -171,6 +172,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           tones.container,
           tones.onContainer,
           tones.primary,
+          tones.primaryHover,
         ]
         names.forEach((name, index) => root.style.setProperty(name, values[index]))
       }

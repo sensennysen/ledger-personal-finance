@@ -28,6 +28,8 @@
 
   --primary: #55659A;
   --primary-foreground: #FFFFFF;
+  /* Hover: darker, away from the white ink (LED-248). A custom accent sets its own (accentTheme.ts). */
+  --primary-hover: color-mix(in srgb, var(--primary) 88%, #000000);
 
   --secondary: #EEF1FA;
   --secondary-foreground: #2E3A63;
@@ -110,6 +112,7 @@
 
   --primary: #A8B4DE;
   --primary-foreground: #1B2135;  /* dark ink on the lightened accent, not white */
+  --primary-hover: color-mix(in srgb, var(--primary) 88%, #FFFFFF);
 
   --secondary: #2E3552;
   --secondary-foreground: #DBE1F7;
@@ -192,6 +195,10 @@
   --color-elevated: var(--elevated);
   /* Solid hover for cards: a see-through bg-accent/N swaps out bg-card and lets the grey page through (LED-246) */
   --color-surface-hover: color-mix(in srgb, var(--accent) 50%, var(--card));
+  /* Solid button hovers (LED-248): primary/85 and destructive/30 let the surface through and drew labels under 4.5:1.
+     Container first: without color-mix the build falls back to the first colour, and --expense would hide the label. */
+  --color-primary-hover: var(--primary-hover);
+  --color-destructive-hover: color-mix(in srgb, var(--expense-container) 88%, var(--expense));
 
   /* Shadcn token mappings */
   --color-sidebar-ring: var(--sidebar-ring);

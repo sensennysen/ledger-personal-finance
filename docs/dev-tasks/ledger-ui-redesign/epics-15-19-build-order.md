@@ -89,7 +89,7 @@ Built in four phases (plan 2026-10-03), each validated before the next:
 - **B, categories:** LED-233, then 236, 240, 239. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-phase-b.md`).
 - **C, cycle totals:** LED-238, then 237. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-phase-c.md`). Validation filed LED-251.
 - **D, Activity, loading, storage:** LED-241, 242, 245. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-phase-d.md`).
-- **Filed during A and B:** LED-247, 250, 249, 248. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-led-247-250.md`). LED-251 waits for a decision.
+- **Filed during A and B:** LED-247, 250, 249, 248. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-led-247-250.md`). LED-251's decision is OD-14 (a).
 
 | Ticket | Item | Summary | Pts |
 |---|---|---|---|
@@ -111,7 +111,7 @@ Built in four phases (plan 2026-10-03), each validated before the next:
 | LED-248 | LED-246 | Hovered primary and destructive buttons drop their label below 4.5:1 (found by `pnpm sweep --hover`) | 1 |
 | LED-249 | LED-235 | A completed goal card dims its text below 4.5:1 (found with a completed goal on the local stack) | 1 |
 | LED-250 | phase B validation | The auto-categorization rule form shows a category id once one is chosen (LED-239 fixed the same in its merge dialog) | 1 |
-| LED-251 | phase C validation | Account balances and net worth move when a future-dated row is saved, not on its date (needs a decision first) | 5 |
+| LED-251 | phase C validation | Account balances and net worth move when a future-dated row is saved, not on its date (OD-14: (a), show "after scheduled" beside stored balances) | 5 |
 
 ## Phase 6 — Hygiene (run last, so statuses reflect what shipped)
 
@@ -132,6 +132,7 @@ Phase totals in points: 1 = 22, 2 = 22, 3 = 19, 4 = 21, 5 = 21 (LED-189 widened 
 | OD-11 | What does "first four widgets above the fold" mean at 390? | (a) a shorter cash flow chart on phones; (b) fewer widgets above it; (c) drop the claim | (a) | LED-202 | (a) |
 | OD-12 | Should the sweep drivers live in the repo? | (a) yes, a dev-only script; (b) no, keep the pattern file | (a) | LED-211 | (a), dev only |
 | OD-13 | The twelve parked items in LED-214 | per item, each with a Fallback in the ticket | answer them in one pass; most stay as the Fallback | LED-214 | Item 7 kept as is; the other eleven changed (LED-233 to LED-244) |
+| OD-14 | A future-dated row moves stored balances when it is saved, not on its date. What do balances show? | (a) keep stored balances and show "after scheduled" beside them; (b) derive a balance as of today in the client; (c) apply a row on its date in the database (scheduled job, migration) | (b) | LED-251 | (a), answered 2026-10-04 |
 
 Decisions inside a ticket (not blocking): LED-195 (Pay now for a past bill defaults to today; recommended).
 

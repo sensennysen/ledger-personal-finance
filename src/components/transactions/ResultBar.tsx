@@ -1,10 +1,27 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowDownWideNarrow, ArrowUpNarrowWide, Bookmark, Download, Rows3 } from 'lucide-react'
+import { ArrowDown10, ArrowDownWideNarrow, ArrowUp01, ArrowUpNarrowWide, Bookmark, Download, Rows3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatNet } from '@/lib/formatNet'
-import type { TxSort } from '@/lib/transactionWindow'
+import type { ActivitySort, TxSort } from '@/lib/transactionWindow'
 
 type Density = 'comfortable' | 'compact'
+
+const SORT_OPTIONS: Record<ActivitySort, { label: string; icon: typeof ArrowDownWideNarrow }> = {
+  newest: { label: 'Newest first', icon: ArrowDownWideNarrow },
+  oldest: { label: 'Oldest first', icon: ArrowUpNarrowWide },
+  largest: { label: 'Largest first', icon: ArrowDown10 },
+  smallest: { label: 'Smallest first', icon: ArrowUp01 },
+}
+
+const DATE_SORTS: readonly TxSort[] = ['newest', 'oldest']
 
 function sumColor(sum: Record<string, number>): string {
   const values = Object.values(sum).filter((v) => v !== 0)
@@ -26,6 +43,7 @@ export function ResultBar({
   sum,
   sort,
   onSortChange,
+  sortOptions = DATE_SORTS,
   density,
   onDensityChange,
   onExport,
@@ -37,8 +55,10 @@ export function ResultBar({
   totalLabel: string
   rangeLabel: string | null
   sum: Record<string, number>
-  sort: TxSort
-  onSortChange: (sort: TxSort) => void
+  sort: ActivitySort
+  onSortChange: (sort: ActivitySort) => void
+  /** The sorts offered: dates only unless the page lists amounts flat (Activity, LED-241). */
+  sortOptions?: readonly ActivitySort[]
   density: Density
   onDensityChange: (density: Density) => void
   /** Downloads the matching rows as CSV (29a "Export match"). */
@@ -47,9 +67,7 @@ export function ResultBar({
   savedFilters?: { count: number; canSave: boolean; onOpen: () => void }
   compact: boolean
 }) {
-  const nextSort: TxSort = sort === 'newest' ? 'oldest' : 'newest'
-  const SortIcon = sort === 'newest' ? ArrowDownWideNarrow : ArrowUpNarrowWide
-  const sortLabel = sort === 'newest' ? 'Newest first' : 'Oldest first'
+  const { label: sortLabel, icon: SortIcon } = SORT_OPTIONS[sort]
 
   return (
     <div className="relative -mx-4 flex items-center justify-between gap-3 border-y border-border bg-muted px-4 py-2 md:-mx-6 md:px-6">
@@ -70,17 +88,29 @@ export function ResultBar({
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-1.5 text-xs"
-          onClick={() => onSortChange(nextSort)}
-          aria-label={`Sorted ${sortLabel.toLowerCase()}; switch to ${nextSort} first`}
-          title={`Switch to ${nextSort} first`}
-        >
-          <SortIcon className="w-3.5 h-3.5" />
-          {!compact && <span>{sortLabel}</span>}
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'gap-1.5 text-xs' })}
+            aria-label={`Sorted ${sortLabel.toLowerCase()}; change sort`}
+            title="Change sort"
+          >
+            <SortIcon className="w-3.5 h-3.5" />
+            {!compact && <span>{sortLabel}</span>}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuRadioGroup value={sort} onValueChange={(value) => onSortChange(value as ActivitySort)}>
+              {sortOptions.map((option) => {
+                const { label, icon: Icon } = SORT_OPTIONS[option]
+                return (
+                  <DropdownMenuRadioItem key={option} value={option} closeOnClick>
+                    <Icon className="text-muted-foreground" />
+                    {label}
+                  </DropdownMenuRadioItem>
+                )
+              })}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {!compact && (
           <Button
             variant={density === 'compact' ? 'secondary' : 'ghost'}

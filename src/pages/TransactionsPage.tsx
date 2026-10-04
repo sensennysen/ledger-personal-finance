@@ -43,7 +43,8 @@ import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
 import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { effectiveDensity, groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { ACTIVITY_SORTS, effectiveDensity, groupByDay, isAmountSort, sliceGroups, sortByAmount, sortByDate, sumByCurrency, WINDOW_STEP, type ActivitySort } from '@/lib/transactionWindow'
+import { amountInCurrency } from '@/lib/exchangeRates'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
 import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
 import { FilterTopCategories } from '@/components/transactions/FilterTopCategories'
@@ -70,7 +71,7 @@ export default function TransactionsPage() {
   const [formError, setFormError] = useState<FormErrorValue>(null)
   const { prefs, set: setPref } = usePreferences()
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
-  const [sort, setSort] = useState<TxSort>('newest')
+  const [sort, setSort] = useState<ActivitySort>('newest')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
 
@@ -108,6 +109,7 @@ export default function TransactionsPage() {
       setSearch(handoffFilter.search)
       setFilterType(handoffFilter.type)
       setActiveTagFilter(handoffFilter.tag)
+      setSort(handoffFilter.sort)
     }
   }
   useEffect(() => {
@@ -116,6 +118,7 @@ export default function TransactionsPage() {
       params.delete('q')
       params.delete('type')
       params.delete('tag')
+      params.delete('sort')
       return params
     }, { replace: true })
   }, [handoffKey, setSearchParams])
@@ -128,13 +131,14 @@ export default function TransactionsPage() {
   const savedFilters = useSavedFilters()
   const [savedFiltersOpen, setSavedFiltersOpen] = useState(false)
   const currentFilter = useMemo<ActivityFilter>(
-    () => ({ type: filterType as FilterType, search, tag: activeTagFilter }),
-    [filterType, search, activeTagFilter]
+    () => ({ type: filterType as FilterType, search, tag: activeTagFilter, sort }),
+    [filterType, search, activeTagFilter, sort]
   )
   const applySavedFilter = (filter: ActivityFilter) => {
     setSearch(filter.search)
     setFilterType(filter.type)
     setActiveTagFilter(filter.tag)
+    changeSort(filter.sort)
   }
 
   // tx pending "save as template" name input
@@ -270,6 +274,12 @@ export default function TransactionsPage() {
     [setSelectedMonth]
   )
 
+  // Switching between date and amount changes the list's shape, so start it from the top.
+  const changeSort = (next: ActivitySort) => {
+    if (isAmountSort(next) !== isAmountSort(sort)) pageTopRef.current?.scrollIntoView({ block: 'start' })
+    setSort(next)
+  }
+
   const clearActivityFilters = useCallback(() => {
     setFilterType('all')
     setSearch('')
@@ -281,8 +291,17 @@ export default function TransactionsPage() {
     [transactions]
   )
 
-  const grouped = useMemo(() => groupByDay(filtered, undefined, sort), [filtered, sort])
-  const flatSorted = useMemo(() => sortByDate(filtered, sort), [filtered, sort])
+  // Amount sorts (LED-241) rank the whole filtered set, in the default currency; a row with no rate
+  // is not compared one to one and sorts last.
+  const amountSorted = isAmountSort(sort)
+  const grouped = useMemo(() => (isAmountSort(sort) ? [] : groupByDay(filtered, undefined, sort)), [filtered, sort])
+  const flatSorted = useMemo(
+    () =>
+      isAmountSort(sort)
+        ? sortByAmount(filtered, sort, (tx) => amountInCurrency(tx, baseCurrency, rateTable))
+        : sortByDate(filtered, sort),
+    [filtered, sort, baseCurrency, rateTable]
+  )
   const matchSum = useMemo(() => sumByCurrency(filtered), [filtered])
 
   // Window the list (LED-60). The cycle is left out of the reset key so
@@ -449,13 +468,14 @@ export default function TransactionsPage() {
       selected={selectedIds.has(tx.id)}
       onSelect={toggleSelect}
       dense={density === 'compact'}
+      showDate={amountSorted}
     />
   )
 
   // Export match (29a): exactly the rows the bar counts, in the order on screen, not just the rendered window.
   const exportMatch = () =>
     downloadCsv(
-      buildTransactionsCsv(sortByDate(filtered, sort), buildRunningBalanceMap(accounts, transactions)),
+      buildTransactionsCsv(flatSorted, buildRunningBalanceMap(accounts, transactions)),
       `ledger-activity_${selectedMonth}.csv`,
     )
 
@@ -467,7 +487,8 @@ export default function TransactionsPage() {
       rangeLabel={`${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
       sum={matchSum}
       sort={sort}
-      onSortChange={setSort}
+      onSortChange={changeSort}
+      sortOptions={ACTIVITY_SORTS}
       density={density}
       onDensityChange={(next) => setPref('txDensity', next)}
       onExport={exportMatch}
@@ -812,7 +833,7 @@ export default function TransactionsPage() {
               </Button>
             }
           />
-        ) : prefs.txView === 'flat' ? (
+        ) : prefs.txView === 'flat' || amountSorted ? (
           <ResultBarLayout bar={resultBar}>
             <div className="space-y-1">{flatSorted.slice(0, rendered).map(renderRow)}</div>
             <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
@@ -961,7 +982,7 @@ export default function TransactionsPage() {
 
         {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} onSelect={toggleSelectMode} selecting={selectMode} />}
       </div>
-      {showMonthJump && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} baseCurrency={baseCurrency} rateTable={rateTable} />} />}
+      {showMonthJump && !amountSorted && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} baseCurrency={baseCurrency} rateTable={rateTable} />} />}
     </div>
   )
 }

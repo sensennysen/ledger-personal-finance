@@ -11,7 +11,9 @@ import { usePreferences } from '@/hooks/usePreferences'
 import { useFlipReorder } from '@/hooks/useFlipReorder'
 import { supabase } from '@/lib/supabase'
 import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/types'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency, getLocalDateString } from '@/lib/utils'
+import { useTransactions } from '@/hooks/useTransactions'
+import { afterScheduledLabel, scheduledByAccount, scheduledNetWorth } from '@/lib/scheduledBalances'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -74,6 +76,22 @@ export default function AccountsPage() {
     new Date(),
     convertToDefault,
   )
+  // Balances are stored, so rows dated after today are already in them: show that part beside them (LED-251).
+  const today = getLocalDateString()
+  const tomorrow = useMemo(() => {
+    const [year, month, day] = today.split('-').map(Number)
+    return getLocalDateString(new Date(year, month - 1, day + 1))
+  }, [today])
+  const { transactions: laterRows, error: scheduledError, refetch: refetchScheduled } = useTransactions({ startDate: tomorrow })
+  const scheduled = useMemo(() => scheduledByAccount(accounts, laterRows, today), [accounts, laterRows, today])
+  const netWorthScheduled = useMemo(
+    () => scheduledNetWorth(accounts, laterRows, today, defaultCurrency, convertToDefault),
+    [accounts, laterRows, today, defaultCurrency, convertToDefault],
+  )
+  const afterScheduled = (account: Account) => {
+    const label = afterScheduledLabel(scheduled.get(account.id) ?? 0, account.currency, formatCurrency)
+    return label && <p className="text-xs text-muted-foreground">{label}</p>
+  }
   const ratesAsOf = ratesAsOfLabel(rateTable)
   const defaultGroupOrder = useMemo(() => Object.keys(ACCOUNT_TYPE_LABELS) as AccountType[], [])
   const accountGroupOrder = useMemo(() => {
@@ -351,6 +369,7 @@ export default function AccountsPage() {
           {row.converted !== null && (
             <p className="money text-xs text-muted-foreground">≈ {formatCurrency(row.converted, defaultCurrency)}</p>
           )}
+          {afterScheduled(account)}
         </div>
         {accountMenu(account)}
       </div>
@@ -390,6 +409,7 @@ export default function AccountsPage() {
               {row.convertedOwed !== null && (
                 <p className="money text-xs text-muted-foreground">≈ {row.convertedOwed > 0 ? '−' : ''}{formatCurrency(row.convertedOwed, defaultCurrency)}</p>
               )}
+              {afterScheduled(account)}
             </div>
             {accountMenu(account)}
           </div>
@@ -720,6 +740,9 @@ export default function AccountsPage() {
             <div className="col-span-2 border-b border-border/60 p-4 lg:col-span-1 lg:border-b-0 lg:border-r">
               <p className="text-xs text-muted-foreground">Net Worth</p>
               <p className="money mt-1 text-lg font-bold">{formatCurrency(overview.totals.netWorth, defaultCurrency)}</p>
+              {netWorthScheduled !== 0 && (
+                <p className="text-xs text-muted-foreground">{afterScheduledLabel(netWorthScheduled, defaultCurrency, formatCurrency)}</p>
+              )}
               {overview.excludedCurrencies.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
                   {overview.convertedCurrencies.length > 0
@@ -751,6 +774,10 @@ export default function AccountsPage() {
               )}
             </div>
           </div>
+
+          {scheduledError && (
+            <InlineLoadError message="Couldn't load scheduled transactions, so balances don't show what is still scheduled." onRetry={() => void refetchScheduled()} />
+          )}
 
           <div className="grid items-start gap-6 lg:grid-cols-2">
             {overview.assets.length > 0 && (

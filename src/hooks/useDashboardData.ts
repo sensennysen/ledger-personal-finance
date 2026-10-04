@@ -14,6 +14,7 @@ import {
 import { summarizeBalances } from '@/lib/accountsOverview'
 import { sumConverted } from '@/lib/convertedTotals'
 import { countedEnd, countsYet } from '@/lib/countsYet'
+import { scheduledNetWorth } from '@/lib/scheduledBalances'
 import type { ConvertFn, RateTable } from '@/lib/exchangeRates'
 import { buildUpcomingLoanBills } from '@/lib/loanInstallments'
 import type { Account, Category, LoanPaymentAllocation, LoanPurchase, Transaction } from '@/types'
@@ -52,6 +53,8 @@ export type DashboardStatsSummary = {
   upcomingExpenses: number
   /** Currencies left out of income/expenses/net (no exchange rate); distinct from the balance figures above. */
   excludedFlowCurrencies: string[]
+  /** What rows dated after today already added to `totalBalance`, which is stored (LED-251). */
+  scheduledNetWorth: number
 }
 
 type RecurringTransaction = Transaction & {
@@ -378,8 +381,9 @@ export function useDashboardData({
       upcomingIncome: upcomingIncomeResult.total,
       upcomingExpenses: upcomingExpensesResult.total,
       excludedFlowCurrencies,
+      scheduledNetWorth: scheduledNetWorth(accounts, transactions, today, baseCurrency, convert),
     }
-  }, [accounts, baseCurrency, convert, rateTable, monthTransactionGroups])
+  }, [accounts, transactions, today, baseCurrency, convert, rateTable, monthTransactionGroups])
 
   const { cashFlowData, excludedCashFlowCurrencies } = useMemo(() => {
     const periods = getCashFlowPeriods(chartPeriod, selectedMonth, monthStart, monthEnd, startDay)

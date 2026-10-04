@@ -3,6 +3,7 @@ import { PieChart, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { EXPENSE, INCOME } from '@/constants/colors'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { getAccountNetWorthContribution } from '@/lib/creditCards'
+import { afterScheduledLabel } from '@/lib/scheduledBalances'
 import { formatCurrency } from '@/lib/utils'
 import { MINUS } from '@/lib/netSign'
 import type { DashboardExpenseCategoryDetail, DashboardStatsSummary } from '@/hooks/useDashboardData'
@@ -170,6 +171,9 @@ export function DashboardDetailDialogs({
                 label="Net"
                 value={<span className="money text-base font-bold balance-gradient">{formatCurrency(stats.totalBalance, currency)}</span>}
               />
+              {stats.scheduledNetWorth !== 0 && (
+                <p className="text-right text-xs text-muted-foreground">{afterScheduledLabel(stats.scheduledNetWorth, currency, formatCurrency)}</p>
+              )}
             </div>
           )}
         </DialogContent>

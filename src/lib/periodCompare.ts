@@ -27,6 +27,48 @@ export function cycleMonthLabel(cycleKey: string): string {
   return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short' })
 }
 
+interface Window {
+  start: string
+  end: string
+}
+
+/** A local "YYYY-MM-DD" as a Date at local midnight. */
+function parseDay(date: string): Date {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function formatDay(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * The two windows a previous-period comparison sets side by side (LED-237). While the current
+ * cycle is open, day 1 to N of it (N = today's day in the cycle) is set against day 1 to N of the
+ * previous one, or all of the previous one when it is shorter. A closed cycle compares whole with
+ * whole. `partial` is true when the previous window is cut short, so the label names its days.
+ */
+export function likeForLikeWindows(current: Window, previous: Window, today: string): { current: Window; previous: Window; partial: boolean } {
+  if (today < current.start || today > current.end) return { current, previous, partial: false }
+  const start = parseDay(current.start)
+  const days = Math.round((parseDay(today).getTime() - start.getTime()) / 86400000) + 1
+  const prevStart = parseDay(previous.start)
+  const cut = formatDay(new Date(prevStart.getFullYear(), prevStart.getMonth(), prevStart.getDate() + days - 1))
+  const previousEnd = cut < previous.end ? cut : previous.end
+  return {
+    current: { start: current.start, end: today },
+    previous: { start: previous.start, end: previousEnd },
+    partial: previousEnd < previous.end,
+  }
+}
+
+/** What the comparison is against: "Aug" for a whole cycle, "Aug 25 – Aug 28" for part of one (LED-237). */
+export function comparisonLabel(previousKey: string, windows: { previous: Window; partial: boolean }): string {
+  if (!windows.partial) return cycleMonthLabel(previousKey)
+  const short = (date: string) => parseDay(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${short(windows.previous.start)} – ${short(windows.previous.end)}`
+}
+
 /**
  * Income, expenses and net for transactions dated within [start, end], converted into `target`.
  * A row with no rate is left out and its currency named, never counted at a rate of 1 (LED-183).

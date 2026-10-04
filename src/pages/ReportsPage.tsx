@@ -36,9 +36,10 @@ import { useCycle } from '@/contexts/cycleState'
 import { getReportRange } from '@/lib/reportCycle'
 import {
   compareToPrevious,
+  comparisonLabel,
   convertedNetWorthEffect,
-  cycleMonthLabel,
   formatComparison,
+  likeForLikeWindows,
   previousCycleKey,
   summarizeRange,
 } from '@/lib/periodCompare'
@@ -478,12 +479,17 @@ export default function ReportsPage() {
   )
   const scheduledSub = (amount: number) => (amount > 0 ? `+ ${formatCurrency(amount, currency)} scheduled` : undefined)
 
-  // Same figures for the previous cycle, so each stat card has a reference point.
-  const previousLabel = cycleMonthLabel(previousCycleKey(selectedMonth))
-  const previousTotals = useMemo(() => {
-    const range = getReportRange(previousCycleKey(selectedMonth), startDay)
-    return summarizeRange(transactions, range.start, range.end, currency, rateTable)
-  }, [transactions, selectedMonth, startDay, currency, rateTable])
+  // Same figures for the previous cycle, so each stat card has a reference point. While this
+  // cycle is open, only its first N days are set against the first N of the last one (LED-237).
+  const previousWindows = useMemo(() => {
+    const previous = getReportRange(previousCycleKey(selectedMonth), startDay)
+    return likeForLikeWindows({ start, end }, { start: previous.start, end: previous.end }, today)
+  }, [selectedMonth, startDay, start, end, today])
+  const previousLabel = comparisonLabel(previousCycleKey(selectedMonth), previousWindows)
+  const previousTotals = useMemo(
+    () => summarizeRange(transactions, previousWindows.previous.start, previousWindows.previous.end, currency, rateTable),
+    [transactions, previousWindows, currency, rateTable]
+  )
   const netWorthChange = useMemo(
     () => counted.reduce((sum, t) => sum + (convertedNetWorthEffect(t, currency, rateTable) ?? 0), 0),
     [counted, currency, rateTable]

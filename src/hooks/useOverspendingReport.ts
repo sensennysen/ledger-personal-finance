@@ -8,6 +8,7 @@ import type { DeficitBehaviour } from '@/lib/budgetRollover'
 import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { useAuth } from '@/contexts/AuthContext'
 import { getLocalDateString } from '@/lib/utils'
+import { likeForLikeWindows } from '@/lib/periodCompare'
 
 /**
  * The Overspending report for the selected cycle and the one before it, from one
@@ -45,8 +46,11 @@ export function useOverspendingReport({
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `compute` only closes over the listed inputs
   const result = useMemo(() => compute(month, today), [budgets, txs, month, startDay, behaviour, rates, today])
+  // Like for like (LED-237): while this cycle is open, the previous one counts only its first N days.
+  const previousMonth = shiftMonthKey(month, -1)
+  const previousUntil = likeForLikeWindows(range, monthCycleRange(previousMonth, startDay), today).previous.end
   // eslint-disable-next-line react-hooks/exhaustive-deps -- as above
-  const previous = useMemo(() => compute(shiftMonthKey(month, -1), today), [budgets, txs, month, startDay, behaviour, rates, today])
+  const previous = useMemo(() => compute(previousMonth, previousUntil), [budgets, txs, previousMonth, previousUntil, startDay, behaviour, rates])
 
   // One total in the default currency for the card and the stat card (LED-185), never "A + B".
   const converted = useMemo(() => convertOverspendingTotals(result, currency, rates), [result, currency, rates])

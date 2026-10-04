@@ -8,6 +8,8 @@ import {
   convertedNetWorthEffect,
   compareToPrevious,
   formatComparison,
+  likeForLikeWindows,
+  comparisonLabel,
 } from '../src/lib/periodCompare.ts'
 
 // 1 USD = 56 PHP.
@@ -117,4 +119,53 @@ test('convertedNetWorthEffect: a transfer between two currencies moves net worth
   assert.equal(convertedNetWorthEffect({ ...transfer, destination_amount: null, transfer_fee: null }, 'PHP', table), 0)
   // A side no rate converts makes the whole effect unknown, never counted at 1.
   assert.equal(convertedNetWorthEffect({ ...transfer, currency: 'EUR' }, 'PHP', table), null)
+})
+
+// LED-237: like-for-like windows.
+const sep = { start: '2026-09-01', end: '2026-09-30' }
+const aug = { start: '2026-08-01', end: '2026-08-31' }
+
+test('an open cycle on day 4 compares day 1 to 4 of each', () => {
+  const w = likeForLikeWindows(sep, aug, '2026-09-04')
+  assert.deepEqual(w.current, { start: '2026-09-01', end: '2026-09-04' })
+  assert.deepEqual(w.previous, { start: '2026-08-01', end: '2026-08-04' })
+  assert.equal(w.partial, true)
+  assert.equal(comparisonLabel('2026-08', w), 'Aug 1 – Aug 4')
+})
+
+test('day 1 compares one day with one day', () => {
+  const w = likeForLikeWindows(sep, aug, '2026-09-01')
+  assert.deepEqual(w.previous, { start: '2026-08-01', end: '2026-08-01' })
+})
+
+test('the last day of a 30-day cycle still cuts a 31-day previous one', () => {
+  const w = likeForLikeWindows(sep, aug, '2026-09-30')
+  assert.deepEqual(w.previous, { start: '2026-08-01', end: '2026-08-30' })
+  assert.equal(w.partial, true)
+})
+
+test('a previous cycle shorter than N days is used whole', () => {
+  const mar = { start: '2026-03-01', end: '2026-03-31' }
+  const feb = { start: '2026-02-01', end: '2026-02-28' }
+  const w = likeForLikeWindows(mar, feb, '2026-03-30')
+  assert.deepEqual(w.previous, feb)
+  assert.equal(w.partial, false)
+  assert.equal(comparisonLabel('2026-02', w), 'Feb')
+})
+
+test('a closed cycle compares whole with whole', () => {
+  const w = likeForLikeWindows(aug, { start: '2026-07-01', end: '2026-07-31' }, '2026-10-04')
+  assert.deepEqual(w.current, aug)
+  assert.deepEqual(w.previous, { start: '2026-07-01', end: '2026-07-31' })
+  assert.equal(w.partial, false)
+  assert.equal(comparisonLabel('2026-07', w), 'Jul')
+})
+
+test('a cycle starting on the 25th crosses the year', () => {
+  const current = { start: '2026-12-25', end: '2027-01-24' }
+  const previous = { start: '2026-11-25', end: '2026-12-24' }
+  const w = likeForLikeWindows(current, previous, '2027-01-02')
+  assert.deepEqual(w.current, { start: '2026-12-25', end: '2027-01-02' })
+  assert.deepEqual(w.previous, { start: '2026-11-25', end: '2026-12-03' })
+  assert.equal(comparisonLabel('2026-11', w), 'Nov 25 – Dec 3')
 })

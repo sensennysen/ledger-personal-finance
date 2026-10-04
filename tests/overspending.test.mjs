@@ -160,3 +160,29 @@ test('a yearly row carries its period and is labelled year to date; cycle budget
   assert.equal(spendWindowLabel('yearly'), 'year to date')
   for (const period of ['weekly', 'monthly', 'quarterly']) assert.equal(spendWindowLabel(period), null)
 })
+
+test('countUntil leaves a later row out of the open cycle until its date (LED-238)', () => {
+  const txs = [tx('2026-09-05', 500), tx('2026-09-20', 300)]
+  assert.deepEqual(run({ txs, countUntil: '2026-09-10' }).rows, [])
+  assert.equal(run({ txs, countUntil: '2026-09-20' }).rows[0].over, 200)
+})
+
+test('countUntil leaves a closed cycle unchanged (LED-238)', () => {
+  const txs = [tx('2026-09-05', 500), tx('2026-09-20', 300)]
+  assert.deepEqual(run({ txs, countUntil: '2026-10-04' }).rows, run({ txs }).rows)
+})
+
+test('countUntil cuts a non-rollover period too (LED-238)', () => {
+  const txs = [tx('2026-03-01', 500), tx('2026-11-01', 800)]
+  const yearly = run({ budgets: [budget({ period: 'yearly', amount: 1000 })], txs, rangeFor: () => ({ start: '2026-01-01', end: '2026-12-31' }), countUntil: '2026-09-15' })
+  assert.deepEqual(yearly.rows, [])
+})
+
+test('countUntil does not change rollover carried from closed cycles (LED-238)', () => {
+  const b = budget({ rollover_enabled: true, start_date: '2026-08-01' })
+  // August went 200 over, so September's limit is 400; the row on the 25th is not spent yet.
+  const txs = [tx('2026-08-05', 800), tx('2026-09-05', 500), tx('2026-09-25', 100)]
+  const [row] = run({ budgets: [b], txs, behaviour: 'carry', countUntil: '2026-09-10' }).rows
+  assert.equal(row.limit, 400)
+  assert.equal(row.spent, 500)
+})

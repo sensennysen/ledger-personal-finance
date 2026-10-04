@@ -49,7 +49,8 @@ import {
   getLookbackSubtitle,
   type Lookback,
 } from '@/lib/reportLookback'
-import { formatCurrency, formatDate, cn } from '@/lib/utils'
+import { formatCurrency, formatDate, getLocalDateString, cn } from '@/lib/utils'
+import { countedEnd, countsYet, scheduledIn } from '@/lib/countsYet'
 import { buildReportCsv, downloadCsv } from '@/lib/transactionCsv'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
 import { abbreviateTick, thinCategoryTicks } from '@/lib/chartTicks'
@@ -447,6 +448,11 @@ export default function ReportsPage() {
     })
   }, [transactions, start, end])
 
+  // Rows dated after today are scheduled: listed, but not in the totals until their date (LED-238).
+  const today = getLocalDateString()
+  const countedTo = countedEnd(end, today)
+  const counted = useMemo(() => filtered.filter((t) => countsYet(t.date, today)), [filtered, today])
+
   const goToPreviousPeriod = () => {
     setSelectedMonth(previousCycleKey(selectedMonth))
   }
@@ -463,9 +469,14 @@ export default function ReportsPage() {
 
   // Summary stats
   const { income: totalIncome, expenses: totalExpenses, net: netChange, excludedCurrencies: summaryExcludedCurrencies } = useMemo(
-    () => summarizeRange(transactions, start, end, currency, rateTable),
-    [transactions, start, end, currency, rateTable]
+    () => summarizeRange(transactions, start, countedTo, currency, rateTable),
+    [transactions, start, countedTo, currency, rateTable]
   )
+  const scheduledTotals = useMemo(
+    () => summarizeRange(scheduledIn(transactions, start, end, today), start, end, currency, rateTable),
+    [transactions, start, end, today, currency, rateTable]
+  )
+  const scheduledSub = (amount: number) => (amount > 0 ? `+ ${formatCurrency(amount, currency)} scheduled` : undefined)
 
   // Same figures for the previous cycle, so each stat card has a reference point.
   const previousLabel = cycleMonthLabel(previousCycleKey(selectedMonth))
@@ -474,8 +485,8 @@ export default function ReportsPage() {
     return summarizeRange(transactions, range.start, range.end, currency, rateTable)
   }, [transactions, selectedMonth, startDay, currency, rateTable])
   const netWorthChange = useMemo(
-    () => filtered.reduce((sum, t) => sum + (convertedNetWorthEffect(t, currency, rateTable) ?? 0), 0),
-    [filtered, currency, rateTable]
+    () => counted.reduce((sum, t) => sum + (convertedNetWorthEffect(t, currency, rateTable) ?? 0), 0),
+    [counted, currency, rateTable]
   )
   // good: which direction is good news for this figure. Hidden when a read
   // failed, since partial data would produce a false comparison.
@@ -490,8 +501,8 @@ export default function ReportsPage() {
 
   // Category breakdown (expenses only)
   const { rows: categoryBreakdown, excludedCurrencies: categoryExcludedCurrencies } = useMemo(
-    () => buildCategoryBreakdown(filtered, categoryById, currency, rateTable),
-    [filtered, categoryById, currency, rateTable]
+    () => buildCategoryBreakdown(counted, categoryById, currency, rateTable),
+    [counted, categoryById, currency, rateTable]
   )
 
   // Over budget stat card: the report's total in the display currency, against last cycle.
@@ -565,7 +576,7 @@ export default function ReportsPage() {
   const { monthlyData, monthlyExcludedCurrencies } = useMemo(() => {
     const excluded = new Set<string>()
     const monthlyData = getLookbackBuckets(lookback, new Date()).map((bucket) => {
-      const { income, expenses, excludedCurrencies } = summarizeRange(transactions, bucket.start, bucket.end, currency, rateTable)
+      const { income, expenses, excludedCurrencies } = summarizeRange(transactions, bucket.start, countedEnd(bucket.end, today), currency, rateTable)
       for (const code of excludedCurrencies) excluded.add(code)
       return {
         month: bucket.label,
@@ -574,12 +585,12 @@ export default function ReportsPage() {
       }
     })
     return { monthlyData, monthlyExcludedCurrencies: [...excluded].sort() }
-  }, [transactions, lookback, currency, rateTable])
+  }, [transactions, lookback, currency, rateTable, today])
 
   // ── Spending by Merchant (top 10 from filtered period) ──
   const merchantBreakdown = (() => {
     const map = new Map<string, { displayName: string; amount: number; count: number }>()
-    for (const t of filtered) {
+    for (const t of counted) {
       if (t.type !== 'expense') continue
       const key = t.description.trim().toLowerCase()
       if (!key) continue
@@ -685,18 +696,20 @@ export default function ReportsPage() {
           value={formatCurrency(totalIncome, currency)}
           icon={TrendingUp}
           color={INCOME}
+          sub={scheduledSub(scheduledTotals.income)}
           comparison={compare(totalIncome, previousTotals.income, 'up')}
           loading={loading}
-          note={<UnratedCurrencyNotice currencies={summaryExcludedCurrencies} subject="income and expenses" />}
+          note={<UnratedCurrencyNotice currencies={[...new Set([...summaryExcludedCurrencies, ...scheduledTotals.excludedCurrencies])].sort()} subject="income and expenses" />}
         />
         <StatCard
           title="Total Expenses"
           value={formatCurrency(totalExpenses, currency)}
           icon={TrendingDown}
           color={EXPENSE}
+          sub={scheduledSub(scheduledTotals.expenses)}
           comparison={compare(totalExpenses, previousTotals.expenses, 'down')}
           loading={loading}
-          note={<UnratedCurrencyNotice currencies={summaryExcludedCurrencies} subject="income and expenses" />}
+          note={<UnratedCurrencyNotice currencies={[...new Set([...summaryExcludedCurrencies, ...scheduledTotals.excludedCurrencies])].sort()} subject="income and expenses" />}
         />
         <StatCard
           title="Net Change"
@@ -896,6 +909,7 @@ export default function ReportsPage() {
                         return (
                           <td key={key} className="px-2 py-3 first:pl-4 last:pr-4 text-muted-foreground whitespace-nowrap">
                             {formatDate(t.date)}
+                            {!countsYet(t.date, today) && <span className="block text-[0.6875rem]">Scheduled</span>}
                           </td>
                         )
                       case 'description':

@@ -1493,6 +1493,7 @@ export default function BudgetsPage() {
                       <span className={over ? 'text-destructive font-medium' : 'text-muted-foreground'}>
                         {formatCurrency(spent, budget.currency)} spent
                         {spendWindowLabel(budget.period) && ` · ${spendWindowLabel(budget.period)}`}
+                        {(budget.scheduled ?? 0) > 0 && ` · + ${formatCurrency(budget.scheduled ?? 0, budget.currency)} scheduled`}
                       </span>
                       <span className="font-medium">
                         {over

@@ -102,6 +102,9 @@ export function BudgetTable({
                 <td className={cn('px-4 py-3 text-right align-top tabular-nums', over && 'font-medium text-destructive')}>
                   {formatCurrency(spent, budget.currency)}
                   {spendWindow && <span className="block text-xs font-normal text-muted-foreground">{spendWindow}</span>}
+                  {(budget.scheduled ?? 0) > 0 && (
+                    <span className="block text-xs font-normal text-muted-foreground">+ {formatCurrency(budget.scheduled ?? 0, budget.currency)} scheduled</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right align-top tabular-nums">
                   {formatCurrency(effective, budget.currency)}

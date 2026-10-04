@@ -35,3 +35,4 @@ supabase/prod_dump_*.sql
 
 # Graphify output
 graphify-out/
+sweep-out/

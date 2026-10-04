@@ -14,6 +14,8 @@ import AccountTransactionsPage from '@/pages/AccountTransactionsPage'
 import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage'
 import TermsOfServicePage from '@/pages/TermsOfServicePage'
 import DataDeletionPage from '@/pages/DataDeletionPage'
+import CookiesStoragePage from '@/pages/CookiesStoragePage'
+import LegalNoticesPage from '@/pages/LegalNoticesPage'
 import ReportsPage from '@/pages/ReportsPage'
 import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
 
@@ -77,12 +79,27 @@ const routeMeta: RouteMetaEntry[] = [
   {
     test: (pathname) => pathname === '/privacy',
     title: 'Privacy Policy',
-    description: 'Learn how Ledger collects, uses, and protects your personal and financial data.',
+    description: 'What Ledger stores, which services your browser contacts, and how to export or delete your data.',
   },
   {
     test: (pathname) => pathname === '/data-deletion',
     title: 'Data Deletion Instructions',
-    description: 'Request permanent deletion of your Ledger account and all associated personal data.',
+    description: 'Delete your Ledger account and everything in it yourself, from Settings, and download a copy first.',
+  },
+  {
+    test: (pathname) => pathname === '/terms',
+    title: 'Terms of Service',
+    description: 'The terms for using a copy of Ledger, the open-source personal finance app.',
+  },
+  {
+    test: (pathname) => pathname === '/cookies',
+    title: 'Cookies and browser storage',
+    description: 'Ledger sets no cookies. What it keeps in your browser, why, and how to remove it.',
+  },
+  {
+    test: (pathname) => pathname === '/notices',
+    title: 'Notices',
+    description: 'Not financial advice, running your own copy, the MIT licence and how to get in touch.',
   },
 ]
 
@@ -183,7 +200,7 @@ function ProtectedRoutes() {
   }
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary variant="app">
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<DashboardPage />} />
@@ -219,6 +236,8 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsOfServicePage />} />
           <Route path="/data-deletion" element={<DataDeletionPage />} />
+          <Route path="/cookies" element={<CookiesStoragePage />} />
+          <Route path="/notices" element={<LegalNoticesPage />} />
           <Route path="/*" element={<ProtectedRoutes />} />
         </Routes>
       </AuthProvider>

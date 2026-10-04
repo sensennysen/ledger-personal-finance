@@ -1,3 +1,5 @@
+import { SWATCHES } from '../lib/swatches.ts'
+
 export type AccountType =
   | 'cash'
   | 'digital_wallet'
@@ -34,6 +36,8 @@ export interface Profile {
   avatar_url: string | null
   default_currency: string
   month_start_day: number
+  budget_deficit_behaviour?: 'carry' | 'reset' | null
+  exchange_rate_refresh?: 'open' | 'daily' | 'weekly' | 'manual' | null
   dashboard_widget_order?: string[] | null
   account_group_order?: AccountType[] | null
   account_view_mode?: 'all' | AccountType | null
@@ -78,6 +82,8 @@ export interface Category {
   color: string
   icon: string
   is_default: boolean
+  /** Counts as basic salary on the 13th Month page (LED-236). */
+  counts_as_salary: boolean
   sort_order?: number
   created_at: string
   updated_at: string
@@ -104,6 +110,11 @@ export interface Transaction {
   amount: number
   currency: string
   exchange_rate: number
+  /**
+   * What a transfer between two currencies credits its destination, in the destination's currency
+   * (LED-185). Null for every other row; the destination then receives the amount itself.
+   */
+  destination_amount?: number | null
   description: string
   notes: string | null
   date: string
@@ -111,9 +122,14 @@ export interface Transaction {
   is_recurring: boolean
   recurrence_interval: RecurrenceInterval | null
   recurrence_end_date: string | null
+  /** Set by the database once this row's next occurrence is posted, on any device (LED-232). */
+  recurrence_next_posted?: boolean
   receipt_url: string | null
   tags?: string[]
   goal_id?: string | null
+  /** The statement amount and currency of a converted CSV import row (LED-136). */
+  original_amount?: number | null
+  original_currency?: string | null
   created_at: string
   updated_at: string
   // joined
@@ -121,6 +137,8 @@ export interface Transaction {
   to_account?: Account
   category?: Category
   subcategory?: Subcategory
+  /** Client-only: set on optimistic rows queued while offline, cleared on the next successful fetch. */
+  queued?: boolean
 }
 
 export interface BudgetHistoryEntry {
@@ -149,9 +167,14 @@ export interface Budget {
   // joined / computed
   category?: Category
   spent?: number
+  /** Spend dated later in the open period: scheduled, not in `spent` yet (LED-238). */
+  scheduled?: number
+  unrated_currencies?: string[]
   rollover_amount?: number
   effective_amount?: number
   history?: BudgetHistoryEntry[]
+  /** Spend in every closed monthly period, oldest first; lets the form replay Carried in. */
+  period_spends?: number[]
 }
 
 export interface SavingsGoal {
@@ -177,6 +200,8 @@ export interface CreditCardPayment {
   amount: number
   payment_date: string
   notes: string | null
+  /** The transfer this payment came from. Null on payments made before LED-191 that could not be matched. */
+  transaction_id: string | null
   created_at: string
 }
 
@@ -249,15 +274,5 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
   other: 'Other',
 }
 
-export const ACCOUNT_COLORS = [
-  '#6366f1',
-  '#8b5cf6',
-  '#ec4899',
-  '#ef4444',
-  '#f97316',
-  '#eab308',
-  '#22c55e',
-  '#14b8a6',
-  '#3b82f6',
-  '#06b6d4',
-]
+/** The shared swatch list (src/lib/swatches.ts): accounts, budgets, categories and the accent all pick from it. */
+export const ACCOUNT_COLORS: readonly string[] = SWATCHES

@@ -1,0 +1,148 @@
+import { useMemo } from 'react'
+import { useCycle } from '@/contexts/cycleState'
+import { useTransactions } from '@/hooks/useTransactions'
+import { useAccounts } from '@/hooks/useAccounts'
+import { useCategories } from '@/hooks/useCategories'
+import { useBudgetIndex } from '@/hooks/useBudgetIndex'
+import { useLoanPurchases } from '@/hooks/useLoanPurchases'
+import { getCustomMonthRange } from '@/lib/utils'
+import { resolveLoadState } from '@/lib/loadState'
+import { sumByCurrency } from '@/lib/transactionWindow'
+import { getLoanAmountOwed, loansOwed } from '@/lib/loans'
+import { roundMoney } from '@/lib/loanInstallments'
+import {
+  buildDueSoon,
+  buildHandoff,
+  capGroup,
+  categoryMatches,
+  inScope,
+  matchActions,
+  mergeCategoryResults,
+  parseAmountQuery,
+  searchMatcher,
+  searchNamed,
+  searchTransactions,
+  type SearchAction,
+  type SearchScope,
+} from '@/lib/globalSearch'
+
+/**
+ * Search over transactions, accounts, categories and actions. The cycle is
+ * never applied implicitly: `scope` says whether to search the shell's selected
+ * cycle or all time, and `range` is returned so the UI can state which.
+ * `account` (⌘F) narrows transactions to one account and sends "See all" there.
+ */
+export function useGlobalSearch(
+  query: string,
+  scope: SearchScope,
+  actions: SearchAction[],
+  account?: { id: string; name: string } | null,
+) {
+  const { startDay, selectedMonth } = useCycle()
+  const transactions = useTransactions()
+  const accounts = useAccounts()
+  const categories = useCategories()
+  // Loans only feed the before-you-type state, so they load only while the query is empty.
+  const emptyQuery = query.trim() === ''
+  const loans = useLoanPurchases(undefined, emptyQuery)
+  // Budget ids only feed "Edit the budget" on category rows, so they load once someone types.
+  const budgets = useBudgetIndex(!emptyQuery)
+
+  const range = useMemo(
+    () => getCustomMonthRange(selectedMonth, startDay),
+    [selectedMonth, startDay],
+  )
+
+  const accountId = account?.id
+  const accountName = account?.name
+  const results = useMemo(() => {
+    const rows = transactions.transactions
+    const matches = searchTransactions(rows, query, scope, range, accountId)
+    const matched = [...matches.exact, ...matches.nearby, ...matches.text]
+
+    // What the destination of "See all" will show for the same query.
+    const matcher = searchMatcher(query)
+    const cycleCount =
+      scope === 'cycle' && !accountId
+        ? matched.length
+        : inScope(rows, 'cycle', range).filter(matcher).length
+    const accountCount = accountId ? inScope(rows, 'all', range, accountId).filter(matcher).length : 0
+    const handoff = buildHandoff({
+      query,
+      scope,
+      paletteTotal: matched.length,
+      cycleCount,
+      account: accountId && accountName ? { id: accountId, name: accountName } : null,
+      accountCount,
+    })
+
+    const byCategory = categoryMatches(matched)
+    const matchCounts = new Map([...byCategory].map(([id, inCategory]) => [id, inCategory.length]))
+    const categoryRows = mergeCategoryResults(categories.categories, query, matchCounts).map((category) => {
+      const inCategory = byCategory.get(category.id) ?? []
+      return { ...category, matchCount: inCategory.length, matchSum: sumByCurrency(inCategory) }
+    })
+
+    return {
+      exact: capGroup(matches.exact),
+      nearby: capGroup(matches.nearby),
+      text: capGroup(matches.text),
+      transactionTotal: matched.length,
+      handoff,
+      accounts: capGroup(searchNamed(accounts.accounts, query)),
+      categories: capGroup(categoryRows),
+      actions: matchActions(actions, query),
+    }
+  }, [transactions.transactions, accounts.accounts, categories.categories, query, scope, range, actions, accountId, accountName])
+
+  const deadlines = loans.deadlines
+  const dueSoon = useMemo(() => {
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const accountByPurchase = new Map(loans.purchases.map((purchase) => [purchase.id, purchase.account_id]))
+    return buildDueSoon(deadlines, today).map((row) => ({
+      ...row,
+      accountId: accountByPurchase.get(row.purchaseId) ?? null,
+    }))
+  }, [deadlines, loans.purchases])
+  // The count is loan accounts that still owe something, the same definition the Add
+  // Transaction kind menu uses (LED-156), not distinct purchases: a loan can hold several
+  // purchases and still be one loan to pay down.
+  const loanSummary = useMemo(() => {
+    const owedAccounts = loansOwed(accounts.accounts)
+    return {
+      count: owedAccounts.length,
+      owed: roundMoney(owedAccounts.reduce((sum, account) => sum + getLoanAmountOwed(account), 0)),
+    }
+  }, [accounts.accounts])
+
+  const error = transactions.error ?? accounts.error ?? categories.error ?? loans.error ?? budgets.error
+  const loadState = resolveLoadState({
+    loading: transactions.loading || accounts.loading || categories.loading || loans.loading,
+    error,
+    hasData:
+      transactions.transactions.length > 0 ||
+      accounts.accounts.length > 0 ||
+      categories.categories.length > 0,
+  })
+
+  const refetch = () => {
+    void transactions.refetch()
+    void accounts.refetch()
+    void categories.refetch()
+    void loans.refetch()
+    void budgets.refetch()
+  }
+
+  return {
+    results,
+    range,
+    dueSoon,
+    loanSummary,
+    budgetByCategory: budgets.budgetByCategory,
+    isAmountQuery: parseAmountQuery(query) !== null,
+    loadState,
+    error,
+    refetch,
+  }
+}

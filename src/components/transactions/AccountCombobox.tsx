@@ -4,6 +4,7 @@ import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { ACCOUNT_TYPE_LABELS, type Account, type AccountType } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
+import { compareAccountsForPicker, pickerGroupOrder } from '@/lib/accountDefault'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -14,6 +15,7 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 interface AccountComboboxProps {
   accounts: Account[]
@@ -38,20 +40,20 @@ export function AccountCombobox({
   disabled = false,
   className,
 }: AccountComboboxProps) {
+  const ink = useCategoryInk()
   const { profile } = useAuth()
   const [open, setOpen] = useState(false)
   const selectedAccount = accounts.find((account) => account.id === value)
 
   const groupedAccounts = useMemo(() => {
-    const preferredOrder = profile?.account_group_order ?? defaultGroupOrder
-    const groupOrder = [...preferredOrder, ...defaultGroupOrder.filter((type) => !preferredOrder.includes(type))]
+    const groupOrder = pickerGroupOrder(profile?.account_group_order, defaultGroupOrder)
 
     return groupOrder
       .map((type) => ({
         type,
         accounts: accounts
           .filter((account) => account.type === type)
-          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)),
+          .sort(compareAccountsForPicker),
       }))
       .filter((group) => group.accounts.length > 0)
   }, [accounts, profile?.account_group_order])
@@ -76,7 +78,7 @@ export function AccountCombobox({
           {SelectedIcon && (
             <span
               className="flex size-6 shrink-0 items-center justify-center rounded-md"
-              style={{ backgroundColor: `${selectedAccount?.color}18`, color: selectedAccount?.color }}
+              style={{ backgroundColor: `${ink(selectedAccount?.color ?? '')}18`, color: ink(selectedAccount?.color ?? '') }}
             >
               <SelectedIcon className="size-3.5" />
             </span>
@@ -110,7 +112,7 @@ export function AccountCombobox({
                     >
                       <span
                         className="flex size-7 shrink-0 items-center justify-center rounded-md"
-                        style={{ backgroundColor: `${account.color}18`, color: account.color }}
+                        style={{ backgroundColor: `${ink(account.color)}18`, color: ink(account.color) }}
                       >
                         <Icon className="size-3.5" />
                       </span>

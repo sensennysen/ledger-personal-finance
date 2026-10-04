@@ -1,12 +1,15 @@
+import { ArrowLeftRight, Clock } from 'lucide-react'
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { useNavigate } from 'react-router-dom'
 import { EXPENSE, INCOME, TRANSFER } from '@/constants/colors'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getLocalDateString } from '@/lib/utils'
+import { countsYet } from '@/lib/countsYet'
+import { MINUS } from '@/lib/netSign'
 import type { Transaction } from '@/types'
 import { Button } from '@/components/ui/button'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
-import { Skeleton } from '@/components/ui/skeleton'
-import { DashboardTransactionRow } from '@/components/dashboard/DashboardTransactionRow'
+import { EmptyState } from '@/components/ui/empty-state'
+import { DashboardTransactionRow, DashboardTransactionRowSkeleton } from '@/components/dashboard/DashboardTransactionRow'
 
 interface DashboardRecentTransactionsCardProps {
   recentTransactions: Transaction[]
@@ -24,7 +27,7 @@ function getTransactionAmountColor(type: Transaction['type']) {
 
 function getTransactionPrefix(type: Transaction['type']) {
   if (type === 'income') return '+'
-  if (type === 'expense') return '-'
+  if (type === 'expense') return MINUS
   return ''
 }
 
@@ -37,6 +40,8 @@ export function DashboardRecentTransactionsCard({
 }: DashboardRecentTransactionsCardProps) {
   const navigate = useNavigate()
   const openDetail = useEntryDetail()
+  // A row dated later is listed but not counted yet (LED-238).
+  const today = getLocalDateString()
 
   return (
     <div className="min-w-0 max-w-full rounded-[20px] border border-border p-4 md:p-5 bg-card" style={style}>
@@ -55,9 +60,14 @@ export function DashboardRecentTransactionsCard({
         )}
       />
       {loading ? (
-        <div className="space-y-3">{[...Array(4)].map((_, index) => <Skeleton key={index} className="h-11" />)}</div>
+        <div className="space-y-0.5" aria-busy="true">{[...Array(5)].map((_, index) => <DashboardTransactionRowSkeleton key={index} />)}</div>
       ) : recentTransactions.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-8">No transactions yet</p>
+        <EmptyState
+          icon={ArrowLeftRight}
+          title="No transactions yet"
+          description="Your first entry will show up here."
+          bare
+        />
       ) : (
         <div className="space-y-0.5">
           {recentTransactions.map((transaction) => (
@@ -67,12 +77,19 @@ export function DashboardRecentTransactionsCard({
               icon={transaction.category?.icon ?? 'Tx'}
               iconBackgroundColor={'var(--'+transaction.type+'-container)'}
               title={transaction.description}
-              subtitle={transaction.date}
+              subtitle={countsYet(transaction.date, today) ? transaction.date : `${transaction.date} · Scheduled`}
               amount={
                 <span style={{ color: getTransactionAmountColor(transaction.type) }}>
                   {getTransactionPrefix(transaction.type)}
                   {formatCurrency(transaction.amount, transaction.currency)}
                 </span>
+              }
+              rightDetail={
+                transaction.queued ? (
+                  <span className="inline-flex items-center gap-1 text-[0.6875rem] text-warning">
+                    <Clock className="h-3 w-3" aria-hidden />Not synced yet
+                  </span>
+                ) : undefined
               }
             />
           ))}

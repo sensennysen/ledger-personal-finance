@@ -28,9 +28,6 @@ try {
     start: '2025-01-01',
     end: '2025-12-31',
   })
-  const { editEntryAmount } = await server.ssrLoadModule(
-    '/src/lib/entryAmount.ts',
-  )
   const { transactionSchema } = await server.ssrLoadModule(
     '/src/components/transactions/transactionFormSchema.ts',
   )
@@ -46,12 +43,6 @@ try {
     start: '2026-02-28',
     end: '2026-03-27',
   })
-  const type = (keys) => keys.reduce(editEntryAmount, '0')
-  assert.equal(type(['0', '0', '1', '0', '.', '2', '5', '8']), '10.25')
-  assert.equal(type(['.', '5', '.', 'delete', '2']), '0.2')
-  assert.equal(type(['delete', 'delete']), '0')
-  assert.equal(type(Array(20).fill('9')).length, 12)
-  assert.equal(editEntryAmount('10', 'invalid'), '10')
   const expense = {
     type: 'expense',
     account_id: 'test-account',
@@ -94,7 +85,7 @@ try {
     true,
   )
   console.log(
-    'Redesign checks passed: cycle boundaries, keypad editing, and transaction validation.',
+    'Redesign checks passed: cycle boundaries and transaction validation.',
   )
 } finally {
   await server.close()

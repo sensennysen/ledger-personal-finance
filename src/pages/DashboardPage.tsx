@@ -1,8 +1,7 @@
 import { WidgetDragContext } from '@/contexts/widgetDragState'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  ChevronLeft,
   ChevronRight,
   Plus,
   TrendingDown,
@@ -12,6 +11,8 @@ import {
 } from 'lucide-react'
 import { useOutletContext } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
+import { converterTo } from '@/lib/exchangeRates'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
@@ -24,9 +25,13 @@ import { usePreferences } from '@/hooks/usePreferences'
 import { useFlipReorder } from '@/hooks/useFlipReorder'
 import { formatCurrency, getCurrencySymbol, getLocalDateString, cn } from '@/lib/utils'
 import { useCycle } from '@/contexts/cycleState'
-import { INCOME, EXPENSE, GOLD } from '@/constants/colors'
-import { Skeleton } from '@/components/ui/skeleton'
+import { INCOME, EXPENSE } from '@/constants/colors'
+import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { InlineLoadError } from '@/components/ui/error-state'
+import { RefreshingRegion } from '@/components/ui/refreshing-region'
+import { DashboardWidgetBoundary } from '@/components/dashboard/DashboardWidgetBoundary'
+import type { Budget } from '@/types'
 import { DashboardDetailDialogs, type DashboardDetailView } from '@/components/dashboard/DashboardDetailDialogs'
 import { DashboardWidgetSettingsSheet } from '@/components/dashboard/DashboardWidgetSettingsSheet'
 import { DashboardCreditCardMonitor } from '@/components/dashboard/DashboardCreditCardMonitor'
@@ -36,9 +41,24 @@ import { DashboardRecentTransactionsCard } from '@/components/dashboard/Dashboar
 import { DashboardBudgetProgressCard } from '@/components/dashboard/DashboardBudgetProgressCard'
 import { DashboardUpcomingBillsCard } from '@/components/dashboard/DashboardUpcomingBillsCard'
 import { DashboardCashFlowForecastCard } from '@/components/dashboard/DashboardCashFlowForecastCard'
+import { DashboardFirstRunChecklist } from '@/components/dashboard/DashboardFirstRunChecklist'
 import { getCreditCardSpending } from '@/lib/creditCards'
+import { afterScheduledLabel } from '@/lib/scheduledBalances'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
+import { PageActions } from '@/components/layout/PageActions'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
+
+/** "This month · + ₱1,200.00 scheduled" when rows later in the cycle are not counted yet (LED-238). */
+function withScheduled(sub: string, upcoming: number, currency: string): string {
+  return upcoming > 0 ? `${sub} · + ${formatCurrency(upcoming, currency)} scheduled` : sub
+}
+
+/** "Assets minus Liabilities · after − ₱100.00 scheduled" when rows dated later are already in the stored balances (LED-251). */
+function withAfterScheduled(sub: string, scheduled: number, currency: string): string {
+  const label = afterScheduledLabel(scheduled, currency, formatCurrency)
+  return label ? `${sub} · ${label}` : sub
+}
 
 function StatCard({
   title,
@@ -50,6 +70,7 @@ function StatCard({
   variant = 'default',
   onClick,
   className,
+  note,
 }: {
   title: string
   value: string
@@ -60,11 +81,12 @@ function StatCard({
   variant?: 'balance' | 'income' | 'expense' | 'default'
   onClick?: () => void
   className?: string
+  note?: React.ReactNode
 }) {
   const accentColor =
     variant === 'income' ? INCOME
     : variant === 'expense' ? EXPENSE
-    : GOLD
+    : 'var(--primary)'
 
   return (
     <div
@@ -72,7 +94,7 @@ function StatCard({
       tabIndex={onClick ? 0 : undefined}
       aria-label={onClick ? `View ${title.toLowerCase()} details` : undefined}
       className={cn(
-        'relative overflow-hidden rounded-[20px] border border-border p-5 transition-colors duration-200 group bg-card press-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'relative overflow-hidden rounded-[20px] border border-border p-5 2xl:px-4 2xl:py-3 transition-colors duration-(--dur-base) group bg-card press-scale focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
         onClick && 'cursor-pointer select-none',
         className
       )}
@@ -87,7 +109,7 @@ function StatCard({
     >
 
 
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-4 2xl:mb-2">
         <p className="text-[0.6875rem] font-medium text-muted-foreground uppercase tracking-widest">{title}</p>
         <div className="flex items-center gap-1.5">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{background: variant==='income'?'var(--income-container)':variant==='expense'?'var(--expense-container)':'var(--accent)'}}>
@@ -100,7 +122,12 @@ function StatCard({
       </div>
 
       {loading ? (
-        <Skeleton className="h-9 w-32" />
+        <>
+          <div className="mb-2 flex h-[1.75rem] items-center"><Skeleton className="h-6 w-32" /></div>
+          {sub !== undefined && <div className="text-[0.6875rem]"><SkeletonText className="w-24" /></div>}
+          {/* The loaded tile always has this wrapper, empty or not, so the 8px is not data-dependent (LED-200). */}
+          {note && <div className="mt-2" />}
+        </>
       ) : (
         <>
           <p
@@ -122,14 +149,11 @@ function StatCard({
               {sub}
             </p>
           )}
+          {note && <div className="mt-2">{note}</div>}
         </>
       )}
     </div>
   )
-}
-
-function getMonthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
 function formatMonthLabel(key: string) {
@@ -137,23 +161,21 @@ function formatMonthLabel(key: string) {
   return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 }
 
-function addMonths(key: string, delta: number) {
-  const [year, month] = key.split('-').map(Number)
-  const date = new Date(year, month - 1 + delta, 1)
-  return getMonthKey(date)
-}
+const NO_BUDGETS: Budget[] = []
 
 export default function DashboardPage() {
   const { openAddTransactionModal } = useOutletContext<AppLayoutContext>()
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
   const currencySymbol = getCurrencySymbol(currency)
-  const { accounts, loading: accountsLoading, updateAccount } = useAccounts()
-  const { transactions, loading: txLoading } = useTransactions()
+  const { table: rateTable } = useExchangeRates()
+  const convertToDefault = useMemo(() => converterTo(rateTable, currency), [rateTable, currency])
+  const { accounts, loading: accountsLoading, error: accountsError, refetch: refetchAccounts, updateAccount } = useAccounts()
+  const { transactions, loading: txLoading, error: txError, refetch: refetchTransactions } = useTransactions()
   const { categories } = useCategories()
-  const { purchases: loanPurchases, allocations: loanAllocations, loading: loansLoading } = useLoanPurchases()
-  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
-  const { budgets } = useBudgets({ selectedMonth, startDay })
+  const { purchases: loanPurchases, allocations: loanAllocations, loading: loansLoading, error: loansError, refetch: refetchLoans } = useLoanPurchases()
+  const { startDay, selectedMonth } = useCycle()
+  const { budgets, refreshing: budgetsRefreshing } = useBudgets({ selectedMonth, startDay })
   const [chartPeriod, setChartPeriod] = useState<DashboardChartPeriod>('month')
   const [detailView, setDetailView] = useState<DashboardDetailView>(null)
 
@@ -161,9 +183,11 @@ export default function DashboardPage() {
     isCurrentMonth,
     stats,
     cashFlowData,
+    excludedCashFlowCurrencies,
     monthIncomeTx,
     monthExpenseTx,
     expensesByCategory,
+    expensesByCategoryExcluded,
     expenseCategoryDetails,
     recentTx,
     upcomingBills,
@@ -179,13 +203,24 @@ export default function DashboardPage() {
     chartPeriod,
     selectedMonth,
     startDay,
+    baseCurrency: currency,
+    convert: convertToDefault,
+    rateTable,
   })
 
   const monthLabel = formatMonthLabel(selectedMonth)
   const loading = accountsLoading || txLoading || loansLoading
+  // Figures below are sums over these sources; a failed source would read as zero, so say so once.
+  const loadFailed = !!(accountsError || txError || loansError)
+  const retryFailedSources = () => {
+    if (accountsError) void refetchAccounts()
+    if (txError) void refetchTransactions()
+    if (loansError) void refetchLoans()
+  }
   const { widgets, widgetOrder, toggle, moveWidget, reorderWidget } = useDashboardPrefs()
   const { prefs } = usePreferences()
-  const alerts = useSpendingAlerts(budgets, transactions, prefs.largeTransactionThreshold)
+  // While a new cycle loads the budgets on screen belong to the previous one; don't alert on them.
+  const alerts = useSpendingAlerts(budgetsRefreshing ? NO_BUDGETS : budgets, transactions, prefs.largeTransactionThreshold)
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
   const [draggedWidget, setDraggedWidget] = useState<DashboardWidgetKey | null>(null)
   const [dropTargetWidget, setDropTargetWidget] = useState<DashboardWidgetKey | null>(null)
@@ -245,13 +280,14 @@ export default function DashboardPage() {
 
   return (
     <WidgetDragContext.Provider value={{start:setDraggedWidget,drop:key=>{if(draggedWidget)reorderWidget(draggedWidget,key);setDraggedWidget(null)},end:()=>setDraggedWidget(null)}}>
-    <div className="mx-auto grid w-full min-w-0 max-w-7xl gap-4 overflow-x-hidden p-4 md:p-6 lg:grid-cols-[1.5fr_1fr]">
-      <div className="hidden md:flex items-start justify-between gap-3 flex-wrap lg:col-span-2">
-        <div className="min-w-0">
+    <div className="grid w-full min-w-0 gap-3 md:gap-4 overflow-x-hidden p-4 md:p-6 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="hidden md:flex items-start justify-between gap-3 flex-wrap col-span-full">
+        <div className="min-w-0 2xl:flex 2xl:items-baseline 2xl:gap-3">
           <h1 className="text-2xl font-bold leading-tight truncate">
-            {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Dashboard'}
+            {/* Matches the "Home" nav title (src/App.tsx) so the page doesn't read as two names (LED-181 item, OD-8). */}
+            {profile?.full_name ? `Good day, ${profile.full_name.split(' ')[0]}.` : 'Home'}
           </h1>
-          <p className="text-muted-foreground text-[0.8125rem] mt-0.5">
+          <p className="text-muted-foreground text-[0.8125rem] mt-0.5 2xl:mt-0">
             {new Date().toLocaleDateString('en-US', {
               weekday: 'long',
               month: 'long',
@@ -276,46 +312,51 @@ export default function DashboardPage() {
       </div>
 
       <div
-        className="hidden md:block h-px lg:col-span-2"
+        className="hidden md:block 2xl:hidden h-px col-span-full"
         style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--primary) 35%, transparent), transparent)' }}
       />
 
-      <div className="hidden md:flex items-center gap-2 lg:col-span-2">
-        <div className="flex items-center gap-1 bg-muted/40 rounded-xl px-2 py-1.5 flex-1">
-          <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => setSelectedMonth((month) => addMonths(month, -1))}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <span className="text-sm font-semibold flex-1 text-center">{monthLabel}</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Next month"
-            onClick={() => setSelectedMonth((month) => addMonths(month, 1))}
-            disabled={isCurrentMonth}
-          >
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
+      <PageActions desktopOnly>
         <TransactionKindMenu
           onSelect={openAddTransactionModal}
           trigger={
-            <Button className="hidden md:inline-flex gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0">
+            <Button className="gap-1.5 h-9 text-[0.8125rem] font-medium shrink-0">
               <Plus className="w-3.5 h-3.5" />
               Add Transaction
             </Button>
           }
         />
-      </div>
+      </PageActions>
 
-      {(visibleAlerts.length > 0 || widgets.upcomingBills) && (
-        <div className="lg:col-span-2" style={{ order: 1 }}>
+      {loadFailed && !loading && (
+        <div className="col-span-full" style={{ order: -1 }}>
+          <InlineLoadError
+            message="Some of your data didn't load, so totals below may be incomplete."
+            onRetry={retryFailedSources}
+          />
+        </div>
+      )}
+
+      {(loading || !loadFailed) && (
+        <div className="col-span-full empty:hidden" style={{ order: 0 }}>
+          <DashboardFirstRunChecklist
+            accounts={accounts}
+            transactions={transactions}
+            onAddTransaction={openAddTransactionModal}
+            loading={loading}
+          />
+        </div>
+      )}
+
+      {visibleAlerts.length > 0 && (
+        <div className="col-span-full" style={{ order: 1 }}>
           <h2 className="text-sm font-semibold">Needs attention</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">Warnings and commitments for {monthLabel}</p>
         </div>
       )}
 
       {visibleAlerts.length > 0 && (
-        <div className="space-y-2 lg:col-span-2" style={{ order: 2 }}>
+        <div className="space-y-2 col-span-full" style={{ order: 2 }}>
           {visibleAlerts.map((alert) => (
             <div
               key={alert.id}
@@ -332,6 +373,7 @@ export default function DashboardPage() {
                 type="button"
                 aria-label="Dismiss warning"
                 onClick={() => setDismissedAlerts((state) => new Set([...state, alert.id]))}
+                className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
               >
                 <X className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
               </button>
@@ -341,121 +383,153 @@ export default function DashboardPage() {
       )}
 
       {widgets.upcomingBills && (
-        <DashboardUpcomingBillsCard
-          bills={upcomingBills}
-          isCurrentMonth={isCurrentMonth}
-          monthLabel={monthLabel}
-          loading={loading}
-          style={widgetGridStyle('upcomingBills')}
-        />
+        <DashboardWidgetBoundary widget="upcomingBills" style={widgetGridStyle('upcomingBills')}>
+          <DashboardUpcomingBillsCard
+            bills={upcomingBills}
+            isCurrentMonth={isCurrentMonth}
+            monthLabel={monthLabel}
+            loading={loading}
+            onPay={(payment) =>
+              openAddTransactionModal('loan-repayment', {
+                targetAccountId: payment.accountId,
+                prefill: { amount: payment.amount, date: payment.date },
+              })
+            }
+            style={widgetGridStyle('upcomingBills')}
+          />
+        </DashboardWidgetBoundary>
       )}
 
-      {widgets.stats && <section className="md:hidden rounded-3xl bg-card p-5" style={{order:0}}>
-        <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] mt-2">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
-        <div className="grid grid-cols-2 gap-3 mt-4">{([{view:'income',label:'↙ In',value:stats.income,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl p-3 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p></button>)}</div>
-      </section>}
       {widgets.stats && (
-        <div className="hidden md:grid gap-4 grid-cols-3 lg:col-span-2" style={widgetGridStyle('stats')}>
-          <StatCard
-            title="Net Worth"
-            value={formatCurrency(stats.totalBalance, currency)}
-            sub="Assets minus Liabilities"
-            icon={Wallet}
-            variant="balance"
-            loading={loading}
-            onClick={() => setDetailView('balance')}
-            className="animate-fade-up"
-          />
-          <StatCard
-            title="Monthly Income"
-            value={formatCurrency(stats.income, currency)}
-            className="animate-fade-up anim-delay-1"
-            sub={isCurrentMonth ? 'This month' : monthLabel}
-            icon={TrendingUp}
-            trend="up"
-            variant="income"
-            loading={loading}
-            onClick={() => setDetailView('income')}
-          />
-          <StatCard
-            title="Monthly Expenses"
-            value={formatCurrency(stats.expenses, currency)}
-            sub={isCurrentMonth ? 'This month' : monthLabel}
-            icon={TrendingDown}
-            trend="down"
-            variant="expense"
-            loading={loading}
-            onClick={() => setDetailView('expenses')}
-            className="animate-fade-up anim-delay-2"
-          />
+        <DashboardWidgetBoundary widget="stats" style={widgetGridStyle('stats')}>
+          <section className="md:hidden rounded-3xl bg-card p-4" style={widgetGridStyle('stats')}>
+            <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] leading-none mt-1.5">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p>{!loading && stats.scheduledNetWorth !== 0 && <p className="text-[11px] mt-1 text-muted-foreground">{afterScheduledLabel(stats.scheduledNetWorth,currency,formatCurrency)}</p>}</button>
+            {/* Only when there is a notice: an empty wrapper still takes its margin (LED-202). */}
+            {!loading && stats.excludedCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" /></div>}
+            <div className="grid grid-cols-2 gap-3 mt-2.5">{([{view:'income',label:'↙ In',value:stats.income,upcoming:stats.upcomingIncome,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,upcoming:stats.upcomingExpenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-1.5 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p>{!loading && item.upcoming > 0 && <p className="text-[11px] mt-0.5 truncate">+ {formatCurrency(item.upcoming,currency)} scheduled</p>}</button>)}</div>
+            {!loading && stats.excludedFlowCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" /></div>}
+          </section>
+          <div className="hidden md:grid gap-4 grid-cols-3 col-span-full" style={widgetGridStyle('stats')}>
+            <StatCard
+              title="Net Worth"
+              value={formatCurrency(stats.totalBalance, currency)}
+              sub={withAfterScheduled('Assets minus Liabilities', stats.scheduledNetWorth, currency)}
+              note={<UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" />}
+              icon={Wallet}
+              variant="balance"
+              loading={loading}
+              onClick={() => setDetailView('balance')}
+              className="animate-fade-up"
+            />
+            <StatCard
+              title="Monthly Income"
+              value={formatCurrency(stats.income, currency)}
+              className="animate-fade-up anim-delay-1"
+              sub={withScheduled(isCurrentMonth ? 'This month' : monthLabel, stats.upcomingIncome, currency)}
+              note={<UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" />}
+              icon={TrendingUp}
+              trend="up"
+              variant="income"
+              loading={loading}
+              onClick={() => setDetailView('income')}
+            />
+            <StatCard
+              title="Monthly Expenses"
+              value={formatCurrency(stats.expenses, currency)}
+              sub={withScheduled(isCurrentMonth ? 'This month' : monthLabel, stats.upcomingExpenses, currency)}
+              note={<UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" />}
+              icon={TrendingDown}
+              trend="down"
+              variant="expense"
+              loading={loading}
+              onClick={() => setDetailView('expenses')}
+              className="animate-fade-up anim-delay-2"
+            />
 
-        </div>
+          </div>
+        </DashboardWidgetBoundary>
       )}
 
       {widgets.creditCards && creditCards.length > 0 && (
-        <DashboardCreditCardMonitor
-          creditCards={creditCardsWithState}
-          style={widgetGridStyle('creditCards')}
-        />
+        <DashboardWidgetBoundary widget="creditCards" style={widgetGridStyle('creditCards')}>
+          <DashboardCreditCardMonitor
+            creditCards={creditCardsWithState}
+            style={widgetGridStyle('creditCards')}
+          />
+        </DashboardWidgetBoundary>
       )}
 
       {widgets.cashflowChart && (
-        <DashboardCashFlowChart
-          chartPeriod={chartPeriod}
-          setChartPeriod={setChartPeriod}
-          cashFlowData={cashFlowData}
-          currency={currency}
-          currencySymbol={currencySymbol}
-          loading={loading}
-          monthLabel={monthLabel}
-          style={widgetGridStyle('cashflowChart')}
-        />
+        <DashboardWidgetBoundary widget="cashflowChart" style={widgetGridStyle('cashflowChart')}>
+          <DashboardCashFlowChart
+            chartPeriod={chartPeriod}
+            setChartPeriod={setChartPeriod}
+            cashFlowData={cashFlowData}
+            currency={currency}
+            currencySymbol={currencySymbol}
+            loading={loading}
+            monthLabel={monthLabel}
+            excludedCurrencies={excludedCashFlowCurrencies}
+            style={widgetGridStyle('cashflowChart')}
+          />
+        </DashboardWidgetBoundary>
       )}
 
       <div className="contents">
         {widgets.categoryPie && (
-          <DashboardCategoryPieCard
-            expensesByCategory={expensesByCategory}
-            monthLabel={monthLabel}
-            currency={currency}
-            loading={loading}
-            onClick={() => setDetailView('categories')}
-            style={widgetGridStyle('categoryPie')}
-          />
+          <DashboardWidgetBoundary widget="categoryPie" style={widgetGridStyle('categoryPie')}>
+            <DashboardCategoryPieCard
+              expensesByCategory={expensesByCategory}
+              excludedCurrencies={expensesByCategoryExcluded}
+              monthLabel={monthLabel}
+              currency={currency}
+              loading={loading}
+              onClick={() => setDetailView('categories')}
+              style={widgetGridStyle('categoryPie')}
+            />
+          </DashboardWidgetBoundary>
         )}
 
         {widgets.recentTransactions && (
-          <DashboardRecentTransactionsCard
-            recentTransactions={recentTx}
-            isCurrentMonth={isCurrentMonth}
-            monthLabel={monthLabel}
-            loading={loading}
-            style={widgetGridStyle('recentTransactions')}
-          />
+          <DashboardWidgetBoundary widget="recentTransactions" style={widgetGridStyle('recentTransactions')}>
+            <DashboardRecentTransactionsCard
+              recentTransactions={recentTx}
+              isCurrentMonth={isCurrentMonth}
+              monthLabel={monthLabel}
+              loading={loading}
+              style={widgetGridStyle('recentTransactions')}
+            />
+          </DashboardWidgetBoundary>
         )}
       </div>
 
       <div className="contents">
         {widgets.budgets && budgets.length > 0 && (
-          <DashboardBudgetProgressCard
-            budgets={budgets}
-            monthLabel={monthLabel}
-            style={widgetGridStyle('budgets')}
-          />
+          <DashboardWidgetBoundary widget="budgets" style={widgetGridStyle('budgets')}>
+            <RefreshingRegion
+              refreshing={budgetsRefreshing}
+              label={`Loading ${monthLabel}…`}
+              style={widgetGridStyle('budgets')}
+            >
+              <DashboardBudgetProgressCard budgets={budgets} monthLabel={monthLabel} />
+            </RefreshingRegion>
+          </DashboardWidgetBoundary>
         )}
       </div>
 
       <div className="contents">
         {widgets.cashflowForecast && (
-          <DashboardCashFlowForecastCard
-            forecast={cashFlowForecast}
-            currentBalance={stats.totalBalance}
-            currency={currency}
-            isCurrentMonth={isCurrentMonth}
-            monthLabel={monthLabel}
-            loading={loading}
-            style={widgetGridStyle('cashflowForecast')}
-          />
+          <DashboardWidgetBoundary widget="cashflowForecast" style={widgetGridStyle('cashflowForecast')}>
+            <DashboardCashFlowForecastCard
+              forecast={cashFlowForecast}
+              currentBalance={stats.totalBalance}
+              currency={currency}
+              isCurrentMonth={isCurrentMonth}
+              monthLabel={monthLabel}
+              loading={loading}
+              style={widgetGridStyle('cashflowForecast')}
+            />
+          </DashboardWidgetBoundary>
         )}
       </div>
 
@@ -467,6 +541,7 @@ export default function DashboardPage() {
         monthIncomeTx={monthIncomeTx}
         monthExpenseTx={monthExpenseTx}
         expenseCategoryDetails={expenseCategoryDetails}
+        categoryExcludedCurrencies={expensesByCategoryExcluded}
         stats={stats}
         currency={currency}
       />

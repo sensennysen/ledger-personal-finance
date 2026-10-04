@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <!-- Security headers -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in; connect-src 'self' %VITE_SUPABASE_URL% https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://accounts.google.com; object-src 'none'; base-uri 'self'; worker-src 'self'; manifest-src 'self';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in; connect-src 'self' %VITE_SUPABASE_URL% https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://accounts.google.com https://api.frankfurter.dev; object-src 'none'; base-uri 'self'; worker-src 'self'; manifest-src 'self';" />
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <link rel="icon" type="image/png" href="/l-black.png" />
@@ -12,7 +12,8 @@
     <meta name="keywords" content="personal finance, budget tracker, expense tracker, money manager, wallet app, financial dashboard" />
     <meta name="author" content="Ledger" />
     <meta name="robots" content="index, follow" />
-    <meta name="theme-color" content="#15130B" />
+    <meta name="theme-color" content="#131218" />
+    <script src="/theme-init.js"></script>
     <link rel="manifest" href="/manifest.json" />
 
     <link rel="canonical" href="https://your-domain.example/" />

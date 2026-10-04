@@ -1,9 +1,11 @@
+import { Link } from 'react-router-dom'
 import { LegalPage } from '@/components/legal/LegalPage'
 import { STORAGE_ROWS } from '@/lib/browserStorage'
 
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). The rows live in
-// src/lib/browserStorage.ts, which Settings also reads to clear them (LED-245).
-const LAST_UPDATED = 'October 3, 2026'
+// src/lib/browserStorage.ts, which Settings also reads to clear them (LED-245). The link to Settings in
+// "Removing them" was approved on 2026-10-04.
+const LAST_UPDATED = 'October 4, 2026'
 
 const TOC = [
   { id: 'what-ledger-keeps', label: 'What Ledger keeps in your browser' },
@@ -57,7 +59,12 @@ export default function CookiesStoragePage() {
           <h2 className="mb-3 text-base font-semibold text-foreground">Removing them</h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
             Signing out removes your session, your data copy, changes waiting to sync and pending receipts. To remove
-            the rest, clear this site’s data in your browser settings.
+            the rest, clear this site’s data in your browser settings. You can also see and clear them one group at a
+            time in{' '}
+            <Link to="/settings#browser-storage" className="underline underline-offset-2 hover:text-foreground transition-colors">
+              Settings → Browser storage
+            </Link>
+            .
           </p>
         </section>
 

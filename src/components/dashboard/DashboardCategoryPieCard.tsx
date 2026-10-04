@@ -111,7 +111,9 @@ export function DashboardCategoryPieCard({
       ) : (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div className="flex justify-center sm:block sm:w-[50%]">
-            <div className="h-[200px] 2xl:h-[168px]">
+            {/* w-full: as a flex child below sm this box shrank to 0px wide, and
+                ResponsiveContainer drew nothing. */}
+            <div className="h-[200px] w-full 2xl:h-[168px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie

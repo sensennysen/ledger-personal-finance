@@ -86,7 +86,7 @@ All five questions are answered (see the Decision register). Phase 5 is done (20
 
 Built in four phases (plan 2026-10-03), each validated before the next:
 - **A, quick and independent:** LED-246, 244, 234, 235, 243. **Done** (2026-10-03, retro `knowledge/retros/2026-10-03-epic-21-phase-a.md`).
-- **B, categories:** LED-233, then 236, 240, 239.
+- **B, categories:** LED-233, then 236, 240, 239. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-phase-b.md`).
 - **C, cycle totals:** LED-238, then 237.
 - **D, Activity, loading, storage:** LED-241, 242, 245.
 
@@ -109,6 +109,7 @@ Built in four phases (plan 2026-10-03), each validated before the next:
 | LED-247 | LED-246 | Settings shows garbled characters in the currency list and the delete button (found in passing) | 1 |
 | LED-248 | LED-246 | Hovered primary and destructive buttons drop their label below 4.5:1 (found by `pnpm sweep --hover`) | 1 |
 | LED-249 | LED-235 | A completed goal card dims its text below 4.5:1 (found with a completed goal on the local stack) | 1 |
+| LED-250 | phase B validation | The auto-categorization rule form shows a category id once one is chosen (LED-239 fixed the same in its merge dialog) | 1 |
 
 ## Phase 6 — Hygiene (run last, so statuses reflect what shipped)
 
@@ -118,7 +119,7 @@ Built in four phases (plan 2026-10-03), each validated before the next:
 | 32 | LED-212 | Merge route for the phase branches, `.claude/launch.json` | 2 | Do not push or merge without being asked. |
 | 33 | LED-213 | Release checklist: live CI and remote migrations | 2 | The remote step only when the owner asks. |
 
-Phase totals in points: 1 = 22, 2 = 22, 3 = 19, 4 = 21, 5 = 21 (LED-189 widened from 2 to 5), 6 = 6. Sum 111. Epic 21 adds 42 (39, plus LED-247 to 249 filed during phase A).
+Phase totals in points: 1 = 22, 2 = 22, 3 = 19, 4 = 21, 5 = 21 (LED-189 widened from 2 to 5), 6 = 6. Sum 111. Epic 21 adds 43 (39, plus LED-247 to 249 filed during phase A and LED-250 during phase B).
 
 ## Decision register
 

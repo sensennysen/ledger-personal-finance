@@ -143,3 +143,37 @@ test('a completed goal card is not dimmed with opacity', () => {
   const body = src.slice(start, src.indexOf('\nfunction ', start + 1))
   assert.doesNotMatch(body, /(?<![\w-])opacity-\d+/)
 })
+
+// Button hovers (LED-248): default hover:bg-primary/85 let the surface through and drew the white label at
+// 4.15:1 (light); destructive dark:hover:bg-destructive/30 drew --expense at 4.27:1. Both are solid mixes now.
+const srgbMix = /color-mix\(in srgb, var\((--[\w-]+)\) (\d+)%, (?:var\((--[\w-]+)\)|(#[0-9A-Fa-f]{6}))\)/
+
+function mixedToken(map, decl) {
+  const m = srgbMix.exec(decl ?? '')
+  assert.ok(m, `not color-mix(in srgb, var(--a) N%, var(--b) | #hex): ${decl}`)
+  const [, a, pct, b, hex] = m
+  return mixHex(resolve(map, a), hex ?? resolve(map, b), Number(pct) / 100)
+}
+
+const destructiveHoverDecl = /--color-destructive-hover:\s*([^;]+);/.exec(css)?.[1]
+
+for (const [theme, map] of Object.entries(themes)) {
+  test(`${theme}: --primary-foreground on the primary button hover holds 4.5:1`, () => {
+    const fill = mixedToken(map, map['--primary-hover'])
+    const ratio = contrastRatio(resolve(map, '--primary-foreground'), fill)
+    assert.ok(ratio >= 4.5, `${ratio.toFixed(2)}:1 on ${fill}`)
+    assert.ok(ratio > contrastRatio(resolve(map, '--primary-foreground'), resolve(map, '--primary')), 'hover moves toward the ink')
+  })
+  test(`${theme}: --expense on the destructive button hover holds 4.5:1`, () => {
+    const fill = mixedToken(map, destructiveHoverDecl)
+    const ratio = contrastRatio(resolve(map, '--expense'), fill)
+    assert.ok(ratio >= 4.5, `${ratio.toFixed(2)}:1 on ${fill}`)
+  })
+}
+
+test('button variants hover to solid fills, not a see-through primary or destructive', () => {
+  const variants = readFileSync(new URL('../src/components/ui/button-variants.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(variants, /hover:bg-(primary|destructive)\/\d+/)
+  assert.match(variants, /hover:bg-primary-hover/)
+  assert.match(variants, /(?<!dark:)hover:bg-destructive-hover[\s\S]*dark:hover:bg-destructive-hover/)
+})

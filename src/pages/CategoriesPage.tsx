@@ -73,6 +73,7 @@ import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 
 const DEFAULT_CATEGORY_ICON = '\u{1F3F7}\uFE0F'
 const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
+const RULE_TYPE_HINT_LABELS = { any: 'Any type', income: 'Income', expense: 'Expense', transfer: 'Transfer' } as const
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(40),
@@ -1284,7 +1285,12 @@ export default function CategoriesPage() {
               />
               <Select value={ruleCategoryId} onValueChange={(v) => setRuleCategoryId(v ?? '')}>
                 <SelectTrigger className="flex-1 min-w-[140px] h-8 text-sm">
-                  <SelectValue placeholder="Category" />
+                  <SelectValue>
+                    {(value: string | null) => {
+                      const chosen = categories.find((category) => category.id === value)
+                      return chosen ? `${chosen.icon} ${chosen.name}` : 'Category'
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => (
@@ -1296,7 +1302,7 @@ export default function CategoriesPage() {
               </Select>
               <Select value={ruleTypeHint} onValueChange={(v) => setRuleTypeHint(v as typeof ruleTypeHint)}>
                 <SelectTrigger className="w-28 h-8 text-sm">
-                  <SelectValue />
+                  <SelectValue>{(value: keyof typeof RULE_TYPE_HINT_LABELS) => RULE_TYPE_HINT_LABELS[value]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Any type</SelectItem>

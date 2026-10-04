@@ -481,7 +481,9 @@ function LayoutShell() {
               sheet === 'add'
                 ? `max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`
                 : 'max-h-[90dvh] max-w-md overflow-y-auto',
-              mobile && sheet === 'account' && 'm3-bottom-sheet',
+              // translate-*-0 drops the dialog's centering translate here: the production
+              // minifier folds the CSS's `translate: none` into `transform`, so it can't.
+              mobile && sheet === 'account' && 'm3-bottom-sheet translate-x-0 translate-y-0',
             )}
           >
             {mobile && sheet === 'account' && (

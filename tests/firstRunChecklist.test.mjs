@@ -4,6 +4,7 @@ import {
   FIRST_RUN_STEPS,
   getStepStatus,
   isSetupComplete,
+  isNavUnlocked,
   shouldReserveChecklist,
 } from '../src/lib/firstRunChecklist.ts'
 
@@ -56,4 +57,19 @@ test('Home reserves the checklist while loading only when it is certain to show 
   // Dismissed: never shown.
   assert.equal(shouldReserveChecklist({ dismissed: true, cycleConfirmed: false }), false)
   assert.equal(shouldReserveChecklist({ dismissed: true, cycleConfirmed: true }), false)
+})
+
+test('skipping setup unlocks the nav without marking setup complete', () => {
+  const skipped = { ...base, dismissed: true }
+  assert.equal(isNavUnlocked(skipped), true)
+  assert.equal(isNavUnlocked(skipped, { loading: true }), true)
+  assert.equal(isSetupComplete(skipped), false)
+})
+
+test('without a skip the nav follows setup completion', () => {
+  assert.equal(isNavUnlocked({ ...base, dismissed: false }), false)
+  assert.equal(
+    isNavUnlocked({ hasAccount: true, hasTransaction: true, cycleConfirmed: true, dismissed: false }),
+    true,
+  )
 })

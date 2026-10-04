@@ -52,6 +52,7 @@ import {
 } from '@/lib/reportLookback'
 import { formatCurrency, formatDate, getLocalDateString, cn } from '@/lib/utils'
 import { countedEnd, countsYet, scheduledIn } from '@/lib/countsYet'
+import { afterScheduledLabel, scheduledNetWorth } from '@/lib/scheduledBalances'
 import { buildReportCsv, downloadCsv } from '@/lib/transactionCsv'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
 import { abbreviateTick, thinCategoryTicks } from '@/lib/chartTicks'
@@ -637,6 +638,15 @@ export default function ReportsPage() {
   )
   const balanceSummary = summarizeBalances(activeAccounts, currency, convertToDefault)
   const totalBalance = balanceSummary.netWorth
+  // Stored balances already hold rows dated after today (LED-251). The chart's last point does not.
+  const netWorthAfterScheduled = afterScheduledLabel(
+    scheduledNetWorth(activeAccounts, transactions, today, currency, convertToDefault),
+    currency,
+    formatCurrency,
+  )
+  const netWorthSub = balanceSummary.totalCreditCardDebt > 0
+    ? `Assets minus Liabilities`
+    : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`
 
   // Sorted transactions for table (newest first)
   const sortedTransactions = [...filtered].sort(
@@ -731,9 +741,7 @@ export default function ReportsPage() {
         <StatCard
           title="Net Worth"
           value={formatCurrency(totalBalance, currency)}
-          sub={balanceSummary.totalCreditCardDebt > 0
-            ? `Assets minus Liabilities`
-            : `${activeAccounts.length} account${activeAccounts.length !== 1 ? 's' : ''}`}
+          sub={netWorthAfterScheduled ? `${netWorthSub} · ${netWorthAfterScheduled}` : netWorthSub}
           icon={Wallet}
           color={'var(--foreground)'}
           note={<UnratedCurrencyNotice currencies={balanceSummary.excludedCurrencies} subject="balances" />}

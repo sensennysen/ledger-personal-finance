@@ -8,4 +8,4 @@ A row dated after today is scheduled (LED-238). It shows in lists but is not cou
 - Lists keep every row and mark the later ones with `countsYet(tx.date, today)`.
 - A pure helper that already takes a range (`sumBudgetSpend`, `summarizeRange`) stays range-based. The caller caps it, so suggestions and history built on closed periods are untouched. `computeOverspending` takes `countUntil` for the same reason.
 - Previous-period comparisons use `likeForLikeWindows` (LED-237). Its current window ends at today, so it agrees with the cap.
-- Account balances are not cycle totals. They come from database triggers (see LED-251).
+- Account balances are not cycle totals. The database triggers apply a row when it is saved, so a stored balance already holds the rows dated after today. Show it as stored, with the scheduled part beside it: `scheduledByAccount` or `scheduledNetWorth` from `src/lib/scheduledBalances.ts`, worded with `afterScheduledLabel` ("after − X scheduled"). Don't subtract it client-side (OD-14 (a), LED-251).

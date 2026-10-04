@@ -12,6 +12,7 @@ import { ACCOUNT_TYPE_LABELS } from '@/types'
 import { formatCurrency, formatDate, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange, getLocalDateString } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 import { daysUntilDue, formatLoanSchedule, formatOverdue, getLoanAmountOwed } from '@/lib/loans'
+import { afterScheduledLabel, scheduledByAccount } from '@/lib/scheduledBalances'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -262,6 +263,14 @@ export default function AccountTransactionsPage() {
   }, [accountTransactions, accountId])
 
   const currency = account?.currency ?? profile?.default_currency ?? 'USD'
+  // The stored balance already holds rows dated after today; say how much beside it (LED-251).
+  const today = getLocalDateString()
+  const scheduledDelta = useMemo(
+    () => (accountId ? scheduledByAccount(accounts, transactions, today).get(accountId) ?? 0 : 0),
+    [accounts, transactions, today, accountId],
+  )
+  const afterScheduled = afterScheduledLabel(scheduledDelta, currency, formatCurrency)
+  const withAfterScheduled = (sub: string) => (afterScheduled ? `${sub} · ${afterScheduled}` : sub)
   // "Where it went" (LED-98): this cycle's spending from this account, by category.
   const cycleRange = getCustomMonthRange(selectedMonth, startDay)
   const cycleLabel = `${formatDateShort(cycleRange.start)} – ${formatDateShort(cycleRange.end)}`
@@ -575,7 +584,7 @@ export default function AccountTransactionsPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 [&>div]:border-border/60 [&>div]:p-4 [&>div:nth-child(odd)]:border-r [&>div:nth-child(-n+2)]:border-b lg:[&>div]:border-b-0 lg:[&>div:not(:last-child)]:border-r">
               {account.type === 'credit_card' ? (
                 <>
-                  {bandCell('Current balance', formatCurrency(getCreditCardSpending(account), currency), account.balance < 0 ? 'owed' : 'nothing owed')}
+                  {bandCell('Current balance', formatCurrency(getCreditCardSpending(account), currency), withAfterScheduled(account.balance < 0 ? 'owed' : 'nothing owed'))}
                   {bandCell(
                     'Credit limit',
                     account.credit_limit != null ? formatCurrency(account.credit_limit, currency) : 'Not set',
@@ -586,7 +595,7 @@ export default function AccountTransactionsPage() {
                 </>
               ) : account.type === 'loan' ? (
                 <>
-                  {bandCell('Outstanding', formatCurrency(getLoanAmountOwed(account), currency), 'owed')}
+                  {bandCell('Outstanding', formatCurrency(getLoanAmountOwed(account), currency), withAfterScheduled('owed'))}
                   {bandCell(
                     'Repaid',
                     formatCurrency(loanRepayment?.totalPaid ?? 0, currency),
@@ -601,7 +610,7 @@ export default function AccountTransactionsPage() {
                 </>
               ) : (
                 <>
-                  {bandCell('Current balance', formatCurrency(account.balance, currency))}
+                  {bandCell('Current balance', formatCurrency(account.balance, currency), afterScheduled ?? undefined)}
                   {bandCell('Income', `+${formatCurrency(stats.income, currency)}`)}
                   {bandCell('Expenses', `−${formatCurrency(stats.expenses, currency)}`)}
                   {bandCell('Transfers', `−${formatCurrency(stats.transfersSent, currency)}`, `+${formatCurrency(stats.transfersReceived, currency)} received`)}

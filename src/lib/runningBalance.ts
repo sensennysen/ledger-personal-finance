@@ -48,15 +48,27 @@ export function buildRunningBalanceMap(
     // The balance after this transaction is what the register holds before it is undone.
     if (register.has(tx.account_id)) balances.set(tx.id, register.get(tx.account_id)!)
 
-    if (tx.type === 'income') {
-      move(tx.account_id, -tx.amount)
-    } else if (tx.type === 'expense') {
-      move(tx.account_id, tx.amount)
-      if (tx.to_account_id && types.get(tx.to_account_id) === 'loan') move(tx.to_account_id, -tx.amount)
-    } else {
-      move(tx.account_id, tx.amount + (tx.transfer_fee ?? 0))
-      if (tx.to_account_id) move(tx.to_account_id, -transferCredit(tx))
-    }
+    for (const [id, delta] of balanceEffects(tx, types)) move(id, -delta)
   }
   return balances
+}
+
+/**
+ * What the update_account_balance trigger did to each account when this row was saved, as
+ * [account id, delta] pairs. `types` maps account ids to their type: only a loan target is
+ * credited by an expense. buildRunningBalanceMap undoes these; scheduledBalances.ts sums them.
+ */
+export function balanceEffects(
+  tx: Omit<BalanceTransaction, 'id' | 'date' | 'created_at'>,
+  types: ReadonlyMap<string, string>,
+): [string, number][] {
+  if (tx.type === 'income') return [[tx.account_id, tx.amount]]
+  if (tx.type === 'expense') {
+    const effects: [string, number][] = [[tx.account_id, -tx.amount]]
+    if (tx.to_account_id && types.get(tx.to_account_id) === 'loan') effects.push([tx.to_account_id, tx.amount])
+    return effects
+  }
+  const effects: [string, number][] = [[tx.account_id, -(tx.amount + (tx.transfer_fee ?? 0))]]
+  if (tx.to_account_id) effects.push([tx.to_account_id, transferCredit(tx)])
+  return effects
 }

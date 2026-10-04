@@ -43,6 +43,7 @@ import { DashboardUpcomingBillsCard } from '@/components/dashboard/DashboardUpco
 import { DashboardCashFlowForecastCard } from '@/components/dashboard/DashboardCashFlowForecastCard'
 import { DashboardFirstRunChecklist } from '@/components/dashboard/DashboardFirstRunChecklist'
 import { getCreditCardSpending } from '@/lib/creditCards'
+import { afterScheduledLabel } from '@/lib/scheduledBalances'
 import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
 import { PageActions } from '@/components/layout/PageActions'
@@ -51,6 +52,12 @@ import { TransactionKindMenu } from '@/components/transactions/TransactionKindMe
 /** "This month · + ₱1,200.00 scheduled" when rows later in the cycle are not counted yet (LED-238). */
 function withScheduled(sub: string, upcoming: number, currency: string): string {
   return upcoming > 0 ? `${sub} · + ${formatCurrency(upcoming, currency)} scheduled` : sub
+}
+
+/** "Assets minus Liabilities · after − ₱100.00 scheduled" when rows dated later are already in the stored balances (LED-251). */
+function withAfterScheduled(sub: string, scheduled: number, currency: string): string {
+  const label = afterScheduledLabel(scheduled, currency, formatCurrency)
+  return label ? `${sub} · ${label}` : sub
 }
 
 function StatCard({
@@ -396,7 +403,7 @@ export default function DashboardPage() {
       {widgets.stats && (
         <DashboardWidgetBoundary widget="stats" style={widgetGridStyle('stats')}>
           <section className="md:hidden rounded-3xl bg-card p-4" style={widgetGridStyle('stats')}>
-            <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] leading-none mt-1.5">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p></button>
+            <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] leading-none mt-1.5">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p>{!loading && stats.scheduledNetWorth !== 0 && <p className="text-[11px] mt-1 text-muted-foreground">{afterScheduledLabel(stats.scheduledNetWorth,currency,formatCurrency)}</p>}</button>
             {/* Only when there is a notice: an empty wrapper still takes its margin (LED-202). */}
             {!loading && stats.excludedCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" /></div>}
             <div className="grid grid-cols-2 gap-3 mt-2.5">{([{view:'income',label:'↙ In',value:stats.income,upcoming:stats.upcomingIncome,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,upcoming:stats.upcomingExpenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-1.5 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p>{!loading && item.upcoming > 0 && <p className="text-[11px] mt-0.5 truncate">+ {formatCurrency(item.upcoming,currency)} scheduled</p>}</button>)}</div>
@@ -406,7 +413,7 @@ export default function DashboardPage() {
             <StatCard
               title="Net Worth"
               value={formatCurrency(stats.totalBalance, currency)}
-              sub="Assets minus Liabilities"
+              sub={withAfterScheduled('Assets minus Liabilities', stats.scheduledNetWorth, currency)}
               note={<UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" />}
               icon={Wallet}
               variant="balance"

@@ -39,7 +39,8 @@ The script reads the ticket IDs from the `epic-8` to `epic-13` CSVs. It looks fo
 | (d) `.claude/launch.json` is tracked or added to `.gitignore` | PASS. It is tracked. |
 
 ## Validation
-- `pnpm lint`, `pnpm build` and `pnpm test`: see the /validate run for this commit.
+- `pnpm lint` and `pnpm build` are clean. `pnpm test`: 1001 passing, 0 failing, plus `tests/redesign.mjs`. No code changed, so this only confirms the branch is still green locally.
+- The graph query on the merge route reaches only the epics 8 to 13 retros, the build orders and this retro. No source module references the changed files. Tracking `launch.json` affects only the desktop preview, not the build, the tests or CI.
 
 ## What went well
 - **The ancestry was already in place.** `epics-15-19` was branched from the phase-13 tip, so the merge route needed no git operations at all.

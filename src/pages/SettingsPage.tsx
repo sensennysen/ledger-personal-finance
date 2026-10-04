@@ -19,6 +19,7 @@ import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ExchangeRatesCard } from '@/components/settings/ExchangeRatesCard'
+import { BrowserStorageCard } from '@/components/settings/BrowserStorageCard'
 import { FormError } from '@/components/ui/form-error'
 import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { ReceiptCleanupError } from '@/lib/receiptCleanup'
@@ -641,6 +642,8 @@ export default function SettingsPage() {
           </Link>
         </CardContent>
       </Card>
+
+      <BrowserStorageCard />
 
       {/* Account / Danger zone â€” always last to prevent accidental destructive actions */}
       <Card className="border-destructive/30">

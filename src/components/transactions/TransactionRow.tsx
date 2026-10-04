@@ -1,6 +1,6 @@
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { memo, useEffect, useState } from 'react'
-import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal, Clock } from 'lucide-react'
+import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal, Clock, Repeat, CalendarClock, Paperclip } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import { formatCurrency, formatDateShort, getLocalDateString } from '@/lib/utils'
 import { countsYet } from '@/lib/countsYet'
@@ -8,6 +8,7 @@ import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { Badge } from '@/components/ui/badge'
+import { InteractiveRow } from '@/components/ui/interactive-row'
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,10 @@ interface TransactionRowProps {
   dense?: boolean
   /** Shows the date on the row, for a flat list sorted by amount (LED-241). */
   showDate?: boolean
+  /** 'list' (phones, M-06): a flat one-line row inside a day card; the whole row opens the entry sheet. */
+  variant?: 'card' | 'list'
+  /** The profile's currency; the list variant names a row's currency only when it differs. */
+  baseCurrency?: string
 }
 
 // Memoised (LED-164): a load step in the windowed list only mounts new rows,
@@ -64,6 +69,8 @@ function TransactionRowImpl({
   contextAccountId,
   dense,
   showDate,
+  variant = 'card',
+  baseCurrency,
 }: TransactionRowProps) {
   const openDetail = useEntryDetail()
   const [receiptOpen, setReceiptOpen] = useState(false)
@@ -106,6 +113,105 @@ function TransactionRowImpl({
 
   const { sign: amountPrefix, value: displayAmount, currency: displayCurrency } = amountDisplay(tx, contextAccountId)
 
+  // Split only where the inline button offers it: never on transfers or repayments (M-07).
+  const canSplit = !!onSplit && tx.type !== 'transfer' && !isLoanRepayment
+  const open = () =>
+    openDetail
+      ? openDetail(tx, {
+          onEdit: () => onEdit(tx),
+          onDelete: () => void onDelete(tx.id),
+          onSplit: canSplit ? () => onSplit(tx) : undefined,
+          onSaveTemplate: onSaveTemplate ? () => onSaveTemplate(tx) : undefined,
+        })
+      : onEdit(tx)
+
+  if (variant === 'list') {
+    const today = getLocalDateString()
+    const scheduled = !countsYet(tx.date, today)
+    const isPayment = tx.type === 'transfer' || isLoanRepayment
+    const meta = [
+      showDate ? formatDateShort(tx.date) : '',
+      contextAccountId !== undefined
+        ? isPayment
+          ? isIncoming
+            ? `← from ${tx.account?.name ?? ''}`
+            : `→ to ${tx.to_account?.name ?? ''}`
+          : (tx.category?.name ?? '')
+        : isPayment
+          ? `${tx.account?.name ?? ''} → ${tx.to_account?.name ?? ''}`
+          : [tx.account?.name ?? '', tx.category?.name ?? 'Uncategorized'].filter(Boolean).join(' · '),
+      tx.tags && tx.tags.length > 0
+        ? `#${tx.tags[0]}${tx.tags.length > 1 ? ` +${tx.tags.length - 1}` : ''}`
+        : '',
+      tx.type === 'transfer' && tx.transfer_fee != null && tx.transfer_fee > 0
+        ? `Fee ${formatCurrency(tx.transfer_fee, tx.currency)}`
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' · ')
+    const flag = 'size-[13px] shrink-0 text-muted-foreground'
+    return (
+      <InteractiveRow
+        as="div"
+        onActivate={open}
+        className="group/row flex items-stretch pl-4 press-scale hover:bg-surface-hover focus-visible:ring-inset cursor-pointer"
+      >
+        {selectable && (
+          // Its own target: a tap here selects, it does not open the row.
+          <label
+            className="-ml-2 flex w-11 shrink-0 items-center justify-center cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onSelect?.(tx.id)}
+              className="size-5 accent-primary cursor-pointer"
+              aria-label={`Select ${tx.description}`}
+            />
+          </label>
+        )}
+        <div className="flex items-center pr-3">
+          <div
+            className="size-10 rounded-xl flex items-center justify-center text-lg"
+            style={{ background: `var(--${tx.type}-container)` }}
+          >
+            {tx.category ? tx.category.icon : <Icon className={`w-4 h-4 ${TRANSACTION_TYPE_COLOR[tx.type]}`} />}
+          </div>
+        </div>
+        <div className="flex min-h-[60px] min-w-0 flex-1 items-center gap-3 border-t border-border pr-4 group-first/row:border-t-0">
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-1.5 text-sm font-medium">
+              <span className="truncate">{tx.description}</span>
+              {tx.is_recurring && (
+                <Repeat role="img" aria-label={`Repeats ${tx.recurrence_interval ?? ''}`.trim()} className={flag} />
+              )}
+              {scheduled && <CalendarClock role="img" aria-label="Scheduled" className={flag} />}
+              {tx.receipt_url && <Paperclip role="img" aria-label="Has receipt" className={flag} />}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {tx.queued ? (
+                <span className="inline-flex items-center gap-1 text-warning">
+                  <Clock className="size-3" />Not synced yet
+                </span>
+              ) : (
+                meta
+              )}
+            </p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className={`money text-sm font-medium ${amountColorClass}`}>
+              {amountPrefix}{formatCurrency(displayAmount, displayCurrency)}
+            </p>
+            {baseCurrency && displayCurrency !== baseCurrency && (
+              <p className="text-[0.6875rem] text-muted-foreground">{displayCurrency}</p>
+            )}
+          </div>
+        </div>
+      </InteractiveRow>
+    )
+  }
+
   return (
     <div className={`flex items-center gap-3 ${dense ? 'px-3 py-2' : 'p-3'} rounded-lg bg-card border hover:bg-surface-hover transition-colors group`}>
       {/* Checkbox (bulk select) */}
@@ -131,11 +237,7 @@ function TransactionRowImpl({
       <div className="flex-1 min-w-0 space-y-0.5">
         {/* Row 1: description | amount */}
         <div className="flex items-baseline justify-between gap-2">
-          <button type="button" className="text-sm font-medium truncate text-left py-1" onClick={()=>openDetail ? openDetail(tx,{
-            onEdit: ()=>onEdit(tx),
-            onDelete: ()=>void onDelete(tx.id),
-            onSplit: onSplit && tx.type !== 'transfer' ? ()=>onSplit(tx) : undefined,
-          }) : onEdit(tx)}>{tx.description}</button>
+          <button type="button" className="text-sm font-medium truncate text-left py-1" onClick={open}>{tx.description}</button>
           <p className={`money text-sm font-semibold shrink-0 ${amountColorClass}`}>
             {amountPrefix}{formatCurrency(displayAmount, displayCurrency)}
           </p>

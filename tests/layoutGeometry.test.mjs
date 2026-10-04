@@ -23,8 +23,8 @@ test('FAB, toast and install banner clear the bottom nav', () => {
   const toastBottom = px(toast, /bottom-\[calc\((\d+)px\+env/)
   const bannerBottom = px(banner, /bottom-\[calc\((\d+)px\+env/)
   assert.ok(fab > nav)
-  assert.ok(toastBottom > fab + 64, 'toast sits above the 64px FAB')
-  assert.ok(bannerBottom > fab + 64)
+  assert.ok(toastBottom > fab + 56, 'toast sits above the 56px FAB')
+  assert.ok(bannerBottom > fab + 56)
 })
 
 test('entry-detail pane docks only where it fits beside the full-width Activity list', () => {

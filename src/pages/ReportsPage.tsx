@@ -665,7 +665,6 @@ export default function ReportsPage() {
         />
       )}
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
-        <h1 className="sr-only md:hidden">Reports</h1>
         <PageActions>
           <div className="flex w-full flex-wrap items-center justify-between gap-2 md:w-auto md:flex-nowrap">
             <TabsList className="h-8">

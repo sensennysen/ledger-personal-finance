@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { registerSyncedListener } from '@/lib/offlineQueue'
 import { isNearScrollEnd } from '@/lib/scrollEnd'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
@@ -18,6 +18,10 @@ import { QueueReviewSheet } from './QueueReviewSheet'
 import { PWAInstallBanner } from './PWAInstallBanner'
 import { resolveHeaderMeta } from '@/lib/pageChrome'
 import { CycleProvider } from '@/contexts/CycleContext'
+import { useCycle } from '@/contexts/cycleState'
+import { buildMonthNets } from '@/lib/monthJump'
+import { cn, getCurrentCycleMonthKey } from '@/lib/utils'
+import { MonthJumpSheet } from '@/components/transactions/MonthJump'
 import { EntryContext, type EntryActions } from '@/contexts/EntryContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
 import { useNotify } from '@/contexts/notificationState'
@@ -55,7 +59,6 @@ import { entryDialogWidthClass, type TransactionKind } from '@/components/transa
 import { SearchPalette } from '@/components/search/SearchPalette'
 import { EntryDetail } from '@/components/transactions/EntryDetail'
 import { X } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
 import type { Transaction } from '@/types'
 
@@ -70,6 +73,8 @@ export type AppLayoutContext = {
   /** `categoryId` opens the form with that category chosen (search: "New expense in Groceries"). */
   /** `prefill` opens it with an amount and date (Home: Pay now on a loan bill). */
   openAddTransactionModal: (kind: TransactionKind, options?: AddTransactionOptions) => void
+  /** Advisory locks (More's destinations follow the nav's). */
+  setupComplete: boolean
 }
 export default function AppLayout() {
   return (
@@ -125,6 +130,17 @@ function LayoutShell() {
   const [reviewOpen, setReviewOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [fabHidden, setFabHidden] = useState(false)
+  // Phones jump months from the cycle dates under the header (M-04). Built
+  // from the shell's own transactions, only while the sheet is open.
+  const { startDay, selectedMonth, setSelectedMonth } = useCycle()
+  const [monthsOpen, setMonthsOpen] = useState(false)
+  const months = useMemo(
+    () =>
+      monthsOpen
+        ? buildMonthNets(transactions, { startDay, currentKey: getCurrentCycleMonthKey(startDay) })
+        : [],
+    [monthsOpen, transactions, startDay],
+  )
   const mainRef = useRef<HTMLElement>(null)
   // Where focus returns when the add/account dialog or entry detail closes
   // (LED-91). The FAB unmounts while a sheet is open, so it is remembered by
@@ -245,6 +261,15 @@ function LayoutShell() {
       </AvatarFallback>
     </Avatar>
   )
+  const mobileAvatar = (
+    <Avatar className="size-9">
+      <AvatarImage src={profile?.avatar_url ?? undefined} />
+      <AvatarFallback className="bg-accent text-accent-foreground">
+        {initials}
+      </AvatarFallback>
+    </Avatar>
+  )
+  const headerMeta = resolveHeaderMeta(location.pathname, location.search)
   // Every action closes detail first, then hands off to the page that owns it.
   const closeThen = (action?: () => void) =>
     action
@@ -260,6 +285,7 @@ function LayoutShell() {
         onEdit={closeThen(entry.actions?.onEdit)}
         onDelete={closeThen(entry.actions?.onDelete)}
         onSplit={closeThen(entry.actions?.onSplit)}
+        onSaveTemplate={closeThen(entry.actions?.onSaveTemplate)}
       />
     </ErrorBoundary>
   )
@@ -286,6 +312,7 @@ function LayoutShell() {
         </a>
         <TopBar
           avatar={avatar}
+          mobileAvatar={mobileAvatar}
           onAvatarClick={() => {
             rememberTrigger()
             setSheet('account')
@@ -295,17 +322,22 @@ function LayoutShell() {
           mobileTitle={
             location.pathname === '/'
               ? 'Good day, ' + (profile?.full_name?.split(' ')[0] ?? 'there')
-              : resolveHeaderMeta(location.pathname).title
+              : headerMeta.title
           }
-          mobileStatus={
-            !isOnline
-              ? 'Working offline'
-              : pendingCount
-                ? pendingCount + ' changes pending'
-                : 'Your money, at a glance'
-          }
+          titleIsHeading={headerMeta.titleIsHeading}
         />
-        <PageHeader />
+        <PageHeader onOpenMonths={() => setMonthsOpen(true)} />
+        <MonthJumpSheet
+          open={monthsOpen}
+          onOpenChange={setMonthsOpen}
+          months={months}
+          activeKey={selectedMonth}
+          onPick={(key) => {
+            setSelectedMonth(key)
+            // Not scrollIntoView: it moves Chrome's focus starting point (LED-155).
+            if (mainRef.current) mainRef.current.scrollTop = 0
+          }}
+        />
         <div className="flex flex-1 min-h-0 min-w-0">
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <OfflineBanner status={networkStatus} onReview={() => setReviewOpen(true)} />
@@ -328,14 +360,14 @@ function LayoutShell() {
             ref={mainRef}
             tabIndex={-1}
             onScroll={syncFab}
-            className="outline-none flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0"
+            className="outline-none flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-[calc(80px+env(safe-area-inset-bottom))] md:pb-0"
           >
             <div
               key={location.pathname}
               className="animate-page-in min-h-full min-w-0 w-full max-w-full"
             >
               <ErrorBoundary>
-                <Outlet context={{ openAddTransactionModal }} />
+                <Outlet context={{ openAddTransactionModal, setupComplete } satisfies AppLayoutContext} />
               </ErrorBoundary>
             </div>
           </main>
@@ -369,10 +401,9 @@ function LayoutShell() {
           </aside>
         )}
         </div>
-        {/* While the month-jump bar (56px, above the nav) is on the page the FAB rides above it (LED-149).
-            The FAB comes before the nav in the DOM, so Tab reaches the page's
+        {/* One size, one position (M-09). The FAB comes before the nav in the DOM, so Tab reaches the page's
             primary action before Home (27a). */}
-        {mobile && !sheet && location.pathname !== '/settings' && (
+        {mobile && !sheet && location.pathname !== '/settings' && location.pathname !== '/more' && (
           // Same action as the page's Add button: pick a kind, then the entry dialog.
           <TransactionKindMenu
             onSelect={(kind) => {
@@ -386,11 +417,11 @@ function LayoutShell() {
                 aria-hidden={fabHidden}
                 tabIndex={fabHidden ? -1 : 0}
                 className={cn(
-                  'fixed right-4 bottom-[calc(104px+env(safe-area-inset-bottom))] [body:has([data-month-jump-bar])_&]:bottom-[calc(160px+env(safe-area-inset-bottom))] z-30 size-16 rounded-[20px] bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(0,0,0,.45)] flex items-center justify-center transition-opacity duration-(--dur-base)',
+                  'fixed right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] z-30 size-14 rounded-2xl bg-primary text-primary-foreground shadow-[0_4px_12px_rgba(0,0,0,.3)] flex items-center justify-center transition-opacity duration-(--dur-base)',
                   fabHidden && 'opacity-0 pointer-events-none',
                 )}
               >
-                <Plus className="size-7" />
+                <Plus className="size-6" />
               </button>
             }
           />
@@ -502,6 +533,19 @@ function LayoutShell() {
                     </p>
                   </div>
                 </div>
+                {/* Phones reach these from More (M-02); the grid stays above md. */}
+                {mobile ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setSheet(null)
+                      navigate('/more')
+                    }}
+                  >
+                    All settings
+                  </Button>
+                ) : (
                 <div className="grid grid-cols-4 gap-2">
                   {[
                     { label: 'Reports', to: '/reports', icon: FileBarChart2 },
@@ -526,6 +570,7 @@ function LayoutShell() {
                     </button>
                   ))}
                 </div>
+                )}
                 <Button
                   variant="outline"
                   onClick={() => void signOut().then((ok) => { if (!ok) setSheet(null) })}

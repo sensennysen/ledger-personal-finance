@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { getLocalDateString } from '@/lib/utils'
+import { formatCurrency, getLocalDateString } from '@/lib/utils'
 import type { Budget, Transaction } from '@/types'
 
 export type AlertType = 'budget_warning' | 'budget_exceeded' | 'large_transaction'
@@ -7,7 +7,11 @@ export type AlertType = 'budget_warning' | 'budget_exceeded' | 'large_transactio
 export interface SpendingAlert {
   id: string
   type: AlertType
+  /** Desktop's one-line warning. */
   message: string
+  /** Phone's Needs attention row (M-08): a title and a short detail line. */
+  title: string
+  detail: string
   budgetId?: string
   budgetName?: string
   percent?: number
@@ -37,6 +41,8 @@ export function useSpendingAlerts(
           id: `budget-exceeded-${b.id}`,
           type: 'budget_exceeded',
           message: `Budget "${b.name}" exceeded (${Math.round(percent * 100)}% spent)`,
+          title: `${b.name} is over budget`,
+          detail: `${Math.round(percent * 100)}% spent`,
           budgetId: b.id,
           budgetName: b.name,
           percent,
@@ -46,6 +52,8 @@ export function useSpendingAlerts(
           id: `budget-warning-${b.id}`,
           type: 'budget_warning',
           message: `Budget "${b.name}" is at ${Math.round(percent * 100)}%`,
+          title: `${b.name} is at ${Math.round(percent * 100)}%`,
+          detail: 'Close to the limit',
           budgetId: b.id,
           budgetName: b.name,
           percent,
@@ -67,6 +75,8 @@ export function useSpendingAlerts(
           id: `large-tx-${tx.id}`,
           type: 'large_transaction',
           message: `Large transaction: "${tx.description}" — ${tx.currency} ${tx.amount.toFixed(2)}`,
+          title: `Large transaction · ${tx.description}`,
+          detail: formatCurrency(tx.amount, tx.currency),
         })
       }
     }

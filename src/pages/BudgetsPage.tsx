@@ -1324,8 +1324,7 @@ export default function BudgetsPage() {
     <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="min-w-0 max-md:basis-full">
-          {/* The phone header already names the page; keep one visible title and one h1. */}
-          <h1 className="sr-only md:hidden">Budgets & Goals</h1>
+          {/* The phone header is the page's one h1 (M-03). */}
           <p className="text-muted-foreground text-sm">Track spending limits and savings targets</p>
         </div>
         <PageActions>

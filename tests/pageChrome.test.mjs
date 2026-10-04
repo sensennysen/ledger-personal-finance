@@ -15,6 +15,7 @@ test('screens that do not follow the cycle hide it', () => {
     '/settings',
     '/thirteenth-month',
     '/accounts/abc',
+    '/more',
   ]) {
     assert.equal(resolveHeaderMeta(path).showStepper, false, path)
   }
@@ -24,6 +25,7 @@ test('titles match the destination labels', () => {
   assert.equal(resolveHeaderMeta('/').title, 'Home')
   assert.equal(resolveHeaderMeta('/transactions').title, 'Activity')
   assert.equal(resolveHeaderMeta('/thirteenth-month').title, '13th Month')
+  assert.equal(resolveHeaderMeta('/more').title, 'More')
   assert.equal(resolveHeaderMeta('/accounts/abc').title, 'Account')
 })
 

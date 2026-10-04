@@ -53,7 +53,7 @@ export function DashboardRecentTransactionsCard({
             variant="ghost"
             size="sm"
             onClick={() => navigate('/transactions')}
-            className="text-xs text-muted-foreground hover:text-primary h-7 px-2"
+            className="text-xs text-muted-foreground hover:text-primary h-7 px-2 max-md:h-10 max-md:px-3"
           >
             View all
           </Button>

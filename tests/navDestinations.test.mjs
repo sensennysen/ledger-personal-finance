@@ -4,6 +4,7 @@ import {
   NAV_TABS,
   BOTTOM_NAV_TABS,
   SETTINGS_DESTINATION,
+  MORE_DESTINATION,
   isDestinationActive,
   isLocked,
   nextTabIndex,
@@ -19,16 +20,32 @@ test('tabs follow the 2B order and include Categories', () => {
   )
 })
 
-test('bottom nav keeps the four mobile destinations', () => {
+test('bottom nav keeps the four mobile destinations, then More', () => {
   assert.deepEqual(
     BOTTOM_NAV_TABS.map((t) => t.label),
-    ['Home', 'Accounts', 'Activity', 'Budgets'],
+    ['Home', 'Accounts', 'Activity', 'Budgets', 'More'],
   )
+})
+
+test('More is active on every destination it holds', () => {
+  for (const path of ['/more', '/categories', '/reports', '/thirteenth-month', '/settings']) {
+    assert.equal(isDestinationActive(path, MORE_DESTINATION), true, path)
+  }
+  assert.equal(isDestinationActive('/', MORE_DESTINATION), false)
+  assert.equal(isDestinationActive('/transactions', MORE_DESTINATION), false)
+})
+
+test('More never locks', () => {
+  assert.equal(isLocked(MORE_DESTINATION, false), false)
 })
 
 test('Categories is a tab at every size, not only a bottom-nav overflow', () => {
   assert.equal(tab('Categories').to, '/categories')
-  assert.ok(BOTTOM_NAV_TABS.every((b) => NAV_TABS.some((t) => t.to === b.to)))
+  assert.ok(
+    BOTTOM_NAV_TABS.filter((b) => b !== MORE_DESTINATION).every((b) =>
+      NAV_TABS.some((t) => t.to === b.to),
+    ),
+  )
   assert.equal(isDestinationActive('/categories', tab('Categories')), true)
 })
 

@@ -840,6 +840,8 @@ export default function AccountTransactionsPage() {
                   onDelete={handleDelete}
                   contextAccountId={accountId}
                   dense={density === 'compact'}
+                  variant={compactList ? 'list' : 'card'}
+                  baseCurrency={currency}
                 />
               )}
             />

@@ -1,10 +1,12 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowDown10, ArrowDownWideNarrow, ArrowUp01, ArrowUpNarrowWide, Bookmark, Download, Rows3 } from 'lucide-react'
+import { ArrowDown10, ArrowDownWideNarrow, ArrowUp01, ArrowUpNarrowWide, Bookmark, CheckSquare, Download, EllipsisVertical, Rows3, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
@@ -48,6 +50,9 @@ export function ResultBar({
   onDensityChange,
   onExport,
   savedFilters,
+  onSelect,
+  selecting = false,
+  onImport,
   compact,
 }: {
   matchCount: number
@@ -65,9 +70,90 @@ export function ResultBar({
   onExport?: () => void
   /** Saved filters (29a): "Save filter" while a filter narrows the list, else the saved list. */
   savedFilters?: { count: number; canSave: boolean; onOpen: () => void }
+  /** Phone overflow menu (M-05): bulk select and CSV import. */
+  onSelect?: () => void
+  selecting?: boolean
+  onImport?: () => void
   compact: boolean
 }) {
   const { label: sortLabel, icon: SortIcon } = SORT_OPTIONS[sort]
+  const sortMenu = (triggerClassName: string, iconClassName: string) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={triggerClassName}
+        aria-label={`Sorted ${sortLabel.toLowerCase()}; change sort`}
+        title="Change sort"
+      >
+        <SortIcon className={iconClassName} />
+        {!compact && <span>{sortLabel}</span>}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuRadioGroup value={sort} onValueChange={(value) => onSortChange(value as ActivitySort)}>
+          {sortOptions.map((option) => {
+            const { label, icon: Icon } = SORT_OPTIONS[option]
+            return (
+              <DropdownMenuRadioItem key={option} value={option} closeOnClick>
+                <Icon className="text-muted-foreground" />
+                {label}
+              </DropdownMenuRadioItem>
+            )
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+  const showSavedFilters = savedFilters && (savedFilters.canSave || savedFilters.count > 0)
+
+  if (compact) {
+    // Phones (M-05): one plain line, sort, and every list action behind ⋯, labelled.
+    const iconTrigger = buttonVariants({ variant: 'ghost', size: 'icon', className: '[&_svg]:size-[18px]' })
+    const hasOverflow = onSelect || showSavedFilters || onExport || onImport
+    return (
+      <div className="-mr-2 flex items-center justify-between gap-2 bg-background py-0.5">
+        <p className="min-w-0 truncate text-[0.8125rem] text-muted-foreground">
+          <b className="money font-semibold text-foreground">{matchCount.toLocaleString()}</b>{' '}
+          {matchCount === total ? totalLabel : `of ${total.toLocaleString()}`} ·{' '}
+          <span className={`money font-medium ${sumColor(sum)}`}>{formatNet(sum)}</span>
+        </p>
+        <div className="flex shrink-0">
+          {sortMenu(iconTrigger, '')}
+          {hasOverflow && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className={iconTrigger} aria-label="More list actions">
+                <EllipsisVertical />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                {onSelect && (
+                  <DropdownMenuCheckboxItem checked={selecting} onCheckedChange={onSelect} closeOnClick>
+                    <CheckSquare className="text-muted-foreground" />
+                    Select multiple
+                  </DropdownMenuCheckboxItem>
+                )}
+                {showSavedFilters && (
+                  <DropdownMenuItem onClick={savedFilters.onOpen}>
+                    <Bookmark className="text-muted-foreground" />
+                    {savedFilters.canSave ? 'Save filter' : `Saved filters · ${savedFilters.count}`}
+                  </DropdownMenuItem>
+                )}
+                {onExport && (
+                  <DropdownMenuItem onClick={onExport} disabled={matchCount === 0}>
+                    <Download className="text-muted-foreground" />
+                    Export match
+                  </DropdownMenuItem>
+                )}
+                {onImport && (
+                  <DropdownMenuItem onClick={onImport}>
+                    <Upload className="text-muted-foreground" />
+                    Import CSV
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative -mx-4 flex items-center justify-between gap-3 border-y border-border bg-muted px-4 py-2 md:-mx-6 md:px-6">
@@ -75,55 +161,29 @@ export function ResultBar({
       <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-0.5">
         <span className="text-sm font-bold">
           <span className="money">{matchCount.toLocaleString()}</span>{' '}
-          {compact ? (matchCount === 1 ? 'match' : 'matches') : `transaction${matchCount === 1 ? '' : 's'} match`}
+          {`transaction${matchCount === 1 ? '' : 's'} match`}
         </span>
-        {!compact && (
-          <span className="text-xs text-muted-foreground">
-            of <span className="money">{total.toLocaleString()}</span> {totalLabel}
-            {rangeLabel ? ` · ${rangeLabel}` : ''}
-          </span>
-        )}
+        <span className="text-xs text-muted-foreground">
+          of <span className="money">{total.toLocaleString()}</span> {totalLabel}
+          {rangeLabel ? ` · ${rangeLabel}` : ''}
+        </span>
         <span className="text-xs text-muted-foreground">
           Sum <span className={`money font-bold ${sumColor(sum)}`}>{formatNet(sum)}</span>
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className={buttonVariants({ variant: 'ghost', size: 'sm', className: 'gap-1.5 text-xs' })}
-            aria-label={`Sorted ${sortLabel.toLowerCase()}; change sort`}
-            title="Change sort"
-          >
-            <SortIcon className="w-3.5 h-3.5" />
-            {!compact && <span>{sortLabel}</span>}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuRadioGroup value={sort} onValueChange={(value) => onSortChange(value as ActivitySort)}>
-              {sortOptions.map((option) => {
-                const { label, icon: Icon } = SORT_OPTIONS[option]
-                return (
-                  <DropdownMenuRadioItem key={option} value={option} closeOnClick>
-                    <Icon className="text-muted-foreground" />
-                    {label}
-                  </DropdownMenuRadioItem>
-                )
-              })}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {!compact && (
-          <Button
-            variant={density === 'compact' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => onDensityChange(density === 'compact' ? 'comfortable' : 'compact')}
-            aria-pressed={density === 'compact'}
-          >
-            <Rows3 className="w-3.5 h-3.5" />
-            <span>Compact</span>
-          </Button>
-        )}
-        {savedFilters && (savedFilters.canSave || savedFilters.count > 0) && (
+        {sortMenu(buttonVariants({ variant: 'ghost', size: 'sm', className: 'gap-1.5 text-xs' }), 'w-3.5 h-3.5')}
+        <Button
+          variant={density === 'compact' ? 'secondary' : 'ghost'}
+          size="sm"
+          className="gap-1.5 text-xs"
+          onClick={() => onDensityChange(density === 'compact' ? 'comfortable' : 'compact')}
+          aria-pressed={density === 'compact'}
+        >
+          <Rows3 className="w-3.5 h-3.5" />
+          <span>Compact</span>
+        </Button>
+        {showSavedFilters && (
           <Button
             variant="ghost"
             size="sm"
@@ -132,7 +192,7 @@ export function ResultBar({
             aria-label={savedFilters.canSave ? 'Save this filter' : `Saved filters, ${savedFilters.count}`}
           >
             <Bookmark className="w-3.5 h-3.5" />
-            {!compact && <span>{savedFilters.canSave ? 'Save filter' : `Saved filters · ${savedFilters.count}`}</span>}
+            <span>{savedFilters.canSave ? 'Save filter' : `Saved filters · ${savedFilters.count}`}</span>
           </Button>
         )}
         {onExport && (
@@ -145,7 +205,7 @@ export function ResultBar({
             aria-label={`Export ${matchCount.toLocaleString()} matching transactions as CSV`}
           >
             <Download className="w-3.5 h-3.5" />
-            {!compact && <span>Export match</span>}
+            <span>Export match</span>
           </Button>
         )}
       </div>

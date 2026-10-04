@@ -579,7 +579,6 @@ export default function AccountsPage() {
     <div className="p-4 md:p-6 lg:px-8 space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold md:hidden">Accounts</h1>
           {accounts.length > 0 && (
             <p className="text-muted-foreground text-sm">
               {accounts.length} account{accounts.length > 1 ? 's' : ''} · {currencyCount} currenc{currencyCount > 1 ? 'ies' : 'y'}

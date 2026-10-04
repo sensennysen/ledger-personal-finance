@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Pencil, Scissors, Trash2 } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { Bookmark, Pencil, Scissors, Trash2 } from 'lucide-react'
+import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
+import { countsYet } from '@/lib/countsYet'
 import { Button } from '@/components/ui/button'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useCycle } from '@/contexts/cycleState'
@@ -16,20 +17,49 @@ export function EntryDetail({
   onEdit,
   onDelete,
   onSplit,
+  onSaveTemplate,
 }: {
   transaction: Transaction
   onEdit?: () => void
   onDelete?: () => void
   onSplit?: () => void
+  onSaveTemplate?: () => void
 }) {
   const accountName = transaction.account?.name ?? 'Account'
   const tags = transaction.tags ?? []
+  const interval = transaction.recurrence_interval
+  // Everything the phone row no longer shows lives here (M-07).
+  const scheduled = !countsYet(transaction.date, getLocalDateString())
+  const status = scheduled || transaction.queued ? (
+    <span className="inline-flex flex-col items-end">
+      {scheduled && <span>Scheduled · counts from {formatDate(transaction.date)}</span>}
+      {transaction.queued && <span className="text-warning">Not synced yet</span>}
+    </span>
+  ) : null
+  const fee = transaction.transfer_fee ?? 0
   const rows: [string, React.ReactNode][] = [
     ['Date', formatDate(transaction.date)],
     ['Category', transaction.category?.name ?? 'Uncategorized'],
+    ...(transaction.subcategory
+      ? [['Subcategory', transaction.subcategory.name] as [string, React.ReactNode]]
+      : []),
     transaction.to_account
       ? ['From → To', `${accountName} → ${transaction.to_account.name}`]
       : ['Account', accountName],
+    ...(transaction.is_recurring && interval
+      ? [[
+          'Repeats',
+          `${interval.charAt(0).toUpperCase()}${interval.slice(1)}${
+            transaction.recurrence_end_date
+              ? ` until ${formatDate(transaction.recurrence_end_date)}`
+              : ''
+          }`,
+        ] as [string, React.ReactNode]]
+      : []),
+    ...(status ? [['Status', status] as [string, React.ReactNode]] : []),
+    ...(fee > 0
+      ? [['Transfer fee', formatCurrency(fee, transaction.currency)] as [string, React.ReactNode]]
+      : []),
     ...(tags.length > 0
       ? [[
           'Tags',
@@ -80,7 +110,7 @@ export function EntryDetail({
       {transaction.type === 'expense' && transaction.category_id && (
         <BudgetImpactBar transaction={transaction} />
       )}
-      {(onEdit || onSplit || onDelete) && (
+      {(onEdit || onSplit || onDelete || onSaveTemplate) && (
         <div className="space-y-2">
           {onEdit && (
             <Button className="w-full" onClick={onEdit}>
@@ -107,6 +137,12 @@ export function EntryDetail({
                 </Button>
               )}
             </div>
+          )}
+          {onSaveTemplate && (
+            <Button variant="ghost" className="w-full" onClick={onSaveTemplate}>
+              <Bookmark />
+              Save as template
+            </Button>
           )}
         </div>
       )}

@@ -40,6 +40,8 @@ import { DashboardCategoryPieCard } from '@/components/dashboard/DashboardCatego
 import { DashboardRecentTransactionsCard } from '@/components/dashboard/DashboardRecentTransactionsCard'
 import { DashboardBudgetProgressCard } from '@/components/dashboard/DashboardBudgetProgressCard'
 import { DashboardUpcomingBillsCard } from '@/components/dashboard/DashboardUpcomingBillsCard'
+import { DashboardAttentionCard } from '@/components/dashboard/DashboardAttentionCard'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { DashboardCashFlowForecastCard } from '@/components/dashboard/DashboardCashFlowForecastCard'
 import { DashboardFirstRunChecklist } from '@/components/dashboard/DashboardFirstRunChecklist'
 import { getCreditCardSpending } from '@/lib/creditCards'
@@ -229,6 +231,14 @@ export default function DashboardPage() {
   )
 
   const visibleAlerts = alerts.filter((alert) => !dismissedAlerts.has(alert.id))
+  const dismissAlert = (id: string) => setDismissedAlerts((state) => new Set([...state, id]))
+  const payBill = (payment: { accountId: string; amount: number; date: string }) =>
+    openAddTransactionModal('loan-repayment', {
+      targetAccountId: payment.accountId,
+      prefill: { amount: payment.amount, date: payment.date },
+    })
+  // Phones fold warnings and bills into one card under net worth (M-08).
+  const phone = useMediaQuery('(max-width: 767px)')
   const orderedWidgetControls = widgetOrder.filter((key) => DEFAULT_WIDGET_ORDER.includes(key))
   const setWidgetControlRef = useFlipReorder(orderedWidgetControls)
 
@@ -348,14 +358,14 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {visibleAlerts.length > 0 && (
+      {!phone && visibleAlerts.length > 0 && (
         <div className="col-span-full" style={{ order: 1 }}>
           <h2 className="text-sm font-semibold">Needs attention</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">Warnings and commitments for {monthLabel}</p>
         </div>
       )}
 
-      {visibleAlerts.length > 0 && (
+      {!phone && visibleAlerts.length > 0 && (
         <div className="space-y-2 col-span-full" style={{ order: 2 }}>
           {visibleAlerts.map((alert) => (
             <div
@@ -372,7 +382,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 aria-label="Dismiss warning"
-                onClick={() => setDismissedAlerts((state) => new Set([...state, alert.id]))}
+                onClick={() => dismissAlert(alert.id)}
                 className="rounded-full focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
               >
                 <X className="w-3.5 h-3.5 opacity-60 hover:opacity-100" />
@@ -382,19 +392,14 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {widgets.upcomingBills && (
+      {!phone && widgets.upcomingBills && (
         <DashboardWidgetBoundary widget="upcomingBills" style={widgetGridStyle('upcomingBills')}>
           <DashboardUpcomingBillsCard
             bills={upcomingBills}
             isCurrentMonth={isCurrentMonth}
             monthLabel={monthLabel}
             loading={loading}
-            onPay={(payment) =>
-              openAddTransactionModal('loan-repayment', {
-                targetAccountId: payment.accountId,
-                prefill: { amount: payment.amount, date: payment.date },
-              })
-            }
+            onPay={payBill}
             style={widgetGridStyle('upcomingBills')}
           />
         </DashboardWidgetBoundary>
@@ -402,11 +407,11 @@ export default function DashboardPage() {
 
       {widgets.stats && (
         <DashboardWidgetBoundary widget="stats" style={widgetGridStyle('stats')}>
-          <section className="md:hidden rounded-3xl bg-card p-4" style={widgetGridStyle('stats')}>
-            <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] leading-none mt-1.5">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p>{!loading && stats.scheduledNetWorth !== 0 && <p className="text-[11px] mt-1 text-muted-foreground">{afterScheduledLabel(stats.scheduledNetWorth,currency,formatCurrency)}</p>}</button>
+          <section className="md:hidden rounded-3xl bg-card px-4 pt-[18px] pb-4" style={widgetGridStyle('stats')}>
+            <button className="w-full text-left" onClick={()=>setDetailView('balance')}><span className="text-[11px] tracking-[.14em] uppercase text-muted-foreground">Net worth</span><p className="money text-[32px] leading-none mt-1.5">{loading ? '…' : formatCurrency(stats.totalBalance,currency)}</p>{!loading && stats.scheduledNetWorth !== 0 && <p className="text-xs mt-1.5 text-muted-foreground">{afterScheduledLabel(stats.scheduledNetWorth,currency,formatCurrency)}</p>}</button>
             {/* Only when there is a notice: an empty wrapper still takes its margin (LED-202). */}
             {!loading && stats.excludedCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedCurrencies} subject="balances" /></div>}
-            <div className="grid grid-cols-2 gap-3 mt-2.5">{([{view:'income',label:'↙ In',value:stats.income,upcoming:stats.upcomingIncome,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,upcoming:stats.upcomingExpenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-xl px-3 py-1.5 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-[11px] uppercase">{item.label}</span><p className="money text-sm mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p>{!loading && item.upcoming > 0 && <p className="text-[11px] mt-0.5 truncate">+ {formatCurrency(item.upcoming,currency)} scheduled</p>}</button>)}</div>
+            <div className="grid grid-cols-2 gap-2 mt-3.5">{([{view:'income',label:'↙ In',value:stats.income,upcoming:stats.upcomingIncome,tone:'income'},{view:'expenses',label:'↗ Out',value:stats.expenses,upcoming:stats.upcomingExpenses,tone:'expense'}] as const).map(item=><button key={item.view} className="text-left rounded-[14px] px-3 py-2.5 min-w-0" style={{background:'var(--'+item.tone+'-container)',color:'var(--'+item.tone+')'}} onClick={()=>setDetailView(item.view)}><span className="text-xs font-medium">{item.label}</span><p className="money text-[15px] mt-1 truncate">{loading?'…':formatCurrency(item.value,currency)}</p>{!loading && item.upcoming > 0 && <p className="text-[11px] mt-0.5 truncate">+ {formatCurrency(item.upcoming,currency)} scheduled</p>}</button>)}</div>
             {!loading && stats.excludedFlowCurrencies.length > 0 && <div className="mt-2"><UnratedCurrencyNotice currencies={stats.excludedFlowCurrencies} subject="income and expenses" /></div>}
           </section>
           <div className="hidden md:grid gap-4 grid-cols-3 col-span-full" style={widgetGridStyle('stats')}>
@@ -448,6 +453,21 @@ export default function DashboardPage() {
 
           </div>
         </DashboardWidgetBoundary>
+      )}
+
+      {/* Same order as stats and next in the DOM, so it always sits right under net worth. */}
+      {phone && (
+        <DashboardAttentionCard
+          alerts={visibleAlerts}
+          onDismiss={dismissAlert}
+          bills={upcomingBills}
+          billsEnabled={widgets.upcomingBills}
+          loading={loading}
+          onPay={payBill}
+          isCurrentMonth={isCurrentMonth}
+          monthLabel={monthLabel}
+          style={widgetGridStyle('stats')}
+        />
       )}
 
       {widgets.creditCards && creditCards.length > 0 && (

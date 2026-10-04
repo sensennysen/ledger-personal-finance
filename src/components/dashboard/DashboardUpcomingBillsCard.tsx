@@ -1,6 +1,6 @@
 import { Bell, CircleDollarSign } from 'lucide-react'
-import { EXPENSE, WARNING_INK } from '@/constants/colors'
 import { formatCurrency } from '@/lib/utils'
+import { PHONE_LIMIT, formatDaysUntil, getUpcomingBillDayColor } from '@/lib/upcomingBills'
 import type { UpcomingBill } from '@/hooks/useDashboardData'
 import { Button } from '@/components/ui/button'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
@@ -16,23 +16,7 @@ interface DashboardUpcomingBillsCardProps {
   style?: React.CSSProperties
 }
 
-function getUpcomingBillDayColor(daysUntil: number) {
-  if (daysUntil <= 0) return EXPENSE
-  if (daysUntil <= 3) return WARNING_INK
-  return 'var(--muted-foreground)'
-}
-
-function formatDaysUntil(daysUntil: number) {
-  if (daysUntil < 0) return daysUntil === -1 ? '1 day overdue' : `${-daysUntil} days overdue`
-  if (daysUntil === 0) return 'today'
-  if (daysUntil === 1) return 'tomorrow'
-  return `in ${daysUntil} days`
-}
-
 const STRIP_LIMIT = 4
-// A phone shows the next bill only, as design 18a's strip does, so Home's first four widgets fit
-// above the bottom nav at 390x844 (LED-202); the rest are counted in "+N more".
-const PHONE_LIMIT = 1
 
 // A strip, not a grid cell (LED-78): one line of the next few bills, full width.
 export function DashboardUpcomingBillsCard({

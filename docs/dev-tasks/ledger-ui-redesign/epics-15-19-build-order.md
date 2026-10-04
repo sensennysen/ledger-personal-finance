@@ -88,7 +88,7 @@ Built in four phases (plan 2026-10-03), each validated before the next:
 - **A, quick and independent:** LED-246, 244, 234, 235, 243. **Done** (2026-10-03, retro `knowledge/retros/2026-10-03-epic-21-phase-a.md`).
 - **B, categories:** LED-233, then 236, 240, 239. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-phase-b.md`).
 - **C, cycle totals:** LED-238, then 237. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-phase-c.md`). Validation filed LED-251.
-- **D, Activity, loading, storage:** LED-241, 242, 245.
+- **D, Activity, loading, storage:** LED-241, 242, 245. **Done** except LED-245 (d), the link from the cookie notice, which waits for wording approval (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-phase-d.md`).
 
 | Ticket | Item | Summary | Pts |
 |---|---|---|---|

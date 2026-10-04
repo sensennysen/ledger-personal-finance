@@ -133,3 +133,13 @@ test('cards on the page hover to the solid surface, not a see-through accent', (
     assert.doesNotMatch(near.split('\n').slice(0, 3).join('\n'), /hover:bg-accent\/\d+/, file)
   }
 })
+
+// Completed goal (LED-249): opacity-75 on the whole card took its muted text to 3.73:1 in light. A completed
+// goal is not a disabled control, so it keeps full-strength text; the check icon and income bar mark it.
+test('a completed goal card is not dimmed with opacity', () => {
+  const src = readFileSync(new URL('../src/pages/BudgetsPage.tsx', import.meta.url), 'utf8')
+  const start = src.indexOf('function SavingsGoalCard(')
+  assert.ok(start >= 0, 'SavingsGoalCard not found')
+  const body = src.slice(start, src.indexOf('\nfunction ', start + 1))
+  assert.doesNotMatch(body, /(?<![\w-])opacity-\d+/)
+})

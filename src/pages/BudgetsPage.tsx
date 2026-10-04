@@ -1028,7 +1028,7 @@ function SavingsGoalCard({
   })()
 
   return (
-    <Card className={goal.is_completed ? 'opacity-75' : ''}>
+    <Card>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2.5">

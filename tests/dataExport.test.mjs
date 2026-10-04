@@ -53,9 +53,20 @@ test('categories and budgets carry their own columns', () => {
     'Name,Type,Default\nFood & Dining,expense,yes\nSide gig,income,no',
   )
   assert.equal(
-    buildBudgetsCsv([{ name: 'Groceries', category: { name: 'Food & Dining' }, amount: 5000, currency: 'PHP', period: 'monthly', start_date: '2026-09-01', end_date: null, is_active: true, rollover_enabled: false }]),
-    'Name,Category,Amount,Currency,Period,Start Date,End Date,Active,Rollover\nGroceries,Food & Dining,5000,PHP,monthly,2026-09-01,,yes,no',
+    buildBudgetsCsv([{
+      name: 'Groceries', category: { name: 'Food & Dining' }, amount: 5000, currency: 'PHP', period: 'monthly',
+      start_date: '2026-09-01', end_date: null, is_active: true, rollover_enabled: false, spent: 3210.5, unrated_currencies: [],
+    }]),
+    'Name,Category,Amount,Currency,Period,Start Date,End Date,Active,Rollover,Spent,Unrated Currencies\nGroceries,Food & Dining,5000,PHP,monthly,2026-09-01,,yes,no,3210.5,',
   )
+})
+
+test('a budget with an unrated currency names it in its own column', () => {
+  const csv = buildBudgetsCsv([{
+    name: 'Groceries', category: null, amount: 5000, currency: 'PHP', period: 'monthly',
+    start_date: '2026-09-01', end_date: null, is_active: false, rollover_enabled: false, spent: 0, unrated_currencies: ['EUR', 'USD'],
+  }])
+  assert.ok(csv.endsWith('Groceries,,5000,PHP,monthly,2026-09-01,,no,no,0,EUR;USD'))
 })
 
 test('an empty list is a header only, never a broken file', () => {

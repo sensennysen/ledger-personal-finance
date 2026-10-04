@@ -28,12 +28,14 @@ export function DashboardCreditCardMonitor({
       <DashboardCardHeader
         title="Credit Card Monitor"
         subtitle="Spending, statement, and payment tracking"
+        subtitleOnPhone={false}
         icon={<CreditCard className="w-3.5 h-3.5 text-muted-foreground" />}
+        iconOnPhone={false}
         className="mb-1"
       />
       <ul className="divide-y divide-border/60">
         {creditCards.map((card) => (
-          <li key={card.acc.id} className="space-y-2 py-3 last:pb-0">
+          <li key={card.acc.id} className="space-y-2 py-3 last:pb-0 max-md:first:pt-2">
             <div className="flex items-baseline justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{card.acc.name}</p>
@@ -72,7 +74,7 @@ export function DashboardCreditCardMonitor({
               </p>
             )}
             {card.acc.last_payment_date && card.acc.last_payment_amount != null && (
-              <p className="text-[0.6875rem] text-muted-foreground">
+              <p className="text-[0.6875rem] text-muted-foreground max-md:hidden">
                 Last payment: {formatCurrency(card.acc.last_payment_amount, card.acc.currency)} on {card.acc.last_payment_date}
               </p>
             )}

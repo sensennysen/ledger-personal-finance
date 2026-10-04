@@ -13,6 +13,7 @@ import {
   parseFeed,
   parseRateRow,
   rateBetween,
+  rateStatusLabel,
   rebaseOverrides,
   refreshDue,
   unansweredQuotes,
@@ -206,4 +207,21 @@ test('the only hook that requires the rates provider lives in the app shell', ()
   const state = readFileSync('src/contexts/exchangeRatesState.ts', 'utf8')
   assert.match(state, /requires ExchangeRatesProvider/)
   assert.match(state, /export function useOptionalExchangeRates/)
+})
+
+// ── Settings rate status (LED-187) ──────────────────────────
+test('with nothing needing a rate, the status never claims a fetch, even with a stale fetchedAt', () => {
+  assert.equal(rateStatusLabel(null, 0), 'Rates · nothing to fetch')
+  assert.equal(rateStatusLabel(table(), 0), 'Rates · nothing to fetch')
+})
+
+test('with a foreign account and no fetch yet, the status says so', () => {
+  assert.equal(rateStatusLabel(null, 1), 'No rates fetched yet.')
+  assert.equal(rateStatusLabel(table({ fetchedAt: null }), 1), 'No rates fetched yet.')
+})
+
+test('with a foreign account and a fetch, the status names the as-of date and fetched time', () => {
+  const label = rateStatusLabel(table(), 1)
+  assert.match(label, /^Rates as of .+ · fetched .+$/)
+  assert.doesNotMatch(label, /nothing to fetch|No rates fetched yet/)
 })

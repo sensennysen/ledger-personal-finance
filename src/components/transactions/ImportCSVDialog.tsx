@@ -6,7 +6,7 @@ import { useImportCategoryMemory } from '@/hooks/useImportCategoryMemory'
 import { useImportDuplicates } from '@/hooks/useImportDuplicates'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { similarRows } from '@/lib/importCategories'
-import { duplicateSpan, matchDuplicates, type ExistingTx } from '@/lib/importDuplicates'
+import { duplicateSpan, findIdenticalRows, identicalRowsLabel, matchDuplicates, type ExistingTx } from '@/lib/importDuplicates'
 import {
   buildRows,
   EMPTY_DESCRIPTION,
@@ -56,6 +56,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { TechnicalDetail } from '@/components/ui/technical-detail'
+import { transferCredit } from '@/lib/transferCredit'
 
 export interface ImportTx {
   date: string
@@ -174,6 +175,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     [file, dateOrder],
   )
   const span = useMemo(() => duplicateSpan(built.rows), [built.rows])
+  // Rows repeated within the file (LED-234): marked in the preview, never unticked.
+  const identical = useMemo(() => findIdenticalRows(built.rows), [built.rows])
   const dupeCheck = useImportDuplicates(accountId, span)
   // Compare in the account's currency: that's what the existing rows are in.
   const duplicates = matchDuplicates(
@@ -401,7 +404,9 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const describeMatch = (match: ExistingTx) => {
     if (match.type === 'transfer') {
       const inbound = match.account_id !== accountId
-      const amount = Number(match.amount) * (inbound ? Number(match.exchange_rate ?? 1) : 1)
+      const amount = inbound
+        ? transferCredit({ amount: Number(match.amount), exchange_rate: Number(match.exchange_rate ?? 1), destination_amount: match.destination_amount == null ? null : Number(match.destination_amount) })
+        : Number(match.amount)
       return `${match.date} · transfer ${inbound ? `from ${accountName(match.account_id)}` : `to ${accountName(match.to_account_id)}`} · ${formatCurrency(amount, accountCurrency)}`
     }
     if (match.type === 'expense' && match.to_account_id) {
@@ -829,6 +834,11 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                 {match && (
                                   <span className="block text-xs text-muted-foreground truncate">
                                     Matches {describeMatch(match)}
+                                  </span>
+                                )}
+                                {identical.has(row.line) && (
+                                  <span className="block text-xs text-muted-foreground">
+                                    {identicalRowsLabel(identical.get(row.line)!)}
                                   </span>
                                 )}
                                 {reason && (

@@ -2,7 +2,8 @@ import { useEntryDetail } from '@/contexts/EntryContext'
 import { memo, useEffect, useState } from 'react'
 import { Pencil, Trash2, RepeatIcon, ImageIcon, CloudUpload, Scissors, Bookmark, MoreHorizontal, Clock } from 'lucide-react'
 import { TRANSACTION_TYPE_ICON, TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDateShort, getLocalDateString } from '@/lib/utils'
+import { countsYet } from '@/lib/countsYet'
 import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
 import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -44,6 +45,8 @@ interface TransactionRowProps {
   contextAccountId?: string
   /** Compact density from the result bar (LED-61): tighter padding and a smaller icon tile. */
   dense?: boolean
+  /** Shows the date on the row, for a flat list sorted by amount (LED-241). */
+  showDate?: boolean
 }
 
 // Memoised (LED-164): a load step in the windowed list only mounts new rows,
@@ -60,6 +63,7 @@ function TransactionRowImpl({
   onSelect,
   contextAccountId,
   dense,
+  showDate,
 }: TransactionRowProps) {
   const openDetail = useEntryDetail()
   const [receiptOpen, setReceiptOpen] = useState(false)
@@ -103,7 +107,7 @@ function TransactionRowImpl({
   const { sign: amountPrefix, value: displayAmount, currency: displayCurrency } = amountDisplay(tx, contextAccountId)
 
   return (
-    <div className={`flex items-center gap-3 ${dense ? 'px-3 py-2' : 'p-3'} rounded-lg bg-card border hover:bg-accent/50 transition-colors group`}>
+    <div className={`flex items-center gap-3 ${dense ? 'px-3 py-2' : 'p-3'} rounded-lg bg-card border hover:bg-surface-hover transition-colors group`}>
       {/* Checkbox (bulk select) */}
       {selectable && (
         <input
@@ -139,6 +143,9 @@ function TransactionRowImpl({
         {/* Row 2: labels | currency */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
+            {showDate && (
+              <time dateTime={tx.date} className="text-xs text-muted-foreground">{formatDateShort(tx.date)}</time>
+            )}
             {tx.queued && (
               <span className="inline-flex items-center gap-1 text-xs text-warning">
                 <Clock className="w-3 h-3" />Not synced yet
@@ -173,6 +180,10 @@ function TransactionRowImpl({
                 # {tag}
               </Badge>
             ))}
+            {!countsYet(tx.date, getLocalDateString()) && (
+              // Dated later: listed now, counted in totals from its date (LED-238).
+              <Badge variant="outline" className="text-xs py-0 px-1.5">Scheduled</Badge>
+            )}
             {tx.is_recurring && (
               <Badge variant="outline" className="text-xs py-0 px-1.5 gap-1">
                 <RepeatIcon className="w-2.5 h-2.5" />{tx.recurrence_interval}

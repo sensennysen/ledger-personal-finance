@@ -16,6 +16,7 @@ import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DASHBOARD_CHART_TOOLTIP_STYLE } from '@/components/dashboard/chartTooltipStyle'
 import { abbreviateTick } from '@/lib/chartTicks'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 
 interface DashboardCashFlowChartProps {
   chartPeriod: DashboardChartPeriod
@@ -25,6 +26,7 @@ interface DashboardCashFlowChartProps {
   currencySymbol: string
   loading: boolean
   monthLabel: string
+  excludedCurrencies?: string[]
   style?: React.CSSProperties
 }
 
@@ -36,6 +38,7 @@ export function DashboardCashFlowChart({
   currencySymbol,
   loading,
   monthLabel,
+  excludedCurrencies = [],
   style,
 }: DashboardCashFlowChartProps) {
   return (
@@ -56,12 +59,13 @@ export function DashboardCashFlowChart({
           )}
           className="flex-col 2xl:flex-row 2xl:items-center mb-0"
         />
+        {!loading && <UnratedCurrencyNotice currencies={excludedCurrencies} subject="income and expenses" />}
       </div>
       <div className="px-2 pb-4">
         {loading ? (
-          <Skeleton className="h-60 w-full rounded-xl 2xl:h-48" aria-busy="true" />
+          <Skeleton className="h-40 w-full rounded-xl sm:h-60 2xl:h-48" aria-busy="true" />
         ) : (
-          <div className="h-60 2xl:h-48">
+          <div className="h-40 sm:h-60 2xl:h-48">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={cashFlowData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

@@ -4,6 +4,7 @@ import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { ACCOUNT_TYPE_LABELS, type Account, type AccountType } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
+import { compareAccountsForPicker, pickerGroupOrder } from '@/lib/accountDefault'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -45,15 +46,14 @@ export function AccountCombobox({
   const selectedAccount = accounts.find((account) => account.id === value)
 
   const groupedAccounts = useMemo(() => {
-    const preferredOrder = profile?.account_group_order ?? defaultGroupOrder
-    const groupOrder = [...preferredOrder, ...defaultGroupOrder.filter((type) => !preferredOrder.includes(type))]
+    const groupOrder = pickerGroupOrder(profile?.account_group_order, defaultGroupOrder)
 
     return groupOrder
       .map((type) => ({
         type,
         accounts: accounts
           .filter((account) => account.type === type)
-          .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)),
+          .sort(compareAccountsForPicker),
       }))
       .filter((group) => group.accounts.length > 0)
   }, [accounts, profile?.account_group_order])

@@ -6,11 +6,13 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useLoanPurchases } from '@/hooks/useLoanPurchases'
 import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { useCycle } from '@/contexts/cycleState'
 import { ACCOUNT_TYPE_LABELS } from '@/types'
 import { formatCurrency, formatDate, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange, getLocalDateString } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 import { daysUntilDue, formatLoanSchedule, formatOverdue, getLoanAmountOwed } from '@/lib/loans'
+import { afterScheduledLabel, scheduledByAccount } from '@/lib/scheduledBalances'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,11 +25,12 @@ import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
 import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
+import { notifyCardPaymentsRefresh, registerCardPaymentsListener } from '@/lib/cacheEvents'
 import { searchMatcher } from '@/lib/globalSearch'
 import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { useCardPayment } from '@/hooks/useCardPayment'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
-import { defaultCardPaymentDescription } from '@/lib/cardPayment'
+import { defaultCardPaymentDescription, isCardPaymentTransaction } from '@/lib/cardPayment'
 import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { entryDialogWidthClass, type TransactionKind } from '@/components/transactions/transactionKinds'
@@ -52,6 +55,7 @@ import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import type { CreditCardPayment, Transaction } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
+import { transferCredit } from '@/lib/transferCredit'
 
 function bandCell(label: string, value: string, sub?: string, money = true, wrapValue = false) {
   return (
@@ -87,6 +91,7 @@ export default function AccountTransactionsPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
   const { profile, user } = useAuth()
+  const { table: rateTable } = useExchangeRates()
   const { accounts, error: accountsError, refetch: refetchAccounts, updateAccountWithAdjustment } = useAccounts()
   const { categories } = useCategories()
   const { transactions, loading, error: txError, errorDetail: txErrorDetail, refetch: refetchTransactions, createTransaction, updateTransaction, deleteTransaction } = useTransactions()
@@ -120,13 +125,15 @@ export default function AccountTransactionsPage() {
   const [editAccountOpen, setEditAccountOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formError, setFormError] = useState<FormErrorValue>(null)
-  const [paymentHistory, setPaymentHistory] = useState<CreditCardPayment[]>([])
-  const [paymentsLoading, setPaymentsLoading] = useState(false)
+  // The rows are kept with the card they were read for, so a card change never shows the last card's payments.
+  const [paymentHistory, setPaymentHistory] = useState<{ accountId: string; rows: CreditCardPayment[] } | null>(null)
+  const [paymentsError, setPaymentsError] = useState<string | null>(null)
   const [loanSection, setLoanSection] = useState<'summary' | 'purchases' | 'activity'>('summary')
 
-  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createTransaction, refetchAccounts)
   // Every card payment, from the header or the pane, saves the transfer, the payment record and the statement (LED-146).
-  const { createWithStatement } = useCardPayment(createTransaction, (payment) => setPaymentHistory((prev) => [payment, ...prev]))
+  const { createWithStatement } = useCardPayment(createTransaction)
+  // Undo restores a deleted card payment through the same path, so its payment record and statement come back too (LED-191).
+  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createWithStatement, refetchAccounts)
 
   const account = accounts.find((a) => a.id === accountId)
   const Icon = account ? ACCOUNT_ICONS[account.type] : Wallet
@@ -245,24 +252,34 @@ export default function AccountTransactionsPage() {
   const stats = useMemo(() => {
     const income = accountTransactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
     const expenses = accountTransactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    // Outgoing transfers debit amount + fee; incoming transfers credit amount * exchange_rate
+    // Outgoing transfers debit amount + fee; incoming transfers credit what the trigger credits (transferCredit)
     const transfersSent = accountTransactions
       .filter((t) => t.type === 'transfer' && t.account_id === accountId)
       .reduce((s, t) => s + t.amount + (t.transfer_fee ?? 0), 0)
     const transfersReceived = accountTransactions
       .filter((t) => t.type === 'transfer' && t.to_account_id === accountId)
-      .reduce((s, t) => s + t.amount * (t.exchange_rate ?? 1), 0)
+      .reduce((s, t) => s + transferCredit(t), 0)
     return { income, expenses, transfersSent, transfersReceived }
   }, [accountTransactions, accountId])
 
   const currency = account?.currency ?? profile?.default_currency ?? 'USD'
+  // The stored balance already holds rows dated after today; say how much beside it (LED-251).
+  const today = getLocalDateString()
+  const scheduledDelta = useMemo(
+    () => (accountId ? scheduledByAccount(accounts, transactions, today).get(accountId) ?? 0 : 0),
+    [accounts, transactions, today, accountId],
+  )
+  const afterScheduled = afterScheduledLabel(scheduledDelta, currency, formatCurrency)
+  const withAfterScheduled = (sub: string) => (afterScheduled ? `${sub} · ${afterScheduled}` : sub)
   // "Where it went" (LED-98): this cycle's spending from this account, by category.
   const cycleRange = getCustomMonthRange(selectedMonth, startDay)
   const cycleLabel = `${formatDateShort(cycleRange.start)} – ${formatDateShort(cycleRange.end)}`
   const categoryById = new Map(categories.map((category) => [category.id, category]))
-  const cycleBreakdown = buildCategoryBreakdown(
+  // Every row here belongs to this one account, so it is already in `currency`; no conversion needed.
+  const { rows: cycleBreakdown } = buildCategoryBreakdown(
     accountTransactions.filter((t) => t.type === 'expense' && t.account_id === accountId && t.date >= cycleRange.start && t.date <= cycleRange.end),
     categoryById,
+    currency,
   )
   const statementDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.statement_day) : null
   const dueDays = account?.type === 'credit_card' ? daysUntilDayOfMonth(account.due_day) : null
@@ -304,6 +321,8 @@ export default function AccountTransactionsPage() {
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     refetchAccounts()
+    // The database moved, added or removed the payment's history row and statement with the transfer (LED-191, LED-230).
+    if (isCardPaymentTransaction(editingTx, accounts) || isCardPaymentTransaction(values, accounts)) notifyCardPaymentsRefresh()
     setEditingTx(null)
   }
 
@@ -317,35 +336,44 @@ export default function AccountTransactionsPage() {
       return
     }
     refetchAccounts()
+    if (snapshot && isCardPaymentTransaction(snapshot, accounts)) notifyCardPaymentsRefresh()
     if (snapshot) announceDeleted([snapshot], `"${snapshot.description}" deleted`)
-  }, [transactions, deleteTransaction, refetchAccounts, announceDeleteFailed, announceDeleted])
+  }, [transactions, accounts, deleteTransaction, refetchAccounts, announceDeleteFailed, announceDeleted])
+
+  const isCard = account?.type === 'credit_card'
+  const fetchPaymentHistory = useCallback(async () => {
+    if (!user || !accountId || !isCard) return
+    const { data, error } = await supabase
+      .from('credit_card_payments')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('account_id', accountId)
+      .order('payment_date', { ascending: false })
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      setPaymentsError(describeDataError(error, { action: 'load' })?.message ?? 'Could not load payment history')
+      return
+    }
+    setPaymentsError(null)
+    setPaymentHistory({ accountId, rows: (data as CreditCardPayment[]) ?? [] })
+  }, [user, accountId, isCard])
 
   useEffect(() => {
-    const fetchPaymentHistory = async () => {
-      if (!user || !accountId || account?.type !== 'credit_card') {
-        setPaymentHistory([])
-        return
-      }
+    queueMicrotask(() => void fetchPaymentHistory())
+  }, [fetchPaymentHistory])
 
-      setPaymentsLoading(true)
-      const { data, error } = await supabase
-        .from('credit_card_payments')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('account_id', accountId)
-        .order('payment_date', { ascending: false })
-        .order('created_at', { ascending: false })
+  // A payment made from the global modal, or a card payment edited or deleted, signals here instead of
+  // this page running a second listener of its own (LED-192).
+  useEffect(() => registerCardPaymentsListener(() => void fetchPaymentHistory()), [fetchPaymentHistory])
 
-      if (error) {
-        setFormError(describeDataError(error, { action: 'load' }))
-      } else {
-        setPaymentHistory((data as CreditCardPayment[]) ?? [])
-      }
-      setPaymentsLoading(false)
-    }
-
-    fetchPaymentHistory()
-  }, [user, accountId, account?.type])
+  const historyLoaded = paymentHistory !== null && paymentHistory.accountId === accountId
+  const historyRows = historyLoaded ? paymentHistory.rows : []
+  const historyState = resolveLoadState({
+    loading: !historyLoaded,
+    error: paymentsError,
+    hasData: historyRows.length > 0,
+  })
 
   // Same path as editing the balance in the account form, so the change leaves an adjustment in history.
   const handleSetLoanAmount = async (owed: number) => {
@@ -556,7 +584,7 @@ export default function AccountTransactionsPage() {
             <div className="grid grid-cols-2 lg:grid-cols-4 [&>div]:border-border/60 [&>div]:p-4 [&>div:nth-child(odd)]:border-r [&>div:nth-child(-n+2)]:border-b lg:[&>div]:border-b-0 lg:[&>div:not(:last-child)]:border-r">
               {account.type === 'credit_card' ? (
                 <>
-                  {bandCell('Current balance', formatCurrency(getCreditCardSpending(account), currency), account.balance < 0 ? 'owed' : 'nothing owed')}
+                  {bandCell('Current balance', formatCurrency(getCreditCardSpending(account), currency), withAfterScheduled(account.balance < 0 ? 'owed' : 'nothing owed'))}
                   {bandCell(
                     'Credit limit',
                     account.credit_limit != null ? formatCurrency(account.credit_limit, currency) : 'Not set',
@@ -567,7 +595,7 @@ export default function AccountTransactionsPage() {
                 </>
               ) : account.type === 'loan' ? (
                 <>
-                  {bandCell('Outstanding', formatCurrency(getLoanAmountOwed(account), currency), 'owed')}
+                  {bandCell('Outstanding', formatCurrency(getLoanAmountOwed(account), currency), withAfterScheduled('owed'))}
                   {bandCell(
                     'Repaid',
                     formatCurrency(loanRepayment?.totalPaid ?? 0, currency),
@@ -582,7 +610,7 @@ export default function AccountTransactionsPage() {
                 </>
               ) : (
                 <>
-                  {bandCell('Current balance', formatCurrency(account.balance, currency))}
+                  {bandCell('Current balance', formatCurrency(account.balance, currency), afterScheduled ?? undefined)}
                   {bandCell('Income', `+${formatCurrency(stats.income, currency)}`)}
                   {bandCell('Expenses', `−${formatCurrency(stats.expenses, currency)}`)}
                   {bandCell('Transfers', `−${formatCurrency(stats.transfersSent, currency)}`, `+${formatCurrency(stats.transfersReceived, currency)} received`)}
@@ -616,12 +644,13 @@ export default function AccountTransactionsPage() {
           </div>
         )}
 
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        {/* Side column from xl: at lg the month rail is already beside the page, and a third column left the list 344px wide at 1024 (LED-231). */}
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         {account && (
           <aside
             className={account.type === 'loan' && loanSection === 'summary'
               ? 'space-y-4 lg:col-span-full lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0'
-              : 'space-y-4 lg:col-start-2 lg:row-start-1'}
+              : 'space-y-4 xl:col-start-2 xl:row-start-1'}
             aria-label="Account summary"
           >
             {account.type === 'credit_card' && (
@@ -651,13 +680,16 @@ export default function AccountTransactionsPage() {
                 )}
                 <div className="border-t border-border/60 pt-2">
                   <p className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground mb-1.5">Payment history</p>
-                  {paymentsLoading ? (
+                  {historyState === 'loading' ? (
                     <p className="text-xs text-muted-foreground">Loading payment history...</p>
-                  ) : paymentHistory.length === 0 ? (
+                  ) : historyState === 'error' ? (
+                    <p className="text-xs text-expense" role="alert">{paymentsError}</p>
+                  ) : historyState === 'empty' ? (
                     <p className="text-xs text-muted-foreground">No logged payments yet.</p>
                   ) : (
                     <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                      {paymentHistory.map((p) => (
+                      {historyState === 'stale-error' && <p className="text-xs text-expense" role="alert">{paymentsError}</p>}
+                      {historyRows.map((p) => (
                         <div key={p.id} className="flex items-center justify-between text-xs">
                           <span className="text-muted-foreground">{p.payment_date}</span>
                           <span className="money font-semibold">{formatCurrency(p.amount, currency)}</span>
@@ -683,9 +715,9 @@ export default function AccountTransactionsPage() {
                 </Button>
               </section>
             )}
-            {/* Account facts: beside the list from lg, behind a disclosure below it so a phone can reach them (LED-146). */}
-            <div className="hidden space-y-4 lg:block">{accountFacts}</div>
-            <details className="group lg:hidden">
+            {/* Account facts: beside the list from xl, behind a disclosure below that so a phone or tablet can reach them (LED-146). */}
+            <div className="hidden space-y-4 xl:block">{accountFacts}</div>
+            <details className="group xl:hidden">
               <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
                 Account details
                 <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
@@ -694,7 +726,7 @@ export default function AccountTransactionsPage() {
             </details>
           </aside>
         )}
-        <div className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
+        <div className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1">
         {account?.type === 'loan' && loanSection === 'purchases' && (
           <LoanPurchaseTracker
             account={account}
@@ -789,7 +821,7 @@ export default function AccountTransactionsPage() {
                 rangeLabel={historyRange}
                 sum={matchSum}
                 sort={sort}
-                onSortChange={setSort}
+                onSortChange={(next) => setSort(next as TxSort)}
                 density={density}
                 onDensityChange={(next) => setPref('txDensity', next)}
                 onExport={exportMatch}
@@ -833,6 +865,7 @@ export default function AccountTransactionsPage() {
                   amount: editingTx.amount,
                   currency: editingTx.currency,
                   exchange_rate: editingTx.exchange_rate ?? 1,
+                  destination_amount: editingTx.destination_amount ?? null,
                   description: editingTx.description,
                   notes: editingTx.notes,
                   date: editingTx.date,
@@ -852,7 +885,7 @@ export default function AccountTransactionsPage() {
 
         {showMonthJump && <MonthJumpBar months={months} activeKey={null} onPick={jumpToMonth} />}
       </div>
-      {showMonthJump && <MonthRail months={months} activeKey={null} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} />} />}
+      {showMonthJump && <MonthRail months={months} activeKey={null} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} baseCurrency={currency} rateTable={rateTable} />} />}
     </div>
   )
 }

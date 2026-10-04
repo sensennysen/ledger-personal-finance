@@ -1,4 +1,5 @@
 import { signPrefix } from './netSign.ts'
+import { transferCredit } from './transferCredit.ts'
 
 // Transaction lists render a window of rows that grows on scroll (spec §7 V1):
 // 60 rows per step on desktop, 30 on mobile. Day headers always describe the
@@ -11,6 +12,7 @@ interface WindowedTx {
   amount: number
   currency: string
   exchange_rate?: number | null
+  destination_amount?: number | null
   to_account_id?: string | null
   to_account?: { currency?: string | null } | null
 }
@@ -26,13 +28,14 @@ export interface DayGroup<T> {
 /**
  * Signed amount as the row displays it. Without an account context a transfer
  * moves money between the user's own accounts and nets to zero. Inside an
- * account, money arriving (transfer or loan repayment into it) is positive and
- * carried at the exchange rate, matching TransactionRow.
+ * account, money arriving (transfer or loan repayment into it) is positive and is what the
+ * destination was credited (transferCredit: the destination amount of a transfer between two
+ * currencies), matching TransactionRow.
  */
 export function signedAmount(tx: WindowedTx, contextAccountId?: string): number {
   if (contextAccountId !== undefined) {
     const incoming = (tx.type === 'transfer' || tx.type === 'expense') && tx.to_account_id === contextAccountId
-    if (incoming) return tx.amount * (tx.exchange_rate ?? 1)
+    if (incoming) return tx.type === 'transfer' ? transferCredit(tx) : tx.amount * (tx.exchange_rate ?? 1)
     if (tx.type === 'income') return tx.amount
     return -tx.amount
   }
@@ -84,6 +87,40 @@ function compareDates(a: string, b: string, sort: TxSort): number {
 /** Sorted copy by date; rows on the same day keep their incoming order. */
 export function sortByDate<T extends { date: string }>(txs: T[], sort: TxSort): T[] {
   return [...txs].sort((a, b) => compareDates(a.date, b.date, sort))
+}
+
+/**
+ * Activity's sort (LED-241): the two date orders, plus amount largest or smallest first. An amount
+ * sort lists rows flat, since day groups would break its order.
+ */
+export type ActivitySort = TxSort | 'largest' | 'smallest'
+
+export const ACTIVITY_SORTS: readonly ActivitySort[] = ['newest', 'oldest', 'largest', 'smallest']
+
+export function isAmountSort(sort: ActivitySort): sort is 'largest' | 'smallest' {
+  return sort === 'largest' || sort === 'smallest'
+}
+
+/**
+ * Sorted copy by size. `magnitude` gives a row's amount in one currency, or null when it has no
+ * rate: those rows are never compared one to one with the rest, so they come last, ordered by their
+ * own amount. Equal sizes keep the newest first.
+ */
+export function sortByAmount<T extends { date: string; amount: number }>(
+  txs: T[],
+  sort: 'largest' | 'smallest',
+  magnitude: (tx: T) => number | null,
+): T[] {
+  const sign = sort === 'largest' ? -1 : 1
+  const keyed = txs.map((tx) => ({ tx, size: magnitude(tx) }))
+  keyed.sort((a, b) => {
+    if ((a.size === null) !== (b.size === null)) return a.size === null ? 1 : -1
+    const left = Math.abs(a.size ?? a.tx.amount)
+    const right = Math.abs(b.size ?? b.tx.amount)
+    if (left !== right) return sign * (left - right)
+    return b.tx.date.localeCompare(a.tx.date)
+  })
+  return keyed.map((entry) => entry.tx)
 }
 
 /** Sum of the signed amounts per currency, as the rows and day headers sign them. */

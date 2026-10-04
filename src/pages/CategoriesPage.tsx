@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import React, { useMemo, useState } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
@@ -12,10 +12,10 @@ import {
   ListTree,
   Zap,
   GripVertical,
+  GitMerge,
   ArrowUp,
   ArrowDown,
   Check,
-  MoreHorizontal,
 } from 'lucide-react'
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useNotify } from '@/contexts/notificationState'
@@ -49,7 +49,6 @@ import {
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ColorPicker } from '@/components/ui/color-picker'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn, formatCurrency, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange } from '@/lib/utils'
 import {
   buildCategoryUsage,
@@ -66,45 +65,25 @@ import { resolveLoadState } from '@/lib/loadState'
 import type { Category, Subcategory } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 import { SWATCHES } from '@/lib/swatches'
+import { Switch } from '@/components/ui/switch'
+import { clashSentence, findNameClash } from '@/lib/categoryNames'
+import { mergeSubsetOrder, moveAnnouncement, moveId, reorderIds } from '@/lib/reorder'
+import { budgetNote, mergedSentence, mergeSentence, mergeTargets, type MergePreview } from '@/lib/categoryMerge'
+import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 
 const DEFAULT_CATEGORY_ICON = '\u{1F3F7}\uFE0F'
 const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
+const RULE_TYPE_HINT_LABELS = { any: 'Any type', income: 'Income', expense: 'Expense', transfer: 'Transfer' } as const
 
 const schema = z.object({
-  name: z.string().min(1, 'Name is required').max(40),
+  name: z.string().trim().min(1, 'Name is required').max(40),
   type: z.enum(['income', 'expense', 'both']),
   color: z.string(),
   icon: z.string(),
+  counts_as_salary: z.boolean(),
 })
 
 type FormValues = z.infer<typeof schema>
-
-function reorderIds(ids: string[], fromId: string, toId: string) {
-  const from = ids.indexOf(fromId)
-  const to = ids.indexOf(toId)
-  if (from < 0 || to < 0 || from === to) return ids
-  const next = [...ids]
-  const [moved] = next.splice(from, 1)
-  next.splice(to, 0, moved)
-  return next
-}
-
-function moveId(ids: string[], id: string, direction: -1 | 1) {
-  const index = ids.indexOf(id)
-  const targetIndex = index + direction
-  if (index < 0 || targetIndex < 0 || targetIndex >= ids.length) return ids
-  const next = [...ids]
-  const current = next[index]
-  next[index] = next[targetIndex]
-  next[targetIndex] = current
-  return next
-}
-
-function mergeSubsetOrder(allIds: string[], subsetIds: string[]) {
-  const subset = new Set(subsetIds)
-  let pointer = 0
-  return allIds.map((id) => (subset.has(id) ? subsetIds[pointer++] : id))
-}
 
 function CategoryForm({
   defaultValues,
@@ -124,9 +103,12 @@ function CategoryForm({
       type: 'expense',
       color: SWATCHES[0],
       icon: DEFAULT_CATEGORY_ICON,
+      counts_as_salary: false,
       ...defaultValues,
     },
   })
+  // Salary is income: an expense-only category can't count as salary (LED-236).
+  const canCountAsSalary = useWatch({ control: form.control, name: 'type' }) !== 'expense'
 
   React.useEffect(() => {
     const currentIcon = form.getValues('icon')
@@ -137,7 +119,10 @@ function CategoryForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form
+        onSubmit={form.handleSubmit((values) => onSubmit({ ...values, counts_as_salary: canCountAsSalary && values.counts_as_salary }))}
+        className="space-y-4"
+      >
         <FormField
           control={form.control}
           name="name"
@@ -173,6 +158,23 @@ function CategoryForm({
             </FormItem>
           )}
         />
+        {canCountAsSalary && (
+          <FormField
+            control={form.control}
+            name="counts_as_salary"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <FormLabel className="cursor-pointer">Counts as salary</FormLabel>
+                  <p className="text-xs text-muted-foreground">13th Month pay counts income in this category as basic salary.</p>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name="icon"
@@ -245,6 +247,61 @@ function CategoryForm({
 
 type UsageSide = 'expense' | 'income'
 
+// Reorder mode (LED-240, design 8a item 5): one Reorder control puts a list into this mode,
+// where every row, at every width, can be dragged with a pointer or moved with these buttons.
+function ReorderButtons({
+  scope,
+  id,
+  name,
+  index,
+  count,
+  onMove,
+}: {
+  scope: string
+  id: string
+  name: string
+  index: number
+  count: number
+  onMove: (id: string, direction: -1 | 1) => void
+}) {
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Move ${name} up`}
+        data-reorder={`${scope}:${id}:up`}
+        onClick={() => onMove(id, -1)}
+        disabled={index === 0}
+      >
+        <ArrowUp className="w-3 h-3" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Move ${name} down`}
+        data-reorder={`${scope}:${id}:down`}
+        onClick={() => onMove(id, 1)}
+        disabled={index === count - 1}
+      >
+        <ArrowDown className="w-3 h-3" />
+      </Button>
+    </>
+  )
+}
+
+/**
+ * Keeps focus on the moved row's button after React moves the row, so a keyboard user can press
+ * again. At an end the button in that direction is disabled, so the other one takes focus.
+ */
+function refocusMove(scope: string, id: string, direction: -1 | 1) {
+  requestAnimationFrame(() => {
+    const pick = (dir: string) =>
+      document.querySelector<HTMLButtonElement>(`[data-reorder="${scope}:${id}:${dir}"]:not(:disabled)`)
+    ;(pick(direction === -1 ? 'up' : 'down') ?? pick(direction === -1 ? 'down' : 'up'))?.focus()
+  })
+}
+
 // `spendBySub` is this cycle's spend per subcategory; null while usage is not available, so a
 // missing figure shows a dash and never a zero. Omit it to draw names only.
 function SubcategoryPanel({
@@ -268,29 +325,14 @@ function SubcategoryPanel({
   const [rearrangeMode, setRearrangeMode] = useState(false)
   const [draggedSubcategoryId, setDraggedSubcategoryId] = useState<string | null>(null)
   const [dropTargetSubcategoryId, setDropTargetSubcategoryId] = useState<string | null>(null)
-  const [isDesktopDrag, setIsDesktopDrag] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
-  )
+  const [announcement, setAnnouncement] = useState('')
   const subcategoryIds = useMemo(() => subcategories.map((sub) => sub.id), [subcategories])
   const setSubcategoryRef = useFlipReorder(subcategoryIds, rearrangeMode)
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(min-width: 768px)')
-    const handleChange = () => {
-      setIsDesktopDrag(mediaQuery.matches)
-      if (!mediaQuery.matches) {
-        setDraggedSubcategoryId(null)
-        setDropTargetSubcategoryId(null)
-      }
-    }
-    handleChange()
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [])
 
   const handleAdd = async () => {
     const trimmed = addName.trim()
     if (!trimmed) { setAddError('Name is required'); return }
+    if (findNameClash(trimmed, subcategories)) { setAddError(clashSentence('subcategory', trimmed, category.name)); return }
     setAdding(true)
     const { error, errorDetail } = await createSubcategory(trimmed)
     setAdding(false)
@@ -309,24 +351,29 @@ function SubcategoryPanel({
     if (!editSub) return
     const trimmed = editName.trim()
     if (!trimmed) { setEditError('Name is required'); return }
+    if (findNameClash(trimmed, subcategories, editSub)) { setEditError(clashSentence('subcategory', trimmed, category.name)); return }
     const { error, errorDetail } = await updateSubcategory(editSub.id, { name: trimmed })
     if (error) { setEditError({ message: error, detail: errorDetail ?? null }); return }
     setEditSub(null)
   }
 
-  const persistSubcategoryOrder = async (nextIds: string[]) => {
+  const persistSubcategoryOrder = async (nextIds: string[], movedId: string) => {
+    const name = subcategories.find((sub) => sub.id === movedId)?.name ?? 'Subcategory'
+    setAnnouncement(moveAnnouncement(name, nextIds, movedId))
     const { error } = await updateSubcategoryOrder(nextIds)
     if (error) console.error('Failed to update subcategory order:', error)
   }
 
   const reorderSubcategory = (fromId: string, toId: string) => {
     const nextIds = reorderIds(subcategoryIds, fromId, toId)
-    if (nextIds !== subcategoryIds) void persistSubcategoryOrder(nextIds)
+    if (nextIds !== subcategoryIds) void persistSubcategoryOrder(nextIds, fromId)
   }
 
   const moveSubcategory = (id: string, direction: -1 | 1) => {
     const nextIds = moveId(subcategoryIds, id, direction)
-    if (nextIds !== subcategoryIds) void persistSubcategoryOrder(nextIds)
+    if (nextIds === subcategoryIds) return
+    void persistSubcategoryOrder(nextIds, id)
+    refocusMove('sub', id, direction)
   }
 
   return (
@@ -348,10 +395,11 @@ function SubcategoryPanel({
             }}
           >
             {rearrangeMode ? <Check className="w-3 h-3" /> : <GripVertical className="w-3 h-3" />}
-            {rearrangeMode ? 'Done' : 'Rearrange'}
+            {rearrangeMode ? 'Done' : 'Reorder'}
           </Button>
         )}
       </div>
+      <div className="sr-only" aria-live="polite">{rearrangeMode ? announcement : ''}</div>
       {loading ? (
         <div className="space-y-1" aria-busy="true">
           {[...Array(2)].map((_, i) => (
@@ -367,7 +415,7 @@ function SubcategoryPanel({
             <div
               key={sub.id}
               ref={setSubcategoryRef(sub.id)}
-              draggable={isDesktopDrag && rearrangeMode}
+              draggable={rearrangeMode}
               onDragStart={() => {
                 if (rearrangeMode) {
                   setDraggedSubcategoryId(sub.id)
@@ -420,39 +468,16 @@ function SubcategoryPanel({
                 </>
               ) : (
                 <>
-                  <span
-                    className={cn(
-                      'reorder-handle hidden text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted',
-                      rearrangeMode && 'md:inline-flex'
-                    )}
-                    aria-label={`Drag to rearrange ${sub.name}`}
-                  >
-                    <GripVertical className="w-3 h-3" />
-                  </span>
                   <span className="text-sm flex-1 pl-1 truncate">{sub.name}</span>
                   {spendBySub !== undefined && currency && (
                     <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                       {spendBySub === null ? '—' : formatCurrency(spendBySub.get(sub.id)?.[side] ?? 0, currency)}
                     </span>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    className={rearrangeMode ? 'md:hidden' : 'hidden'}
-                    onClick={() => moveSubcategory(sub.id, -1)}
-                    disabled={idx === 0}
-                  >
-                    <ArrowUp className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    className={rearrangeMode ? 'md:hidden' : 'hidden'}
-                    onClick={() => moveSubcategory(sub.id, 1)}
-                    disabled={idx === subcategories.length - 1}
-                  >
-                    <ArrowDown className="w-3 h-3" />
-                  </Button>
+                  {rearrangeMode ? (
+                    <ReorderButtons scope="sub" id={sub.id} name={sub.name} index={idx} count={subcategories.length} onMove={moveSubcategory} />
+                  ) : (
+                  <>
                   <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => startEdit(sub)}>
                     <Pencil className="w-3 h-3" />
                   </Button>
@@ -476,6 +501,8 @@ function SubcategoryPanel({
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                  </>
+                  )}
                 </>
               )}
             </div>
@@ -517,6 +544,7 @@ function CategoryPane({
   rulesError,
   onManageRules,
   header,
+  onMerge,
 }: {
   category: Category
   /** Null while usage is not available: figures show a dash, never zero. */
@@ -530,6 +558,8 @@ function CategoryPane({
   rulesError: string | null
   onManageRules: () => void
   header?: React.ReactNode
+  /** Opens Merge into… (LED-239); omitted when no category can take this one's rows. */
+  onMerge?: () => void
 }) {
   const share = row ? shareOf(row.spend[side], total) : null
   const own = rules.filter((rule) => rule.category_id === category.id)
@@ -560,12 +590,17 @@ function CategoryPane({
         {rulesError ? (
           <p className="text-xs text-destructive">{rulesError}</p>
         ) : rulesLoading ? (
-          <ul className="space-y-1" aria-busy="true">
-            <li className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2.5 py-1.5 text-sm">
-              <SkeletonText className="w-24" />
-              <SkeletonText className="w-6" />
-            </li>
-          </ul>
+          // One rule, as the loaded list shows it: its count line over a 34px row. The runs sit in spans
+          // because a bare inline-block flex item is 9px, not the 20px text line (LED-200).
+          <>
+            <p className="text-xs"><SkeletonText className="w-48" /></p>
+            <ul className="space-y-1" aria-busy="true">
+              <li className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2.5 py-1.5 text-sm">
+                <span><SkeletonText className="w-24" /></span>
+                <span><SkeletonText className="w-6" /></span>
+              </li>
+            </ul>
+          </>
         ) : own.length === 0 ? (
           <p className="text-xs text-muted-foreground">No rules assign transactions to {category.name}.</p>
         ) : (
@@ -584,14 +619,110 @@ function CategoryPane({
           </>
         )}
       </div>
+      {onMerge && (
+        <div className="flex justify-end border-t px-3 py-3">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={onMerge}>
+            <GitMerge className="w-3.5 h-3.5" />Merge into…
+          </Button>
+        </div>
+      )}
     </div>
+  )
+}
+
+// Merge into… (LED-239, design 8a item 6). One rpc moves everything and deletes the source;
+// the confirmation first reads what will move so the user sees the counts.
+function MergeCategoryDialog({
+  source,
+  targets,
+  previewMerge,
+  onConfirm,
+  onClose,
+}: {
+  source: Category
+  targets: Category[]
+  previewMerge: (sourceId: string, targetId: string) => Promise<{ preview: MergePreview | null; error: string | null }>
+  /** Runs the merge; a failure is reported on the notification surface with Retry. */
+  onConfirm: (target: Category) => Promise<void>
+  onClose: () => void
+}) {
+  const { isOnline } = useNetworkStatus()
+  const [targetId, setTargetId] = useState('')
+  const [preview, setPreview] = useState<{ targetId: string; data: MergePreview | null; error: string | null } | null>(null)
+  const [merging, setMerging] = useState(false)
+  const target = targets.find((category) => category.id === targetId) ?? null
+  const current = preview && preview.targetId === targetId ? preview : null
+
+  const choose = async (id: string) => {
+    setTargetId(id)
+    if (!id) return
+    const result = await previewMerge(source.id, id)
+    setPreview({ targetId: id, data: result.preview, error: result.error })
+  }
+
+  const merge = async () => {
+    if (!target) return
+    setMerging(true)
+    await onConfirm(target)
+    setMerging(false)
+  }
+
+  const note = current?.data && target ? budgetNote(current.data.budgets, current.data.targetActiveBudgets, target.name) : null
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open && !merging) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Merge {source.name} into…</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <Select value={targetId} onValueChange={(value) => void choose(value ?? '')}>
+            <SelectTrigger aria-label="Category to merge into">
+              <SelectValue>
+                {(value: string | null) => {
+                  const chosen = targets.find((category) => category.id === value)
+                  return chosen ? `${chosen.icon} ${chosen.name}` : 'Choose a category'
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {targets.map((category) => (
+                <SelectItem key={category.id} value={category.id}>
+                  {category.icon} {category.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {!isOnline ? (
+            <p className="text-sm text-muted-foreground">Connect to the internet to merge categories.</p>
+          ) : !target ? (
+            <p className="text-sm text-muted-foreground">
+              Everything in {source.name} moves to the category you choose, then {source.name} is deleted.
+            </p>
+          ) : !current ? (
+            <p className="text-sm" aria-busy="true"><SkeletonText className="w-64" /></p>
+          ) : current.error ? (
+            <InlineLoadError message={`Couldn't count what would move. ${current.error}`} onRetry={() => void choose(targetId)} />
+          ) : current.data ? (
+            <div className="space-y-1.5 text-sm" aria-live="polite">
+              <p>{mergeSentence(current.data, source.name, target.name)}</p>
+              {note && <p className="text-muted-foreground">{note}</p>}
+              <p className="text-muted-foreground">This can't be undone.</p>
+            </div>
+          ) : null}
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose} disabled={merging}>Cancel</Button>
+          <Button onClick={() => void merge()} disabled={!isOnline || !current?.data || merging}>
+            {merging ? 'Merging…' : 'Merge'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
 export default function CategoriesPage() {
   const ink = useCategoryInk()
   const notify = useNotify()
-  const { categories, loading, error, errorDetail, refetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder } = useCategories()
+  const { categories, loading, error, errorDetail, refetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder, previewMerge, mergeCategory } = useCategories()
   const loadState = resolveLoadState({ loading, error, hasData: categories.length > 0 })
   const [createOpen, setCreateOpen] = useState(false)
   const [editCategory, setEditCategory] = useState<Category | null>(null)
@@ -601,9 +732,8 @@ export default function CategoriesPage() {
   const [rearrangeMode, setRearrangeMode] = useState(false)
   const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null)
   const [dropTargetCategoryId, setDropTargetCategoryId] = useState<string | null>(null)
-  const [isDesktopDrag, setIsDesktopDrag] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
-  )
+  const [announcement, setAnnouncement] = useState('')
+  const [mergeSource, setMergeSource] = useState<Category | null>(null)
   const [rulesOpen, setRulesOpen] = useState(false)
   // Rules load with the page: the button states their count and each category's pane lists its own.
   const { rules, loading: rulesLoading, error: rulesError, refetch: refetchRules, createRule, deleteRule } = useTransactionRules(true)
@@ -625,21 +755,8 @@ export default function CategoriesPage() {
   const [ruleTypeHint, setRuleTypeHint] = useState<'any' | 'income' | 'expense' | 'transfer'>('any')
   const [rulePriority, setRulePriority] = useState(1)
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(min-width: 768px)')
-    const handleChange = () => {
-      setIsDesktopDrag(mediaQuery.matches)
-      if (!mediaQuery.matches) {
-        setDraggedCategoryId(null)
-        setDropTargetCategoryId(null)
-      }
-    }
-    handleChange()
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [])
-
   const handleCreate = async (values: FormValues) => {
+    if (findNameClash(values.name, categories)) { setFormError(clashSentence('category', values.name)); return }
     const { error, errorDetail } = await createCategory(values)
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
@@ -648,6 +765,7 @@ export default function CategoriesPage() {
 
   const handleEdit = async (values: FormValues) => {
     if (!editCategory) return
+    if (findNameClash(values.name, categories, editCategory)) { setFormError(clashSentence('category', values.name)); return }
     const { error, errorDetail } = await updateCategory(editCategory.id, values)
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
@@ -679,7 +797,9 @@ export default function CategoriesPage() {
 
   const setCategoryRef = useFlipReorder(visibleCategoryIds, rearrangeMode)
 
-  const persistCategoryOrder = async (nextVisibleIds: string[]) => {
+  const persistCategoryOrder = async (nextVisibleIds: string[], movedId: string) => {
+    const name = categories.find((category) => category.id === movedId)?.name ?? 'Category'
+    setAnnouncement(moveAnnouncement(name, nextVisibleIds, movedId))
     const nextIds = mergeSubsetOrder(
       categories.map((category) => category.id),
       nextVisibleIds
@@ -690,12 +810,54 @@ export default function CategoriesPage() {
 
   const reorderCategory = (fromId: string, toId: string) => {
     const nextIds = reorderIds(visibleCategoryIds, fromId, toId)
-    if (nextIds !== visibleCategoryIds) void persistCategoryOrder(nextIds)
+    if (nextIds !== visibleCategoryIds) void persistCategoryOrder(nextIds, fromId)
   }
 
   const moveCategory = (id: string, direction: -1 | 1) => {
     const nextIds = moveId(visibleCategoryIds, id, direction)
-    if (nextIds !== visibleCategoryIds) void persistCategoryOrder(nextIds)
+    if (nextIds === visibleCategoryIds) return
+    void persistCategoryOrder(nextIds, id)
+    refocusMove('category', id, direction)
+  }
+
+  const mergeHandler = (category: Category) =>
+    mergeTargets(categories, category).length > 0 ? () => setMergeSource(category) : undefined
+
+  const runMerge = async (source: Category, target: Category) => {
+    const { error, result } = await mergeCategory(source.id, target.id)
+    if (error || !result) {
+      setMergeSource(null)
+      notify({
+        severity: 'failure',
+        title: `Couldn't merge ${source.name}`,
+        body: error ?? 'Try again.',
+        action: { label: 'Retry', run: () => void runMerge(source, target) },
+      })
+      return
+    }
+    handleMerged(source, target, result)
+  }
+
+  const handleMerged = (source: Category, target: Category, result: MergePreview) => {
+    setMergeSource(null)
+    setSelectedCategoryId(target.id)
+    void usageData.refetch()
+    void refetchRules()
+    notify({
+      severity: 'success',
+      title: `Merged ${source.name} into ${target.name}`,
+      body: [
+        mergedSentence(result, source.name, target.name),
+        budgetNote(result.budgets, result.targetActiveBudgets, target.name)?.replace(' will have ', ' now has '),
+      ].filter(Boolean).join(' '),
+    })
+  }
+
+  const toggleReorder = () => {
+    setRearrangeMode((current) => !current)
+    setDraggedCategoryId(null)
+    setDropTargetCategoryId(null)
+    setAnnouncement('')
   }
 
   // Column labels for md and up; the widths match the cells in each row.
@@ -723,7 +885,7 @@ export default function CategoriesPage() {
       <div
         key={cat.id}
         ref={setCategoryRef(cat.id)}
-        draggable={isDesktopDrag && rearrangeMode}
+        draggable={rearrangeMode}
         onDragStart={() => {
           if (rearrangeMode) {
             setDraggedCategoryId(cat.id)
@@ -764,17 +926,13 @@ export default function CategoriesPage() {
             className="flex items-center gap-3 min-w-0 flex-1 text-left"
             aria-expanded={paneMode ? undefined : isSelected(cat.id)}
             aria-current={paneMode && isSelected(cat.id) ? 'true' : undefined}
-            onClick={() => setSelectedCategoryId(!paneMode && selectedCategoryId === cat.id ? null : cat.id)}
+            // While reordering, the row is moved, not opened: its move buttons take the keyboard.
+            tabIndex={rearrangeMode ? -1 : undefined}
+            onClick={() => {
+              if (rearrangeMode) return
+              setSelectedCategoryId(!paneMode && selectedCategoryId === cat.id ? null : cat.id)
+            }}
           >
-            <span
-              className={cn(
-                'reorder-handle hidden text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted',
-                rearrangeMode && 'md:inline-flex'
-              )}
-              aria-label={`Drag to rearrange ${cat.name}`}
-            >
-              <GripVertical className="w-3.5 h-3.5" />
-            </span>
             {!paneMode && (isSelected(cat.id)
               ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
               : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
@@ -808,24 +966,10 @@ export default function CategoriesPage() {
             </div>
           </button>
           <div className="flex items-center gap-1 shrink-0 md:w-16 md:justify-end">
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className={rearrangeMode ? 'md:hidden' : 'hidden'}
-              onClick={() => moveCategory(cat.id, -1)}
-              disabled={idx === 0}
-            >
-              <ArrowUp className="w-3 h-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className={rearrangeMode ? 'md:hidden' : 'hidden'}
-              onClick={() => moveCategory(cat.id, 1)}
-              disabled={idx === cats.length - 1}
-            >
-              <ArrowDown className="w-3 h-3" />
-            </Button>
+            {rearrangeMode ? (
+              <ReorderButtons scope="category" id={cat.id} name={cat.name} index={idx} count={cats.length} onMove={moveCategory} />
+            ) : (
+            <>
             <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Edit ${cat.name}`} onClick={() => setEditCategory(cat)}>
               <Pencil className="w-3 h-3" />
             </Button>
@@ -849,6 +993,8 @@ export default function CategoriesPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            </>
+            )}
           </div>
         </div>
         {!paneMode && isSelected(cat.id) && (
@@ -863,6 +1009,7 @@ export default function CategoriesPage() {
             rulesLoading={rulesLoading}
             rulesError={rulesError}
             onManageRules={() => setRulesOpen(true)}
+            onMerge={mergeHandler(cat)}
           />
         )}
       </div>
@@ -883,22 +1030,13 @@ export default function CategoriesPage() {
               {rulesLoading ? '…' : rulesError ? '—' : rules.length}
             </Badge>
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant={rearrangeMode ? 'secondary' : 'outline'} size="icon-sm" aria-label="Category options" />}>
-              {rearrangeMode ? <Check className="w-4 h-4" /> : <MoreHorizontal className="w-4 h-4" />}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {categories.length > 1 && (
-                <DropdownMenuItem onClick={() => {
-                  setRearrangeMode((current) => !current)
-                  setDraggedCategoryId(null)
-                  setDropTargetCategoryId(null)
-                }}>
-                  <GripVertical className="mr-2 h-4 w-4" />{rearrangeMode ? 'Finish rearranging' : 'Rearrange categories'}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {categories.length > 1 && (
+            <Button variant={rearrangeMode ? 'secondary' : 'outline'} size="sm" className="gap-1.5" aria-pressed={rearrangeMode} onClick={toggleReorder}>
+              {rearrangeMode ? <Check className="w-3.5 h-3.5" /> : <GripVertical className="w-3.5 h-3.5" />}
+              {rearrangeMode ? 'Done' : 'Reorder'}
+            </Button>
+          )}
+          <div className="sr-only" aria-live="polite">{rearrangeMode ? announcement : ''}</div>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger render={<Button className="gap-2" size="sm" />}>
               <Plus className="w-4 h-4" />Add Category
@@ -1041,6 +1179,7 @@ export default function CategoriesPage() {
                 rulesLoading={rulesLoading}
                 rulesError={rulesError}
                 onManageRules={() => setRulesOpen(true)}
+                onMerge={mergeHandler(paneCategory)}
                 header={
                   <div className="flex items-center gap-3 p-3">
                     <div
@@ -1064,6 +1203,16 @@ export default function CategoriesPage() {
           </aside>
         )}
         </div>
+      )}
+
+      {mergeSource && (
+        <MergeCategoryDialog
+          source={mergeSource}
+          targets={mergeTargets(categories, mergeSource)}
+          previewMerge={previewMerge}
+          onConfirm={(target) => runMerge(mergeSource, target)}
+          onClose={() => setMergeSource(null)}
+        />
       )}
 
       <Dialog open={!!editCategory} onOpenChange={(o) => { if (!o) { setEditCategory(null); setFormError(null) } }}>
@@ -1136,7 +1285,12 @@ export default function CategoriesPage() {
               />
               <Select value={ruleCategoryId} onValueChange={(v) => setRuleCategoryId(v ?? '')}>
                 <SelectTrigger className="flex-1 min-w-[140px] h-8 text-sm">
-                  <SelectValue placeholder="Category" />
+                  <SelectValue>
+                    {(value: string | null) => {
+                      const chosen = categories.find((category) => category.id === value)
+                      return chosen ? `${chosen.icon} ${chosen.name}` : 'Category'
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((c) => (
@@ -1148,7 +1302,7 @@ export default function CategoriesPage() {
               </Select>
               <Select value={ruleTypeHint} onValueChange={(v) => setRuleTypeHint(v as typeof ruleTypeHint)}>
                 <SelectTrigger className="w-28 h-8 text-sm">
-                  <SelectValue />
+                  <SelectValue>{(value: keyof typeof RULE_TYPE_HINT_LABELS) => RULE_TYPE_HINT_LABELS[value]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="any">Any type</SelectItem>

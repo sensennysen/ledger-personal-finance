@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { accentTokens, readableOn, MIN_ACCENT_CONTRAST } from '../src/lib/accentTheme.ts'
+import { accentTokens, primaryHover, readableOn, MIN_ACCENT_CONTRAST } from '../src/lib/accentTheme.ts'
 import { contrastRatio } from '../src/lib/contrast.ts'
 import { SWATCHES, DEFAULT_ACCENT } from '../src/lib/swatches.ts'
 
@@ -27,4 +27,24 @@ test('accentTokens repairs on-primary and on-container and leaves the tones alon
   assert.equal(t.container, '#333300')
   assert.ok(contrastRatio(t.onPrimary, t.primary) >= MIN_ACCENT_CONTRAST)
   assert.ok(contrastRatio(t.onContainer, t.container) >= MIN_ACCENT_CONTRAST)
+})
+
+// LED-248: the hover fill moves away from the label ink, so a hovered primary button reads at least as well.
+for (const bg of [...HUES, DEFAULT_ACCENT, ...SWATCHES]) {
+  test(`the primary hover on ${bg} keeps its label at 4.5:1`, () => {
+    for (const ink of [...BAD_INKS, '#000000', '#ffffff']) {
+      const onPrimary = readableOn(ink, bg)
+      const hover = primaryHover(bg, onPrimary)
+      assert.ok(contrastRatio(onPrimary, hover) >= contrastRatio(onPrimary, bg), `${onPrimary} on ${hover}`)
+      assert.ok(contrastRatio(onPrimary, hover) >= MIN_ACCENT_CONTRAST, `${onPrimary} on ${hover}`)
+    }
+  })
+}
+
+test('accentTokens returns a hover that differs from the accent', () => {
+  for (const [primary, onPrimary] of [['#55659a', '#ffffff'], ['#a8b4de', '#1b2135'], ['#ffff00', '#ffffff']]) {
+    const t = accentTokens({ primary, onPrimary, container: '#e4e7f5', onContainer: '#2e3a63' })
+    assert.notEqual(t.primaryHover, t.primary)
+    assert.equal(t.primaryHover, primaryHover(t.primary, t.onPrimary))
+  }
 })

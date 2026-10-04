@@ -2,8 +2,10 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { readCache, writeCache, clearCacheByPrefix } from '@/lib/dataCache'
+import { readWithPolicy } from '@/lib/readRetry'
 import { clearOfflineQueue } from '@/lib/offlineQueue'
 import { clearPendingReceipts } from '@/lib/receiptStore'
+import { removeUserReceipts } from '@/lib/receiptCleanup'
 import { makeAuthError, type AuthError } from '@/lib/authErrors'
 import type { Profile } from '@/types'
 
@@ -14,7 +16,8 @@ interface AuthContextValue {
   loading: boolean
   authError: AuthError | null
   clearAuthError: () => void
-  signInWithGoogle: () => Promise<void>
+  /** `started` is false when the OAuth start failed; the page then shows why (LED-196). */
+  signInWithGoogle: () => Promise<{ started: boolean }>
   signOut: () => Promise<boolean>
   deleteAccount: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -37,11 +40,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cached = readCache<Profile>(cacheKey)
     if (cached) setProfile(cached)
     if (!navigator.onLine) return
-    const { data, error } = await supabase
+    // Budgets waits on the profile, so a first load fails fast like the list reads (LED-242).
+    const { data, error } = await readWithPolicy((retry) => supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single()
+      .retry(retry), { background: cached !== null })
     if (error) {
       console.error('Failed to fetch profile:', error.message)
       // With a cached profile on screen nothing is missing, so there is nothing to warn about.
@@ -94,10 +99,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signInWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    })
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      })
+      return { started: !error }
+    } catch {
+      return { started: false }
+    }
   }
 
   const signOut = async (): Promise<boolean> => {
@@ -129,6 +139,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const deleteAccount = async () => {
+    // Receipt images are files, not rows, so the cascade does not reach them (LED-189). They go
+    // first; if they cannot, this throws a ReceiptCleanupError and the account is left as it was.
+    if (user) await removeUserReceipts(supabase.storage.from('receipts'), user.id)
     const { error } = await supabase.rpc('delete_user')
     if (error) throw error
     // Clear all local data before signing out

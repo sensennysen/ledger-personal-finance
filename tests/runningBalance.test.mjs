@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { buildRunningBalanceMap } from '../src/lib/runningBalance.ts'
 
 // Replays transactions forward with the same rules as the update_account_balance trigger
-// (20260810120000_add_loan_tracker.sql), recording each row's own account after the row.
+// (20260810120000_add_loan_tracker.sql; a transfer credits coalesce(destination_amount, amount * exchange_rate)
+// since 20261003120000_transfer_destination_amount.sql), recording each row's own account after the row.
 function replay(opening, txs) {
   const types = new Map(opening.map((a) => [a.id, a.type]))
   const balance = new Map(opening.map((a) => [a.id, a.balance]))
@@ -16,7 +17,7 @@ function replay(opening, txs) {
       if (tx.to_account_id && types.get(tx.to_account_id) === 'loan') add(tx.to_account_id, tx.amount)
     } else {
       add(tx.account_id, -(tx.amount + (tx.transfer_fee ?? 0)))
-      if (tx.to_account_id) add(tx.to_account_id, tx.amount * (tx.exchange_rate ?? 1))
+      if (tx.to_account_id) add(tx.to_account_id, tx.destination_amount ?? tx.amount * (tx.exchange_rate ?? 1))
     }
     after.set(tx.id, balance.get(tx.account_id))
   }
@@ -78,4 +79,21 @@ test('rows on one day keep a fixed order whatever order they arrive in', () => {
   const forward = buildRunningBalanceMap(final, history)
   const reversed = buildRunningBalanceMap(final, [...history].reverse())
   assert.deepEqual([...forward].sort(), [...reversed].sort())
+})
+
+test('a transfer between two currencies credits its destination amount, and unwinding takes back that amount (LED-185)', () => {
+  const accounts = [
+    { id: 'bank', type: 'checking', balance: 1000 },
+    { id: 'eur', type: 'savings', balance: 50 },
+  ]
+  const rows = [
+    tx('x1', '2026-10-01', 'transfer', 'bank', 100, { to_account_id: 'eur', destination_amount: 91.5, transfer_fee: 2 }),
+    tx('x2', '2026-10-02', 'expense', 'eur', 10),
+  ]
+  const { final, after } = replay(accounts, rows)
+  assert.equal(final.find((a) => a.id === 'eur').balance, 131.5) // 50 + 91.50 - 10, not 50 + 100 - 10
+  assert.equal(final.find((a) => a.id === 'bank').balance, 898)
+  const map = buildRunningBalanceMap(final, rows)
+  assert.equal(map.get('x2'), after.get('x2'))
+  assert.equal(map.get('x1'), 898)
 })

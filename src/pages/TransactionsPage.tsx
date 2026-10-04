@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, ArrowLeftRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCardPayment } from '@/hooks/useCardPayment'
+import { useAuth } from '@/contexts/AuthContext'
+import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { useCycle } from '@/contexts/cycleState'
 import { useNotify } from '@/contexts/notificationState'
 import { useCategories } from '@/hooks/useCategories'
@@ -27,6 +29,8 @@ import { FormError } from '@/components/ui/form-error'
 import type { FormErrorValue } from '@/lib/dataErrors'
 import { InteractiveRow } from '@/components/ui/interactive-row'
 import { resolveLoadState } from '@/lib/loadState'
+import { notifyAccountsRefresh, notifyCardPaymentsRefresh } from '@/lib/cacheEvents'
+import { isCardPaymentTransaction } from '@/lib/cardPayment'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { PageActions } from '@/components/layout/PageActions'
@@ -39,7 +43,8 @@ import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
 import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { effectiveDensity, groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { ACTIVITY_SORTS, effectiveDensity, groupByDay, isAmountSort, sliceGroups, sortByAmount, sortByDate, sumByCurrency, WINDOW_STEP, type ActivitySort } from '@/lib/transactionWindow'
+import { amountInCurrency } from '@/lib/exchangeRates'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
 import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
 import { FilterTopCategories } from '@/components/transactions/FilterTopCategories'
@@ -54,6 +59,9 @@ import { TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import type { Transaction } from '@/types'
 
 export default function TransactionsPage() {
+  const { profile } = useAuth()
+  const baseCurrency = profile?.default_currency ?? 'USD'
+  const { table: rateTable } = useExchangeRates()
   const [filterType, setFilterType] = useState<string>('all')
   const [search, setSearch] = useState('')
   const { startDay, selectedMonth, setSelectedMonth } = useCycle()
@@ -63,7 +71,7 @@ export default function TransactionsPage() {
   const [formError, setFormError] = useState<FormErrorValue>(null)
   const { prefs, set: setPref } = usePreferences()
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null)
-  const [sort, setSort] = useState<TxSort>('newest')
+  const [sort, setSort] = useState<ActivitySort>('newest')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [templatesOpen, setTemplatesOpen] = useState(false)
 
@@ -101,6 +109,7 @@ export default function TransactionsPage() {
       setSearch(handoffFilter.search)
       setFilterType(handoffFilter.type)
       setActiveTagFilter(handoffFilter.tag)
+      setSort(handoffFilter.sort)
     }
   }
   useEffect(() => {
@@ -109,6 +118,7 @@ export default function TransactionsPage() {
       params.delete('q')
       params.delete('type')
       params.delete('tag')
+      params.delete('sort')
       return params
     }, { replace: true })
   }, [handoffKey, setSearchParams])
@@ -121,13 +131,14 @@ export default function TransactionsPage() {
   const savedFilters = useSavedFilters()
   const [savedFiltersOpen, setSavedFiltersOpen] = useState(false)
   const currentFilter = useMemo<ActivityFilter>(
-    () => ({ type: filterType as FilterType, search, tag: activeTagFilter }),
-    [filterType, search, activeTagFilter]
+    () => ({ type: filterType as FilterType, search, tag: activeTagFilter, sort }),
+    [filterType, search, activeTagFilter, sort]
   )
   const applySavedFilter = (filter: ActivityFilter) => {
     setSearch(filter.search)
     setFilterType(filter.type)
     setActiveTagFilter(filter.tag)
+    changeSort(filter.sort)
   }
 
   // tx pending "save as template" name input
@@ -158,7 +169,8 @@ export default function TransactionsPage() {
 
   // ── Helpers ────────────────────────────────────────────────
 
-  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createTransaction)
+  // Through the card path, so undoing a deleted card payment restores its statement too (LED-191).
+  const { announceDeleted, announceDeleteFailed } = useUndoDelete(createWithStatement)
 
   // ── Keyboard shortcuts ─────────────────────────────────────
   useKeyboardShortcut('n', useCallback(() => {
@@ -192,6 +204,7 @@ export default function TransactionsPage() {
       amount: templateSourceTx.amount,
       currency: templateSourceTx.currency,
       exchange_rate: templateSourceTx.exchange_rate,
+      destination_amount: templateSourceTx.destination_amount ?? null,
       description: templateSourceTx.description,
       notes: templateSourceTx.notes,
       date: templateSourceTx.date,
@@ -261,6 +274,12 @@ export default function TransactionsPage() {
     [setSelectedMonth]
   )
 
+  // Switching between date and amount changes the list's shape, so start it from the top.
+  const changeSort = (next: ActivitySort) => {
+    if (isAmountSort(next) !== isAmountSort(sort)) pageTopRef.current?.scrollIntoView({ block: 'start' })
+    setSort(next)
+  }
+
   const clearActivityFilters = useCallback(() => {
     setFilterType('all')
     setSearch('')
@@ -272,8 +291,17 @@ export default function TransactionsPage() {
     [transactions]
   )
 
-  const grouped = useMemo(() => groupByDay(filtered, undefined, sort), [filtered, sort])
-  const flatSorted = useMemo(() => sortByDate(filtered, sort), [filtered, sort])
+  // Amount sorts (LED-241) rank the whole filtered set, in the default currency; a row with no rate
+  // is not compared one to one and sorts last.
+  const amountSorted = isAmountSort(sort)
+  const grouped = useMemo(() => (isAmountSort(sort) ? [] : groupByDay(filtered, undefined, sort)), [filtered, sort])
+  const flatSorted = useMemo(
+    () =>
+      isAmountSort(sort)
+        ? sortByAmount(filtered, sort, (tx) => amountInCurrency(tx, baseCurrency, rateTable))
+        : sortByDate(filtered, sort),
+    [filtered, sort, baseCurrency, rateTable]
+  )
   const matchSum = useMemo(() => sumByCurrency(filtered), [filtered])
 
   // Window the list (LED-60). The cycle is left out of the reset key so
@@ -299,6 +327,11 @@ export default function TransactionsPage() {
     const { error, errorDetail } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
+    // The database moved, added or removed the card's payment row and statement with the edit (LED-191, LED-230).
+    if (isCardPaymentTransaction(editingTx, accounts) || isCardPaymentTransaction(values, accounts)) {
+      notifyAccountsRefresh()
+      notifyCardPaymentsRefresh()
+    }
     setEditingTx(null)
   }
 
@@ -435,13 +468,14 @@ export default function TransactionsPage() {
       selected={selectedIds.has(tx.id)}
       onSelect={toggleSelect}
       dense={density === 'compact'}
+      showDate={amountSorted}
     />
   )
 
   // Export match (29a): exactly the rows the bar counts, in the order on screen, not just the rendered window.
   const exportMatch = () =>
     downloadCsv(
-      buildTransactionsCsv(sortByDate(filtered, sort), buildRunningBalanceMap(accounts, transactions)),
+      buildTransactionsCsv(flatSorted, buildRunningBalanceMap(accounts, transactions)),
       `ledger-activity_${selectedMonth}.csv`,
     )
 
@@ -453,7 +487,8 @@ export default function TransactionsPage() {
       rangeLabel={`${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
       sum={matchSum}
       sort={sort}
-      onSortChange={setSort}
+      onSortChange={changeSort}
+      sortOptions={ACTIVITY_SORTS}
       density={density}
       onDensityChange={(next) => setPref('txDensity', next)}
       onExport={exportMatch}
@@ -604,7 +639,7 @@ export default function TransactionsPage() {
                   as="div"
                   key={tmpl.id}
                   aria-label={`Use ${tmpl.name} template`}
-                  className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-accent/60 transition-colors select-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                  className="group relative flex-none flex items-center gap-2 rounded-lg border border-border/60 bg-card px-3 py-2 cursor-pointer hover:border-primary/40 hover:bg-surface-hover transition-colors select-none focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring"
                   onActivate={() => handleUseTemplate(tmpl.id)}
                 >
                   <div className="flex flex-col min-w-0">
@@ -798,7 +833,7 @@ export default function TransactionsPage() {
               </Button>
             }
           />
-        ) : prefs.txView === 'flat' ? (
+        ) : prefs.txView === 'flat' || amountSorted ? (
           <ResultBarLayout bar={resultBar}>
             <div className="space-y-1">{flatSorted.slice(0, rendered).map(renderRow)}</div>
             <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
@@ -826,6 +861,7 @@ export default function TransactionsPage() {
                   amount: editingTx.amount,
                   currency: editingTx.currency,
                   exchange_rate: editingTx.exchange_rate ?? 1,
+                  destination_amount: editingTx.destination_amount ?? null,
                   description: editingTx.description,
                   notes: editingTx.notes,
                   date: editingTx.date,
@@ -946,7 +982,7 @@ export default function TransactionsPage() {
 
         {showMonthJump && <MonthJumpBar months={months} activeKey={selectedMonth} onPick={jumpToMonth} onSelect={toggleSelectMode} selecting={selectMode} />}
       </div>
-      {showMonthJump && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} />} />}
+      {showMonthJump && !amountSorted && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} baseCurrency={baseCurrency} rateTable={rateTable} />} />}
     </div>
   )
 }

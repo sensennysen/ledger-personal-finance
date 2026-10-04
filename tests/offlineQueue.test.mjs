@@ -140,3 +140,45 @@ test('an update to a deleted row can only be discarded; keep mine clears the con
   const [r] = applyKeepMine([item({ status: 'failed', attempts: 5, lastError: 'x', conflictKind: 'edited', serverSnapshot: {} })], 'a', NOW)
   assert.deepEqual([r.attempts, r.lastError, r.conflictKind, r.serverSnapshot], [undefined, undefined, undefined, undefined])
 })
+
+// LED-193: fixing a card payment that is still in the queue.
+test('an edit of a queued create changes its payload, not a new update', async () => {
+  const { editQueuedInsert } = await import('../src/lib/queueState.ts')
+  const create = item({
+    id: 'q1', table: 'transactions', operation: 'insert', label: 'Card',
+    payload: { id: 'tx-1', user_id: 'u', type: 'transfer', to_account_id: 'card', amount: 100, date: '2026-09-01' },
+  })
+  const other = item({ id: 'q2', table: 'transactions', operation: 'update', rowId: 'tx-9', payload: { amount: 5 } })
+  const { queue, edited } = editQueuedInsert([create, other], 'tx-1', { amount: 120, description: 'Card fixed' })
+  assert.equal(edited, true)
+  assert.equal(queue.length, 2)
+  assert.deepEqual(queue[0].payload, { id: 'tx-1', user_id: 'u', type: 'transfer', to_account_id: 'card', amount: 120, date: '2026-09-01', description: 'Card fixed' })
+  assert.equal(queue[0].label, 'Card fixed')
+  assert.equal(queue[1], other)
+})
+
+test('fixing a failed queued create makes it pending again; flagged conflicts and unknown rows are left alone', async () => {
+  const { editQueuedInsert } = await import('../src/lib/queueState.ts')
+  const failed = item({
+    id: 'q1', table: 'transactions', operation: 'insert', status: 'failed', attempts: 5, lastError: 'bad',
+    payload: { id: 'tx-1', user_id: 'u', amount: -1 },
+  })
+  const fixed = editQueuedInsert([failed], 'tx-1', { amount: 10 })
+  assert.equal(fixed.edited, true)
+  assert.equal(fixed.queue[0].status, undefined)
+  assert.equal(fixed.queue[0].attempts, undefined)
+  assert.equal(fixed.queue[0].lastError, undefined)
+  assert.equal(fixed.queue[0].payload.amount, 10)
+
+  const conflict = item({ id: 'q3', table: 'transactions', operation: 'insert', status: 'expired', payload: { id: 'tx-3' } })
+  assert.equal(editQueuedInsert([conflict], 'tx-3', { amount: 1 }).edited, false)
+  assert.equal(editQueuedInsert([failed], 'nope', { amount: 1 }).edited, false)
+})
+
+test('an edit cannot move a queued create to another user or id', async () => {
+  const { editQueuedInsert } = await import('../src/lib/queueState.ts')
+  const create = item({ id: 'q1', table: 'transactions', operation: 'insert', payload: { id: 'tx-1', user_id: 'u' } })
+  const { queue } = editQueuedInsert([create], 'tx-1', { id: 'other', user_id: 'someone-else', amount: 3 })
+  assert.equal(queue[0].payload.id, 'tx-1')
+  assert.equal(queue[0].payload.user_id, 'u')
+})

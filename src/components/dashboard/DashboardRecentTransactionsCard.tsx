@@ -2,7 +2,8 @@ import { ArrowLeftRight, Clock } from 'lucide-react'
 import { useEntryDetail } from '@/contexts/EntryContext'
 import { useNavigate } from 'react-router-dom'
 import { EXPENSE, INCOME, TRANSFER } from '@/constants/colors'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getLocalDateString } from '@/lib/utils'
+import { countsYet } from '@/lib/countsYet'
 import { MINUS } from '@/lib/netSign'
 import type { Transaction } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -39,6 +40,8 @@ export function DashboardRecentTransactionsCard({
 }: DashboardRecentTransactionsCardProps) {
   const navigate = useNavigate()
   const openDetail = useEntryDetail()
+  // A row dated later is listed but not counted yet (LED-238).
+  const today = getLocalDateString()
 
   return (
     <div className="min-w-0 max-w-full rounded-[20px] border border-border p-4 md:p-5 bg-card" style={style}>
@@ -74,7 +77,7 @@ export function DashboardRecentTransactionsCard({
               icon={transaction.category?.icon ?? 'Tx'}
               iconBackgroundColor={'var(--'+transaction.type+'-container)'}
               title={transaction.description}
-              subtitle={transaction.date}
+              subtitle={countsYet(transaction.date, today) ? transaction.date : `${transaction.date} · Scheduled`}
               amount={
                 <span style={{ color: getTransactionAmountColor(transaction.type) }}>
                   {getTransactionPrefix(transaction.type)}

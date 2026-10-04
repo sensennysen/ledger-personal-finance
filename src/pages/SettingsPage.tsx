@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ChevronRight, Sun, Moon, Monitor, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing } from 'lucide-react'
+import { ChevronRight, Sun, Moon, Monitor, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing, FileText, Cookie, Info } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
@@ -19,8 +19,10 @@ import { INCOME } from '@/constants/colors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ExchangeRatesCard } from '@/components/settings/ExchangeRatesCard'
+import { BrowserStorageCard } from '@/components/settings/BrowserStorageCard'
 import { FormError } from '@/components/ui/form-error'
 import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
+import { ReceiptCleanupError } from '@/lib/receiptCleanup'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -126,7 +128,13 @@ export default function SettingsPage() {
       setDeleting(false)
       setDeleteOpen(false)
     } catch (err) {
-      setDeleteError(err instanceof Error ? describeDataError(err, { action: 'delete', entity: 'account' }) : 'Deletion failed. Please try again.')
+      setDeleteError(
+        err instanceof ReceiptCleanupError
+          ? { message: err.message, detail: describeDataError(err.cause as Error, { action: 'delete', entity: 'account' })?.detail ?? null }
+          : err instanceof Error
+            ? describeDataError(err, { action: 'delete', entity: 'account' })
+            : 'Deletion failed. Please try again.',
+      )
       setDeleting(false)
     }
   }
@@ -248,7 +256,7 @@ export default function SettingsPage() {
                       <SelectContent>
                         {CURRENCIES.map((c) => (
                           <SelectItem key={c.code} value={c.code}>
-                            {c.symbol} {c.code} â€” {c.name}
+                            {c.symbol} {c.code} — {c.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -574,7 +582,7 @@ export default function SettingsPage() {
 
       <ExchangeRatesCard />
 
-      {/* Customization â€” visible on mobile where BottomNav omits Categories */}
+      {/* Customization — visible on mobile where BottomNav omits Categories */}
       {/* Legal */}
       <Card>
         <CardHeader>
@@ -593,6 +601,36 @@ export default function SettingsPage() {
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </Link>
           <Link
+            to="/terms"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-3">
+              <FileText className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Terms of Service</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/cookies"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-3">
+              <Cookie className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Cookies and Storage</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/notices"
+            className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors border-b border-border"
+          >
+            <div className="flex items-center gap-3">
+              <Info className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm font-medium">Notices</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          </Link>
+          <Link
             to="/data-deletion"
             className="flex items-center justify-between px-6 py-4 hover:bg-accent transition-colors rounded-b-lg"
           >
@@ -605,7 +643,9 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Account / Danger zone â€” always last to prevent accidental destructive actions */}
+      <BrowserStorageCard />
+
+      {/* Account / Danger zone — always last to prevent accidental destructive actions */}
       <Card className="border-destructive/30">
         <CardHeader>
           <CardTitle className="text-destructive">Account</CardTitle>
@@ -667,7 +707,7 @@ export default function SettingsPage() {
               disabled={deleteConfirm !== 'DELETE' || deleting}
               onClick={handleDeleteAccount}
             >
-              {deleting ? 'Deletingâ€¦' : 'Delete Forever'}
+              {deleting ? 'Deleting…' : 'Delete Forever'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

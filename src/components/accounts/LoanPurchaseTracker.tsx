@@ -193,9 +193,10 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
                 </div>
               </div>
               <div className="mt-3 h-1.5 rounded-full bg-muted" />
+              {/* Spans, so each run keeps its line: a bare inline-block flex item is 9px, the text line is 16px (LED-200). */}
               <div className="mt-2 flex items-center justify-between text-xs">
-                <SkeletonText className="w-20" />
-                <SkeletonText className="w-24" />
+                <span><SkeletonText className="w-20" /></span>
+                <span><SkeletonText className="w-24" /></span>
               </div>
             </article>
           ))}

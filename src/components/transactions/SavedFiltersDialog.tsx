@@ -219,7 +219,7 @@ export function SavedFiltersDialog({
                       <>
                         <button
                           type="button"
-                          className="min-w-0 flex-1 rounded-md text-left hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                          className="min-w-0 flex-1 rounded-md text-left hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none"
                           onClick={() => {
                             onApply(saved.filter)
                             onOpenChange(false)

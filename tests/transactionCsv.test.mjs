@@ -20,23 +20,40 @@ const tx = (over = {}) => ({
   ...over,
 })
 
-test('header row lists the twelve columns in order', () => {
+test('header row lists the thirteen columns in order', () => {
   const [header] = buildTransactionsCsv([]).split('\n')
   assert.equal(header, TRANSACTION_CSV_HEADERS.join(','))
-  assert.equal(TRANSACTION_CSV_HEADERS.length, 12)
+  assert.equal(TRANSACTION_CSV_HEADERS.length, 13)
 })
 
 test('a row carries the transaction fields and the balance when given', () => {
   const csv = buildTransactionsCsv([tx()], new Map([['t1', 15000]]))
   assert.equal(
     csv.split('\n')[1],
-    '2026-09-08,income,Salary — first half,Salary,BDO Savings,,3200,PHP,1,,15000,',
+    '2026-09-08,income,Salary — first half,Salary,BDO Savings,,3200,PHP,1,,,15000,',
   )
 })
 
 test('missing optional fields and balance are blank; account falls back to its id', () => {
   const row = buildTransactionsCsv([tx({ category: null, account: null })]).split('\n')[1]
-  assert.equal(row, '2026-09-08,income,Salary — first half,,acc-1,,3200,PHP,1,,,')
+  assert.equal(row, '2026-09-08,income,Salary — first half,,acc-1,,3200,PHP,1,,,,')
+})
+
+test('a transfer between two currencies carries what the destination received (LED-185)', () => {
+  const row = buildTransactionsCsv([
+    tx({
+      type: 'transfer',
+      description: 'To EUR wallet',
+      category: null,
+      to_account: { name: 'EUR Wallet' },
+      to_account_id: 'acc-2',
+      amount: 100,
+      currency: 'USD',
+      destination_amount: 91.5,
+    }),
+  ]).split('\n')[1]
+  assert.equal(row, '2026-09-08,transfer,To EUR wallet,,BDO Savings,EUR Wallet,100,USD,1,91.5,,,')
+  assert.equal(TRANSACTION_CSV_HEADERS.indexOf('Amount Received'), TRANSACTION_CSV_HEADERS.indexOf('Exchange Rate') + 1)
 })
 
 test('commas, quotes and newlines are quoted', () => {
@@ -77,9 +94,9 @@ test('buildReportCsv escapes the same way as the full export', () => {
   assert.equal(csv.split('\n')[1], "'=SUM(A1)")
 })
 
-test('the full export is unchanged: all twelve headers, in order', () => {
+test('the full export keeps its headers in order: twelve, plus Amount Received after Exchange Rate (LED-185)', () => {
   assert.equal(buildTransactionsCsv([tx()]).split('\n')[0], TRANSACTION_CSV_HEADERS.join(','))
-  assert.equal(TRANSACTION_CSV_HEADERS.length, 12)
+  assert.equal(TRANSACTION_CSV_HEADERS.length, 13)
 })
 
 test('a negative number stays a number, while text that starts with a minus is still neutralised (LED-143)', async () => {

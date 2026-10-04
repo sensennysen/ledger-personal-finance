@@ -10,6 +10,8 @@ export interface SummaryBudget {
   period: string
   amount: number
   spent?: number
+  /** Spend dated later in the period, not in `spent` yet (LED-238). */
+  scheduled?: number
   effective_amount?: number
   category?: { name: string; icon?: string | null; type?: string | null } | null
 }
@@ -20,6 +22,8 @@ const spentOf = (budget: SummaryBudget) => budget.spent ?? 0
 export interface BudgetSummary {
   budgeted: number
   spent: number
+  /** Scheduled spend in the counted budgets: dated later this cycle, not in `spent` yet (LED-238). */
+  scheduled: number
   remaining: number
   /** Budgets counted in the tiles. */
   counted: number
@@ -42,6 +46,7 @@ export function summarizeBudgets(budgets: SummaryBudget[], currency: string): Bu
   const summary: BudgetSummary = {
     budgeted: 0,
     spent: 0,
+    scheduled: 0,
     remaining: 0,
     counted: 0,
     overCount: 0,
@@ -68,6 +73,7 @@ export function summarizeBudgets(budgets: SummaryBudget[], currency: string): Bu
     summary.counted += 1
     summary.budgeted += limit
     summary.spent += spent
+    summary.scheduled += budget.scheduled ?? 0
     if (spent > limit) {
       summary.overCount += 1
       summary.overNames.push(budget.category?.name ?? budget.name)

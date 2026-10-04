@@ -230,3 +230,24 @@ test('a second drain started while one is running shares it and replays nothing 
   assert.equal(client.calls.filter((c) => c.op === 'insert').length, 1)
   assert.equal(await drain(), 0, 'a later drain runs again once the first has finished')
 })
+
+// LED-193: a saved insert is reported once, so a card payment's statement steps run once.
+test('onSynced hears each saved insert once and ignores updates and a throwing listener', async () => {
+  const store = fakeQueueStore([
+    queued({ id: 'i', operation: 'insert', rowId: undefined, payload: { id: 'tx-1', amount: 1 } }),
+    queued({ id: 'u' }),
+  ])
+  const heard = []
+  const deps = { ...depsFor(fakeClient(happy), store), onSynced: (item) => { heard.push(item.payload.id); throw new Error('listener failed') } }
+  assert.equal(await drainWith(deps), 2)
+  assert.deepEqual(heard, ['tx-1'])
+  assert.deepEqual(store.read(), [])
+})
+
+test('onSynced is not called for an insert the database rejected', async () => {
+  const store = fakeQueueStore([queued({ id: 'i', operation: 'insert', rowId: undefined, payload: { id: 'tx-1' } })])
+  const heard = []
+  const client = fakeClient(() => ({ error: { code: '23514', message: 'amount' } }))
+  await drainWith({ ...depsFor(client, store), onSynced: (item) => heard.push(item.id) })
+  assert.deepEqual(heard, [])
+})

@@ -25,3 +25,15 @@ export function abbreviateTick(value: number): string {
   }
   return `${sign}${whole}`
 }
+
+/**
+ * X-axis labels for a chart too narrow to show them all (LED-204): every other one, counted
+ * back from the last so the newest label is always there. Returns `undefined` when there is room,
+ * which leaves the chart's own tick choice untouched.
+ */
+export function thinCategoryTicks<T>(values: readonly T[], narrow: boolean): T[] | undefined {
+  if (!narrow || values.length < 3) return undefined
+  const ticks: T[] = []
+  for (let i = values.length - 1; i >= 0; i -= 2) ticks.unshift(values[i])
+  return ticks
+}

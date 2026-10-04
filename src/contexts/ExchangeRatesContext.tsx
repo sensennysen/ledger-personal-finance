@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { readCache, writeCache } from '@/lib/dataCache'
+import { readWithPolicy } from '@/lib/readRetry'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 import {
   DEFAULT_REFRESH_FREQUENCY,
@@ -67,11 +68,13 @@ export function ExchangeRatesProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       return
     }
-    const { data, error } = await supabase
+    // Budgets waits on this read, so a first load fails fast like the list reads (LED-242).
+    const { data, error } = await readWithPolicy((retry) => supabase
       .from('exchange_rates')
       .select(COLUMNS)
       .eq('user_id', user.id)
       .maybeSingle()
+      .retry(retry), { background: cached !== null })
     if (error) {
       setReadFailure(describeDataError(error, { action: 'load', entity: 'exchange rate' }))
       setLoading(false)

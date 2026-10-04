@@ -41,6 +41,10 @@ interface ExportBudget {
   end_date: string | null
   is_active: boolean
   rollover_enabled: boolean
+  /** This cycle's converted spend (LED-186). */
+  spent: number
+  /** Currencies left out of `spent` for having no exchange rate. */
+  unrated_currencies: string[]
 }
 
 const cell = (value: Cell) => (typeof value === 'boolean' ? (value ? 'yes' : 'no') : (value ?? ''))
@@ -77,7 +81,7 @@ export function buildCategoriesCsv(categories: readonly ExportCategory[]): strin
 }
 
 export const BUDGET_CSV_HEADERS = [
-  'Name', 'Category', 'Amount', 'Currency', 'Period', 'Start Date', 'End Date', 'Active', 'Rollover',
+  'Name', 'Category', 'Amount', 'Currency', 'Period', 'Start Date', 'End Date', 'Active', 'Rollover', 'Spent', 'Unrated Currencies',
 ]
 
 export function buildBudgetsCsv(budgets: readonly ExportBudget[]): string {
@@ -85,6 +89,7 @@ export function buildBudgetsCsv(budgets: readonly ExportBudget[]): string {
     BUDGET_CSV_HEADERS,
     budgets.map((b) => [
       b.name, b.category?.name, b.amount, b.currency, b.period, b.start_date, b.end_date, b.is_active, b.rollover_enabled,
+      b.spent, b.unrated_currencies.join(';'),
     ]),
   )
 }

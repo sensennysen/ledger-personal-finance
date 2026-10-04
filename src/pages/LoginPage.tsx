@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarRange, Download, FileUp, KeyRound, Trash2, Wallet } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 import { LedgerMark } from '@/components/brand/LedgerMark'
 import { Button } from '@/components/ui/button'
-import { oauthErrorFromSearch } from '@/lib/oauthErrors'
+import { Input } from '@/components/ui/input'
+import { supabase } from '@/lib/supabase'
+import { oauthErrorFromSearch, type OAuthErrorMessage } from '@/lib/oauthErrors'
+import { describeOAuthStartFailure } from '@/lib/authErrors'
 
 // Design 11a: the page says what Ledger does. All three are true of the app as
 // built — multi-account net worth, pay-cycle budgets, bank CSV import.
@@ -27,6 +30,59 @@ const CAPABILITIES = [
   },
 ]
 
+// Email/password sign-in for the local Supabase stack. Only rendered when
+// import.meta.env.DEV is true, so it is stripped from production builds.
+// Defaults match the demo user created by supabase/seed.sql.
+function DevPasswordLogin() {
+  const [email, setEmail] = useState('demo@ledger.local')
+  const [password, setPassword] = useState('ledger-demo-123')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setError(error.message)
+    setSubmitting(false)
+  }
+
+  return (
+    <form
+      onSubmit={(event) => void handleSubmit(event)}
+      className="mt-5 space-y-3 rounded-2xl border border-dashed border-border p-4"
+      aria-label="Development sign-in"
+    >
+      <p className="text-[0.6875rem] font-medium uppercase tracking-[.14em] text-muted-foreground">
+        Dev only · seeded login
+      </p>
+      <Input
+        type="email"
+        value={email}
+        onChange={(event) => setEmail(event.target.value)}
+        autoComplete="username"
+        aria-label="Email"
+      />
+      <Input
+        type="password"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+        autoComplete="current-password"
+        aria-label="Password"
+      />
+      {error && (
+        <p role="alert" className="text-[0.8125rem]" style={{ color: 'var(--expense)' }}>
+          {error}
+        </p>
+      )}
+      <Button type="submit" variant="outline" className="w-full" disabled={submitting}>
+        {submitting ? 'Signing in…' : 'Sign in with email'}
+      </Button>
+    </form>
+  )
+}
+
 export default function LoginPage() {
   const { signInWithGoogle, loading, authError: sessionError } = useAuth()
   const { canInstall, install } = useInstallPrompt()
@@ -34,17 +90,29 @@ export default function LoginPage() {
   // ProtectedRoutes), so "Signing in…" belongs to the click alone (LED-144).
   const [isSigningIn, setIsSigningIn] = useState(false)
 
-  const handleSignIn = async () => {
-    setIsSigningIn(true)
-    try {
-      await signInWithGoogle()
-    } finally {
-      setIsSigningIn(false)
+  const [startError, setStartError] = useState<OAuthErrorMessage | null>(null)
+
+  // Back from Google out of the browser's page cache restores this state with the button still disabled.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setIsSigningIn(false)
     }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
+
+  const handleSignIn = async () => {
+    setStartError(null)
+    setIsSigningIn(true)
+    const { started } = await signInWithGoogle()
+    // On success the browser is leaving for Google, so the button stays disabled until it does (LED-196).
+    if (started) return
+    setStartError(describeOAuthStartFailure(navigator.onLine))
+    setIsSigningIn(false)
   }
 
   // Only the `error` code is read; the provider's description is never shown.
-  const oauthError = oauthErrorFromSearch(window.location.search)
+  const oauthError = startError ?? oauthErrorFromSearch(window.location.search)
 
   return (
     <div className="min-h-dvh bg-card lg:grid lg:grid-cols-2">
@@ -116,6 +184,8 @@ export default function LoginPage() {
             {isSigningIn ? 'Signing in…' : 'Continue with Google'}
           </button>
 
+          {import.meta.env.DEV && <DevPasswordLogin />}
+
           {/* ── Trust lines ── */}
           <ul className="mt-5 space-y-2 text-[0.8125rem] text-muted-foreground">
             <li className="flex items-center gap-2">
@@ -165,6 +235,18 @@ export default function LoginPage() {
               Privacy Policy
             </Link>.
           </p>
+          {/* Every legal page from the login footer (LED-189). */}
+          <nav aria-label="Legal" className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.6875rem] text-muted-foreground">
+            {[
+              { to: '/data-deletion', label: 'Data deletion' },
+              { to: '/cookies', label: 'Cookies and storage' },
+              { to: '/notices', label: 'Notices' },
+            ].map((item) => (
+              <Link key={item.to} to={item.to} className="underline underline-offset-2 hover:text-foreground transition-colors">
+                {item.label}
+              </Link>
+            ))}
+          </nav>
         </div>
       </div>
 

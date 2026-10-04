@@ -2,6 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   computeOverspending,
+  convertOverspendingTotals,
+  spendWindowLabel,
   streakLabel,
   shiftMonthKey,
 } from '../src/lib/overspending.ts'
@@ -109,4 +111,78 @@ test('a foreign expense is converted with the exchange-rate table before it is c
   assert.ok(Math.abs(converted.rows[0].spent - 560) < 1e-9)
   assert.ok(Math.abs(converted.rows[0].over - 60) < 1e-9)
   assert.deepEqual(converted.unrated, [])
+})
+
+// LED-185: one total in the default currency, never "A + B". 1 USD = 56 PHP.
+const rates = { base: 'PHP', rates: { USD: 1 / 56 }, overrides: {}, asOf: '2026-09-25', fetchedAt: '2026-09-26T08:00:00' }
+
+test('totals in two currencies become one figure in the target currency', () => {
+  const totals = [
+    { currency: 'PHP', over: 300, uncarried: 50 },
+    { currency: 'USD', over: 10, uncarried: 0 },
+  ]
+  assert.deepEqual(convertOverspendingTotals({ totals, unrated: [] }, 'PHP', rates), {
+    over: 860,
+    uncarried: 50,
+    excludedCurrencies: [],
+  })
+})
+
+test('a currency with no rate is left out and named, with the unrated spending', () => {
+  const totals = [
+    { currency: 'PHP', over: 300, uncarried: 0 },
+    { currency: 'EUR', over: 40, uncarried: 0 },
+  ]
+  assert.deepEqual(convertOverspendingTotals({ totals, unrated: ['JPY'] }, 'PHP', rates), {
+    over: 300,
+    uncarried: 0,
+    excludedCurrencies: ['EUR', 'JPY'],
+  })
+})
+
+test('nothing over is zero with nothing named', () => {
+  assert.deepEqual(convertOverspendingTotals({ totals: [], unrated: [] }, 'PHP', null), { over: 0, uncarried: 0, excludedCurrencies: [] })
+})
+
+test('a yearly row carries its period and is labelled year to date; cycle budgets are not (LED-244)', () => {
+  const yearly = budget({ id: 'y', period: 'yearly', amount: 1000 })
+  const monthly = budget({ id: 'm', category_id: 'c2' })
+  const txs = [tx('2026-03-05', 900), tx('2026-09-05', 300), tx('2026-09-06', 700, { category_id: 'c2' })]
+  const r = run({
+    budgets: [yearly, monthly],
+    txs,
+    rangeFor: (period) => (period === 'yearly' ? { start: '2026-01-01', end: '2026-12-31' } : { start: '2026-09-01', end: '2026-09-30' }),
+  })
+  const byId = new Map(r.rows.map((row) => [row.budgetId, row]))
+  assert.equal(byId.get('y').period, 'yearly')
+  assert.equal(byId.get('y').spent, 1200) // the year so far, not September's 300
+  assert.equal(byId.get('m').period, 'monthly')
+  assert.equal(spendWindowLabel('yearly'), 'year to date')
+  for (const period of ['weekly', 'monthly', 'quarterly']) assert.equal(spendWindowLabel(period), null)
+})
+
+test('countUntil leaves a later row out of the open cycle until its date (LED-238)', () => {
+  const txs = [tx('2026-09-05', 500), tx('2026-09-20', 300)]
+  assert.deepEqual(run({ txs, countUntil: '2026-09-10' }).rows, [])
+  assert.equal(run({ txs, countUntil: '2026-09-20' }).rows[0].over, 200)
+})
+
+test('countUntil leaves a closed cycle unchanged (LED-238)', () => {
+  const txs = [tx('2026-09-05', 500), tx('2026-09-20', 300)]
+  assert.deepEqual(run({ txs, countUntil: '2026-10-04' }).rows, run({ txs }).rows)
+})
+
+test('countUntil cuts a non-rollover period too (LED-238)', () => {
+  const txs = [tx('2026-03-01', 500), tx('2026-11-01', 800)]
+  const yearly = run({ budgets: [budget({ period: 'yearly', amount: 1000 })], txs, rangeFor: () => ({ start: '2026-01-01', end: '2026-12-31' }), countUntil: '2026-09-15' })
+  assert.deepEqual(yearly.rows, [])
+})
+
+test('countUntil does not change rollover carried from closed cycles (LED-238)', () => {
+  const b = budget({ rollover_enabled: true, start_date: '2026-08-01' })
+  // August went 200 over, so September's limit is 400; the row on the 25th is not spent yet.
+  const txs = [tx('2026-08-05', 800), tx('2026-09-05', 500), tx('2026-09-25', 100)]
+  const [row] = run({ budgets: [b], txs, behaviour: 'carry', countUntil: '2026-09-10' }).rows
+  assert.equal(row.limit, 400)
+  assert.equal(row.spent, 500)
 })

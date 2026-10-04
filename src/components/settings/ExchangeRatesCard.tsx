@@ -14,19 +14,12 @@ import {
   REFRESH_FREQUENCIES,
   displayRate,
   isRefreshFrequency,
-  ratesAsOfLabel,
+  rateStatusLabel,
   type RateTable,
 } from '@/lib/exchangeRates'
 
 function formatRate(rate: number): string {
   return rate >= 100 ? rate.toFixed(2) : Number(rate.toPrecision(6)).toString()
-}
-
-function fetchedLabel(table: RateTable | null): string | null {
-  if (!table?.fetchedAt) return null
-  const at = new Date(table.fetchedAt)
-  if (Number.isNaN(at.getTime())) return null
-  return at.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 /** Settings: how Ledger gets exchange rates, how often it refreshes them, and rates the user types. */
@@ -35,8 +28,7 @@ export function ExchangeRatesCard() {
   const { table, base, needed, missing, frequency } = rates
   const [frequencyError, setFrequencyError] = useState<FormErrorValue>(null)
   const [refreshResult, setRefreshResult] = useState<FormErrorValue>(null)
-  const asOf = ratesAsOfLabel(table)
-  const fetched = fetchedLabel(table)
+  const statusLabel = rateStatusLabel(table, needed.length)
   const current = REFRESH_FREQUENCIES.find((option) => option.value === frequency)
 
   const onFrequency = async (value: string | null) => {
@@ -85,11 +77,7 @@ export function ExchangeRatesCard() {
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-muted-foreground" aria-live="polite">
-            {table?.fetchedAt
-              ? `Rates${asOf ? ` as of ${asOf}` : ''} · fetched ${fetched ?? 'earlier'}`
-              : needed.length === 0
-                ? 'No rates needed.'
-                : 'No rates fetched yet.'}
+            {statusLabel}
           </p>
           <Button type="button" variant="outline" size="sm" onClick={() => void onRefresh()} disabled={rates.refreshing}>
             {rates.refreshing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}

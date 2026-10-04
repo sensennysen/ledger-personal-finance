@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { DeleteBudgetButton } from '@/components/budgets/DeleteBudgetButton'
 import { canRollover } from '@/lib/budgetRollover'
+import { spendWindowLabel } from '@/lib/overspending'
 import { BUDGET_TONE_BAR_CLASS, budgetTone, budgetUsage } from '@/lib/budgetUsage'
 import { cn, formatCurrency } from '@/lib/utils'
 import type { MutationResult } from '@/lib/dataErrors'
@@ -49,6 +50,7 @@ export function BudgetTable({
             const rollover = budget.rollover_amount ?? 0
             const rolloverActive = budget.rollover_enabled && canRollover(budget.period)
             const hasRollover = rolloverActive && rollover !== 0
+            const spendWindow = spendWindowLabel(budget.period)
             return (
               <tr
                 key={budget.id}
@@ -99,6 +101,10 @@ export function BudgetTable({
                 </td>
                 <td className={cn('px-4 py-3 text-right align-top tabular-nums', over && 'font-medium text-destructive')}>
                   {formatCurrency(spent, budget.currency)}
+                  {spendWindow && <span className="block text-xs font-normal text-muted-foreground">{spendWindow}</span>}
+                  {(budget.scheduled ?? 0) > 0 && (
+                    <span className="block text-xs font-normal text-muted-foreground">+ {formatCurrency(budget.scheduled ?? 0, budget.currency)} scheduled</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right align-top tabular-nums">
                   {formatCurrency(effective, budget.currency)}

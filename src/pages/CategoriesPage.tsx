@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -15,7 +15,6 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
-  MoreHorizontal,
 } from 'lucide-react'
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react'
 import { useNotify } from '@/contexts/notificationState'
@@ -49,7 +48,6 @@ import {
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ColorPicker } from '@/components/ui/color-picker'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn, formatCurrency, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange } from '@/lib/utils'
 import {
   buildCategoryUsage,
@@ -68,6 +66,7 @@ import { useCategoryInk } from '@/hooks/useCategoryInk'
 import { SWATCHES } from '@/lib/swatches'
 import { Switch } from '@/components/ui/switch'
 import { clashSentence, findNameClash } from '@/lib/categoryNames'
+import { mergeSubsetOrder, moveAnnouncement, moveId, reorderIds } from '@/lib/reorder'
 
 const DEFAULT_CATEGORY_ICON = '\u{1F3F7}\uFE0F'
 const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
@@ -81,33 +80,6 @@ const schema = z.object({
 })
 
 type FormValues = z.infer<typeof schema>
-
-function reorderIds(ids: string[], fromId: string, toId: string) {
-  const from = ids.indexOf(fromId)
-  const to = ids.indexOf(toId)
-  if (from < 0 || to < 0 || from === to) return ids
-  const next = [...ids]
-  const [moved] = next.splice(from, 1)
-  next.splice(to, 0, moved)
-  return next
-}
-
-function moveId(ids: string[], id: string, direction: -1 | 1) {
-  const index = ids.indexOf(id)
-  const targetIndex = index + direction
-  if (index < 0 || targetIndex < 0 || targetIndex >= ids.length) return ids
-  const next = [...ids]
-  const current = next[index]
-  next[index] = next[targetIndex]
-  next[targetIndex] = current
-  return next
-}
-
-function mergeSubsetOrder(allIds: string[], subsetIds: string[]) {
-  const subset = new Set(subsetIds)
-  let pointer = 0
-  return allIds.map((id) => (subset.has(id) ? subsetIds[pointer++] : id))
-}
 
 function CategoryForm({
   defaultValues,
@@ -271,6 +243,61 @@ function CategoryForm({
 
 type UsageSide = 'expense' | 'income'
 
+// Reorder mode (LED-240, design 8a item 5): one Reorder control puts a list into this mode,
+// where every row, at every width, can be dragged with a pointer or moved with these buttons.
+function ReorderButtons({
+  scope,
+  id,
+  name,
+  index,
+  count,
+  onMove,
+}: {
+  scope: string
+  id: string
+  name: string
+  index: number
+  count: number
+  onMove: (id: string, direction: -1 | 1) => void
+}) {
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Move ${name} up`}
+        data-reorder={`${scope}:${id}:up`}
+        onClick={() => onMove(id, -1)}
+        disabled={index === 0}
+      >
+        <ArrowUp className="w-3 h-3" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Move ${name} down`}
+        data-reorder={`${scope}:${id}:down`}
+        onClick={() => onMove(id, 1)}
+        disabled={index === count - 1}
+      >
+        <ArrowDown className="w-3 h-3" />
+      </Button>
+    </>
+  )
+}
+
+/**
+ * Keeps focus on the moved row's button after React moves the row, so a keyboard user can press
+ * again. At an end the button in that direction is disabled, so the other one takes focus.
+ */
+function refocusMove(scope: string, id: string, direction: -1 | 1) {
+  requestAnimationFrame(() => {
+    const pick = (dir: string) =>
+      document.querySelector<HTMLButtonElement>(`[data-reorder="${scope}:${id}:${dir}"]:not(:disabled)`)
+    ;(pick(direction === -1 ? 'up' : 'down') ?? pick(direction === -1 ? 'down' : 'up'))?.focus()
+  })
+}
+
 // `spendBySub` is this cycle's spend per subcategory; null while usage is not available, so a
 // missing figure shows a dash and never a zero. Omit it to draw names only.
 function SubcategoryPanel({
@@ -294,25 +321,9 @@ function SubcategoryPanel({
   const [rearrangeMode, setRearrangeMode] = useState(false)
   const [draggedSubcategoryId, setDraggedSubcategoryId] = useState<string | null>(null)
   const [dropTargetSubcategoryId, setDropTargetSubcategoryId] = useState<string | null>(null)
-  const [isDesktopDrag, setIsDesktopDrag] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
-  )
+  const [announcement, setAnnouncement] = useState('')
   const subcategoryIds = useMemo(() => subcategories.map((sub) => sub.id), [subcategories])
   const setSubcategoryRef = useFlipReorder(subcategoryIds, rearrangeMode)
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(min-width: 768px)')
-    const handleChange = () => {
-      setIsDesktopDrag(mediaQuery.matches)
-      if (!mediaQuery.matches) {
-        setDraggedSubcategoryId(null)
-        setDropTargetSubcategoryId(null)
-      }
-    }
-    handleChange()
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [])
 
   const handleAdd = async () => {
     const trimmed = addName.trim()
@@ -342,19 +353,23 @@ function SubcategoryPanel({
     setEditSub(null)
   }
 
-  const persistSubcategoryOrder = async (nextIds: string[]) => {
+  const persistSubcategoryOrder = async (nextIds: string[], movedId: string) => {
+    const name = subcategories.find((sub) => sub.id === movedId)?.name ?? 'Subcategory'
+    setAnnouncement(moveAnnouncement(name, nextIds, movedId))
     const { error } = await updateSubcategoryOrder(nextIds)
     if (error) console.error('Failed to update subcategory order:', error)
   }
 
   const reorderSubcategory = (fromId: string, toId: string) => {
     const nextIds = reorderIds(subcategoryIds, fromId, toId)
-    if (nextIds !== subcategoryIds) void persistSubcategoryOrder(nextIds)
+    if (nextIds !== subcategoryIds) void persistSubcategoryOrder(nextIds, fromId)
   }
 
   const moveSubcategory = (id: string, direction: -1 | 1) => {
     const nextIds = moveId(subcategoryIds, id, direction)
-    if (nextIds !== subcategoryIds) void persistSubcategoryOrder(nextIds)
+    if (nextIds === subcategoryIds) return
+    void persistSubcategoryOrder(nextIds, id)
+    refocusMove('sub', id, direction)
   }
 
   return (
@@ -376,10 +391,11 @@ function SubcategoryPanel({
             }}
           >
             {rearrangeMode ? <Check className="w-3 h-3" /> : <GripVertical className="w-3 h-3" />}
-            {rearrangeMode ? 'Done' : 'Rearrange'}
+            {rearrangeMode ? 'Done' : 'Reorder'}
           </Button>
         )}
       </div>
+      <div className="sr-only" aria-live="polite">{rearrangeMode ? announcement : ''}</div>
       {loading ? (
         <div className="space-y-1" aria-busy="true">
           {[...Array(2)].map((_, i) => (
@@ -395,7 +411,7 @@ function SubcategoryPanel({
             <div
               key={sub.id}
               ref={setSubcategoryRef(sub.id)}
-              draggable={isDesktopDrag && rearrangeMode}
+              draggable={rearrangeMode}
               onDragStart={() => {
                 if (rearrangeMode) {
                   setDraggedSubcategoryId(sub.id)
@@ -448,39 +464,16 @@ function SubcategoryPanel({
                 </>
               ) : (
                 <>
-                  <span
-                    className={cn(
-                      'reorder-handle hidden text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted',
-                      rearrangeMode && 'md:inline-flex'
-                    )}
-                    aria-label={`Drag to rearrange ${sub.name}`}
-                  >
-                    <GripVertical className="w-3 h-3" />
-                  </span>
                   <span className="text-sm flex-1 pl-1 truncate">{sub.name}</span>
                   {spendBySub !== undefined && currency && (
                     <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                       {spendBySub === null ? '—' : formatCurrency(spendBySub.get(sub.id)?.[side] ?? 0, currency)}
                     </span>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    className={rearrangeMode ? 'md:hidden' : 'hidden'}
-                    onClick={() => moveSubcategory(sub.id, -1)}
-                    disabled={idx === 0}
-                  >
-                    <ArrowUp className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    className={rearrangeMode ? 'md:hidden' : 'hidden'}
-                    onClick={() => moveSubcategory(sub.id, 1)}
-                    disabled={idx === subcategories.length - 1}
-                  >
-                    <ArrowDown className="w-3 h-3" />
-                  </Button>
+                  {rearrangeMode ? (
+                    <ReorderButtons scope="sub" id={sub.id} name={sub.name} index={idx} count={subcategories.length} onMove={moveSubcategory} />
+                  ) : (
+                  <>
                   <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => startEdit(sub)}>
                     <Pencil className="w-3 h-3" />
                   </Button>
@@ -504,6 +497,8 @@ function SubcategoryPanel({
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
+                  </>
+                  )}
                 </>
               )}
             </div>
@@ -634,9 +629,7 @@ export default function CategoriesPage() {
   const [rearrangeMode, setRearrangeMode] = useState(false)
   const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null)
   const [dropTargetCategoryId, setDropTargetCategoryId] = useState<string | null>(null)
-  const [isDesktopDrag, setIsDesktopDrag] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : true
-  )
+  const [announcement, setAnnouncement] = useState('')
   const [rulesOpen, setRulesOpen] = useState(false)
   // Rules load with the page: the button states their count and each category's pane lists its own.
   const { rules, loading: rulesLoading, error: rulesError, refetch: refetchRules, createRule, deleteRule } = useTransactionRules(true)
@@ -657,20 +650,6 @@ export default function CategoriesPage() {
   const [ruleCategoryId, setRuleCategoryId] = useState('')
   const [ruleTypeHint, setRuleTypeHint] = useState<'any' | 'income' | 'expense' | 'transfer'>('any')
   const [rulePriority, setRulePriority] = useState(1)
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(min-width: 768px)')
-    const handleChange = () => {
-      setIsDesktopDrag(mediaQuery.matches)
-      if (!mediaQuery.matches) {
-        setDraggedCategoryId(null)
-        setDropTargetCategoryId(null)
-      }
-    }
-    handleChange()
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [])
 
   const handleCreate = async (values: FormValues) => {
     if (findNameClash(values.name, categories)) { setFormError(clashSentence('category', values.name)); return }
@@ -714,7 +693,9 @@ export default function CategoriesPage() {
 
   const setCategoryRef = useFlipReorder(visibleCategoryIds, rearrangeMode)
 
-  const persistCategoryOrder = async (nextVisibleIds: string[]) => {
+  const persistCategoryOrder = async (nextVisibleIds: string[], movedId: string) => {
+    const name = categories.find((category) => category.id === movedId)?.name ?? 'Category'
+    setAnnouncement(moveAnnouncement(name, nextVisibleIds, movedId))
     const nextIds = mergeSubsetOrder(
       categories.map((category) => category.id),
       nextVisibleIds
@@ -725,12 +706,21 @@ export default function CategoriesPage() {
 
   const reorderCategory = (fromId: string, toId: string) => {
     const nextIds = reorderIds(visibleCategoryIds, fromId, toId)
-    if (nextIds !== visibleCategoryIds) void persistCategoryOrder(nextIds)
+    if (nextIds !== visibleCategoryIds) void persistCategoryOrder(nextIds, fromId)
   }
 
   const moveCategory = (id: string, direction: -1 | 1) => {
     const nextIds = moveId(visibleCategoryIds, id, direction)
-    if (nextIds !== visibleCategoryIds) void persistCategoryOrder(nextIds)
+    if (nextIds === visibleCategoryIds) return
+    void persistCategoryOrder(nextIds, id)
+    refocusMove('category', id, direction)
+  }
+
+  const toggleReorder = () => {
+    setRearrangeMode((current) => !current)
+    setDraggedCategoryId(null)
+    setDropTargetCategoryId(null)
+    setAnnouncement('')
   }
 
   // Column labels for md and up; the widths match the cells in each row.
@@ -758,7 +748,7 @@ export default function CategoriesPage() {
       <div
         key={cat.id}
         ref={setCategoryRef(cat.id)}
-        draggable={isDesktopDrag && rearrangeMode}
+        draggable={rearrangeMode}
         onDragStart={() => {
           if (rearrangeMode) {
             setDraggedCategoryId(cat.id)
@@ -799,17 +789,13 @@ export default function CategoriesPage() {
             className="flex items-center gap-3 min-w-0 flex-1 text-left"
             aria-expanded={paneMode ? undefined : isSelected(cat.id)}
             aria-current={paneMode && isSelected(cat.id) ? 'true' : undefined}
-            onClick={() => setSelectedCategoryId(!paneMode && selectedCategoryId === cat.id ? null : cat.id)}
+            // While reordering, the row is moved, not opened: its move buttons take the keyboard.
+            tabIndex={rearrangeMode ? -1 : undefined}
+            onClick={() => {
+              if (rearrangeMode) return
+              setSelectedCategoryId(!paneMode && selectedCategoryId === cat.id ? null : cat.id)
+            }}
           >
-            <span
-              className={cn(
-                'reorder-handle hidden text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted',
-                rearrangeMode && 'md:inline-flex'
-              )}
-              aria-label={`Drag to rearrange ${cat.name}`}
-            >
-              <GripVertical className="w-3.5 h-3.5" />
-            </span>
             {!paneMode && (isSelected(cat.id)
               ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
               : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
@@ -843,24 +829,10 @@ export default function CategoriesPage() {
             </div>
           </button>
           <div className="flex items-center gap-1 shrink-0 md:w-16 md:justify-end">
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className={rearrangeMode ? 'md:hidden' : 'hidden'}
-              onClick={() => moveCategory(cat.id, -1)}
-              disabled={idx === 0}
-            >
-              <ArrowUp className="w-3 h-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className={rearrangeMode ? 'md:hidden' : 'hidden'}
-              onClick={() => moveCategory(cat.id, 1)}
-              disabled={idx === cats.length - 1}
-            >
-              <ArrowDown className="w-3 h-3" />
-            </Button>
+            {rearrangeMode ? (
+              <ReorderButtons scope="category" id={cat.id} name={cat.name} index={idx} count={cats.length} onMove={moveCategory} />
+            ) : (
+            <>
             <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Edit ${cat.name}`} onClick={() => setEditCategory(cat)}>
               <Pencil className="w-3 h-3" />
             </Button>
@@ -884,6 +856,8 @@ export default function CategoriesPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            </>
+            )}
           </div>
         </div>
         {!paneMode && isSelected(cat.id) && (
@@ -918,22 +892,13 @@ export default function CategoriesPage() {
               {rulesLoading ? '…' : rulesError ? '—' : rules.length}
             </Badge>
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant={rearrangeMode ? 'secondary' : 'outline'} size="icon-sm" aria-label="Category options" />}>
-              {rearrangeMode ? <Check className="w-4 h-4" /> : <MoreHorizontal className="w-4 h-4" />}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {categories.length > 1 && (
-                <DropdownMenuItem onClick={() => {
-                  setRearrangeMode((current) => !current)
-                  setDraggedCategoryId(null)
-                  setDropTargetCategoryId(null)
-                }}>
-                  <GripVertical className="mr-2 h-4 w-4" />{rearrangeMode ? 'Finish rearranging' : 'Rearrange categories'}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {categories.length > 1 && (
+            <Button variant={rearrangeMode ? 'secondary' : 'outline'} size="sm" className="gap-1.5" aria-pressed={rearrangeMode} onClick={toggleReorder}>
+              {rearrangeMode ? <Check className="w-3.5 h-3.5" /> : <GripVertical className="w-3.5 h-3.5" />}
+              {rearrangeMode ? 'Done' : 'Reorder'}
+            </Button>
+          )}
+          <div className="sr-only" aria-live="polite">{rearrangeMode ? announcement : ''}</div>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger render={<Button className="gap-2" size="sm" />}>
               <Plus className="w-4 h-4" />Add Category

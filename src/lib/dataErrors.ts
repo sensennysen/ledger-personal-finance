@@ -13,15 +13,19 @@ export interface DescribedError {
   detail: string | null
 }
 
-type RawError = { code?: string | null; message?: string | null } | Error | string | null | undefined
+type RawError = { code?: string | null; message?: string | null; hint?: string | null } | Error | string | null | undefined
+
+/** Hint a database function sets when its message is already a sentence for the user. */
+export const USER_MESSAGE_HINT = 'user-message'
 
 export type DataErrorKind = 'connection' | 'unique' | 'permission' | 'unknown'
 
-function parts(err: RawError): { code: string | null; message: string } {
-  if (typeof err === 'string') return { code: null, message: err }
-  if (!err) return { code: null, message: '' }
+function parts(err: RawError): { code: string | null; message: string; hint: string | null } {
+  if (typeof err === 'string') return { code: null, message: err, hint: null }
+  if (!err) return { code: null, message: '', hint: null }
   const code = 'code' in err && typeof err.code === 'string' ? err.code : null
-  return { code, message: err.message ?? '' }
+  const hint = 'hint' in err && typeof err.hint === 'string' ? err.hint : null
+  return { code, message: err.message ?? '', hint }
 }
 
 /**
@@ -61,8 +65,10 @@ function sentence(kind: DataErrorKind, { action, entity }: DataErrorContext): st
 /** Plain-language message plus the raw text; null when there was no error. */
 export function describeDataError(err: RawError, context: DataErrorContext): DescribedError | null {
   if (!err) return null
-  const { code, message } = parts(err)
+  const { code, message, hint } = parts(err)
   const raw = [code, message].filter(Boolean).join(' — ')
+  // A check in the database wrote the sentence itself (e.g. which name clashes); show it as is.
+  if (hint === USER_MESSAGE_HINT && message) return { message, detail: raw || null }
   return { message: sentence(classifyDataError(err), context), detail: raw || null }
 }
 

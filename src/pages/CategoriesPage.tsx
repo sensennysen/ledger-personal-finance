@@ -66,12 +66,13 @@ import { resolveLoadState } from '@/lib/loadState'
 import type { Category, Subcategory } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 import { SWATCHES } from '@/lib/swatches'
+import { clashSentence, findNameClash } from '@/lib/categoryNames'
 
 const DEFAULT_CATEGORY_ICON = '\u{1F3F7}\uFE0F'
 const DEFAULT_EMOJI_PLACEHOLDER = '\u{1F600}'
 
 const schema = z.object({
-  name: z.string().min(1, 'Name is required').max(40),
+  name: z.string().trim().min(1, 'Name is required').max(40),
   type: z.enum(['income', 'expense', 'both']),
   color: z.string(),
   icon: z.string(),
@@ -291,6 +292,7 @@ function SubcategoryPanel({
   const handleAdd = async () => {
     const trimmed = addName.trim()
     if (!trimmed) { setAddError('Name is required'); return }
+    if (findNameClash(trimmed, subcategories)) { setAddError(clashSentence('subcategory', trimmed, category.name)); return }
     setAdding(true)
     const { error, errorDetail } = await createSubcategory(trimmed)
     setAdding(false)
@@ -309,6 +311,7 @@ function SubcategoryPanel({
     if (!editSub) return
     const trimmed = editName.trim()
     if (!trimmed) { setEditError('Name is required'); return }
+    if (findNameClash(trimmed, subcategories, editSub)) { setEditError(clashSentence('subcategory', trimmed, category.name)); return }
     const { error, errorDetail } = await updateSubcategory(editSub.id, { name: trimmed })
     if (error) { setEditError({ message: error, detail: errorDetail ?? null }); return }
     setEditSub(null)
@@ -645,6 +648,7 @@ export default function CategoriesPage() {
   }, [])
 
   const handleCreate = async (values: FormValues) => {
+    if (findNameClash(values.name, categories)) { setFormError(clashSentence('category', values.name)); return }
     const { error, errorDetail } = await createCategory(values)
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
@@ -653,6 +657,7 @@ export default function CategoriesPage() {
 
   const handleEdit = async (values: FormValues) => {
     if (!editCategory) return
+    if (findNameClash(values.name, categories, editCategory)) { setFormError(clashSentence('category', values.name)); return }
     const { error, errorDetail } = await updateCategory(editCategory.id, values)
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)

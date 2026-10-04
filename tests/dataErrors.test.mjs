@@ -65,3 +65,15 @@ test('withDetail keeps the raw text with the sentence, and passes on no error', 
     detail: 'Failed to fetch',
   })
 })
+
+test('a database sentence marked user-message is shown as is, with the raw text kept', () => {
+  const err = { code: '23505', message: 'A category named "Groceries" already exists.', hint: 'user-message' }
+  const d = describeDataError(err, { action: 'save', entity: 'category' })
+  assert.equal(d.message, 'A category named "Groceries" already exists.')
+  assert.equal(d.detail, '23505 — A category named "Groceries" already exists.')
+  // Without the hint, the generic sentence still applies.
+  assert.equal(
+    describeDataError({ code: '23505', message: 'duplicate key' }, { action: 'save', entity: 'category' }).message,
+    'A category with that name already exists.',
+  )
+})

@@ -90,6 +90,7 @@ Built in four phases (plan 2026-10-03), each validated before the next:
 - **C, cycle totals:** LED-238, then 237. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-phase-c.md`). Validation filed LED-251.
 - **D, Activity, loading, storage:** LED-241, 242, 245. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-phase-d.md`).
 - **Filed during A and B:** LED-247, 250, 249, 248. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-epic-21-led-247-250.md`). LED-251's decision is OD-14 (a).
+- **Filed during C:** LED-251. **Done** (2026-10-04, retro `knowledge/retros/2026-10-04-led-251.md`).
 
 | Ticket | Item | Summary | Pts |
 |---|---|---|---|

@@ -124,6 +124,7 @@ Built in four phases (plan 2026-10-03), each validated before the next:
 
 - **LED-210 Done** (2026-10-04, retro `knowledge/retros/2026-10-04-led-210-flip-epics-8-13-statuses.md`). LED-142 and LED-145 stay To Do, so EPIC-DESIGN-PARITY does too.
 - **LED-212 applied, stays To Do** (2026-10-04, retro `knowledge/retros/2026-10-04-led-212-merge-route-and-launch-json.md`). Route: the `epics-15-19` → `main` PR carries every epics 8 to 13 phase, because `epics-8-13-phase-13` is an ancestor of `epics-15-19`. `.claude/launch.json` is tracked. Only (c), CI green, is left; set it to Done when that PR is green.
+- **LED-213 applied, stays To Do** (2026-10-04). Checklist `knowledge/checklists/release.md`: the CI run log, the 16 migrations absent from `main` with what fails without each, the Vercel CSP and a live smoke test; README has the self-hoster note. Left: (c), the `epics-15-19` PR's CI link, and the remote push when the owner asks.
 
 Phase totals in points: 1 = 22, 2 = 22, 3 = 19, 4 = 21, 5 = 21 (LED-189 widened from 2 to 5), 6 = 6. Sum 111. Epic 21 adds 48 (39, plus LED-247 to 249 filed during phase A, LED-250 during phase B and LED-251 during phase C).
 

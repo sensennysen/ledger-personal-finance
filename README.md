@@ -52,6 +52,8 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 
 Run the Supabase schema in `supabase/schema.sql`, then apply any migrations in `supabase/migrations` that match your deployment state.
 
+**Upgrading a self-hosted database.** Apply every file in `supabase/migrations/` that your database does not have yet, in filename order, *before* you deploy the new client. Each file is idempotent. A database missing a column the client writes rejects every transaction save, not only the new feature's. `knowledge/checklists/release.md` lists each migration and what fails without it.
+
 Start the app:
 
 ```bash
@@ -145,7 +147,7 @@ Other flags: `--base-url` (default `http://127.0.0.1:5173`), `--out` (default `s
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and on pushes to `main`. A separate `db` job starts a fresh local Supabase, applies all migrations and the seed, lints database functions and replays the migrations from scratch, so a migration that fails on an empty database fails CI. Contributor conventions are in `AGENTS.md`.
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and on pushes to `main`. A separate `db` job starts a fresh local Supabase, applies all migrations and the seed, lints database functions and replays the migrations from scratch, so a migration that fails on an empty database fails CI. CI cannot see the hosted database or the headers Vercel serves; `knowledge/checklists/release.md` covers those before a release. Contributor conventions are in `AGENTS.md`.
 
 ## Philosophy
 

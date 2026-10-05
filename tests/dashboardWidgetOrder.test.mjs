@@ -2,10 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 
-// useDashboardPrefs.ts imports Supabase and the "@/" alias, so node cannot load it. Read the
-// constant from its source instead; the test is about the two lists agreeing, not about running it.
+// The constant lives in src/lib/dashboardLayout.ts (LED-264). Read it from the source; the test is
+// about the two lists agreeing, not about running it.
 function codeDefault() {
-  const src = readFileSync('src/hooks/useDashboardPrefs.ts', 'utf8')
+  const src = readFileSync('src/lib/dashboardLayout.ts', 'utf8')
   const body = src.match(/export const DEFAULT_WIDGET_ORDER[^=]*=\s*\[([^\]]*)\]/)
   assert.ok(body, 'DEFAULT_WIDGET_ORDER not found')
   return [...body[1].matchAll(/'([A-Za-z]+)'/g)].map((m) => m[1])

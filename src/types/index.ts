@@ -39,6 +39,8 @@ export interface Profile {
   budget_deficit_behaviour?: 'carry' | 'reset' | null
   exchange_rate_refresh?: 'open' | 'daily' | 'weekly' | 'manual' | null
   dashboard_widget_order?: string[] | null
+  /** The Home widgets turned off; null until the account stores one (LED-264). */
+  dashboard_hidden_widgets?: string[] | null
   account_group_order?: AccountType[] | null
   account_view_mode?: 'all' | AccountType | null
   /** Only the preferences the user changed; read through parsePreferences (LED-263). */

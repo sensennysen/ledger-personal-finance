@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 // LED-243: one broken Home card must not take the page with it, so every widget has its own boundary.
-const prefs = readFileSync(new URL('../src/hooks/useDashboardPrefs.ts', import.meta.url), 'utf8')
+const prefs = readFileSync(new URL('../src/lib/dashboardLayout.ts', import.meta.url), 'utf8')
 const page = readFileSync(new URL('../src/pages/DashboardPage.tsx', import.meta.url), 'utf8')
 const order = /DEFAULT_WIDGET_ORDER: DashboardWidgetKey\[\] = \[([^\]]+)\]/.exec(prefs)
 const keys = order ? [...order[1].matchAll(/'(\w+)'/g)].map((m) => m[1]) : []

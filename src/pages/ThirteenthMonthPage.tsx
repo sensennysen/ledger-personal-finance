@@ -218,9 +218,11 @@ export default function ThirteenthMonthPage() {
         <p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p>
         {showSkeleton
           ? <p className="text-[40px] leading-tight mt-3"><SkeletonText className="w-40" /></p>
-          : <p className="money text-[40px] leading-tight mt-3">{formatCurrency(thirteenthMonthPay, currency)}</p>
+          : picksUnavailable
+            ? <p className="text-[40px] leading-tight mt-3" aria-label="No estimate">—</p>
+            : <p className="money text-[40px] leading-tight mt-3">{formatCurrency(thirteenthMonthPay, currency)}</p>
         }
-        <p className="text-sm mt-3">{formatCurrency(totalIncluded, currency)} basic salary ÷ 12</p>
+        {!picksUnavailable && <p className="text-sm mt-3">{formatCurrency(totalIncluded, currency)} basic salary ÷ 12</p>}
         {showSkeleton ? (
           <p className="text-xs mt-1"><SkeletonText className="w-48" /></p>
         ) : (
@@ -254,7 +256,7 @@ export default function ThirteenthMonthPage() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={salaryFlagsUnavailable}
+                disabled={salaryFlagsUnavailable || picksUnavailable}
                 onClick={() => updateIncluded(salaryOnlySelection(transactions, salaryCategoryIds))}
               >
                 Auto-select salary only
@@ -262,11 +264,12 @@ export default function ThirteenthMonthPage() {
               <Button
                 variant="ghost"
                 size="sm"
+                disabled={picksUnavailable}
                 onClick={() => updateIncluded(new Set(transactions.map((t) => t.id)))}
               >
                 Select all
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => updateIncluded(new Set())}>
+              <Button variant="ghost" size="sm" disabled={picksUnavailable} onClick={() => updateIncluded(new Set())}>
                 Clear
               </Button>
             </div>
@@ -356,6 +359,7 @@ export default function ThirteenthMonthPage() {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); toggleMonth(txs) }}
+                        disabled={picksUnavailable}
                         className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
                         title={allOn ? 'Deselect all in month' : 'Select all in month'}
                       >
@@ -403,6 +407,7 @@ export default function ThirteenthMonthPage() {
                                 type="checkbox"
                               checked={isOn}
                                 onChange={() => toggleTx(tx.id)}
+                                disabled={picksUnavailable}
                                 className="w-4 h-4 accent-primary rounded shrink-0"
                               />
                               <div className="flex-1 min-w-0">

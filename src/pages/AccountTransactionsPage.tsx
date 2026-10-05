@@ -40,6 +40,8 @@ import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
 import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
 import { usePreferences } from '@/hooks/usePreferences'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
+import { useLocalDate } from '@/hooks/useLocalDate'
+import { countsYet } from '@/lib/countsYet'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { dateSpan, effectiveDensity, groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
@@ -238,6 +240,8 @@ export default function AccountTransactionsPage() {
 
   // Result bar (LED-61): the sum is relative to this account, the range spans its history.
   const matchSum = useMemo(() => sumByCurrency(filtered, accountId), [filtered, accountId])
+  const today = useLocalDate()
+  const matchScheduled = useMemo(() => filtered.filter((tx) => !countsYet(tx.date, today)).length, [filtered, today])
   const historyRange = useMemo(() => {
     const span = dateSpan(accountTransactions)
     if (!span) return null
@@ -264,7 +268,6 @@ export default function AccountTransactionsPage() {
 
   const currency = account?.currency ?? profile?.default_currency ?? 'USD'
   // The stored balance already holds rows dated after today; say how much beside it (LED-251).
-  const today = getLocalDateString()
   const scheduledDelta = useMemo(
     () => (accountId ? scheduledByAccount(accounts, transactions, today).get(accountId) ?? 0 : 0),
     [accounts, transactions, today, accountId],
@@ -822,6 +825,7 @@ export default function AccountTransactionsPage() {
                 totalLabel="on this account"
                 rangeLabel={historyRange}
                 sum={matchSum}
+                scheduledCount={matchScheduled}
                 sort={sort}
                 onSortChange={(next) => setSort(next as TxSort)}
                 density={density}

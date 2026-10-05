@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { countsYet, countedEnd, splitCounted, scheduledIn } from '../src/lib/countsYet.ts'
+import { countsYet, countedEnd, splitCounted, scheduledIn, msUntilNextLocalMidnight, scheduledSumNote } from '../src/lib/countsYet.ts'
 
 test('a row counts on its date and before, not after', () => {
   assert.equal(countsYet('2026-10-04', '2026-10-04'), true)
@@ -47,4 +47,17 @@ test('scheduledIn takes only rows after today within the range', () => {
   const rows = [{ date: '2026-10-01' }, { date: '2026-10-09' }, { date: '2026-10-30' }]
   assert.deepEqual(scheduledIn(rows, '2026-09-25', '2026-10-24', '2026-10-04').map((r) => r.date), ['2026-10-09'])
   assert.deepEqual(scheduledIn(rows, '2026-08-25', '2026-09-24', '2026-10-04'), [])
+})
+
+test('the next local midnight is when today changes', () => {
+  assert.equal(msUntilNextLocalMidnight(new Date(2026, 9, 5, 23, 59, 0)), 60_000)
+  assert.equal(msUntilNextLocalMidnight(new Date(2026, 9, 5, 0, 0, 0)), 24 * 60 * 60 * 1000)
+  // Month end rolls into the next month.
+  assert.equal(msUntilNextLocalMidnight(new Date(2026, 9, 31, 12, 0, 0)), 12 * 60 * 60 * 1000)
+})
+
+test('the Sum notes scheduled rows only when there are some', () => {
+  assert.equal(scheduledSumNote(0), null)
+  assert.equal(scheduledSumNote(1), 'incl. 1 scheduled')
+  assert.equal(scheduledSumNote(3), 'incl. 3 scheduled')
 })

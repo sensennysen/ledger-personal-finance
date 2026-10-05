@@ -76,6 +76,11 @@ interface SearchPaletteProps {
   currentAccount?: { id: string; name: string } | null
 }
 
+/** "1 more transaction", "3 more amounts": the palette's hand-off row, read aloud as its name (LED-179). */
+function moreLabel(count: number, noun: string): string {
+  return `${count} more ${noun}${count === 1 ? '' : 's'}`
+}
+
 // The body mounts only while the palette is open, so its data hooks do not
 // run (or refetch) until someone searches.
 export function SearchPalette({
@@ -277,6 +282,7 @@ function SearchBody({
               setNavigated(false)
             }}
             placeholder="Search…"
+            aria-label="Search"
           />
           {query && (
             <button
@@ -298,6 +304,7 @@ function SearchBody({
             setNavigated(false)
           }}
           placeholder="Search transactions, accounts, categories — or type a command"
+          aria-label="Search"
         />
       )}
       {!isEmptyQuery && (
@@ -504,7 +511,7 @@ function SearchBody({
                     <CommandItem value={`more:${id}`} onSelect={() => go(handoff.path)}>
                       <span className="text-muted-foreground">
                         {handoff.complete
-                          ? `${group.total - group.items.length} more ${id === 'text' ? 'transactions' : 'amounts'}`
+                          ? moreLabel(group.total - group.items.length, id === 'text' ? 'transaction' : 'amount')
                           : handoff.label}
                       </span>
                       <ArrowRight className="ml-auto size-4 text-muted-foreground" />

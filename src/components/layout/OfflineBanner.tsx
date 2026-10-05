@@ -28,7 +28,7 @@ export function OfflineBanner({
         <AlertTriangle className="size-4 shrink-0" />
         {flaggedCount} change{flaggedCount !== 1 ? 's' : ''}{' '}
         {failedCount === flaggedCount ? "couldn't be saved and" : "didn't sync and"} need
-        {flaggedCount === 1 ? 's' : ''} your review
+        {flaggedCount === 1 ? 's' : ''} your review{' '}
         <button type="button" onClick={onReview} className="underline underline-offset-2 font-semibold">
           Review
         </button>
@@ -67,7 +67,7 @@ export function OfflineBanner({
       {isOnline && !isSyncing && pendingCount > 0 && (
         <>
           <Clock className="size-4 shrink-0" aria-hidden />
-          Back online — {pendingCount} change{pendingCount !== 1 ? 's' : ''} still queued
+          Back online — {pendingCount} change{pendingCount !== 1 ? 's' : ''} still queued{' '}
           <button
             type="button"
             onClick={() => void syncNow()}

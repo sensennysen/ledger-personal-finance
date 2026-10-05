@@ -28,17 +28,20 @@ export function QueueReviewSheet({
   open,
   onOpenChange,
   status,
+  finalFocus,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   status: ReturnType<typeof useNetworkStatus>
+  /** Where focus goes on close; the opener (the banner's Review) may be gone by then. */
+  finalFocus?: () => HTMLElement | boolean
 }) {
   const { isSyncing, pendingCount, flaggedCount, syncNow, resolve, retry, refreshCount } = status
   const items = open ? listQueue() : []
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="data-[side=right]:w-full">
+      <SheetContent side="right" className="data-[side=right]:w-full" finalFocus={finalFocus}>
         <SheetHeader>
           <SheetTitle>Waiting to sync</SheetTitle>
           <SheetDescription>
@@ -52,6 +55,8 @@ export function QueueReviewSheet({
           )}
           {items.map((item) => {
             const Icon = item.status ? AlertTriangle : item.operation === 'insert' ? Plus : Pencil
+            // Each item's buttons carry its title, so a list of them is not a run of identical "Discard" (LED-179).
+            const title = itemTitle(item)
             return (
               <li key={item.id} className="flex items-center gap-3 border-t py-3 max-sm:flex-wrap max-sm:gap-y-2">
                 <span
@@ -65,7 +70,7 @@ export function QueueReviewSheet({
                   <Icon className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1 max-sm:basis-[calc(100%-2.75rem)]">
-                  <span className="block truncate text-sm font-medium">{itemTitle(item)}</span>
+                  <span className="block truncate text-sm font-medium">{title}</span>
                   <span className="block text-xs text-muted-foreground">
                     {itemNote(item)} · {age(item.timestamp)}
                   </span>
@@ -80,21 +85,21 @@ export function QueueReviewSheet({
                 </span>
                 {item.status === 'failed' && (
                   <span className="flex shrink-0 gap-2 max-sm:ml-11">
-                    <Button size="sm" variant="outline" disabled={isSyncing} onClick={() => resolve(item.id, 'theirs')}>
+                    <Button size="sm" variant="outline" disabled={isSyncing} aria-label={`Discard ${title}`} onClick={() => resolve(item.id, 'theirs')}>
                       Discard
                     </Button>
-                    <Button size="sm" disabled={isSyncing} onClick={() => retry(item.id)}>
+                    <Button size="sm" disabled={isSyncing} aria-label={`Retry ${title}`} onClick={() => retry(item.id)}>
                       Retry
                     </Button>
                   </span>
                 )}
                 {item.status && item.status !== 'failed' && (
                   <span className="flex shrink-0 gap-2 max-sm:ml-11">
-                    <Button size="sm" variant="outline" disabled={isSyncing} onClick={() => resolve(item.id, 'theirs')}>
+                    <Button size="sm" variant="outline" disabled={isSyncing} aria-label={`${canKeepMine(item) ? 'Keep theirs' : 'Discard'} ${title}`} onClick={() => resolve(item.id, 'theirs')}>
                       {canKeepMine(item) ? 'Keep theirs' : 'Discard'}
                     </Button>
                     {canKeepMine(item) && (
-                      <Button size="sm" disabled={isSyncing} onClick={() => resolve(item.id, 'mine')}>
+                      <Button size="sm" disabled={isSyncing} aria-label={`Keep mine ${title}`} onClick={() => resolve(item.id, 'mine')}>
                         Keep mine
                       </Button>
                     )}

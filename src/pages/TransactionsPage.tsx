@@ -584,7 +584,7 @@ export default function TransactionsPage() {
               )}
             </Button>
             <Tabs value={filterType} onValueChange={setFilterType} className="hidden w-auto sm:block">
-              <TabsList className="w-full group-data-horizontal/tabs:h-12 sm:w-auto">
+              <TabsList className="w-full group-data-horizontal/tabs:h-12 sm:w-auto" aria-label="Transaction type">
                 <TabsTrigger value="all" className="flex-1 px-3 sm:flex-none">All</TabsTrigger>
                 <TabsTrigger value="income" className="flex-1 px-3 sm:flex-none">Income</TabsTrigger>
                 <TabsTrigger value="expense" className="flex-1 px-3 sm:flex-none">Expense</TabsTrigger>
@@ -735,7 +735,7 @@ export default function TransactionsPage() {
               <div className="space-y-2">
                 <Label>Transaction type</Label>
                 <Tabs value={filterType} onValueChange={setFilterType}>
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-4" aria-label="Transaction type">
                     <TabsTrigger value="all">All</TabsTrigger>
                     <TabsTrigger value="income">Income</TabsTrigger>
                     <TabsTrigger value="expense">Expense</TabsTrigger>

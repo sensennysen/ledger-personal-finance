@@ -196,8 +196,10 @@ function CommandShortcut({
   ...props
 }: React.ComponentProps<"span">) {
   return (
+    // A visual hint only: read with the option it would run as "New incomeI" (LED-179).
     <span
       data-slot="command-shortcut"
+      aria-hidden="true"
       className={cn(
         "ml-auto text-xs tracking-widest text-muted-foreground group-data-selected/command-item:text-foreground",
         className

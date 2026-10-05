@@ -2,8 +2,10 @@ import { LegalLink, LegalPage, LegalPageLink, LegalSections } from '@/components
 import { LEDGER_ISSUES_URL, legalToc, type LegalSection } from '@/lib/legalSections'
 
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). Every statement
-// is checked against the code: tests/legalPages.test.mjs ties the hosts to the CSP.
-const LAST_UPDATED = 'October 3, 2026'
+// is checked against the code: tests/legalPages.test.mjs ties the hosts to the CSP. The LED-257 and
+// LED-258 additions (saved transaction templates, error reports) are drafts the owner reviews in the
+// epic-22 pull request.
+const LAST_UPDATED = 'October 5, 2026'
 
 const sections: LegalSection[] = [
   {
@@ -12,6 +14,7 @@ const sections: LegalSection[] = [
       'Your name, email address and profile picture link, received from Google when you sign in.',
       'The records you enter: accounts and their balances; transactions, with their notes, tags and receipt images; categories and subcategories; budgets; savings goals; loans and financed purchases; credit card payments; auto-categorisation rules; saved filters; saved transaction templates; and the exchange rates Ledger fetched or you typed.',
       'Your settings: default currency, pay cycle, budget deficit setting, rate refresh schedule and Home widget order.',
+      'When something in the app fails while you are signed in, an error report: what failed, with numbers, quoted text and ids taken out; the page’s path; the app version; and your browser’s name and version. It never includes your amounts, names, descriptions or notes. Only the operator can read these reports.',
       'Ledger collects no analytics and no usage data, and shows no ads.',
     ],
   },

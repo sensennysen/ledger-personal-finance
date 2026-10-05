@@ -52,6 +52,7 @@ Epic 22 (branch `epic-22`) adds the files below. They reach the hosted database 
 | Migration | Ticket | If it is missing |
 |---|---|---|
 | `20261005100000_transaction_templates` | LED-257 | Activity's templates fail to load and to save (`transaction_templates` does not exist); the old browser copy stays where it is, so nothing is lost. |
+| `20261005110000_error_events` | LED-258 | Error reports are not stored (the insert fails and is only logged to the console); nothing the user sees breaks. |
 
 When this list grows: add the row in the same commit as the migration, with the client query or call that needs it.
 

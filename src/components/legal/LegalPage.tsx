@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { readingMinutes } from '@/lib/readingTime'
 import { legalSectionId, type LegalSection, type LegalTocItem } from '@/lib/legalSections'
 
 // One document layout for the legal pages (LED-88, design 24a; Cookies and Notices added by LED-189).
@@ -26,10 +27,22 @@ interface LegalPageProps {
   toc: LegalTocItem[]
   /** Rendered in the rail at xl, and above the document below it. */
   aside?: ReactNode
+  /** Show "N minute read" beside the date, counted from the title, intro and body (LED-142, 24a). */
+  readingTime?: boolean
   children: ReactNode
 }
 
-export function LegalPage({ current, title, intro, lastUpdated, toc, aside, children }: LegalPageProps) {
+export function LegalPage({ current, title, intro, lastUpdated, toc, aside, readingTime = false, children }: LegalPageProps) {
+  const headRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [minutes, setMinutes] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    if (!readingTime) return
+    // The "On this page" chips and the date line sit inside the head block; they are not reading.
+    const head = headRef.current?.cloneNode(true) as HTMLElement | undefined
+    head?.querySelectorAll('nav, [data-legal-meta]').forEach((node) => node.remove())
+    setMinutes(readingMinutes(`${head?.textContent ?? ''} ${bodyRef.current?.textContent ?? ''}`))
+  }, [readingTime, title, intro, children])
   return (
     <div className="min-h-dvh bg-background">
       <header className="border-b border-border/60">
@@ -71,10 +84,11 @@ export function LegalPage({ current, title, intro, lastUpdated, toc, aside, chil
           'xl:[grid-template-areas:"head_rail"_"body_rail"]',
         )}
       >
-        <div className="max-w-[58ch] [grid-area:head]">
+        <div ref={headRef} className="max-w-[58ch] [grid-area:head]">
           <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{title}</h1>
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p data-legal-meta className="mt-3 text-sm text-muted-foreground">
             Last updated <span className="font-medium text-foreground">{lastUpdated}</span>
+            {minutes !== null && <> · {minutes} minute read</>}
           </p>
           {intro && <div className="mt-4 leading-relaxed text-muted-foreground">{intro}</div>}
           {toc.length > 0 && (
@@ -117,7 +131,7 @@ export function LegalPage({ current, title, intro, lastUpdated, toc, aside, chil
           </aside>
         )}
 
-        <article className="max-w-[58ch] [grid-area:body]">
+        <article ref={bodyRef} className="max-w-[58ch] [grid-area:body]">
           {children}
           <footer className="mt-14 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border/60 pt-6 text-xs text-muted-foreground">
             <span>© {new Date().getFullYear()} Ledger</span>

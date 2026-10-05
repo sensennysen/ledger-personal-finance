@@ -3,8 +3,9 @@ import { LegalPage } from '@/components/legal/LegalPage'
 import { ExportDataCard } from '@/components/legal/ExportDataCard'
 import { cn } from '@/lib/utils'
 
-// Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5).
-const LAST_UPDATED = 'October 3, 2026'
+// Wording approved by the product owner before commit (LED-189, OD-9; step 02 and the reading time,
+// LED-142, 2026-10-05; rule OD-5).
+const LAST_UPDATED = 'October 5, 2026'
 
 const dataItems = [
   'Your name, email address and profile picture link, from Google at sign-in.',
@@ -27,7 +28,7 @@ const steps = [
   {
     number: '02',
     heading: 'Open Settings',
-    body: 'On a phone, tap your initials at the top and choose Settings. On a tablet or computer, click the gear icon at the top right.',
+    body: 'On a computer or tablet, click the gear icon at the top right. On a phone, tap your initials at the top and choose “All settings”, or open More and choose Settings. You can also press ⌘K (Ctrl+K on Windows) and search for Settings.',
   },
   {
     number: '03',
@@ -54,6 +55,7 @@ export default function DataDeletionPage() {
       current="data-deletion"
       title="Data Deletion Instructions"
       lastUpdated={LAST_UPDATED}
+      readingTime
       intro={
         <p>
           You can delete your Ledger account and everything in it yourself, from Settings. No email request is

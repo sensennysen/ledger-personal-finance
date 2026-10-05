@@ -275,6 +275,18 @@
   ::-webkit-scrollbar-thumb:hover {
     background: color-mix(in oklch, var(--foreground) 22%, transparent);
   }
+  /* WebKit's native date control has its own minimum width and ignores w-full, so on iOS it
+     runs past its container (LED-253). Drop the native box; the picker still opens on tap. */
+  input[type="date"],
+  input[type="time"],
+  input[type="month"],
+  input[type="datetime-local"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input::-webkit-date-and-time-value {
+    text-align: left;
+  }
 }
 
 /* Shared Material surfaces and safe-area aware mobile sheets. */

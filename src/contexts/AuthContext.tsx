@@ -12,6 +12,7 @@ import {
   readLegacyPreferences,
   type Preferences,
 } from '@/lib/preferences'
+import { forgetLegacyFirstRun, legacyFirstRunUpload, readLegacyFirstRun } from '@/lib/firstRun'
 import { forgetLegacyDashboardKeys, hasLegacyDashboardKeys, legacyHiddenUpload, readLegacyWidgets } from '@/lib/dashboardLayout'
 import { clearPendingReceipts } from '@/lib/receiptStore'
 import { removeUserReceipts } from '@/lib/receiptCleanup'
@@ -170,6 +171,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         forgetLegacyDashboardKeys()
       }
     }
+
+    // LED-265: the setup checklist. Each column is set only while it is still null.
+    const legacyFirstRun = readLegacyFirstRun()
+    if (legacyFirstRun !== null) {
+      const upload = legacyFirstRunUpload(legacyFirstRun, data, new Date().toISOString())
+      let failure: string | null = null
+      for (const [column, value] of Object.entries(upload)) {
+        const { data: stored, error } = await supabase
+          .from('profiles')
+          .update({ [column]: value })
+          .eq('id', data.id)
+          .is(column, null)
+          .select(column)
+        if (error) failure = error.message
+        else if (stored && stored.length > 0) moved = { ...moved, [column]: value }
+      }
+      if (failure !== null) {
+        console.error('Failed to move the setup checklist to the account:', failure)
+        setAuthError(makeAuthError('settings', failure))
+      } else {
+        forgetLegacyFirstRun()
+      }
+    }
     return moved
   }
 
@@ -281,6 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     forgetLegacyTemplates()
     forgetLegacyPreferences()
     forgetLegacyDashboardKeys()
+    forgetLegacyFirstRun()
     forgetPendingSettings()
     clearOfflineQueue()
     try {
@@ -309,6 +334,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     forgetLegacyTemplates()
     forgetLegacyPreferences()
     forgetLegacyDashboardKeys()
+    forgetLegacyFirstRun()
     forgetPendingSettings()
     clearOfflineQueue()
     try {

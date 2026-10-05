@@ -21,6 +21,10 @@ function siteMeta(siteUrl: string | null): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
+  // The commit an error report names (LED-258). Vercel sets VERCEL_GIT_COMMIT_SHA on every build.
+  define: {
+    'import.meta.env.VITE_RELEASE': JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'local'),
+  },
   server: {
     host: '127.0.0.1',
   },

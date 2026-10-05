@@ -4,7 +4,8 @@ import { ExportDataCard } from '@/components/legal/ExportDataCard'
 import { cn } from '@/lib/utils'
 
 // Wording approved by the product owner before commit (LED-189, OD-9; step 02 and the reading time,
-// LED-142, 2026-10-05; rule OD-5).
+// LED-142, 2026-10-05; rule OD-5). The error reports line (LED-258) is a draft the owner reviews in
+// the epic-22 pull request.
 const LAST_UPDATED = 'October 5, 2026'
 
 const dataItems = [
@@ -16,6 +17,7 @@ const dataItems = [
   'Savings goals, loans and financed purchases with their payment allocations, and credit card payments.',
   'Auto-categorisation rules, saved filters and saved transaction templates.',
   'Exchange rates Ledger fetched or you typed.',
+  'Error reports the app sent when something failed for you.',
   'Your settings: default currency, pay cycle, deficit setting, rate schedule and Home widget order.',
 ]
 

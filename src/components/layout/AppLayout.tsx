@@ -37,6 +37,7 @@ import { useCardPayment } from '@/hooks/useCardPayment'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
 import { isNavUnlocked } from '@/lib/firstRunChecklist'
+import { recurringRunNotice } from '@/lib/recurringTransactions'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { NetworkStatusProvider } from '@/contexts/NetworkStatusContext'
 import { ExchangeRatesProvider } from '@/contexts/ExchangeRatesContext'
@@ -224,16 +225,12 @@ function LayoutShell() {
   useEffect(() => {
     if (hasGenerated.current) return
     hasGenerated.current = true
-    // A recurring row that could not be posted is reported, with Retry, not skipped silently (LED-232).
+    // A recurring row that could not be posted, or a failed read of them, is reported with Retry,
+    // not skipped silently (LED-232).
     const run = async () => {
-      const { failed } = await generateDueRecurring(recordGenerated)
-      if (failed === 0) return
-      notify({
-        severity: 'failure',
-        title: 'Recurring transactions not posted',
-        body: `${failed} recurring ${failed === 1 ? 'transaction is' : 'transactions are'} due but could not be posted.`,
-        action: { label: 'Retry', run: () => void run() },
-      })
+      const notice = recurringRunNotice(await generateDueRecurring(recordGenerated))
+      if (!notice) return
+      notify({ severity: 'failure', ...notice, action: { label: 'Retry', run: () => void run() } })
     }
     void run()
   }, [generateDueRecurring, recordGenerated, notify])

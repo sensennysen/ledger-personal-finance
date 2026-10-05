@@ -36,3 +36,21 @@ test('each interval steps from the row date', () => {
 test('a month-end row keeps the date the generator has always posted (Jan 31 + 1 month = Mar 3)', () => {
   assert.equal(dueRecurringPosts([row({ date: '2026-01-31' })], '2026-10-03')[0].date, '2026-03-03')
 })
+
+import { recurringRunNotice } from '../src/lib/recurringTransactions.ts'
+
+test('a clean run reports nothing', () => {
+  assert.equal(recurringRunNotice({ posted: 2, failed: 0 }), null)
+  assert.equal(recurringRunNotice({ posted: 0, failed: 0 }), null)
+})
+
+test('a failed read is reported, not taken as nothing due', () => {
+  const notice = recurringRunNotice({ posted: 0, failed: 0, readFailed: true })
+  assert.equal(notice.title, "Couldn't check recurring transactions")
+  assert.match(notice.body, /nothing due was posted/)
+})
+
+test('failed posts are counted, singular and plural', () => {
+  assert.match(recurringRunNotice({ posted: 0, failed: 1 }).body, /^1 recurring transaction is due/)
+  assert.match(recurringRunNotice({ posted: 1, failed: 3 }).body, /^3 recurring transactions are due/)
+})

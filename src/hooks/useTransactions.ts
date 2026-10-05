@@ -14,7 +14,7 @@ import {
   registerTransactionsListener,
 } from '@/lib/cacheEvents'
 import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/lib/splitState'
-import { dueRecurringPosts } from '@/lib/recurringTransactions'
+import { dueRecurringPosts, type RecurringRun } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
 import { generatedCardPayment } from '@/lib/cardPayment'
 import type { Transaction, Account, Category } from '@/types'
@@ -35,10 +35,9 @@ import { describeDataError, toResult, type DescribedError, type MutationResult }
 
 // ---------- hook ----------
 
-/** What a generated card payment hands back so the statement steps can run (LED-190). */
-/** What one run of the recurring generator did: rows it posted, and reads or posts that failed. */
-export type RecurringRun = { posted: number; failed: number }
+export type { RecurringRun }
 
+/** What a generated card payment hands back so the statement steps can run (LED-190). */
 export type CardPaymentHandler = (payment: { card: Account; amount: number; date: string; transactionId: string }) => Promise<void>
 
 export interface UseTransactionsOptions {
@@ -406,7 +405,8 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         .range(from, to),
     )
     // A failed read means nothing is known to be due, and a partial list would skip series.
-    if (recurringError) return { posted: 0, failed: 0 }
+    // Say so: the caller reports it rather than treating it as "nothing due".
+    if (recurringError) return { posted: 0, failed: 0, readFailed: true }
 
     let posted = 0
     let failed = 0

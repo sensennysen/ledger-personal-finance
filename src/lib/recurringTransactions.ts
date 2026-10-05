@@ -78,3 +78,24 @@ export function dueRecurringPosts<T extends RecurringSource>(rows: T[], today: s
   }
   return due
 }
+
+/** What one run of the recurring generator did: rows it posted, posts that failed, and whether the read of due rows failed. */
+export type RecurringRun = { posted: number; failed: number; readFailed?: boolean }
+
+/**
+ * The notice for a generator run, or null when there is nothing to report. A failed read is not
+ * "nothing due": the user hears about it (AGENTS.md: sync failures are surfaced).
+ */
+export function recurringRunNotice(run: RecurringRun): { title: string; body: string } | null {
+  if (run.readFailed) {
+    return {
+      title: "Couldn't check recurring transactions",
+      body: 'Ledger could not read your recurring transactions, so nothing due was posted.',
+    }
+  }
+  if (run.failed === 0) return null
+  return {
+    title: 'Recurring transactions not posted',
+    body: `${run.failed} recurring ${run.failed === 1 ? 'transaction is' : 'transactions are'} due but could not be posted.`,
+  }
+}

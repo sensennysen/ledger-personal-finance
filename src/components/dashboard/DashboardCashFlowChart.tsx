@@ -49,7 +49,7 @@ export function DashboardCashFlowChart({
           subtitle={`Income vs expenses ending ${monthLabel}`}
           action={(
             <Tabs value={chartPeriod} onValueChange={(value) => setChartPeriod(value as DashboardChartPeriod)}>
-              <TabsList className="h-8 w-full sm:w-auto">
+              <TabsList className="h-8 w-full sm:w-auto" aria-label="Cash flow period">
                 <TabsTrigger value="week" className="text-xs flex-1 sm:flex-none px-3">Weekly</TabsTrigger>
                 <TabsTrigger value="month" className="text-xs flex-1 sm:flex-none px-3">Daily</TabsTrigger>
                 <TabsTrigger value="quarterly" className="text-xs flex-1 sm:flex-none px-3">3 months</TabsTrigger>

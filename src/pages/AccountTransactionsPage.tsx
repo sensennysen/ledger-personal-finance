@@ -571,7 +571,7 @@ export default function AccountTransactionsPage() {
 
         {account?.type === 'loan' && (
           <Tabs value={loanSection} onValueChange={(value) => setLoanSection(value as typeof loanSection)}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-3" aria-label="Loan sections">
               <TabsTrigger value="summary">Summary</TabsTrigger>
               <TabsTrigger value="purchases">Purchases</TabsTrigger>
               <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -768,7 +768,7 @@ export default function AccountTransactionsPage() {
             />
           </div>
           <Tabs value={filterType} onValueChange={setFilterType} className="w-full sm:w-auto">
-            <TabsList className="w-full sm:w-auto">
+            <TabsList className="w-full sm:w-auto" aria-label="Transaction type">
               <TabsTrigger value="all" className="flex-1 sm:flex-none">All</TabsTrigger>
               <TabsTrigger value="income" className="flex-1 sm:flex-none">Income</TabsTrigger>
               <TabsTrigger value="expense" className="flex-1 sm:flex-none">Expense</TabsTrigger>

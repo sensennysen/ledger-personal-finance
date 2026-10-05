@@ -667,7 +667,7 @@ export default function ReportsPage() {
       <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
         <PageActions>
           <div className="flex w-full flex-wrap items-center justify-between gap-2 md:w-auto md:flex-nowrap">
-            <TabsList className="h-8">
+            <TabsList className="h-8" aria-label="Reports view">
               <TabsTrigger value="overview" className="text-xs h-7 px-3">Overview</TabsTrigger>
               <TabsTrigger value="analytics" className="text-xs h-7 px-3">Analytics</TabsTrigger>
             </TabsList>

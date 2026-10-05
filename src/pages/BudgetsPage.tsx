@@ -1330,7 +1330,7 @@ export default function BudgetsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <TabsList className="grid w-full max-w-xs grid-cols-2">
+          <TabsList className="grid w-full max-w-xs grid-cols-2" aria-label="Budgets and goals">
             <TabsTrigger value="budgets" className="gap-1.5">
               <Target className="w-3.5 h-3.5" />Budgets
             </TabsTrigger>

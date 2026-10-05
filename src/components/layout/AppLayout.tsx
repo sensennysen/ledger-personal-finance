@@ -131,6 +131,7 @@ function LayoutShell() {
     actions?: EntryActions
   } | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const reviewTrigger = useRef<HTMLElement | null>(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const [fabHidden, setFabHidden] = useState(false)
   // Phones jump months from the cycle dates under the header (M-04). Built
@@ -349,8 +350,26 @@ function LayoutShell() {
         />
         <div className="flex flex-1 min-h-0 min-w-0">
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <OfflineBanner status={networkStatus} onReview={() => setReviewOpen(true)} />
-          <QueueReviewSheet open={reviewOpen} onOpenChange={setReviewOpen} status={networkStatus} />
+          <OfflineBanner
+            status={networkStatus}
+            onReview={() => {
+              reviewTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+              setReviewOpen(true)
+            }}
+          />
+          <QueueReviewSheet
+            open={reviewOpen}
+            onOpenChange={setReviewOpen}
+            status={networkStatus}
+            // Resolving the last flagged item removes the banner and its Review button. Focus the
+            // main region then, as the skip link does: handed `main`, base-ui would move on to its
+            // first field, which on a phone opens the keyboard (LED-179).
+            finalFocus={() => {
+              if (reviewTrigger.current?.isConnected) return reviewTrigger.current
+              requestAnimationFrame(() => mainRef.current?.focus())
+              return false
+            }}
+          />
           {authError && (
             <div className="shrink-0 px-4 pt-3 md:px-6">
               <InlineLoadError

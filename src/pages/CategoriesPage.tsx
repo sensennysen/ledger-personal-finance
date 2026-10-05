@@ -1070,10 +1070,10 @@ export default function CategoriesPage() {
         <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start xl:gap-6" aria-busy="true" aria-label="Loading categories">
           <div>
             <Tabs value="expense">
-              <TabsList className="w-full">
+              <TabsList className="w-full" aria-label="Category type">
                 {['Expenses', 'Income', 'Unused'].map((label) => (
                   <TabsTrigger key={label} value={label === 'Expenses' ? 'expense' : label.toLowerCase()} disabled className="flex-1">
-                    {label}
+                    {label}{' '}
                     <Badge variant="secondary" className="ml-2 text-xs">…</Badge>
                   </TabsTrigger>
                 ))}
@@ -1109,17 +1109,17 @@ export default function CategoriesPage() {
       ) : (
         <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start xl:gap-6">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'expense' | 'income' | 'unused')}>
-          <TabsList className="w-full">
+          <TabsList className="w-full" aria-label="Category type">
             <TabsTrigger value="expense" className="flex-1">
-              Expenses
+              Expenses{' '}
               <Badge variant="secondary" className="ml-2 text-xs">{expenseCategories.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="income" className="flex-1">
-              Income
+              Income{' '}
               <Badge variant="secondary" className="ml-2 text-xs">{incomeCategories.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="unused" className="flex-1">
-              Unused
+              Unused{' '}
               <Badge variant="secondary" className="ml-2 text-xs tabular-nums">
                 {unusedIds ? unusedCategories.length : usageData.loading ? '…' : '—'}
               </Badge>

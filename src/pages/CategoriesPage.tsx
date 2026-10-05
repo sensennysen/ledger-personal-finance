@@ -316,6 +316,7 @@ function SubcategoryPanel({
   currency?: string
 }) {
   const { subcategories, loading, createSubcategory, updateSubcategory, deleteSubcategory, updateSubcategoryOrder } = useSubcategories(category.id)
+  const notify = useNotify()
   const [addName, setAddName] = useState('')
   const [addError, setAddError] = useState<FormErrorValue>(null)
   const [adding, setAdding] = useState(false)
@@ -361,7 +362,7 @@ function SubcategoryPanel({
     const name = subcategories.find((sub) => sub.id === movedId)?.name ?? 'Subcategory'
     setAnnouncement(moveAnnouncement(name, nextIds, movedId))
     const { error } = await updateSubcategoryOrder(nextIds)
-    if (error) console.error('Failed to update subcategory order:', error)
+    if (error) notify({ severity: 'failure', title: "Couldn't change the order", body: error })
   }
 
   const reorderSubcategory = (fromId: string, toId: string) => {

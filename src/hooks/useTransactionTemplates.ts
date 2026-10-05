@@ -70,7 +70,8 @@ export function useTransactionTemplates() {
       if (shouldUploadLegacy(upload.length, rows.length)) {
         const { error: uploadError } = await supabase
           .from('transaction_templates')
-          .upsert(upload, { onConflict: 'id', ignoreDuplicates: true })
+          // An old entry without a usable id or date gets the column default, not null.
+          .upsert(upload, { onConflict: 'id', ignoreDuplicates: true, defaultToNull: false })
         if (uploadError) {
           // The key stays, so the next load tries again; the list shows what the account holds.
           uploadFailure = describeDataError(uploadError, { action: 'save', entity: 'template' })

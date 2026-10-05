@@ -479,8 +479,8 @@ function LayoutShell() {
             // Add matches the Activity page's entry dialog; only the account sheet is a bottom sheet.
             className={cn(
               sheet === 'add'
-                ? `max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`
-                : 'max-h-[90dvh] max-w-md overflow-y-auto',
+                ? `max-h-[calc(var(--vv-height,100dvh)-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`
+                : 'max-h-[calc(var(--vv-height,100dvh)*0.9)] max-w-md overflow-y-auto',
               // translate-*-0 drops the dialog's centering translate here: the production
               // minifier folds the CSS's `translate: none` into `transform`, so it can't.
               mobile && sheet === 'account' && 'm3-bottom-sheet translate-x-0 translate-y-0',

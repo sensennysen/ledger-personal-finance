@@ -513,7 +513,7 @@ export default function AccountTransactionsPage() {
             </div>
           )}
           <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setRepaymentPrefill(null) }}>
-              <DialogContent className={`max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(account?.type === 'loan' ? 'loan-repayment' : transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
+              <DialogContent className={`max-h-[calc(var(--vv-height,100dvh)-0.75rem)] ${entryDialogWidthClass(account?.type === 'loan' ? 'loan-repayment' : transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
               <TransactionEntryHeader
                 kind={account?.type === 'loan' ? 'loan-repayment' : transactionKind}
                 title={account?.type === 'loan' ? `Pay ${account.name}` : undefined}
@@ -855,7 +855,7 @@ export default function AccountTransactionsPage() {
 
         {/* Edit dialog */}
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
-          <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+          <DialogContent className="max-h-[calc(var(--vv-height,100dvh)-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
             <TransactionEditHeader type={editingTx?.type ?? 'expense'} toAccountId={editingTx?.to_account_id ?? null} />
             <FormError error={formError} />
             {editingTx && (

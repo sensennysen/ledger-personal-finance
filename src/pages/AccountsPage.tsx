@@ -621,7 +621,7 @@ export default function AccountsPage() {
             <DialogTrigger render={<Button className="gap-2" size="sm" />}>
               <Plus className="w-4 h-4" />Add Account
             </DialogTrigger>
-            <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
+            <DialogContent className="max-h-[calc(var(--vv-height,100dvh)-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
               <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
               <FormError error={formError} />
               <AccountForm onSubmit={handleCreate} onClose={() => { setCreateOpen(false); setFormError(null) }} defaultValues={{ currency: defaultCurrency }} />
@@ -826,7 +826,7 @@ export default function AccountsPage() {
 
       {/* Edit dialog */}
       <Dialog open={!!editAccount} onOpenChange={(o) => { if (!o) { setEditAccount(null); setFormError(null) } }}>
-        <DialogContent className="max-h-[calc(100dvh-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
+        <DialogContent className="max-h-[calc(var(--vv-height,100dvh)-0.75rem)] overflow-y-auto sm:max-h-[90vh]">
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
           <FormError error={formError} />
           {editAccount && (

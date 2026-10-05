@@ -62,9 +62,10 @@ function DialogContent({
         initialFocus={initialFocus ?? focusTitle}
         data-slot="dialog-content"
         // 100vw - 2rem at every width, capped by the dialog's max-w-*: a wide dialog keeps 16px a side
-        // until the viewport outgrows its cap (LED-226).
+        // until the viewport outgrows its cap (LED-226). --vv-* track the visible area while the
+        // iOS keyboard is open, so the dialog and its sticky footer stay above it (LED-252).
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-sm min-w-0 -translate-x-1/2 -translate-y-1/2 gap-4 overflow-x-hidden overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-(--dur-instant) outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-[var(--vv-center,50%)] left-1/2 z-50 grid max-h-[calc(var(--vv-height,100dvh)-2rem)] w-[calc(100vw-2rem)] max-w-sm min-w-0 -translate-x-1/2 -translate-y-1/2 gap-4 overflow-x-hidden overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-(--dur-instant) outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}

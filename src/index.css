@@ -294,7 +294,8 @@
 .settings-grid > [data-slot="card"] { height: 100%; }
 [data-slot="card"] { box-shadow: none; }
 .m3-bottom-sheet {
-  top: auto; bottom: 0; left: 0; width: 100%; max-width: none;
+  /* --vv-bottom lifts the sheet onto the iOS keyboard while it is open (LED-252). */
+  top: auto; bottom: var(--vv-bottom, 0); left: 0; width: 100%; max-width: none;
   transform: none; translate: none; border-radius: 28px 28px 0 0;
   background: var(--elevated); padding: 12px 20px calc(20px + env(safe-area-inset-bottom));
   animation: slide-in-bottom var(--dur-sheet) cubic-bezier(.05,.7,.1,1);

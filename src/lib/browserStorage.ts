@@ -3,6 +3,7 @@
 //
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). Every key below is
 // one the code writes; tests/legalPages.test.mjs fails when a new one appears without a row here.
+// The templates row's LED-257 wording is a draft the owner reviews in the epic-22 pull request.
 
 /**
  * How Settings clears a group on this device. `keys` removes the matching local storage keys;
@@ -111,11 +112,11 @@ export const STORAGE_ROWS: StorageRow[] = [
   },
   {
     id: 'templates',
-    what: 'Saved templates',
+    what: 'Saved templates (older copy)',
     keys: ['ledger_transaction_templates'],
     where: 'local storage',
-    why: 'Transactions you saved as templates',
-    removed: 'When you clear site data',
+    why: 'Templates saved on this browser before they were kept in your account. Ledger copies them to your account the next time you open Activity, then removes them here',
+    removed: 'When they are copied to your account, or when you sign out',
     clear: 'keys',
     match: exactly('ledger_transaction_templates'),
     reload: true,

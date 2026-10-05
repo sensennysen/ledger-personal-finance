@@ -125,7 +125,8 @@ export default function TransactionsPage() {
   }, [handoffKey, setSearchParams])
 
   // ── Templates ─────────────────────────────────────────────
-  const { templates, addTemplate, removeTemplate } = useTransactionTemplates()
+  const { templates, loading: templatesLoading, error: templatesError, refetch: refetchTemplates, addTemplate, removeTemplate } = useTransactionTemplates()
+  const templatesLoadState = resolveLoadState({ loading: templatesLoading, error: templatesError, hasData: templates.length > 0 })
   const { accounts } = useAccounts()
 
   // ── Saved filters (LED-138) ───────────────────────────────
@@ -194,9 +195,31 @@ export default function TransactionsPage() {
     setCreateOpen(true)
   }
 
+  const saveTemplate = async (name: string, values: TransactionFormValues) => {
+    const { error } = await addTemplate(name, values)
+    if (!error) return
+    notify({
+      severity: 'failure',
+      title: `Couldn't save the "${name}" template`,
+      body: error,
+      action: { label: 'Retry', run: () => void saveTemplate(name, values) },
+    })
+  }
+
+  const deleteTemplate = async (id: string, name: string) => {
+    const { error } = await removeTemplate(id)
+    if (!error) return
+    notify({
+      severity: 'failure',
+      title: `Couldn't remove the "${name}" template`,
+      body: error,
+      action: { label: 'Retry', run: () => void deleteTemplate(id, name) },
+    })
+  }
+
   const handleSaveTemplateConfirm = () => {
     if (!templateSourceTx || !templateName.trim()) return
-    addTemplate(templateName.trim(), {
+    void saveTemplate(templateName.trim(), {
       type: templateSourceTx.type,
       account_id: templateSourceTx.account_id,
       to_account_id: templateSourceTx.to_account_id,
@@ -595,6 +618,12 @@ export default function TransactionsPage() {
         )}
 
         {/* Templates strip */}
+        {(templatesLoadState === 'error' || templatesLoadState === 'stale-error') && (
+          <InlineLoadError
+            message={templatesLoadState === 'stale-error' ? `Couldn't refresh your templates. ${templatesError}` : `Couldn't load your templates. ${templatesError}`}
+            onRetry={() => void refetchTemplates()}
+          />
+        )}
         {templates.length > 0 && (
           <div className="space-y-1.5">
             <button
@@ -625,7 +654,7 @@ export default function TransactionsPage() {
                   <button
                     type="button"
                     className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-muted border border-border text-muted-foreground hover:text-destructive"
-                    onClick={(e) => { e.stopPropagation(); removeTemplate(tmpl.id) }}
+                    onClick={(e) => { e.stopPropagation(); void deleteTemplate(tmpl.id, tmpl.name) }}
                     aria-label={`Remove ${tmpl.name} template`}
                   >
                     <X className="w-2.5 h-2.5" />

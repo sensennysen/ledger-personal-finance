@@ -14,7 +14,7 @@ const dataItems = [
   'Receipt images you attached.',
   'Categories, subcategories and budgets.',
   'Savings goals, loans and financed purchases with their payment allocations, and credit card payments.',
-  'Auto-categorisation rules and saved filters.',
+  'Auto-categorisation rules, saved filters and saved transaction templates.',
   'Exchange rates Ledger fetched or you typed.',
   'Your settings: default currency, pay cycle, deficit setting, rate schedule and Home widget order.',
 ]

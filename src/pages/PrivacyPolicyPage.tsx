@@ -10,7 +10,7 @@ const sections: LegalSection[] = [
     title: '1. What Ledger stores',
     content: [
       'Your name, email address and profile picture link, received from Google when you sign in.',
-      'The records you enter: accounts and their balances; transactions, with their notes, tags and receipt images; categories and subcategories; budgets; savings goals; loans and financed purchases; credit card payments; auto-categorisation rules; saved filters; and the exchange rates Ledger fetched or you typed.',
+      'The records you enter: accounts and their balances; transactions, with their notes, tags and receipt images; categories and subcategories; budgets; savings goals; loans and financed purchases; credit card payments; auto-categorisation rules; saved filters; saved transaction templates; and the exchange rates Ledger fetched or you typed.',
       'Your settings: default currency, pay cycle, budget deficit setting, rate refresh schedule and Home widget order.',
       'Ledger collects no analytics and no usage data, and shows no ads.',
     ],

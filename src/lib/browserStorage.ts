@@ -3,8 +3,9 @@
 //
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). Every key below is
 // one the code writes; tests/legalPages.test.mjs fails when a new one appears without a row here.
-// The wording of the rows moved to the account in epic 22 (templates, preferences, Home layout, setup
-// checklist, card reminders, 13th month picks) is a draft the owner reviews in the epic-22 pull request.
+// The rows for settings moved to the account (LED-263 to LED-268: preferences, Home layout, setup
+// checklist, card reminders, 13th month picks) were approved by the owner on 2026-10-06. The templates
+// row (LED-257) is still a draft the owner reviews in the epic-22 pull request.
 
 /**
  * How Settings clears a group on this device. `keys` removes the matching local storage keys;
@@ -128,7 +129,7 @@ export const STORAGE_ROWS: StorageRow[] = [
     keys: ['<your id>:cc-notifs-sent'],
     where: 'local storage',
     why: 'The card reminders this browser showed before they were kept in your account. Ledger copies them to your account the next time it checks your cards, then removes them here',
-    removed: 'When they are copied to your account, or when you clear site data',
+    removed: 'When they are copied to your account, or when you sign out',
     clear: 'keys',
     match: (key, userId) => userId !== null && key === `${userId}:cc-notifs-sent`,
   },
@@ -138,7 +139,7 @@ export const STORAGE_ROWS: StorageRow[] = [
     keys: ['13th-month-selection:<your id>:<year>'],
     where: 'local storage',
     why: 'The transactions you picked for the estimate on this browser before they were kept in your account. Ledger copies them to your account the next time you open 13th Month Pay, then removes them here',
-    removed: 'When they are copied to your account, or when you clear site data',
+    removed: 'When they are copied to your account, or when you sign out',
     clear: 'keys',
     match: (key, userId) => userId !== null && key.startsWith(`13th-month-selection:${userId}:`),
   },
@@ -163,6 +164,39 @@ export const STORAGE_ROWS: StorageRow[] = [
     clear: 'none',
   },
 ]
+
+// What sign-out removes as plain keys (LED-268): the data copy and every older copy of a group that now
+// lives in the account, whoever's they are, so the next person on this browser finds none of them.
+// The session, the queue and pending receipts go through their owners. Appearance and the install
+// banner flag stay: they are this device's, not the account's (decision C).
+const PERSONAL_EXACT = [
+  'ledger-preferences',
+  'ledger-dashboard-widgets',
+  'ledger-dashboard-widget-order',
+  'ledger-first-run',
+  'ledger_transaction_templates',
+]
+
+export function isPersonalKey(key: string): boolean {
+  return key.startsWith('ledger_cache:')
+    || PERSONAL_EXACT.includes(key)
+    || key.endsWith(':cc-notifs-sent')
+    || key.startsWith('13th-month-selection:')
+}
+
+/** Removes every personal key from this browser, at sign-out and account deletion. */
+export function forgetPersonalBrowserCopies(): void {
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && isPersonalKey(key)) keys.push(key)
+    }
+    keys.forEach((key) => localStorage.removeItem(key))
+  } catch {
+    /* storage unavailable: nothing to remove */
+  }
+}
 
 /** The keys among `allKeys` that clearing `row` removes: exactly its own, and only the signed-in user's. */
 export function keysInGroup(row: StorageRow, allKeys: string[], userId: string | null): string[] {

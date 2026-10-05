@@ -14,16 +14,16 @@ For what CI and the local stack cannot see (LED-213): the CI run on the release 
 
 Run log:
 - 2026-09-29: PR "Ship epics 8-14" (`epic-14`, #9), run [36568023009](https://github.com/sensennysen/ledger-personal-finance/actions/runs/36568023009), green. It predates every migration below; it does not cover them.
-- `epics-15-19` → `main`: not opened yet.
+- 2026-10-04: PR "epics-15-19" (#10), run [37184349456](https://github.com/sensennysen/ledger-personal-finance/actions/runs/37184349456), `verify` and `db` green. Merged 2026-10-04.
 
 ## B. Migrations on the hosted database
 `origin/main` ends at `20260810140000_allow_financed_purchase_changes.sql`, so the 16 files below are not on `main` (checked 2026-10-04 with `git fetch`). What the hosted database has applied is not known from the repo; B1 finds out.
 
 | # | Do | Expect | Result |
 |---|---|---|---|
-| B1 | `supabase migration list --linked` | Lists which of the files below the remote is missing | |
-| B2 | `pnpm db:push:remote` | Applies the missing files in filename order, no error | |
-| B3 | `supabase migration list --linked` again | Local and remote columns match for every row | |
+| B1 | `supabase migration list --linked` | Lists which of the files below the remote is missing | 2026-10-05 (owner): none missing; all 30 local migrations have a Remote entry |
+| B2 | `pnpm db:push:remote` | Applies the missing files in filename order, no error | Not needed (B1 found nothing missing) |
+| B3 | `supabase migration list --linked` again | Local and remote columns match for every row | PASS (same B1 output, 2026-10-05) |
 | B4 | Only now: deploy the client (merge to `main`, Vercel builds) | | |
 
 Every file is idempotent, so re-running one that the remote already has is a no-op.

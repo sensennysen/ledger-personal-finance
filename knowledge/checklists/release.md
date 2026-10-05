@@ -47,6 +47,12 @@ Every file is idempotent, so re-running one that the remote already has is a no-
 | `20261004110000_category_counts_as_salary` | LED-236 | Saving a category fails (the form sends `counts_as_salary`), and the 13th Month page finds no salary category. |
 | `20261004120000_merge_category_rpc` | LED-239 | Merging a category fails (`merge_category` does not exist). |
 
+Epic 22 (branch `epic-22`) adds the files below. They reach the hosted database (B1–B3) before the branch merges to `main`.
+
+| Migration | Ticket | If it is missing |
+|---|---|---|
+| `20261005100000_transaction_templates` | LED-257 | Activity's templates fail to load and to save (`transaction_templates` does not exist); the old browser copy stays where it is, so nothing is lost. |
+
 When this list grows: add the row in the same commit as the migration, with the client query or call that needs it.
 
 ## C. CSP on Vercel

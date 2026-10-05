@@ -7,7 +7,7 @@ Tickets in `epic-22-post-release-backlog-tasks.csv`. Refer to a phase as **"epic
 Written 2026-10-05, after epics 8 to 21 shipped to `main` and production (https://ledger-personal.vercel.app). It collects everything the retro Backlogs still held, ranked by risk rather than by source. Each ticket's DESCRIPTION cites its retro.
 
 - **Tickets:** 20 (LED-257 to LED-276). **Points:** 45.
-- **Branch convention:** commit to `main`, one commit per LED-NN ticket, push when the owner says so (CI and the Vercel deploy run on push).
+- **Branch convention:** one branch, `epic-22`, one commit per LED-NN ticket (owner, 2026-10-05). Push and open the pull request when the owner says so; CI runs on the pull request, the Vercel production deploy on the merge to `main`.
 - **Migrations** (LED-257, LED-263 to LED-267, maybe LED-261) reach production before the client: release checklist B, `pnpm db:push:remote` only when the owner asks.
 - **Legal wording** (LED-257 f, LED-258 c, LED-268) is approved by the owner before commit (OD-5).
 

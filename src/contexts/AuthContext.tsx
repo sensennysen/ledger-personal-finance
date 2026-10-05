@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { readCache, writeCache, clearCacheByPrefix } from '@/lib/dataCache'
 import { readWithPolicy } from '@/lib/readRetry'
 import { clearOfflineQueue } from '@/lib/offlineQueue'
+import { forgetLegacyTemplates } from '@/lib/transactionTemplates'
 import { clearPendingReceipts } from '@/lib/receiptStore'
 import { removeUserReceipts } from '@/lib/receiptCleanup'
 import { makeAuthError, type AuthError } from '@/lib/authErrors'
@@ -122,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (user) clearCacheByPrefix(user.id)
+    forgetLegacyTemplates()
     clearOfflineQueue()
     try {
       await clearPendingReceipts()
@@ -146,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
     // Clear all local data before signing out
     if (user) clearCacheByPrefix(user.id)
+    forgetLegacyTemplates()
     clearOfflineQueue()
     try {
       await clearPendingReceipts()

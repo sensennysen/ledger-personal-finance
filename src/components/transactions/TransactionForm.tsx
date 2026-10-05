@@ -449,10 +449,13 @@ export function TransactionForm({
                 type="number"
                 inputMode="decimal"
                 step="0.01"
+                placeholder="0.00"
                 name={field.name}
                 ref={field.ref}
                 onBlur={field.onBlur}
-                value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                // A new entry starts at 0, which no save accepts (amount > 0). Show it empty, so typing
+                // 12.50 reads 12.50 rather than 012.50.
+                value={field.value === 0 ? '' : typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
                 onChange={(event) => field.onChange(event.target.value)}
               />
             </FormControl>

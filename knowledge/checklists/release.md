@@ -66,6 +66,10 @@ The policy is two strings that nothing compares: the `<meta>` in `index.html` (d
 | C3 | Compare `index.html` with `vercel.json` | They differ only in `%VITE_SUPABASE_URL%` (meta only) and `frame-ancestors 'none'` (header only; browsers ignore it in a meta) || PASS (owner, 2026-10-05) |
 | C4 | On the live site, open Settings and refresh rates; watch the console | No "Refused to connect" || PASS (owner, 2026-10-05) |
 
+"Creating a worker from 'blob:…' violates … worker-src 'self'" on the **dev server** is expected (LED-259). After the dev server restarts, Vite's client (`waitForSuccessfulPing`, vite 8.3 `dist/client/client.mjs`) starts a `SharedWorker` from a `blob:` URL to wait for it; the policy blocks it, so the page does not reload by itself. Reload by hand. The production bundle creates no worker: the only `new Worker` in it is Supabase Realtime's heartbeat, which is off unless `realtime.worker` is set, and Ledger opens no Realtime channel. Do not add `blob:` to `worker-src` for it.
+
+| C5 | On the live site, signed in, open Home, Activity, Reports and Import; watch the console | No "violates the following Content Security Policy directive" || |
+
 ## D. Smoke test on the live site
 With a real account, after B and C. Undo what you add.
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { registerSyncedListener } from '@/lib/offlineQueue'
-import { isNearScrollEnd } from '@/lib/scrollEnd'
+import { hiddenByScroll, isNearScrollEnd } from '@/lib/scrollEnd'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import {
   Tag,
@@ -164,8 +164,15 @@ function LayoutShell() {
     if (target === 'fab') return fabRef.current ?? true
     return target?.isConnected ? target : true
   }
+  // Hidden at the end of a list (it would cover the last row) and while scrolling down (decision D).
+  const lastScrollTop = useRef(0)
+  const scrollHidden = useRef(false)
   const syncFab = () => {
-    if (mainRef.current) setFabHidden(isNearScrollEnd(mainRef.current))
+    const main = mainRef.current
+    if (!main) return
+    scrollHidden.current = hiddenByScroll(lastScrollTop.current, main.scrollTop, scrollHidden.current)
+    lastScrollTop.current = main.scrollTop
+    setFabHidden(scrollHidden.current || isNearScrollEnd(main))
   }
   const [formError, setFormError] = useState<FormErrorValue>(null)
   useEffect(() => {
@@ -193,7 +200,10 @@ function LayoutShell() {
     const main = mainRef.current
     const content = main?.firstElementChild
     if (!main || !content) return
-    const sync = () => setFabHidden(isNearScrollEnd(main))
+    // A new page starts at the top, so a hide from scrolling the last one does not carry over.
+    scrollHidden.current = false
+    lastScrollTop.current = main.scrollTop
+    const sync = () => setFabHidden(scrollHidden.current || isNearScrollEnd(main))
     sync()
     const observer = new ResizeObserver(sync)
     observer.observe(content)

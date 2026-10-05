@@ -9,8 +9,8 @@ For what CI and the local stack cannot see (LED-213): the CI run on the release 
 ## A. CI on the release PR
 | # | Do | Expect | Result |
 |---|---|---|---|
-| A1 | Open the release PR (for epics 15 to 19: `epics-15-19` → `main`, which also carries every epics 8 to 13 phase, see LED-212) | Both jobs run: `verify` (lint, build, test) and `db` (fresh Supabase, all migrations and `seed.sql`, `supabase db lint`, replay from scratch) | |
-| A2 | Wait for the run, then record its link and date here | Both jobs green | |
+| A1 | Open the release PR (for epics 15 to 19: `epics-15-19` → `main`, which also carries every epics 8 to 13 phase, see LED-212) | Both jobs run: `verify` (lint, build, test) and `db` (fresh Supabase, all migrations and `seed.sql`, `supabase db lint`, replay from scratch) || PASS: PR #10 (see run log) |
+| A2 | Wait for the run, then record its link and date here | Both jobs green || PASS: run 37184349456, 2026-10-04 |
 
 Run log:
 - 2026-09-29: PR "Ship epics 8-14" (`epic-14`, #9), run [36568023009](https://github.com/sensennysen/ledger-personal-finance/actions/runs/36568023009), green. It predates every migration below; it does not cover them.
@@ -24,7 +24,7 @@ Run log:
 | B1 | `supabase migration list --linked` | Lists which of the files below the remote is missing | 2026-10-05 (owner): none missing; all 30 local migrations have a Remote entry |
 | B2 | `pnpm db:push:remote` | Applies the missing files in filename order, no error | Not needed (B1 found nothing missing) |
 | B3 | `supabase migration list --linked` again | Local and remote columns match for every row | PASS (same B1 output, 2026-10-05) |
-| B4 | Only now: deploy the client (merge to `main`, Vercel builds) | | |
+| B4 | Only now: deploy the client (merge to `main`, Vercel builds) | || Done: PR #10 merged 2026-10-04 after B1–B3 confirmed the remote |
 
 Every file is idempotent, so re-running one that the remote already has is a no-op.
 
@@ -54,22 +54,22 @@ The policy is two strings that nothing compares: the `<meta>` in `index.html` (d
 
 | # | Do | Expect | Result |
 |---|---|---|---|
-| C1 | `curl -sI https://<production host>/ \| grep -i content-security-policy` | The value equals `vercel.json`'s `Content-Security-Policy` exactly | |
-| C2 | Read `connect-src` in that header | Has Supabase (`https://*.supabase.co`, `wss://*.supabase.co`), `https://accounts.google.com` and `https://api.frankfurter.dev` | |
-| C3 | Compare `index.html` with `vercel.json` | They differ only in `%VITE_SUPABASE_URL%` (meta only) and `frame-ancestors 'none'` (header only; browsers ignore it in a meta) | |
-| C4 | On the live site, open Settings and refresh rates; watch the console | No "Refused to connect" | |
+| C1 | `curl -sI https://<production host>/ \| grep -i content-security-policy` | The value equals `vercel.json`'s `Content-Security-Policy` exactly || PASS (owner, 2026-10-05) |
+| C2 | Read `connect-src` in that header | Has Supabase (`https://*.supabase.co`, `wss://*.supabase.co`), `https://accounts.google.com` and `https://api.frankfurter.dev` || PASS (owner, 2026-10-05) |
+| C3 | Compare `index.html` with `vercel.json` | They differ only in `%VITE_SUPABASE_URL%` (meta only) and `frame-ancestors 'none'` (header only; browsers ignore it in a meta) || PASS (owner, 2026-10-05) |
+| C4 | On the live site, open Settings and refresh rates; watch the console | No "Refused to connect" || PASS (owner, 2026-10-05) |
 
 ## D. Smoke test on the live site
 With a real account, after B and C. Undo what you add.
 
 | # | Do | Expect | Result |
 |---|---|---|---|
-| D1 | Add an expense, edit it, delete it | Each saves; the balance moves and moves back | |
-| D2 | Add a transfer between two accounts | Saves (covers `destination_amount`) | |
-| D3 | Import a short CSV that repeats an existing row | The duplicate is flagged (covers `original_amount`) | |
-| D4 | Pay a credit card from an account | The payment shows in the card's history and statement | |
-| D5 | Open Home with a recurring row due | It posts once; reload in a second browser and it does not post again | |
-| D6 | Merge one test category into another, save a filter, open 13th Month | Each works | |
+| D1 | Add an expense, edit it, delete it | Each saves; the balance moves and moves back || PASS (owner, 2026-10-05) |
+| D2 | Add a transfer between two accounts | Saves (covers `destination_amount`) || PASS (owner, 2026-10-05) |
+| D3 | Import a short CSV that repeats an existing row | The duplicate is flagged (covers `original_amount`) || PASS (owner, 2026-10-05) |
+| D4 | Pay a credit card from an account | The payment shows in the card's history and statement || PASS (owner, 2026-10-05) |
+| D5 | Open Home with a recurring row due | It posts once; reload in a second browser and it does not post again || PASS (owner, 2026-10-05) |
+| D6 | Merge one test category into another, save a filter, open 13th Month | Each works || PASS (owner, 2026-10-05) |
 
 ## Report back
 Paste the Result columns and the CI run link. They go into the release's retro, with a ticket for each FAIL.

@@ -16,7 +16,7 @@ Checked twice: in a Safari tab, then as an installed web app (Add to Home Screen
 | Safe-area insets: search view (LED-42) | **PASS** (Safari tab). Full screen, the input below the island, nothing clipped. | `shots/178-sim-search-18pro.png` |
 | Safe-area insets: sheets | **PASS.** The add chooser's last row clears the home indicator in the installed app. | `shots/178-pwa-add-chooser-sheet.png` |
 | PWA install / Add to Home Screen (LED-144) | **PASS.** Share sheet and the Add dialog show the name "Ledger" and a sharp "L." icon; the Home Screen icon is crisp at full size; it launches standalone with no Safari bars. This settles the 2026-09-29 single-icon concern for iOS. | `shots/178-sim-add-to-home-screen.png`, `shots/178-sim-home-screen-icon.png` |
-| Cmd+Enter / Cmd+F in desktop Safari (LED-64) | **Not checkable here.** The simulator has no desktop Safari. Needs Safari on the Mac. | — |
+| Cmd+Enter / Cmd+F in desktop Safari (LED-64) | **PASS** (owner, Safari on the Mac, 2026-10-05). The simulator has no desktop Safari. | — |
 
 ### Seen in passing
 - **FAIL → LED-253.** The Date field on the add sheet is wider than the other fields and runs past the sheet's right edge, in the tab and in the installed app. Chrome does not show it; WebKit gives `<input type="date">` an intrinsic minimum width. `shots/178-sim-add-sheet-date-overflow.png`.
@@ -37,5 +37,5 @@ In the Safari tab the add button covers the end of "nothing here is permanent." 
 - Real hardware: keyboard animation timing and touch feel are not modelled by the simulator.
 
 ## Backlog
-- LED-178 stays To Do until the desktop Safari shortcuts (LED-64) are checked on the Mac. Everything else has a result.
+- LED-178 Done: every item has a result; the desktop Safari shortcuts were checked by the owner on 2026-10-05.
 - LED-252 and LED-253 were fixed the same day and re-run on both devices (`2026-10-05-led-252-253-ios-keyboard-date.md`).

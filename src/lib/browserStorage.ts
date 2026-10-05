@@ -4,7 +4,7 @@
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). Every key below is
 // one the code writes; tests/legalPages.test.mjs fails when a new one appears without a row here.
 // The wording of the rows moved to the account in epic 22 (templates, preferences, Home layout, setup
-// checklist, card reminders) is a draft the owner reviews in the epic-22 pull request.
+// checklist, card reminders, 13th month picks) is a draft the owner reviews in the epic-22 pull request.
 
 /**
  * How Settings clears a group on this device. `keys` removes the matching local storage keys;
@@ -134,11 +134,11 @@ export const STORAGE_ROWS: StorageRow[] = [
   },
   {
     id: 'thirteenth-month',
-    what: '13th month picks',
+    what: '13th month picks (older copy)',
     keys: ['13th-month-selection:<your id>:<year>'],
     where: 'local storage',
-    why: 'The transactions you picked for the estimate',
-    removed: 'When you clear site data',
+    why: 'The transactions you picked for the estimate on this browser before they were kept in your account. Ledger copies them to your account the next time you open 13th Month Pay, then removes them here',
+    removed: 'When they are copied to your account, or when you clear site data',
     clear: 'keys',
     match: (key, userId) => userId !== null && key.startsWith(`13th-month-selection:${userId}:`),
   },

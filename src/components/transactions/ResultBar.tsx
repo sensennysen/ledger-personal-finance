@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatNet } from '@/lib/formatNet'
+import { scheduledSumNote } from '@/lib/countsYet'
 import type { ActivitySort, TxSort } from '@/lib/transactionWindow'
 
 type Density = 'comfortable' | 'compact'
@@ -43,6 +44,7 @@ export function ResultBar({
   totalLabel,
   rangeLabel,
   sum,
+  scheduledCount = 0,
   sort,
   onSortChange,
   sortOptions = DATE_SORTS,
@@ -60,6 +62,8 @@ export function ResultBar({
   totalLabel: string
   rangeLabel: string | null
   sum: Record<string, number>
+  /** Listed rows dated after today: the Sum includes them, so say so (LED-251). */
+  scheduledCount?: number
   sort: ActivitySort
   onSortChange: (sort: ActivitySort) => void
   /** The sorts offered: dates only unless the page lists amounts flat (Activity, LED-241). */
@@ -76,6 +80,7 @@ export function ResultBar({
   onImport?: () => void
   compact: boolean
 }) {
+  const sumNote = scheduledSumNote(scheduledCount)
   const { label: sortLabel, icon: SortIcon } = SORT_OPTIONS[sort]
   const sortMenu = (triggerClassName: string, iconClassName: string) => (
     <DropdownMenu>
@@ -169,6 +174,7 @@ export function ResultBar({
         </span>
         <span className="text-xs text-muted-foreground">
           Sum <span className={`money font-bold ${sumColor(sum)}`}>{formatNet(sum)}</span>
+          {sumNote ? ` · ${sumNote}` : ''}
         </span>
       </div>
       <div className="flex shrink-0 items-center gap-1">

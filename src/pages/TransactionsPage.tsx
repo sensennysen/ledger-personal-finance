@@ -41,6 +41,8 @@ import { DayCard, TransactionDayList, WindowFooter } from '@/components/transact
 import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
 import { MonthRail } from '@/components/transactions/MonthJump'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
+import { useLocalDate } from '@/hooks/useLocalDate'
+import { countsYet } from '@/lib/countsYet'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { ACTIVITY_SORTS, effectiveDensity, groupByDay, isAmountSort, sliceGroups, sortByAmount, sortByDate, sumByCurrency, WINDOW_STEP, type ActivitySort } from '@/lib/transactionWindow'
 import { amountInCurrency } from '@/lib/exchangeRates'
@@ -302,6 +304,8 @@ export default function TransactionsPage() {
     [filtered, sort, baseCurrency, rateTable]
   )
   const matchSum = useMemo(() => sumByCurrency(filtered), [filtered])
+  const today = useLocalDate()
+  const matchScheduled = useMemo(() => filtered.filter((tx) => !countsYet(tx.date, today)).length, [filtered, today])
 
   // Window the list (LED-60). The cycle is left out of the reset key so
   // stepping it keeps the window and the scroll position.
@@ -487,6 +491,7 @@ export default function TransactionsPage() {
       totalLabel="this cycle"
       rangeLabel={`${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
       sum={matchSum}
+      scheduledCount={matchScheduled}
       sort={sort}
       onSortChange={changeSort}
       sortOptions={ACTIVITY_SORTS}

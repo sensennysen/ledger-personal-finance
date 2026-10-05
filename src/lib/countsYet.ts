@@ -27,3 +27,14 @@ export function splitCounted<T extends { date: string }>(rows: T[], today: strin
 export function scheduledIn<T extends { date: string }>(rows: T[], start: string, end: string, today: string): T[] {
   return rows.filter((row) => row.date >= start && row.date <= end && !countsYet(row.date, today))
 }
+
+/** Milliseconds from `now` to the next local midnight, when "today" changes. */
+export function msUntilNextLocalMidnight(now: Date): number {
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+  return next.getTime() - now.getTime()
+}
+
+/** The note beside a list's Sum when scheduled rows are in it: the Sum adds every listed row (LED-251). */
+export function scheduledSumNote(scheduledCount: number): string | null {
+  return scheduledCount > 0 ? `incl. ${scheduledCount} scheduled` : null
+}

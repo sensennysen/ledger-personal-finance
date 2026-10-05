@@ -5,10 +5,11 @@ import { readCache, writeCache } from '@/lib/dataCache'
 import type { Budget } from '@/types'
 import type { BudgetSpendTx } from '@/lib/budgetSpend'
 import type { RateTable } from '@/lib/exchangeRates'
-import { getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
+import { getCurrentCycleMonthKey } from '@/lib/utils'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { sumBudgetSpend } from '@/lib/budgetSpend'
 import { countedEnd } from '@/lib/countsYet'
+import { useLocalDate } from '@/hooks/useLocalDate'
 import { shiftMonthKey } from '@/lib/overspending'
 import { readAllPages } from '@/lib/pagedRead'
 import { readWithPolicy } from '@/lib/readRetry'
@@ -56,6 +57,7 @@ export function useBudgets(
   const [dataKey, setDataKey] = useState<string | null>(null)
   const dataKeyRef = useRef<string | null>(null)
   const [previousCycleRead, setPreviousCycleRead] = useState<PreviousCycleSpend | null>(null)
+  const today = useLocalDate()
   const requestId = useRef(0)
   const requestedKey = selectedMonth ? `${selectedMonth}:${startDay}` : 'current'
 
@@ -154,7 +156,7 @@ export function useBudgets(
 
     const allTx = spentData
     // Rows dated after today are scheduled: shown apart, counted from their date (LED-238).
-    const today = getLocalDateString()
+    // `today` comes from useLocalDate, so a tab left open past midnight refetches on the new day.
     const currentMonthStart = new Date(
       now.getFullYear(),
       now.getMonth(),
@@ -241,7 +243,7 @@ export function useBudgets(
     showBudgets(enriched, key)
     writeCache(cacheKey, enriched)
     setLoading(false)
-  }, [user, selectedMonth, startDay, deficitBehaviour, showBudgets, rateTable, ratesLoading])
+  }, [user, selectedMonth, startDay, deficitBehaviour, showBudgets, rateTable, ratesLoading, today])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -356,6 +358,7 @@ export function useBudgetsForExport(expenseTx: BudgetSpendTx[], rateTable: RateT
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
   const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
+  const today = useLocalDate()
   const requestId = useRef(0)
 
   const fetch = useCallback(async () => {
@@ -398,10 +401,10 @@ export function useBudgetsForExport(expenseTx: BudgetSpendTx[], rateTable: RateT
       budgets.map((b) => {
         const { start, end } = getBudgetCycleRange(b.period, monthKey, startDay)
         // Same "spent so far" as the Budgets page: rows after today are not counted yet (LED-238).
-        const { spent, unrated } = sumBudgetSpend(expenseTx, b, start, countedEnd(end, getLocalDateString()), rateTable)
+        const { spent, unrated } = sumBudgetSpend(expenseTx, b, start, countedEnd(end, today), rateTable)
         return { ...b, spent, unrated_currencies: unrated }
       }),
-    [budgets, expenseTx, rateTable, monthKey, startDay]
+    [budgets, expenseTx, rateTable, monthKey, startDay, today]
   )
 
   return {

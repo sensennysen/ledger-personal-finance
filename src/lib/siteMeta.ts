@@ -19,6 +19,19 @@ export function normalizeSiteUrl(raw: string | undefined | null): string | null 
   }
 }
 
+/**
+ * og:image and twitter:image with an absolute URL. Link previews (Facebook, X, LinkedIn, Slack)
+ * ignore a relative path, so a root-relative `content="/…"` gets the site URL in front. Without a
+ * site URL the HTML is unchanged.
+ */
+export function absoluteImageTags(html: string, siteUrl: string | null): string {
+  if (!siteUrl) return html
+  return html.replace(
+    /(<meta\s+(?:property="og:image"|name="twitter:image")\s+content=")\/(?!\/)/g,
+    `$1${siteUrl}/`,
+  )
+}
+
 /** Tags for <head>: canonical and og:url. Empty when there is no site URL. */
 export function headTags(siteUrl: string | null): string {
   if (!siteUrl) return ''

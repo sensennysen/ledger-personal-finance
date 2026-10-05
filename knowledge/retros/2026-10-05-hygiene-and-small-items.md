@@ -23,4 +23,4 @@ Branch `main`. Backlog items from the LED-189, LED-232, LED-202, LED-251 and epi
 
 ## Backlog
 - **Production needs `VITE_SITE_URL`** in Vercel (Production environment) for the sitemap and canonical link to ship; until then the deploy has neither, which is better than the placeholder it had.
-- `og:image` is still a relative `/social-preview.svg`; some crawlers want an absolute URL. It could come from `VITE_SITE_URL` the same way.
+- ~~`og:image` is still a relative `/social-preview.svg`~~ Done the same day: a 1200×630 `social-preview.png` (link previews do not show SVG), `og:image`/`twitter:image` absolute from `VITE_SITE_URL` (`absoluteImageTags`, tested), plus `og:image:type/width/height`. The SVG's two placeholder bars that cut through the "Ledger" title were removed before rendering. The beige preview predates the dark redesign; a rebrand of it is a design call.

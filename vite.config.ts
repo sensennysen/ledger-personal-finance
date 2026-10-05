@@ -3,15 +3,15 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
-import { headTags, normalizeSiteUrl, robotsTxt, sitemapXml } from './src/lib/siteMeta.ts'
+import { absoluteImageTags, headTags, normalizeSiteUrl, robotsTxt, sitemapXml } from './src/lib/siteMeta.ts'
 
-// Canonical link, og:url, sitemap.xml and robots.txt from VITE_SITE_URL. Unset, the build ships no
+// Canonical link, og:url, absolute og:image/twitter:image, sitemap.xml and robots.txt from VITE_SITE_URL. Unset, the build ships no
 // canonical link and no sitemap rather than a placeholder domain (src/lib/siteMeta.ts).
 function siteMeta(siteUrl: string | null): Plugin {
   return {
     name: 'ledger-site-meta',
     transformIndexHtml: (html) =>
-      html.replace(/ *<!-- site-meta:[^>]*-->\n?/, siteUrl ? `    ${headTags(siteUrl)}\n` : ''),
+      absoluteImageTags(html, siteUrl).replace(/ *<!-- site-meta:[^>]*-->\n?/, siteUrl ? `    ${headTags(siteUrl)}\n` : ''),
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'robots.txt', source: robotsTxt(siteUrl) })
       if (siteUrl) this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: sitemapXml(siteUrl) })

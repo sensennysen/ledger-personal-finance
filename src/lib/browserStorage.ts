@@ -4,7 +4,7 @@
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). Every key below is
 // one the code writes; tests/legalPages.test.mjs fails when a new one appears without a row here.
 // The wording of the rows moved to the account in epic 22 (templates, preferences, Home layout, setup
-// checklist) is a draft the owner reviews in the epic-22 pull request.
+// checklist, card reminders) is a draft the owner reviews in the epic-22 pull request.
 
 /**
  * How Settings clears a group on this device. `keys` removes the matching local storage keys;
@@ -124,11 +124,11 @@ export const STORAGE_ROWS: StorageRow[] = [
   },
   {
     id: 'card-reminders',
-    what: 'Card reminders already shown',
+    what: 'Card reminders already shown (older copy)',
     keys: ['<your id>:cc-notifs-sent'],
     where: 'local storage',
-    why: 'Each card reminder appears once',
-    removed: 'When you clear site data',
+    why: 'The card reminders this browser showed before they were kept in your account. Ledger copies them to your account the next time it checks your cards, then removes them here',
+    removed: 'When they are copied to your account, or when you clear site data',
     clear: 'keys',
     match: (key, userId) => userId !== null && key === `${userId}:cc-notifs-sent`,
   },

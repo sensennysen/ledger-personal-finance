@@ -43,7 +43,7 @@ test('the Privacy Policy names every host the Content Security Policy lets the b
 })
 
 // The keys the code writes to browser storage: named constants passed to localStorage, literal keys,
-// and the static part of the per-user template keys.
+// and the static part of the per-user keys, written inline or returned by a key function.
 function storageKeys() {
   const keys = new Set()
   const files = [...walk('src'), 'public/theme-init.js']
@@ -54,6 +54,7 @@ function storageKeys() {
     for (const m of src.matchAll(/localStorage\.(?:getItem|setItem)\(\s*['"]([^'"]+)['"]/g)) keys.add(m[1])
     for (const m of src.matchAll(/localStorage\.(?:getItem|setItem)\(\s*`\$\{\w+\}:([a-z-]+)`/g)) keys.add(m[1])
     for (const m of src.matchAll(/return `([a-z0-9-]+):\$\{/g)) keys.add(m[1])
+    for (const m of src.matchAll(/return `\$\{\w+\}:([a-z-]+)`/g)) keys.add(m[1])
   }
   // Not a key: the marker a queued receipt's transaction carries in receipt_url while the image waits
   // in IndexedDB (ledger_receipts, listed).

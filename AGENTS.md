@@ -15,7 +15,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on push to `main`: a `verif
 ## Layout
 - `src/lib/` — pure logic and helpers. New logic that needs tests goes here.
 - `src/components/`, `src/pages/`, `src/hooks/`, `src/contexts/`, `src/types/`.
-- `supabase/migrations/` — the only way schema changes ship. `schema.sql` is the base.
+- `supabase/migrations/` — the only way schema changes ship. `schema.sql` is the baseline snapshot (the first migration); a new database applies every migration.
 - `docs/dev-tasks/` — ticket CSVs (LED-NN). `knowledge/` — rules, patterns, prompts, retros.
 - `design_handoff_ledger_ui_audit/` — design source of truth.
 

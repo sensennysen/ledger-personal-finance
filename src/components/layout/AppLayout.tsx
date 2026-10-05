@@ -93,7 +93,7 @@ export default function AppLayout() {
 function LayoutShell() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, profile, signOut, refreshProfile, authError } = useAuth()
+  const { user, profile, signOut, refreshProfile, syncSettings, authError } = useAuth()
   const mobile = useMediaQuery('(max-width: 767px)')
   // At 1920 the capped page leaves room for a docked detail column; below it
   // the column would squeeze the list, so detail overlays instead (LED-99).
@@ -378,6 +378,7 @@ function LayoutShell() {
                 onRetry={() => {
                   if (authError.kind === 'signout') void signOut()
                   else if (authError.kind === 'profile') void refreshProfile()
+                  else if (authError.kind === 'settings') void syncSettings()
                   else window.location.reload()
                 }}
               />

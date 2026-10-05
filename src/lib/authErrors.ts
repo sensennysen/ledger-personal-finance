@@ -1,6 +1,6 @@
 import type { OAuthErrorMessage } from './oauthErrors.ts'
 
-export type AuthErrorKind = 'profile' | 'session' | 'signout'
+export type AuthErrorKind = 'profile' | 'session' | 'signout' | 'settings'
 
 export interface AuthError {
   kind: AuthErrorKind
@@ -12,12 +12,14 @@ const MESSAGES: Record<AuthErrorKind, string> = {
   profile: "Couldn't load your profile. Some details may be out of date.",
   session: "Couldn't check your sign-in. Reload to try again.",
   signout: "Signed out on this device. We couldn't reach the server, so your session may stay open elsewhere until it expires.",
+  settings: "Couldn't save your settings to your account. They apply on this device until they're saved.",
 }
 
 const ACTION_LABELS: Record<AuthErrorKind, string> = {
   profile: 'Retry',
   session: 'Reload',
   signout: 'Try again',
+  settings: 'Retry',
 }
 
 export function makeAuthError(kind: AuthErrorKind, detail?: string | null): AuthError {

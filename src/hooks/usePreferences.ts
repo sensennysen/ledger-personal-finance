@@ -1,82 +1,25 @@
-import { useState, useCallback } from 'react'
-import type { AccountType } from '@/types'
+import { useCallback } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { parsePreferences, type Preferences } from '@/lib/preferences'
 
-export type NumberLocale = 'en-US' | 'de-DE' | 'fr-FR' | 'ja-JP' | 'zh-CN'
-export type DateFormat = 'MDY' | 'DMY' | 'YMD'
+export type { DateFormat, NumberLocale, Preferences } from '@/lib/preferences'
 
-export interface Preferences {
-  numberLocale: NumberLocale
-  dateFormat: DateFormat
-  largeTransactionThreshold: number
-  creditCardNotificationsEnabled: boolean
-  txView: 'grouped' | 'flat'
-  txDensity: 'comfortable' | 'compact'
-  accView: 'grouped' | 'flat'
-  accGroupOrder: AccountType[]
-}
-
-const STORAGE_KEY = 'ledger-preferences'
-
-const DEFAULTS: Preferences = {
-  numberLocale: 'en-US',
-  dateFormat: 'MDY',
-  largeTransactionThreshold: 0,
-  creditCardNotificationsEnabled: false,
-  txView: 'grouped',
-  txDensity: 'comfortable',
-  accView: 'grouped',
-  accGroupOrder: [],
-}
-
-function load(): Preferences {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULTS
-    return { ...DEFAULTS, ...JSON.parse(raw) }
-  } catch {
-    return DEFAULTS
-  }
-}
-
-function save(prefs: Preferences) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs))
-  } catch {
-    // Ignore storage access failures and keep the in-memory preference.
-  }
-}
-
-let _prefs: Preferences = load()
-const _listeners: Set<() => void> = new Set()
-
-function notify() {
-  _listeners.forEach((fn) => fn())
-}
-
+/**
+ * The signed-in user's preferences (LED-263), kept in `profiles.preferences` and read from the
+ * profile, so every screen and device sees the same values. The cached profile is the local copy.
+ */
 export function usePreferences() {
-  const [, forceRender] = useState(0)
-
-  const subscribe = useCallback((fn: () => void) => {
-    _listeners.add(fn)
-    return () => _listeners.delete(fn)
-  }, [])
-
-  // Subscribe on mount
-  useState(() => {
-    const unsub = subscribe(() => forceRender((n) => n + 1))
-    return unsub
-  })
+  const { profile, setPreferences } = useAuth()
+  const prefs = parsePreferences(profile?.preferences)
 
   const set = useCallback(<K extends keyof Preferences>(key: K, value: Preferences[K]) => {
-    _prefs = { ..._prefs, [key]: value }
-    save(_prefs)
-    notify()
-  }, [])
+    setPreferences({ [key]: value } as Partial<Preferences>)
+  }, [setPreferences])
 
   const formatAmount = useCallback(
     (amount: number, currency: string) => {
       try {
-        return new Intl.NumberFormat(_prefs.numberLocale, {
+        return new Intl.NumberFormat(prefs.numberLocale, {
           style: 'currency',
           currency,
           minimumFractionDigits: 2,
@@ -86,8 +29,7 @@ export function usePreferences() {
         return `${currency} ${amount.toFixed(2)}`
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [_prefs.numberLocale],
+    [prefs.numberLocale],
   )
 
   const formatDatePref = useCallback(
@@ -95,7 +37,7 @@ export function usePreferences() {
       if (!dateStr) return ''
       const [year, month, day] = dateStr.split('-')
       if (!year || !month || !day) return dateStr
-      switch (_prefs.dateFormat) {
+      switch (prefs.dateFormat) {
         case 'DMY':
           return `${day}/${month}/${year}`
         case 'YMD':
@@ -105,12 +47,11 @@ export function usePreferences() {
           return `${month}/${day}/${year}`
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [_prefs.dateFormat],
+    [prefs.dateFormat],
   )
 
   return {
-    prefs: _prefs,
+    prefs,
     set,
     formatAmount,
     formatDatePref,

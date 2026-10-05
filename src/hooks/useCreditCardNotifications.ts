@@ -65,6 +65,19 @@ export function useCreditCardNotifications() {
   const { prefs } = usePreferences()
   const movedFor = useRef<string | null>(null)
 
+  // The old record moves whether or not reminders are on, so it never lingers in this browser.
+  useEffect(() => {
+    if (!user || !navigator.onLine || movedFor.current === user.id) return
+    moveLegacyReminders(user.id)
+      .then(() => {
+        movedFor.current = user.id
+      })
+      .catch((error: unknown) => {
+        console.error('Card reminders already shown could not be moved to the account:', error)
+        reportError('error', error)
+      })
+  }, [user])
+
   useEffect(() => {
     if (!user) return
     if (!prefs.creditCardNotificationsEnabled) return
@@ -74,6 +87,7 @@ export function useCreditCardNotifications() {
     const runCheck = async () => {
       if (!navigator.onLine) return
       try {
+        // Until the old record is in the account, a reminder it lists could show again.
         if (movedFor.current !== user.id) {
           await moveLegacyReminders(user.id)
           movedFor.current = user.id

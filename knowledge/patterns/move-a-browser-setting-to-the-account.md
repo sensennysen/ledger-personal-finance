@@ -1,0 +1,14 @@
+# Moving a browser-held setting into the account
+A setting kept in `localStorage` reaches no other device and is inherited by the next person on the browser. Epic 22 phase 2 (LED-263 to LED-267) moved five of them; this is the shape that worked.
+
+**Why:** a per-browser key looks fine in a one-context check. Each group then needs the same four parts, and the one-time upload is easy to get wrong: checking "already uploaded" in `localStorage`, or in a separate read before the write, lets a second device or tab upload again.
+
+**How:**
+1. **Storage.** A `profiles` column for a value per user (`preferences jsonb`, `dashboard_hidden_widgets jsonb`, `setup_checklist_dismissed_at timestamptz`). Use a table with RLS for a list that grows or must be claimed (`card_reminders_sent`, `thirteenth_month_picks`).
+2. **"Never written" is visible in the data.** `{}`, `null`, or no selection row. The upload is conditional in the same statement as the write: `merge_profile_preferences(p_patch, p_only_if_empty)`, `.update(...).is(column, null)`, `set_thirteenth_month_picks(..., p_only_if_absent)`. Rule: `rules/once-per-user-is-recorded-in-the-database.md`.
+3. **The local copy is the cached profile** (`ledger_cache:<user>:profile`). Do not add a new key. Profile columns change through `AuthContext.patchProfile` / `setPreferences`: shown at once, sent at once or on `online`, a failure shown as the `settings` banner with Retry. A JSON column is merged per key in SQL (`preferences || p_patch`), so two devices changing different keys keep both.
+4. **The old key.** Remove it after a successful upload, or when there is nothing worth uploading. Keep it when the upload fails. Sign-out removes every personal key, whoever's (`isPersonalKey`, LED-268).
+5. **Something that must happen once per account** (a reminder shown) is claimed by an insert: `upsert(..., { ignoreDuplicates: true }).select()` returns the row only to the device that added it.
+6. **A read that fails is not the default.** For 13th Month, "no saved picks" means every record counts, so a failed read shows the error, no estimate, and disabled controls. It must not show the default.
+7. **Check in the browser.** Plant the old keys on `/login`, sign in with the dev form, then count in psql. Write through psql to stand in for the other device, then reload. Fail one request with a `window.fetch` override, check the banner, then Retry.
+8. **Source-reading tests** (`widgetBoundary`, `dashboardWidgetOrder`, `legalPages`' key scan) read file paths and literal shapes. Moving a constant or a key into `src/lib` breaks them. Run the whole `pnpm test` before committing, not only the new test file.

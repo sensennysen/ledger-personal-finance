@@ -41,6 +41,8 @@ export interface Profile {
   dashboard_widget_order?: string[] | null
   account_group_order?: AccountType[] | null
   account_view_mode?: 'all' | AccountType | null
+  /** Only the preferences the user changed; read through parsePreferences (LED-263). */
+  preferences?: Record<string, unknown> | null
   created_at: string
   updated_at: string
 }

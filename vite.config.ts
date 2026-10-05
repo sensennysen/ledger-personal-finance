@@ -1,15 +1,31 @@
 import path from 'path'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { headTags, normalizeSiteUrl, robotsTxt, sitemapXml } from './src/lib/siteMeta.ts'
+
+// Canonical link, og:url, sitemap.xml and robots.txt from VITE_SITE_URL. Unset, the build ships no
+// canonical link and no sitemap rather than a placeholder domain (src/lib/siteMeta.ts).
+function siteMeta(siteUrl: string | null): Plugin {
+  return {
+    name: 'ledger-site-meta',
+    transformIndexHtml: (html) =>
+      html.replace(/ *<!-- site-meta:[^>]*-->\n?/, siteUrl ? `    ${headTags(siteUrl)}\n` : ''),
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'robots.txt', source: robotsTxt(siteUrl) })
+      if (siteUrl) this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: sitemapXml(siteUrl) })
+    },
+  }
+}
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   server: {
     host: '127.0.0.1',
   },
   plugins: [
+    siteMeta(normalizeSiteUrl(loadEnv(mode, process.cwd(), '').VITE_SITE_URL)),
     react(),
     tailwindcss(),
     VitePWA({
@@ -52,4 +68,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-})
+}))

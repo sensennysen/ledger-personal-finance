@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { normalizeSiteUrl, headTags, sitemapXml, robotsTxt, PUBLIC_ROUTES } from '../src/lib/siteMeta.ts'
+import { normalizeSiteUrl, headTags, sitemapXml, robotsTxt, absoluteImageTags, PUBLIC_ROUTES } from '../src/lib/siteMeta.ts'
 
 test('the site URL is normalised to an origin without a trailing slash', () => {
   assert.equal(normalizeSiteUrl('https://ledger.example.com/'), 'https://ledger.example.com')
@@ -42,4 +42,33 @@ test('every public route is a route in App.tsx', () => {
 test('no placeholder domain ships', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
   assert.doesNotMatch(html, /your-domain\.example/)
+})
+
+test('social image tags become absolute with a site URL, and only those tags', () => {
+  const html = [
+    '<meta property="og:image" content="/social-preview.png" />',
+    '<meta name="twitter:image" content="/social-preview.png" />',
+    '<meta property="og:image:alt" content="/not-a-url" />',
+    '<link rel="icon" href="/favicon.svg" />',
+  ].join('\n')
+  const out = absoluteImageTags(html, 'https://ledger.example.com')
+  assert.match(out, /property="og:image" content="https:\/\/ledger\.example\.com\/social-preview\.png"/)
+  assert.match(out, /name="twitter:image" content="https:\/\/ledger\.example\.com\/social-preview\.png"/)
+  assert.match(out, /og:image:alt" content="\/not-a-url"/)
+  assert.match(out, /href="\/favicon\.svg"/)
+})
+
+test('without a site URL, or with an already absolute image, nothing changes', () => {
+  const rel = '<meta property="og:image" content="/social-preview.png" />'
+  assert.equal(absoluteImageTags(rel, null), rel)
+  const abs = '<meta property="og:image" content="https://cdn.example.com/x.png" />'
+  assert.equal(absoluteImageTags(abs, 'https://ledger.example.com'), abs)
+  const protocolRelative = '<meta property="og:image" content="//cdn.example.com/x.png" />'
+  assert.equal(absoluteImageTags(protocolRelative, 'https://ledger.example.com'), protocolRelative)
+})
+
+test('index.html points social previews at the PNG, not the SVG', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+  assert.match(html, /property="og:image" content="\/social-preview\.png"/)
+  assert.match(html, /name="twitter:image" content="\/social-preview\.png"/)
 })

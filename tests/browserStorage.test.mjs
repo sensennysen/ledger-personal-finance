@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { STORAGE_ROWS, keysInGroup, unsyncedWarning } from '../src/lib/browserStorage.ts'
+import { STORAGE_ROWS, isPersonalKey, keysInGroup, unsyncedWarning } from '../src/lib/browserStorage.ts'
 
 const me = 'u-1'
 const other = 'u-2'
@@ -79,4 +79,25 @@ test('clearing the queue or receipts warns when unsynced changes would be lost',
   assert.match(unsyncedWarning(row('receipts'), 2, 1), /^1 transaction waiting to sync will be saved without its receipt/)
   assert.equal(unsyncedWarning(row('receipts'), 2, 0), null)
   assert.equal(unsyncedWarning(row('templates'), 5, 5), null)
+})
+
+test('after sign-out only appearance, the install flag and other sites\' keys are left (LED-268)', () => {
+  // The session, the queue and pending receipts go through their owners at sign-out, not as plain keys.
+  const byOwners = new Set(['sb-127-auth-token', 'ledger_offline_queue'])
+  const left = KEYS.filter((key) => !isPersonalKey(key) && !byOwners.has(key))
+  assert.deepEqual(left, ['ledger-theme', 'ledger-font-size', 'ledger-accent-color', 'ledger_pwa_install_dismissed', 'some-other-site-key'])
+})
+
+test('sign-out also removes a previous user\'s per-user copies on this browser (LED-268)', () => {
+  assert.ok(isPersonalKey(`${other}:cc-notifs-sent`))
+  assert.ok(isPersonalKey(`13th-month-selection:${other}:2026`))
+  assert.ok(isPersonalKey(`ledger_cache:${other}:accounts`))
+})
+
+test('every group cleared at sign-out says so in the notice', () => {
+  for (const id of ['cache', 'preferences', 'home-layout', 'checklist', 'templates', 'card-reminders', 'thirteenth-month']) {
+    assert.match(row(id).removed, /sign out/, id)
+    for (const key of keysInGroup(row(id), KEYS, me)) assert.ok(isPersonalKey(key), `${key} (${id}) is not cleared at sign-out`)
+  }
+  for (const id of ['appearance', 'install-banner']) assert.doesNotMatch(row(id).removed, /sign out/, id)
 })

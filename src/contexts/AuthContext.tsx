@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { readCache, writeCache, clearCacheByPrefix } from '@/lib/dataCache'
+import { readCache, writeCache } from '@/lib/dataCache'
+import { forgetPersonalBrowserCopies } from '@/lib/browserStorage'
 import { readWithPolicy } from '@/lib/readRetry'
 import { clearOfflineQueue } from '@/lib/offlineQueue'
-import { forgetLegacyTemplates } from '@/lib/transactionTemplates'
 import {
   forgetLegacyPreferences,
   legacyPreferencesUpload,
@@ -301,11 +301,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       failure = err instanceof Error ? err.message : String(err)
     }
 
-    if (user) clearCacheByPrefix(user.id)
-    forgetLegacyTemplates()
-    forgetLegacyPreferences()
-    forgetLegacyDashboardKeys()
-    forgetLegacyFirstRun()
+    // Every personal copy goes, older copies of moved settings included (LED-268).
+    forgetPersonalBrowserCopies()
     forgetPendingSettings()
     clearOfflineQueue()
     try {
@@ -330,11 +327,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.rpc('delete_user')
     if (error) throw error
     // Clear all local data before signing out
-    if (user) clearCacheByPrefix(user.id)
-    forgetLegacyTemplates()
-    forgetLegacyPreferences()
-    forgetLegacyDashboardKeys()
-    forgetLegacyFirstRun()
+    // Every personal copy goes, older copies of moved settings included (LED-268).
+    forgetPersonalBrowserCopies()
     forgetPendingSettings()
     clearOfflineQueue()
     try {

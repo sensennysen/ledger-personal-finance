@@ -48,9 +48,13 @@ Fill in your Supabase project values:
 ```env
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Optional: the public address, for the canonical link, sitemap.xml and robots.txt
+VITE_SITE_URL=https://ledger.example.com
 ```
 
-Run the Supabase schema in `supabase/schema.sql`, then apply any migrations in `supabase/migrations` that match your deployment state.
+On a hosting provider, set the same variables there (on Vercel: Project → Settings → Environment Variables). Without `VITE_SITE_URL` the build ships no canonical link and no sitemap.
+
+**New database.** Apply every file in `supabase/migrations/` in filename order, for example with `supabase link` then `supabase db push`, or by running each file in the SQL editor. The first file is the baseline schema; `supabase/schema.sql` is the same baseline and has none of the later migrations, so running it alone leaves a database every save fails against.
 
 **Upgrading a self-hosted database.** Apply every file in `supabase/migrations/` that your database does not have yet, in filename order, *before* you deploy the new client. Each file is idempotent. A database missing a column the client writes rejects every transaction save, not only the new feature's. `knowledge/checklists/release.md` lists each migration and what fails without it.
 
@@ -115,7 +119,7 @@ src/
   pages/        route-level app screens
   types/        shared TypeScript models
 supabase/
-  schema.sql    base database schema
+  schema.sql    baseline schema only (same as the first migration)
   migrations/   incremental database changes
 ```
 

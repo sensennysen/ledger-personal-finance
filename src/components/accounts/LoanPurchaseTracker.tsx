@@ -393,7 +393,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
       )}
 
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) setFormError(null) }}>
-        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4 lg:max-w-3xl">
+        <DialogContent className="max-h-[calc(var(--vv-height,100dvh)-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4 lg:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{addMode === 'unitemized' ? 'Add Unitemized Balance as a Purchase' : 'Add Financed Purchase'}</DialogTitle>
           </DialogHeader>
@@ -435,7 +435,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
       </Dialog>
 
       <Dialog open={Boolean(editPurchase)} onOpenChange={(open) => { if (!open) { setEditPurchase(null); setFormError(null) } }}>
-        <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4 lg:max-w-3xl">
+        <DialogContent className="max-h-[calc(var(--vv-height,100dvh)-0.75rem)] max-w-lg overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4 lg:max-w-3xl">
           <DialogHeader><DialogTitle>Edit Financed Purchase</DialogTitle></DialogHeader>
           <FormError error={formError} />
           {editPurchase && (

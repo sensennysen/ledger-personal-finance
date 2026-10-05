@@ -19,6 +19,7 @@ import LegalNoticesPage from '@/pages/LegalNoticesPage'
 import ReportsPage from '@/pages/ReportsPage'
 import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
 import MorePage from '@/pages/MorePage'
+import { useVisualViewportVars } from '@/hooks/useVisualViewportVars'
 
 type RouteMetaEntry = {
   test: (pathname: string) => boolean
@@ -233,6 +234,7 @@ function LoginPageWrapper() {
 }
 
 export default function App() {
+  useVisualViewportVars()
   return (
     <BrowserRouter>
       <AuthProvider>

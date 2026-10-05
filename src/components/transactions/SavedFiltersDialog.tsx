@@ -119,7 +119,7 @@ export function SavedFiltersDialog({
         onOpenChange(next)
       }}
     >
-      <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto sm:max-h-[90vh]">
+      <DialogContent className="max-h-[calc(var(--vv-height,100dvh)-0.75rem)] max-w-md overflow-y-auto sm:max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bookmark className="h-4 w-4" />

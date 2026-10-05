@@ -509,7 +509,7 @@ export default function TransactionsPage() {
     <div className="mx-auto flex w-full max-w-6xl gap-6 p-4 md:p-6">
       <div ref={pageTopRef} className="min-w-0 flex-1 space-y-4">
         <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
-          <DialogContent className={`max-h-[calc(100dvh-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
+          <DialogContent className={`max-h-[calc(var(--vv-height,100dvh)-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
             <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
             <FormError error={formError} />
             <TransactionForm
@@ -843,7 +843,7 @@ export default function TransactionsPage() {
 
         {/* Edit dialog */}
         <Dialog open={!!editingTx} onOpenChange={(open) => { if (!open) { setEditingTx(null); setFormError(null) } }}>
-          <DialogContent className="max-h-[calc(100dvh-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
+          <DialogContent className="max-h-[calc(var(--vv-height,100dvh)-0.75rem)] max-w-md overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4">
             <TransactionEditHeader type={editingTx?.type ?? 'expense'} toAccountId={editingTx?.to_account_id ?? null} />
             <FormError error={formError} />
             {editingTx && (

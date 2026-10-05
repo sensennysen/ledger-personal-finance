@@ -3,8 +3,8 @@
 //
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). Every key below is
 // one the code writes; tests/legalPages.test.mjs fails when a new one appears without a row here.
-// The templates (LED-257) and preferences (LED-263) rows' wording is a draft the owner reviews in the
-// epic-22 pull request.
+// The wording of the rows moved to the account in epic 22 (templates, preferences, Home layout) is a
+// draft the owner reviews in the epic-22 pull request.
 
 /**
  * How Settings clears a group on this device. `keys` removes the matching local storage keys;
@@ -91,11 +91,11 @@ export const STORAGE_ROWS: StorageRow[] = [
   },
   {
     id: 'home-layout',
-    what: 'Home layout',
+    what: 'Home layout (older copy)',
     keys: ['ledger-dashboard-widgets', 'ledger-dashboard-widget-order'],
     where: 'local storage',
-    why: 'Which Home widgets show, and their order',
-    removed: 'When you clear site data',
+    why: 'Which Home widgets show, and their order, saved on this browser before they were kept in your account. Ledger copies them to your account the next time you sign in, then removes them here',
+    removed: 'When they are copied to your account, or when you sign out',
     clear: 'keys',
     match: exactly('ledger-dashboard-widgets', 'ledger-dashboard-widget-order'),
     reload: true,

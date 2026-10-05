@@ -12,6 +12,7 @@ import {
   readLegacyPreferences,
   type Preferences,
 } from '@/lib/preferences'
+import { forgetLegacyDashboardKeys, hasLegacyDashboardKeys, legacyHiddenUpload, readLegacyWidgets } from '@/lib/dashboardLayout'
 import { clearPendingReceipts } from '@/lib/receiptStore'
 import { removeUserReceipts } from '@/lib/receiptCleanup'
 import { makeAuthError, type AuthError } from '@/lib/authErrors'
@@ -125,7 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   /**
-   * Moves settings this browser kept before they lived in the account (LED-263), once: only into an
+   * Moves settings this browser kept before they lived in the account (LED-263 to LED-265), once: only into an
    * account that never stored them, checked in the same statement as the write. A failed upload
    * keeps the old key for the next load and is reported.
    */
@@ -145,6 +146,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         forgetLegacyPreferences()
+      }
+    }
+
+    // LED-264: the hidden Home widgets. The old order key goes too: the account already holds the order.
+    if (hasLegacyDashboardKeys()) {
+      const hidden = legacyHiddenUpload(readLegacyWidgets())
+      if (hidden && data.dashboard_hidden_widgets == null) {
+        const { data: stored, error } = await supabase
+          .from('profiles')
+          .update({ dashboard_hidden_widgets: hidden })
+          .eq('id', data.id)
+          .is('dashboard_hidden_widgets', null)
+          .select('dashboard_hidden_widgets')
+        if (error) {
+          console.error('Failed to move the Home layout to the account:', error.message)
+          setAuthError(makeAuthError('settings', error.message))
+        } else {
+          forgetLegacyDashboardKeys()
+          if (stored && stored.length > 0) moved = { ...moved, dashboard_hidden_widgets: stored[0].dashboard_hidden_widgets }
+        }
+      } else {
+        forgetLegacyDashboardKeys()
       }
     }
     return moved
@@ -257,6 +280,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) clearCacheByPrefix(user.id)
     forgetLegacyTemplates()
     forgetLegacyPreferences()
+    forgetLegacyDashboardKeys()
     forgetPendingSettings()
     clearOfflineQueue()
     try {
@@ -284,6 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) clearCacheByPrefix(user.id)
     forgetLegacyTemplates()
     forgetLegacyPreferences()
+    forgetLegacyDashboardKeys()
     forgetPendingSettings()
     clearOfflineQueue()
     try {

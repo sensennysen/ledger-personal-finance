@@ -121,17 +121,6 @@ export const STORAGE_ROWS: StorageRow[] = [
     reload: true,
   },
   {
-    id: 'recurring',
-    what: 'Recurring entries already posted',
-    keys: ['ledger-recurring-generated'],
-    where: 'local storage',
-    why: 'Stops this browser posting a recurring entry twice',
-    removed: 'When you clear site data',
-    // The database records each post since LED-232, so this is only a shortcut and safe to clear.
-    clear: 'keys',
-    match: exactly('ledger-recurring-generated'),
-  },
-  {
     id: 'card-reminders',
     what: 'Card reminders already shown',
     keys: ['<your id>:cc-notifs-sent'],

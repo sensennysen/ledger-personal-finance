@@ -18,7 +18,6 @@ const KEYS = [
   'ledger-dashboard-widget-order',
   'ledger-first-run',
   'ledger_transaction_templates',
-  'ledger-recurring-generated',
   `${me}:cc-notifs-sent`,
   `${other}:cc-notifs-sent`,
   `13th-month-selection:${me}:2026`,
@@ -38,7 +37,6 @@ test('each group clears exactly its own keys', () => {
   assert.deepEqual(cleared('home-layout'), ['ledger-dashboard-widgets', 'ledger-dashboard-widget-order'])
   assert.deepEqual(cleared('checklist'), ['ledger-first-run'])
   assert.deepEqual(cleared('templates'), ['ledger_transaction_templates'])
-  assert.deepEqual(cleared('recurring'), ['ledger-recurring-generated'])
   assert.deepEqual(cleared('install-banner'), ['ledger_pwa_install_dismissed'])
 })
 

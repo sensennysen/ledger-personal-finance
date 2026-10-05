@@ -22,13 +22,12 @@ import {
   applyTxDelta,
   buildOptimisticTransaction,
   buildTransactionsCacheKey,
+  forgetLegacyRecurringMap,
   limitTransactions,
-  markRecurringGenerated,
   reverseTxDelta,
   txMatchesFilters,
   type TransactionFilters,
   type TransactionUpsertValues,
-  wasRecurringGenerated,
   withTransactionDefaults,
 } from '@/hooks/useTransactions.helpers'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
@@ -385,13 +384,14 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
 
   /**
    * Posts every recurring row that has come due. The database decides whether a row's next
-   * occurrence is already posted (LED-232), so another browser or device never posts it twice;
-   * the localStorage marker only saves a call. `onCardPayment` runs for a generated transfer
+   * occurrence is already posted (LED-232), so another browser or device never posts it twice.
+   * `onCardPayment` runs for a generated transfer
    * into a credit card, with the card as it is now, so the statement steps follow (LED-190).
    * It is awaited, so two payments to one card never read the same statement.
    */
   const generateDueRecurring = useCallback(async (onCardPayment?: CardPaymentHandler): Promise<RecurringRun> => {
     if (!user || !navigator.onLine) return { posted: 0, failed: 0 }
+    forgetLegacyRecurringMap()
     const today = getLocalDateString()
     const { rows: allRecurring, error: recurringError } = await readAllPages<Transaction>((from, to) =>
       supabase
@@ -411,8 +411,6 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     let posted = 0
     let failed = 0
     for (const { source: tx, date: nextDate } of dueRecurringPosts(allRecurring, today)) {
-      if (wasRecurringGenerated(tx.id, nextDate)) continue
-
       const { data: insertedId, error } = await supabase.rpc('post_recurring_transaction', {
         p_source: tx.id,
         p_date: nextDate,
@@ -421,7 +419,6 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         failed++
         continue
       }
-      markRecurringGenerated(tx.id, nextDate)
       // null: already posted, by this or another device.
       if (typeof insertedId !== 'string') continue
       posted++

@@ -20,8 +20,6 @@ type TxShape = Pick<
   'account_id' | 'to_account_id' | 'type' | 'amount' | 'exchange_rate' | 'destination_amount' | 'transfer_fee'
 >
 
-const RECURRING_KEY = 'ledger-recurring-generated'
-
 export function applyTxDelta(accounts: Account[], tx: TxShape): Account[] {
   return accounts.map((account) => {
     if (account.id === tx.account_id) {
@@ -120,25 +118,12 @@ export function limitTransactions(transactions: Transaction[], limit?: number): 
   return limit ? transactions.slice(0, limit) : transactions
 }
 
-function getGeneratedMap(): Record<string, true> {
+// Until LED-232 each browser kept a map of recurring posts in local storage. The database records
+// them now (recurrence_next_posted), so the map is gone; drop what an older version left behind.
+export function forgetLegacyRecurringMap() {
   try {
-    return JSON.parse(localStorage.getItem(RECURRING_KEY) ?? '{}')
+    localStorage.removeItem('ledger-recurring-generated')
   } catch {
-    return {}
+    // Storage unavailable: nothing was left behind either.
   }
-}
-
-export function markRecurringGenerated(txId: string, date: string) {
-  const map = getGeneratedMap()
-  map[`${txId}__${date}`] = true
-
-  try {
-    localStorage.setItem(RECURRING_KEY, JSON.stringify(map))
-  } catch {
-    // Ignore storage write failures and fall back to generating again later.
-  }
-}
-
-export function wasRecurringGenerated(txId: string, date: string): boolean {
-  return getGeneratedMap()[`${txId}__${date}`] === true
 }

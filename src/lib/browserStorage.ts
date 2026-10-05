@@ -3,8 +3,8 @@
 //
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). Every key below is
 // one the code writes; tests/legalPages.test.mjs fails when a new one appears without a row here.
-// The wording of the rows moved to the account in epic 22 (templates, preferences, Home layout) is a
-// draft the owner reviews in the epic-22 pull request.
+// The wording of the rows moved to the account in epic 22 (templates, preferences, Home layout, setup
+// checklist) is a draft the owner reviews in the epic-22 pull request.
 
 /**
  * How Settings clears a group on this device. `keys` removes the matching local storage keys;
@@ -102,11 +102,11 @@ export const STORAGE_ROWS: StorageRow[] = [
   },
   {
     id: 'checklist',
-    what: 'Setup checklist',
+    what: 'Setup checklist (older copy)',
     keys: ['ledger-first-run'],
     where: 'local storage',
-    why: 'Whether you confirmed your pay cycle or dismissed the checklist',
-    removed: 'When you clear site data',
+    why: 'Whether you confirmed your pay cycle or dismissed the checklist, saved on this browser before it was kept in your account. Ledger copies it to your account the next time you sign in, then removes it here',
+    removed: 'When it is copied to your account, or when you sign out',
     clear: 'keys',
     match: exactly('ledger-first-run'),
     reload: true,

@@ -31,3 +31,25 @@ export function ordinal(day: number): string {
   if (tens >= 11 && tens <= 13) return `${day}th`
   return `${day}${({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[day % 10] ?? 'th'}`
 }
+
+/** Whether an edited account has history; 'unknown' is a failed check (LED-316). */
+export type AccountHistoryState = 'none' | 'loading' | 'history' | 'unknown'
+
+/** The currency selector is locked unless the account is known to have no history. */
+export function currencyLocked(state: AccountHistoryState): boolean {
+  return state !== 'none'
+}
+
+/** Why the currency can't change, under the selector; null when it can. */
+export function currencyLockHint(state: AccountHistoryState): string | null {
+  switch (state) {
+    case 'history':
+      return 'Locked: this account has transactions. Add a new account for another currency.'
+    case 'unknown':
+      return 'Locked: couldn’t check this account’s history. Reopen the form to try again.'
+    case 'loading':
+      return 'Checking this account’s history…'
+    default:
+      return null
+  }
+}

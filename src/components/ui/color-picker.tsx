@@ -7,18 +7,23 @@ interface ColorPickerProps {
   onChange: (color: string) => void
   palette: readonly string[]
   className?: string
+  /** From FormControl: the field's id and ARIA land on the swatch group (QA-002). */
+  id?: string
+  'aria-describedby'?: string
+  'aria-invalid'?: boolean
+  'aria-labelledby'?: string
 }
 
 /**
  * Swatch palette + a native color-input button for picking any custom color.
  * The "custom" swatch shows the currently selected color when it isn't in the palette.
  */
-export function ColorPicker({ value, onChange, palette, className }: ColorPickerProps) {
+export function ColorPicker({ value, onChange, palette, className, ...control }: ColorPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const isCustom = !palette.includes(value)
 
   return (
-    <div className={cn('flex gap-2 flex-wrap items-center', className)}>
+    <div role="group" {...control} className={cn('flex gap-2 flex-wrap items-center', className)}>
       {palette.map((c) => (
         <button
           key={c}

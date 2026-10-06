@@ -134,7 +134,9 @@ export function getLoanDeadlines(
  * per purchase, for the cycle `cycleStart`..`cycleEnd`. Shared with Accounts' Coming up
  * (`accountsOverview.ts`) and the repayment form (`RepaymentAssist`), which both find an
  * account's next deadline the same way, so an overdue installment is never dropped just
- * because its due date is before today (LED-173): only the cycle's end bounds it out.
+ * because its due date is before today (LED-173): only the cycle's end bounds it out. In the
+ * current cycle that holds even for an installment overdue from an earlier cycle (LED-292): it is
+ * the bill, shown overdue, and Pay now opens on today. A past or future cycle lists only its own bills.
  */
 export function buildUpcomingLoanBills(
   accounts: Account[],
@@ -151,6 +153,7 @@ export function buildUpcomingLoanBills(
     return value >= cycleStart && value <= cycleEnd
   }
   const cycleEndString = toLocalDateString(cycleEnd)
+  const isDue = (date: string) => (isCurrentMonth ? date <= cycleEndString : dateIsInCycle(date))
 
   for (const account of accounts) {
     if (account.type !== 'loan') continue
@@ -158,7 +161,7 @@ export function buildUpcomingLoanBills(
     if (accountPurchases.length === 0) continue
 
     if (account.loan_pay_period) {
-      const nextDeadline = getLoanDeadlines(accountPurchases, allocations).find((deadline) => dateIsInCycle(deadline.dueDate))
+      const nextDeadline = getLoanDeadlines(accountPurchases, allocations).find((deadline) => isDue(deadline.dueDate))
       if (!nextDeadline) continue
       const nextDue = createDateAtLocalMidnight(nextDeadline.dueDate)
       bills.push({
@@ -184,7 +187,7 @@ export function buildUpcomingLoanBills(
 
     for (const purchase of accountPurchases) {
       const nextInstallment = getPurchaseInstallments(purchase, allocations)
-        .find((installment) => installment.remainingAmount > 0 && dateIsInCycle(installment.dueDate))
+        .find((installment) => installment.remainingAmount > 0 && isDue(installment.dueDate))
       if (!nextInstallment) continue
       const nextDue = createDateAtLocalMidnight(nextInstallment.dueDate)
       const payment = accountDeadline

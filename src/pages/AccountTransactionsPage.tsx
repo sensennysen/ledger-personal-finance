@@ -52,7 +52,7 @@ import { cardAmountDue, loanProgress } from '@/lib/accountsOverview'
 import { buildCategoryBreakdown } from '@/lib/categoryBreakdown'
 import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
-import type { LoanDeadline } from '@/lib/loanInstallments'
+import { payNowDate, type LoanDeadline } from '@/lib/loanInstallments'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import type { CreditCardPayment, Transaction } from '@/types'
@@ -296,11 +296,12 @@ export default function AccountTransactionsPage() {
     setRepaymentPrefill(null)
   }
 
-  // Dated on the due date so the server splits it across purchases exactly as the schedule shows.
+  // Dated on the due date so the server splits it across purchases exactly as the schedule shows; a
+  // deadline already past opens on today (payNowDate, LED-292), since the date decides the split.
   const handleRecordPayment = (deadline: LoanDeadline) => {
     setFormError(null)
     setTransactionKind('loan-repayment')
-    setRepaymentPrefill({ amount: deadline.total, date: deadline.dueDate })
+    setRepaymentPrefill({ amount: deadline.total, date: payNowDate(deadline.dueDate, new Date()) })
     setCreateOpen(true)
   }
 

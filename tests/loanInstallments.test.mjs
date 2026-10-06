@@ -90,3 +90,32 @@ test('a future bill keeps its due date in Pay now (LED-195)', () => {
   const [bill] = buildUpcomingLoanBills([account()], purchases, [], cycleStart, cycleEnd, true, today)
   assert.deepEqual(bill.payment, { accountId: 'phoneLoan', amount: 100, date: '2026-09-30' })
 })
+
+// LED-292: an installment overdue from an earlier cycle is the bill in the current cycle, shown overdue,
+// and Pay now opens on today. "Today" is Oct 6 in the Oct cycle; the Sep 15 installment is 21 days late.
+const octToday = new Date(2026, 9, 6)
+const octStart = new Date(2026, 9, 1)
+const octEnd = new Date(2026, 9, 31)
+const twoInstallments = () => [purchase({ id: 'civic', name: 'Civic', term_months: 2, monthly_installment: 456, total_payable: 912, first_due_date: '2026-09-15' })]
+
+test('a purchase overdue from an earlier cycle is billed overdue and Pay now opens on today (LED-292)', () => {
+  const [bill] = buildUpcomingLoanBills([account()], twoInstallments(), [], octStart, octEnd, true, octToday)
+  assert.equal(bill.nextDue.getDate(), 15)
+  assert.equal(bill.nextDue.getMonth(), 8)
+  assert.equal(bill.daysUntil, -21)
+  assert.deepEqual(bill.payment, { accountId: 'phoneLoan', amount: 456, date: '2026-10-06' })
+})
+
+test('a pay-period loan overdue from an earlier cycle is billed overdue and Pay now opens on today (LED-292)', () => {
+  const [bill] = buildUpcomingLoanBills([account({ loan_pay_period: 'monthly' })], twoInstallments(), [], octStart, octEnd, true, octToday)
+  assert.equal(bill.daysUntil, -21)
+  assert.deepEqual(bill.payment, { accountId: 'phoneLoan', amount: 456, date: '2026-10-06' })
+})
+
+test('a past cycle lists only its own bills, not one overdue from before it (LED-292)', () => {
+  const allocations = [{ loan_purchase_id: 'civic', amount: 0 }]
+  const bills = buildUpcomingLoanBills([account()], twoInstallments(), allocations, octStart, octEnd, false, new Date(2026, 10, 20))
+  assert.equal(bills.length, 1)
+  assert.equal(bills[0].nextDue.getMonth(), 9)
+  assert.equal(bills[0].daysUntil, null)
+})

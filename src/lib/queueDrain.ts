@@ -15,6 +15,7 @@ import {
   rowKey,
   type QueueItem,
   type RevisionMoves,
+  type SentInsert,
 } from './queueState.ts'
 
 /** The slice of the supabase client the drain uses. Left loose: the query builder is a long chain. */
@@ -249,6 +250,8 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
   const moves: RevisionMoves = new Map()
   // Rows whose queued create has not reached the database: a change to one waits for it,
   // or a delete would find nothing and be dropped while the insert later creates the row.
+  // Creates this drain saved, so an edit made while one was in flight is not dropped (LED-299).
+  const sent = new Map<string, SentInsert>()
   const unsentRows = new Set(queue.filter((i) => isFlagged(i) && i.operation === 'insert').map(insertKey))
   let synced = 0
 
@@ -263,6 +266,7 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
       if (outcome.kind === 'synced') {
         synced++
         if (outcome.inserted) {
+          sent.set(item.id, { version: item.version ?? 0, payload: item.payload })
           try { deps.onSynced?.(outcome.inserted) } catch { /* the row is saved; a follow-up reports its own failure */ }
         }
       } else {
@@ -279,7 +283,7 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
   }
 
   // Re-read: the user may have resolved or enqueued items while we awaited the network.
-  deps.writeQueue(rebaseRevisions(mergeDrainResult(remaining, deps.readQueue(), seenIds, flaggedAtStart), moves))
+  deps.writeQueue(rebaseRevisions(mergeDrainResult(remaining, deps.readQueue(), seenIds, flaggedAtStart, sent), moves))
   return synced
 }
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   MAX_QUEUE_AGE_MS, MAX_ATTEMPTS, markExpired, applyKeepMine, removeFlagged, isPending, isFlagged,
   mergeDrainResult, rowKey, expireNow, nextExpiryAt, isCountableError, recordFailure, retryFailed,
-  describeConflict, canKeepMine, recordRevisionMove, rebaseRevision, rebaseRevisions, isDuplicateRowId,
+  describeConflict, canKeepMine, recordRevisionMove, rebaseRevision, rebaseRevisions, isDuplicateRowId, editQueuedInsert, followUpUpdate,
 } from '../src/lib/queueState.ts'
 
 const NOW = 1_000_000_000_000
@@ -203,4 +203,31 @@ test('isDuplicateRowId recognises only a primary-key duplicate', () => {
   assert.equal(isDuplicateRowId({ code: '23505', message: 'duplicate key value violates unique constraint "card_payments_transaction_id_key"' }), false)
   assert.equal(isDuplicateRowId({ code: '23514', message: 'x_pkey"' }), false)
   assert.equal(isDuplicateRowId(null), false)
+})
+
+// LED-299
+test('an edit of a queued create bumps its version', () => {
+  const insert = item({ operation: 'insert', table: 'transactions', payload: { id: 'r', user_id: 'u', amount: 1 } })
+  const once = editQueuedInsert([insert], 'r', { amount: 2 }).queue
+  const twice = editQueuedInsert(once, 'r', { amount: 3 }).queue
+  assert.deepEqual([once[0].version, twice[0].version], [1, 2])
+})
+
+test('followUpUpdate carries only the fields edited since the version that was sent', () => {
+  const cur = item({ operation: 'insert', version: 2, status: 'failed', attempts: 2, payload: { id: 'r', user_id: 'u', amount: 9, notes: 'same' } })
+  const update = followUpUpdate(cur, { version: 1, payload: { id: 'r', user_id: 'u', amount: 1, notes: 'same' } })
+  assert.deepEqual([update.operation, update.rowId, update.payload, update.status, update.attempts], ['update', 'r', { amount: 9 }, undefined, undefined])
+  assert.equal(followUpUpdate(cur, { version: 1, payload: cur.payload }), null)
+})
+
+test('merge turns a create edited mid-send into an update, and keeps the newer copy of a kept one', () => {
+  const sentCopy = item({ id: 's', operation: 'insert', payload: { id: 'r', user_id: 'u', amount: 1 } })
+  const edited = { ...sentCopy, version: 1, payload: { ...sentCopy.payload, amount: 5 } }
+  const [follow] = mergeDrainResult([], [edited], new Set(['s']), new Set(), new Map([['s', { version: 0, payload: sentCopy.payload }]]))
+  assert.deepEqual([follow.operation, follow.payload], ['update', { amount: 5 }])
+  assert.deepEqual(mergeDrainResult([], [sentCopy], new Set(['s']), new Set(), new Map([['s', { version: 0, payload: sentCopy.payload }]])), [])
+
+  const failed = { ...sentCopy, attempts: 1 }
+  const [kept] = mergeDrainResult([failed], [edited], new Set(['s']), new Set())
+  assert.equal(kept.payload.amount, 5)
 })

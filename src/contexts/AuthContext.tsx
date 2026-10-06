@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { readCache, writeCache } from '@/lib/dataCache'
+import { clearCacheByPrefix, readCache, writeCache } from '@/lib/dataCache'
 import { forgetPersonalBrowserCopies } from '@/lib/browserStorage'
 import { readWithPolicy } from '@/lib/readRetry'
 import { clearOfflineQueue } from '@/lib/offlineQueue'
@@ -17,6 +17,18 @@ import { forgetLegacyDashboardKeys, hasLegacyDashboardKeys, legacyHiddenUpload, 
 import { clearPendingReceipts } from '@/lib/receiptStore'
 import { removeUserReceipts } from '@/lib/receiptCleanup'
 import { makeAuthError, type AuthError } from '@/lib/authErrors'
+import {
+  EMPTY_PENDING,
+  dropStale,
+  isPendingEmpty,
+  parsePendingSettings,
+  pendingSettingsKey,
+  pendingValues,
+  recordPending,
+  withoutSent,
+  type PendingGroup,
+  type PendingSettings,
+} from '@/lib/pendingSettings'
 import type { Profile } from '@/types'
 
 interface AuthContextValue {
@@ -52,22 +64,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearAuthError = () => setAuthError(null)
 
-  // Settings changed on this device that the account has not stored yet (LED-263). Kept in memory:
-  // a reload while offline loses them, and the account's values come back.
+  // Settings changed on this device that the account has not stored yet (LED-263). Kept in memory
+  // and in this user's data copy, so a reload while offline keeps them (LED-278, src/lib/pendingSettings).
   const userIdRef = useRef<string | null>(null)
-  const pendingColumns = useRef<Partial<Profile>>({})
-  const pendingPreferences = useRef<Partial<Preferences>>({})
+  const pending = useRef<PendingSettings>(EMPTY_PENDING)
+  // The profile as last shown, for the value a change replaces (its `base`).
+  const profileRef = useRef<Profile | null>(null)
+  useEffect(() => {
+    profileRef.current = profile
+  }, [profile])
 
+  const savePending = (userId: string) => {
+    if (isPendingEmpty(pending.current)) clearCacheByPrefix(pendingSettingsKey(userId))
+    else writeCache(pendingSettingsKey(userId), pending.current)
+  }
+
+  /** Memory only: sign-out removes the stored copy with the rest of the data copy (LED-268). */
   const forgetPendingSettings = () => {
-    pendingColumns.current = {}
-    pendingPreferences.current = {}
+    pending.current = EMPTY_PENDING
+  }
+
+  /** This user's waiting changes, read back after a reload. */
+  const loadPendingSettings = (userId: string | null) => {
+    pending.current = userId ? parsePendingSettings(readCache(pendingSettingsKey(userId))) : EMPTY_PENDING
   }
 
   /** The profile with this device's unsaved settings on top, so a refetch does not undo them. */
   const withPending = (data: Profile): Profile => ({
     ...data,
-    ...pendingColumns.current,
-    preferences: { ...(data.preferences ?? {}), ...pendingPreferences.current },
+    ...pendingValues(pending.current, 'columns'),
+    preferences: { ...(data.preferences ?? {}), ...pendingValues(pending.current, 'preferences') },
   })
 
   const applyLocally = (update: (prev: Profile) => Profile) => {
@@ -79,29 +105,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  // A change stays waiting until the account confirms it, so a failure or a reload keeps it.
   const syncSettings = async () => {
     const userId = userIdRef.current
     if (!userId || !navigator.onLine) return
-    const columns = pendingColumns.current
-    const preferences = pendingPreferences.current
-    if (Object.keys(columns).length === 0 && Object.keys(preferences).length === 0) return
-    forgetPendingSettings()
+    const sending = pending.current
+    if (isPendingEmpty(sending)) return
+    const settle = (group: PendingGroup) => {
+      if (userIdRef.current !== userId) return
+      pending.current = withoutSent(pending.current, group, sending[group])
+      savePending(userId)
+    }
     let failure: string | null = null
 
+    const columns = pendingValues(sending, 'columns')
     if (Object.keys(columns).length > 0) {
       const { error } = await supabase.from('profiles').update(columns).eq('id', userId)
-      if (error) {
-        pendingColumns.current = { ...columns, ...pendingColumns.current }
-        failure = error.message
-      }
+      if (error) failure = error.message
+      else settle('columns')
     }
+    const preferences = pendingValues(sending, 'preferences')
     if (Object.keys(preferences).length > 0) {
       const { data, error } = await supabase.rpc('merge_profile_preferences', { p_patch: preferences })
       if (error) {
-        pendingPreferences.current = { ...preferences, ...pendingPreferences.current }
         failure = error.message
-      } else if (userIdRef.current === userId) {
-        applyLocally((prev) => ({ ...prev, preferences: { ...(data as Record<string, unknown>), ...pendingPreferences.current } }))
+      } else {
+        settle('preferences')
+        if (userIdRef.current === userId) {
+          applyLocally((prev) => ({
+            ...prev,
+            preferences: { ...(data as Record<string, unknown>), ...pendingValues(pending.current, 'preferences') },
+          }))
+        }
       }
     }
 
@@ -114,14 +149,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const recordChange = (group: PendingGroup, patch: Record<string, unknown>) => {
+    const userId = userIdRef.current
+    if (!userId) return
+    const account = profileRef.current as unknown as Record<string, unknown> | null
+    pending.current = recordPending(pending.current, group, patch, group === 'columns' ? account : profileRef.current?.preferences)
+    savePending(userId)
+  }
+
   const patchProfile = (fields: Partial<Omit<Profile, 'id' | 'preferences'>>) => {
-    pendingColumns.current = { ...pendingColumns.current, ...fields }
+    recordChange('columns', fields)
     applyLocally((prev) => ({ ...prev, ...fields }))
     void syncSettings()
   }
 
   const setPreferences = (patch: Partial<Preferences>) => {
-    pendingPreferences.current = { ...pendingPreferences.current, ...patch }
+    recordChange('preferences', patch)
     applyLocally((prev) => ({ ...prev, preferences: { ...(prev.preferences ?? {}), ...patch } }))
     void syncSettings()
   }
@@ -218,6 +261,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setAuthError((prev) => (prev?.kind === 'profile' ? null : prev))
     if (data) {
+      // Waiting changes the account already holds, or that another device has since replaced, go (LED-278).
+      if (userIdRef.current === userId) {
+        pending.current = dropStale(pending.current, data as Profile & Record<string, unknown>)
+        savePending(userId)
+      }
       setProfile(withPending(data as Profile))
       writeCache(cacheKey, withPending(data as Profile))
       const moved = await moveBrowserSettings(data as Profile)
@@ -225,6 +273,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(withPending(moved))
         writeCache(cacheKey, withPending(moved))
       }
+      // A change kept over a reload has no `online` event to send it.
+      if (!isPendingEmpty(pending.current)) void syncSettings()
     }
   }
 
@@ -241,6 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       userIdRef.current = session?.user?.id ?? null
+      loadPendingSettings(userIdRef.current)
       if (session?.user) fetchProfile(session.user.id)
       setLoading(false)
     }).catch((err: unknown) => {
@@ -253,8 +304,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (_event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
-        if (userIdRef.current !== (session?.user?.id ?? null)) forgetPendingSettings()
+        const userChanged = userIdRef.current !== (session?.user?.id ?? null)
         userIdRef.current = session?.user?.id ?? null
+        if (userChanged) loadPendingSettings(userIdRef.current)
         if (session?.user) {
           // A working session supersedes an earlier failed session check
           setAuthError((prev) => (prev?.kind === 'session' ? null : prev))

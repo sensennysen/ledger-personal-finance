@@ -315,7 +315,7 @@ function TransactionRowImpl({
               ) : null
             )}
           </div>
-          <p className="text-xs text-muted-foreground shrink-0">{tx.currency}</p>
+          <p className="text-xs text-muted-foreground shrink-0">{displayCurrency}</p>
         </div>
       </div>
 

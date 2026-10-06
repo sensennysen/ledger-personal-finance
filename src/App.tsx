@@ -19,6 +19,7 @@ import LegalNoticesPage from '@/pages/LegalNoticesPage'
 import ReportsPage from '@/pages/ReportsPage'
 import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
 import MorePage from '@/pages/MorePage'
+import NotFoundPage from '@/pages/NotFoundPage'
 import { useVisualViewportVars } from '@/hooks/useVisualViewportVars'
 
 type RouteMetaEntry = {
@@ -220,6 +221,7 @@ function ProtectedRoutes() {
           <Route path="thirteenth-month" element={<ThirteenthMonthPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="more" element={<MorePage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </ErrorBoundary>

@@ -206,8 +206,11 @@ export function TransactionForm({
   }, [destinationTyped, form, suggestedDestination])
   // The amount a card or loan preset filled, in the target's currency, until the user types an amount of
   // their own; a Pay from switch keeps it as what the target receives (LED-293). `sentTyped`: the amount
-  // sent is the user's figure, so a preset no longer replaces it.
-  const [presetReceived, setPresetReceived] = useState<number | null>(null)
+  // sent is the user's figure, so a preset no longer replaces it. A new entry opened with an amount (Pay now,
+  // Make payment) starts from the bill's amount, which is in the target's currency like a preset.
+  const [presetReceived, setPresetReceived] = useState<number | null>(
+    !isEditing && Number(defaultValues?.amount) > 0 && !defaultValues?.destination_amount ? Number(defaultValues?.amount) : null,
+  )
   const [sentTyped, setSentTyped] = useState(false)
   // A card or loan preset is in the target's currency: between two currencies it fills the amount
   // received, and the amount sent follows from the rate feed unless the user typed it (LED-269, LED-293).
@@ -303,7 +306,7 @@ export function TransactionForm({
       // A loan or card in another currency stays chosen; the form asks for the amount received (LED-269).
       form.setValue('currency', selectedAccountRecord.currency)
       // A preset is what the card or loan receives, so a switch of currency keeps it (LED-293).
-      if (presetReceived !== null && toAccountCurrency) {
+      if (presetReceived !== null && paymentTarget && toAccountCurrency) {
         const next = paySourceAmounts(presetReceived, selectedAccountRecord.currency, toAccountCurrency, (amount, from, to) =>
           amountInCurrency({ amount, currency: from, exchange_rate: null }, to, rateTable),
         )

@@ -453,6 +453,7 @@ export default function TransactionsPage() {
       amount: t.amount,
       currency: t.currency,
       exchange_rate: 1,
+      destination_amount: t.destination_amount ?? null,
       description: t.description,
       notes: null as string | null,
       date: t.date,

@@ -30,7 +30,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { readCache } from '@/lib/dataCache'
 import { pickerGroupOrder, pickOfflineDefaultAccount } from '@/lib/accountDefault'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
-import { destinationAmountFor, isCrossCurrencyTransfer } from '@/lib/transferCredit'
+import { destinationAmountFor, needsAmountReceived } from '@/lib/transferCredit'
 import { amountInCurrency, ratesAsOfLabel } from '@/lib/exchangeRates'
 import { useOptionalExchangeRates } from '@/contexts/exchangeRatesState'
 import { getLoanAmountOwed, loansOwed } from '@/lib/loans'
@@ -186,9 +186,11 @@ export function TransactionForm({
   const goalId = useWatch({ control: form.control, name: 'goal_id' })
   const amountValue = useWatch({ control: form.control, name: 'amount' })
   const currencyValue = useWatch({ control: form.control, name: 'currency' })
-  // A transfer into an account in another currency carries the amount that arrived (LED-185).
+  const destinationValue = useWatch({ control: form.control, name: 'destination_amount' })
+  // A transfer, card payment or loan repayment into an account in another currency carries the amount
+  // that arrived (LED-185, LED-269).
   const toAccountCurrency = accounts.find((account) => account.id === selectedLoanId)?.currency
-  const crossCurrency = isCrossCurrencyTransfer({ type, currency: currencyValue, to_account_id: selectedLoanId }, toAccountCurrency)
+  const crossCurrency = needsAmountReceived({ type, currency: currencyValue, to_account_id: selectedLoanId }, toAccountCurrency)
   const suggestedDestination = useMemo(() => {
     if (!crossCurrency || !toAccountCurrency) return null
     const amount = Number(amountValue)
@@ -202,6 +204,15 @@ export function TransactionForm({
     if (destinationTyped) return
     form.setValue('destination_amount', suggestedDestination)
   }, [destinationTyped, form, suggestedDestination])
+  // A card or loan preset is in the target's currency: between two currencies it fills the amount
+  // received, and the amount sent follows from the rate feed while it is still empty (LED-269).
+  const setReceived = (value: number) => {
+    setDestinationTyped(true)
+    form.setValue('destination_amount', value, { shouldValidate: true })
+    if (Number(form.getValues('amount')) > 0 || !toAccountCurrency) return
+    const sent = amountInCurrency({ amount: value, currency: toAccountCurrency, exchange_rate: null }, currencyValue, rateTable)
+    if (sent !== null) form.setValue('amount', Math.round(sent * 100) / 100, { shouldValidate: true })
+  }
   const loanAccounts = useMemo(() => accounts.filter((account) => account.type === 'loan'), [accounts])
   // Only loans that still owe something are offered when picking a new repayment (LED-181 item, OD-8);
   // `loanAccounts` stays the full list so editing an old repayment against a now-repaid loan still resolves it.
@@ -222,10 +233,9 @@ export function TransactionForm({
         (account) =>
           account.type !== 'loan' &&
           account.type !== 'credit_card' &&
-          account.id !== selectedLoan?.id &&
-          (!paymentTarget || account.currency === paymentTarget.currency)
+          account.id !== selectedLoan?.id
       ),
-    [accounts, selectedLoan?.id, paymentTarget]
+    [accounts, selectedLoan?.id]
   )
 
   const { subcategories } = useSubcategories(selectedCategoryId)
@@ -285,41 +295,37 @@ export function TransactionForm({
 
     const selectedAccountRecord = accounts.find((account) => account.id === accountId)
     if (selectedAccountRecord) {
+      // A loan or card in another currency stays chosen; the form asks for the amount received (LED-269).
       form.setValue('currency', selectedAccountRecord.currency)
-      const repaymentLoan = accounts.find((account) => account.id === form.getValues('to_account_id'))
-      if (repaymentLoan && repaymentLoan.currency !== selectedAccountRecord.currency) {
-        form.setValue('to_account_id', null)
-      }
     }
 
     form.setValue('account_id', accountId)
   }
+
+  // Pay from: the current account when it is in the target's currency, else defaultPaymentSource, which
+  // falls back to another currency when none matches (LED-269). The amount is in the source's currency.
+  const setPaymentSource = useCallback((target: Account) => {
+    const current = accounts.find((account) => account.id === form.getValues('account_id'))
+    const keep =
+      current && current.type !== 'loan' && current.type !== 'credit_card' && current.currency === target.currency
+    const sourceId = keep ? current.id : (defaultPaymentSource(accounts, target) ?? '')
+    form.setValue('account_id', sourceId)
+    form.setValue('currency', accounts.find((account) => account.id === sourceId)?.currency ?? target.currency)
+  }, [accounts, form])
 
   const handleLoanChange = useCallback((loanId: string) => {
     const loan = loanAccounts.find((account) => account.id === loanId)
     if (!loan) return
 
     const currentDescription = form.getValues('description').trim()
-    const currentAccountId = form.getValues('account_id')
-    const compatibleSources = accounts.filter(
-      (account) =>
-        account.type !== 'loan' &&
-        account.type !== 'credit_card' &&
-        account.id !== loan.id &&
-        account.currency === loan.currency
-    )
-
     form.setValue('type', 'expense')
     form.setValue('to_account_id', loan.id)
-    form.setValue('currency', loan.currency)
-    if (!compatibleSources.some((account) => account.id === currentAccountId)) {
-      form.setValue('account_id', compatibleSources[0]?.id ?? '')
-    }
+    setPaymentSource(loan)
     if (!currentDescription || currentDescription.startsWith('Loan payment - ')) {
       form.setValue('description', `Loan payment - ${loan.name}`)
     }
     form.clearErrors(['account_id', 'to_account_id', 'amount'])
-  }, [accounts, form, loanAccounts])
+  }, [form, loanAccounts, setPaymentSource])
 
   const handleCardChange = useCallback((cardId: string) => {
     const card = cardAccounts.find((account) => account.id === cardId)
@@ -327,25 +333,14 @@ export function TransactionForm({
 
     const currentDescription = form.getValues('description').trim()
     const previousCard = cardAccounts.find((account) => account.id === form.getValues('to_account_id'))
-    const currentAccountId = form.getValues('account_id')
-    const compatibleSources = accounts.filter(
-      (account) =>
-        account.type !== 'loan' &&
-        account.type !== 'credit_card' &&
-        account.currency === card.currency
-    )
-
     form.setValue('type', 'expense')
     form.setValue('to_account_id', card.id)
-    form.setValue('currency', card.currency)
-    if (!compatibleSources.some((account) => account.id === currentAccountId)) {
-      form.setValue('account_id', compatibleSources[0]?.id ?? '')
-    }
+    setPaymentSource(card)
     if (isAutoCardPaymentDescription(currentDescription, previousCard?.name)) {
       form.setValue('description', defaultCardPaymentDescription(card.name))
     }
     form.clearErrors(['account_id', 'to_account_id', 'amount'])
-  }, [accounts, cardAccounts, form])
+  }, [cardAccounts, form, setPaymentSource])
 
   useEffect(() => {
     if (!isCardPayment || selectedLoanId) return
@@ -368,7 +363,7 @@ export function TransactionForm({
     const source = defaultPaymentSource(accounts, paymentTarget) ?? ''
     if (source === selectedAccount) return
     form.setValue('account_id', source)
-    form.setValue('currency', paymentTarget.currency)
+    form.setValue('currency', accounts.find((account) => account.id === source)?.currency ?? paymentTarget.currency)
     form.clearErrors('account_id')
   }, [accounts, form, isEditing, isLiabilityPayment, paymentSourceAccounts, paymentTarget, selectedAccount, selectedCard])
 
@@ -397,7 +392,9 @@ export function TransactionForm({
         form.setError('account_id', { message: 'Choose a different account to repay this loan' })
         return
       }
-      if (exceedsOutstanding(values.amount, getLoanAmountOwed(repaymentLoan))) {
+      // What the loan receives: the amount received when it holds another currency (LED-269).
+      const received = destinationAmountFor(values, repaymentLoan.currency) ?? values.amount
+      if (exceedsOutstanding(received, getLoanAmountOwed(repaymentLoan))) {
         form.setError('amount', { message: 'Payment cannot exceed the outstanding loan amount' })
         return
       }
@@ -417,13 +414,14 @@ export function TransactionForm({
 
   const cardSummary =
     isCardPayment && selectedCard && !isEditing
-      ? getCardPaymentSummary(selectedCard.balance, selectedCard.credit_limit, Number(amountValue))
+      ? getCardPaymentSummary(selectedCard.balance, selectedCard.credit_limit, Number(crossCurrency ? destinationValue : amountValue))
       : null
   const cardPresets = cardSummary && selectedCard ? getCardPaymentPresets(selectedCard) : null
   const cardStatementDate = getCardDateInfo(selectedCard?.statement_day)
   const cardDueDate = getCardDateInfo(selectedCard?.due_day)
   const cardCurrency = selectedCard?.currency ?? DEFAULT_CURRENCY
-  const setCardAmount = (value: number) => form.setValue('amount', value, { shouldValidate: true })
+  const setCardAmount = (value: number) =>
+    crossCurrency ? setReceived(value) : form.setValue('amount', value, { shouldValidate: true })
 
   const hasExtraDetails =
     Boolean(notes?.trim()) ||
@@ -488,6 +486,42 @@ export function TransactionForm({
         )}
       />
     </div>
+
+    {crossCurrency && toAccountCurrency && (
+      <FormField
+        control={form.control}
+        name="destination_amount"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Amount received ({toAccountCurrency})</FormLabel>
+            <FormControl>
+              <Input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                name={field.name}
+                ref={field.ref}
+                onBlur={field.onBlur}
+                value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
+                onChange={(event) => {
+                  setDestinationTyped(true)
+                  field.onChange(event.target.value === '' ? null : event.target.value)
+                }}
+              />
+            </FormControl>
+            <p className="text-xs text-muted-foreground">
+              {destinationTyped
+                ? `What arrived in the ${toAccountCurrency} account.`
+                : suggestedDestination !== null
+                  ? `Filled in from the exchange-rate feed${ratesAsOfLabel(rateTable) ? `, as of ${ratesAsOfLabel(rateTable)}` : ''}. Change it to what the account received.`
+                  : `No exchange rate for ${currencyValue} to ${toAccountCurrency}. Enter what the account received.`}
+            </p>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    )}
 
     {cardSummary && cardPresets && (
       <div className="space-y-2">
@@ -638,7 +672,12 @@ export function TransactionForm({
         )}
 
         {isLoanRepayment && selectedLoan && !isEditing && (
-          <RepaymentAssist key={selectedLoan.id} loan={selectedLoan} form={form} />
+          <RepaymentAssist
+            key={selectedLoan.id}
+            loan={selectedLoan}
+            form={form}
+            received={crossCurrency ? { name: 'destination_amount', set: setReceived } : undefined}
+          />
         )}
 
         {isCardPayment && (
@@ -883,42 +922,6 @@ export function TransactionForm({
         )}
 
         {!isCardPayment && amountFields}
-
-        {crossCurrency && toAccountCurrency && (
-          <FormField
-            control={form.control}
-            name="destination_amount"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Amount received ({toAccountCurrency})</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
-                    name={field.name}
-                    ref={field.ref}
-                    onBlur={field.onBlur}
-                    value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
-                    onChange={(event) => {
-                      setDestinationTyped(true)
-                      field.onChange(event.target.value === '' ? null : event.target.value)
-                    }}
-                  />
-                </FormControl>
-                <p className="text-xs text-muted-foreground">
-                  {destinationTyped
-                    ? `What arrived in the ${toAccountCurrency} account.`
-                    : suggestedDestination !== null
-                      ? `Filled in from the exchange-rate feed${ratesAsOfLabel(rateTable) ? `, as of ${ratesAsOfLabel(rateTable)}` : ''}. Change it to what the account received.`
-                      : `No exchange rate for ${currencyValue} to ${toAccountCurrency}. Enter what the account received.`}
-                </p>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
 
         {type === 'transfer' && (
           <FormField

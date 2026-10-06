@@ -160,7 +160,11 @@ const accountsFixture = [
 
 test('the payment source is the first active non-liability account in the card currency', () => {
   assert.equal(defaultPaymentSource(accountsFixture, accountsFixture[0]), 'bank')
-  assert.equal(defaultPaymentSource([accountsFixture[0], accountsFixture[1]], accountsFixture[0]), null)
+})
+
+test('with none in the card currency, another currency pays it (LED-269)', () => {
+  assert.equal(defaultPaymentSource([accountsFixture[0], accountsFixture[1]], accountsFixture[0]), 'usd')
+  assert.equal(defaultPaymentSource([accountsFixture[0], accountsFixture[2], accountsFixture[3]], accountsFixture[0]), null)
 })
 
 test('a card payment is a category-less transfer at rate 1', () => {
@@ -184,6 +188,24 @@ test('a card payment is a category-less transfer at rate 1', () => {
     goal_id: null,
     amount: 500,
   })
+})
+
+test('a card paid from another currency keeps what the card received (LED-269)', () => {
+  const saved = cardPaymentTransfer({
+    type: 'expense',
+    to_account_id: 'card',
+    category_id: null,
+    subcategory_id: null,
+    exchange_rate: 1,
+    transfer_fee: null,
+    goal_id: null,
+    amount: 100,
+    currency: 'USD',
+    destination_amount: 5600,
+  })
+  assert.equal(saved.type, 'transfer')
+  assert.equal(saved.destination_amount, 5600)
+  assert.equal(creditedAmount(saved), 5600)
 })
 
 test('only a transfer into a credit card counts as paying it', () => {

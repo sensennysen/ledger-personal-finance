@@ -71,9 +71,10 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
 
   const updateTransactionCache = useCallback((next: Transaction[]) => {
     setTransactions(next)
-    writeCache(buildCacheKey(), next)
     // Another mounted instance (Home beside the layout's add form) has its own copy of this list.
-    notifyTransactionsRefresh()
+    // It reloads from the cache, so when the copy could not be written, asking it to would reload
+    // the old list over this one too (LED-303).
+    if (writeCache(buildCacheKey(), next)) notifyTransactionsRefresh()
   }, [buildCacheKey])
 
   const reloadFromCache = useCallback(() => {

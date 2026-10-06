@@ -18,6 +18,12 @@ Three layers, so the drain can be tested without Supabase or localStorage (LED-0
 
 **Drains on its own (LED-305).** `NetworkStatusProvider` calls `autoSync` once the queue has loaded, on `online`, and on focus or the tab becoming visible; `shouldDrain` (in `syncReadiness.ts`) decides. A drain that leaves items pending while online retries after 5 s, 30 s and 2 min, then waits for the next trigger. Two tabs opening at once both call it, and the drain lock makes the second find nothing to send.
 
+- A drain that saved rows posts `synced`, and other tabs run `notifySyncListeners` (`subscribeRemoteSync`), so their lists re-read as after their own drain. Without it the other tab's count cleared but its rows stayed "queued".
+
+**A cache write can fail; do not announce one that did (LED-303).** `writeCache` returns false on a quota error. `updateTransactionCache` notifies other instances only when the write landed: they reload from the cache, so announcing a failed write reloads the old list over the new row in every instance, this one included.
+
+**Check the queue live in the browser.** Under Vite, `await import('/src/lib/offlineQueue.ts')` from the console loads a second copy of the module, because the app's copy has an HMR `?t=` suffix. Take the app's URL from `performance.getEntriesByType('resource')`. Two browser-pane tabs share IndexedDB, BroadcastChannel and Web Locks, which is enough for the two-context check. Stub `Navigator.prototype.onLine` and dispatch `offline`/`online` (item 15 of `browser-check-with-local-user.md`).
+
 **One drain at a time.** `drainQueue` is wrapped in `singleFlight`, and `mergeDrainResult` re-reads the queue before writing so items enqueued or resolved mid-drain survive.
 
 **`useNetworkStatus()` reads one provider.** `NetworkStatusProvider` (mounted in `AppLayout`) owns the `online`/`offline` listeners and the drain trigger; the hook is a context read, so a second call site adds nothing. `useIsOnline()` in `LoanPurchaseTracker.tsx` predates this and is still a plain listener.

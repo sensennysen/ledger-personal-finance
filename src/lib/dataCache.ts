@@ -22,12 +22,15 @@ export function readCache<T>(key: string): T | null {
   }
 }
 
-export function writeCache<T>(key: string, data: T, ttlMs = DEFAULT_TTL_MS): void {
+/** Returns false when the copy could not be written (quota): a reader of the cache will not see `data`. */
+export function writeCache<T>(key: string, data: T, ttlMs = DEFAULT_TTL_MS): boolean {
   try {
     const entry: CacheEntry<T> = { data, expiresAt: Date.now() + ttlMs }
     localStorage.setItem(PREFIX + key, JSON.stringify(entry))
+    return true
   } catch {
-    // Storage quota exceeded — silently skip
+    // Storage quota exceeded: the cache is a warm-start hint, so the app carries on without it.
+    return false
   }
 }
 

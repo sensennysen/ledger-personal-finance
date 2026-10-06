@@ -125,7 +125,7 @@ export default function TransactionsPage() {
   }, [handoffKey, setSearchParams])
 
   // ── Templates ─────────────────────────────────────────────
-  const { templates, loading: templatesLoading, error: templatesError, refetch: refetchTemplates, addTemplate, removeTemplate } = useTransactionTemplates()
+  const { templates, loading: templatesLoading, error: templatesError, errorMessage: templatesErrorMessage, refetch: refetchTemplates, addTemplate, removeTemplate } = useTransactionTemplates()
   const templatesLoadState = resolveLoadState({ loading: templatesLoading, error: templatesError, hasData: templates.length > 0 })
   const { accounts } = useAccounts()
 
@@ -622,7 +622,7 @@ export default function TransactionsPage() {
         {/* Templates strip */}
         {(templatesLoadState === 'error' || templatesLoadState === 'stale-error') && (
           <InlineLoadError
-            message={templatesLoadState === 'stale-error' ? `Couldn't refresh your templates. ${templatesError}` : `Couldn't load your templates. ${templatesError}`}
+            message={templatesErrorMessage(templatesLoadState === 'stale-error') ?? ''}
             onRetry={() => void refetchTemplates()}
           />
         )}

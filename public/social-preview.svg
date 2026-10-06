@@ -1,30 +1,35 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="70" y1="40" x2="1130" y2="590" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F4EFE7" />
-      <stop offset="1" stop-color="#E8E0D2" />
-    </linearGradient>
-    <linearGradient id="card" x1="180" y1="120" x2="980" y2="520" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF" stop-opacity="0.92" />
-      <stop offset="1" stop-color="#F8F4EE" stop-opacity="0.98" />
-    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(980 110) rotate(90) scale(420 560)">
+      <stop stop-color="#A8B4DE" stop-opacity="0.16" />
+      <stop offset="1" stop-color="#A8B4DE" stop-opacity="0" />
+    </radialGradient>
   </defs>
 
-  <rect width="1200" height="630" fill="url(#bg)" />
-  <circle cx="1030" cy="120" r="220" fill="#C7A77A" fill-opacity="0.14" />
-  <circle cx="180" cy="560" r="180" fill="#9C8158" fill-opacity="0.15" />
+  <!-- Page and a soft accent glow: the dark theme's tokens (src/index.css .dark) -->
+  <rect width="1200" height="630" fill="#131218" />
+  <rect width="1200" height="630" fill="url(#glow)" />
 
-  <rect x="150" y="95" width="900" height="440" rx="28" fill="url(#card)" stroke="#E4D7C6" stroke-width="2" />
+  <!-- The Ledger mark (src/components/brand/LedgerMark.tsx), 377 -> 168 -->
+  <g transform="translate(84 92) scale(0.4456)">
+    <path fill="#E6E4EA" d="M68 82L173 82L173.5 82.5L173.5 86.5L173 87L159.3 87.3L157.3 88L155.5 88L150.5 90.3L150 91L149 91.3L149 91.8L148.3 92L146.3 94.5L145.8 96L145 96.8L145 97.8L144 100L143.3 110L143.3 248.3L144.3 260L145 261.5L145 262.5L145.8 263.3L146.3 264.8L148.3 266.8L152.5 269L154.5 269L157.8 269.8L191.3 270L197 269L199.5 269L202.3 268L203.8 268L205.8 267L207 267L208.5 266L209.5 266L210.8 265L211.8 265L212.8 264L213.5 264L214.5 263L215.3 263L215.8 262.3L216.8 262L217.5 261L218 261L221.3 258L221.8 258L222 257.3L222.8 257L224.3 255L224.8 255L224.8 254.5L228 251L228.3 250L228.8 250L229 249L229.8 248.5L230 247.5L232 245L232 244.3L232.8 243.8L233.3 242L235 239.5L235 238.8L238 232.8L238.3 231.3L238.8 231L239 229.3L239.8 228.5L240.3 226L240.8 225.8L241.3 223.3L242 222.3L242.3 220.3L243 219.3L243.3 217.3L244 216.3L244 214.8L245 212.8L245 211.5L245.5 211L251.3 211.3L250.5 219.5L249.8 228.5L249 232L249 235.8L248 241.3L247.8 247.3L247 250.5L247 254.3L246 260L246 263.8L245 269.3L245 273L243.8 281L68 281L67.5 280.5L67.5 276.5L68 276L77.8 276L83.3 275L84.5 274.3L86.8 273.8L87 273.3L89.5 272L90.3 271L90.8 271L91 270.3L92 269.5L92.3 268.5L93 268L94.8 263.3L95.5 253.5L95.5 109.5L95 100.8L94 96.5L93.3 95.8L92.8 94.3L92.3 94.3L92 93.5L89.3 91L88.3 90.8L87.8 90L86.8 89.8L86 89L85 89L83.3 88L80.5 87.8L79.8 87.3L68 87L67.5 86.5L67.5 82.5Z" />
+    <circle cx="300" cy="260.5" r="24.3" fill="#A8B4DE" />
+  </g>
 
-  <rect x="220" y="292" width="740" height="14" rx="7" fill="#D5C2A8" />
-  <rect x="220" y="322" width="700" height="14" rx="7" fill="#DCCCB5" />
-  <rect x="220" y="352" width="600" height="14" rx="7" fill="#E5D7C3" />
+  <text x="112" y="360" fill="#E6E4EA" font-family="Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="88" font-weight="700" letter-spacing="-1.5">Ledger</text>
+  <text x="114" y="416" fill="#A9A7B1" font-family="Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="30">Personal finance you can host yourself.</text>
+  <text x="114" y="530" fill="#A8B4DE" font-family="'DM Mono', 'Fira Mono', Menlo, monospace" font-size="22" letter-spacing="3">ACCOUNTS · BUDGETS · ACTIVITY</text>
 
-  <rect x="220" y="410" width="185" height="52" rx="26" fill="#8E6E46" />
-  <text x="312" y="444" text-anchor="middle" fill="#FFFFFF" font-family="Outfit, sans-serif" font-size="24" font-weight="600">Open Ledger</text>
-
-  <text x="220" y="170" fill="#8E6E46" font-family="DM Mono, monospace" font-size="24" letter-spacing="0.18em">PERSONAL FINANCE</text>
-  <text x="220" y="265" fill="#503A22" font-family="Playfair Display, serif" font-size="62" font-weight="600">Ledger</text>
-
-  <text x="220" y="500" fill="#6B5236" font-family="Outfit, sans-serif" font-size="26">Track spending, budgets, and account activity in one dashboard.</text>
+  <!-- A Home card, drawn schematically: no real data -->
+  <rect x="700" y="120" width="404" height="390" rx="24" fill="#26252E" stroke="#3A3944" stroke-width="2" />
+  <text x="736" y="172" fill="#A9A7B1" font-family="'DM Mono', 'Fira Mono', Menlo, monospace" font-size="16" letter-spacing="2">NET WORTH</text>
+  <text x="734" y="228" fill="#E6E4EA" font-family="'DM Mono', 'Fira Mono', Menlo, monospace" font-size="44" letter-spacing="-1">$24,860.00</text>
+  <path d="M736 318 L786 298 L836 306 L886 276 L936 286 L986 254 L1036 262 L1068 240" stroke="#A8B4DE" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M736 318 L786 298 L836 306 L886 276 L936 286 L986 254 L1036 262 L1068 240 L1068 340 L736 340 Z" fill="#A8B4DE" fill-opacity="0.10" />
+  <rect x="736" y="372" width="160" height="14" rx="7" fill="#3A3944" />
+  <rect x="988" y="372" width="80" height="14" rx="7" fill="#3A3944" />
+  <rect x="736" y="414" width="128" height="14" rx="7" fill="#3A3944" />
+  <rect x="1004" y="414" width="64" height="14" rx="7" fill="#3A3944" />
+  <rect x="736" y="456" width="176" height="14" rx="7" fill="#3A3944" />
+  <rect x="996" y="456" width="72" height="14" rx="7" fill="#3A3944" />
 </svg>

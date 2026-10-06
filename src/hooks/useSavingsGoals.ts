@@ -9,7 +9,6 @@ import { describeDataError, toResult, type DescribedError, type MutationResult }
 
 export interface GoalWithContributions extends SavingsGoal {
   linkedTransactions?: Transaction[]
-  totalContributed?: number
 }
 
 export function useSavingsGoals() {
@@ -73,11 +72,8 @@ export function useSavingsGoals() {
 
     const enriched: GoalWithContributions[] = (data as SavingsGoal[]).map((g) => {
       const txs = linkedTxs.filter((t) => t.goal_id === g.id)
-      return {
-        ...g,
-        linkedTransactions: txs,
-        totalContributed: txs.reduce((sum, t) => sum + (t.type === 'expense' ? -t.amount : t.amount), 0),
-      }
+      // The total is converted to the goal's currency where it is shown, with the rates (LED-311).
+      return { ...g, linkedTransactions: txs }
     })
 
     setLoadFailure(null)

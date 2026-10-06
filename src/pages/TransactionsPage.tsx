@@ -587,6 +587,7 @@ export default function TransactionsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder={compactList ? 'Search this cycle' : 'Search transactions...'}
+                aria-label={compactList ? 'Search this cycle' : 'Search transactions'}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 max-md:h-11 max-md:rounded-full max-md:bg-card"

@@ -378,7 +378,8 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         return {
           table: 'transactions',
           operation: 'update' as const,
-          payload: { category_id: categoryId },
+          // A subcategory belongs to one category, so a new category clears it (LED-315).
+          payload: { category_id: categoryId, subcategory_id: null },
           rowId: id,
           baseRevision: revisionFor('transactions', existing),
           userId: user.id,
@@ -389,14 +390,14 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       if (error) return { error }
       updateTransactionCache(transactions.map((t) =>
         ids.includes(t.id)
-          ? { ...t, category_id: categoryId, queued: true }
+          ? { ...t, category_id: categoryId, subcategory_id: null, queued: true }
           : t
       ))
       return { error: null, queued: true }
     }
     const { error } = await supabase
       .from('transactions')
-      .update({ category_id: categoryId })
+      .update({ category_id: categoryId, subcategory_id: null })
       .in('id', ids)
       .eq('user_id', user.id)
     if (!error) await fetch()

@@ -125,7 +125,8 @@ export default function TransactionsPage() {
   }, [handoffKey, setSearchParams])
 
   // ── Templates ─────────────────────────────────────────────
-  const { templates, addTemplate, removeTemplate } = useTransactionTemplates()
+  const { templates, loading: templatesLoading, error: templatesError, refetch: refetchTemplates, addTemplate, removeTemplate } = useTransactionTemplates()
+  const templatesLoadState = resolveLoadState({ loading: templatesLoading, error: templatesError, hasData: templates.length > 0 })
   const { accounts } = useAccounts()
 
   // ── Saved filters (LED-138) ───────────────────────────────
@@ -162,7 +163,7 @@ export default function TransactionsPage() {
     bulkUpdateCategory,
     bulkCreateTransactions,
   } = useTransactions()
-  const { createWithStatement } = useCardPayment(createTransaction)
+  const { createWithStatement, recordGenerated } = useCardPayment(createTransaction)
 
   const notify = useNotify()
   const { categories } = useCategories()
@@ -194,9 +195,31 @@ export default function TransactionsPage() {
     setCreateOpen(true)
   }
 
+  const saveTemplate = async (name: string, values: TransactionFormValues) => {
+    const { error } = await addTemplate(name, values)
+    if (!error) return
+    notify({
+      severity: 'failure',
+      title: `Couldn't save the "${name}" template`,
+      body: error,
+      action: { label: 'Retry', run: () => void saveTemplate(name, values) },
+    })
+  }
+
+  const deleteTemplate = async (id: string, name: string) => {
+    const { error } = await removeTemplate(id)
+    if (!error) return
+    notify({
+      severity: 'failure',
+      title: `Couldn't remove the "${name}" template`,
+      body: error,
+      action: { label: 'Retry', run: () => void deleteTemplate(id, name) },
+    })
+  }
+
   const handleSaveTemplateConfirm = () => {
     if (!templateSourceTx || !templateName.trim()) return
-    addTemplate(templateName.trim(), {
+    void saveTemplate(templateName.trim(), {
       type: templateSourceTx.type,
       account_id: templateSourceTx.account_id,
       to_account_id: templateSourceTx.to_account_id,
@@ -430,6 +453,7 @@ export default function TransactionsPage() {
       amount: t.amount,
       currency: t.currency,
       exchange_rate: 1,
+      destination_amount: t.destination_amount ?? null,
       description: t.description,
       notes: null as string | null,
       date: t.date,
@@ -441,7 +465,7 @@ export default function TransactionsPage() {
       // A converted row keeps the statement's own amount and currency, so a re-import at another rate is still caught.
       ...(t.original ? { original_amount: t.original.amount, original_currency: t.original.currency } : {}),
     }))
-    const result = await bulkCreateTransactions(rows)
+    const result = await bulkCreateTransactions(rows, recordGenerated)
     return { imported: result.imported ?? 0, error: result.error ?? null }
   }
 
@@ -563,6 +587,7 @@ export default function TransactionsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder={compactList ? 'Search this cycle' : 'Search transactions...'}
+                aria-label={compactList ? 'Search this cycle' : 'Search transactions'}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 max-md:h-11 max-md:rounded-full max-md:bg-card"
@@ -595,6 +620,12 @@ export default function TransactionsPage() {
         )}
 
         {/* Templates strip */}
+        {(templatesLoadState === 'error' || templatesLoadState === 'stale-error') && (
+          <InlineLoadError
+            message={templatesLoadState === 'stale-error' ? `Couldn't refresh your templates. ${templatesError}` : `Couldn't load your templates. ${templatesError}`}
+            onRetry={() => void refetchTemplates()}
+          />
+        )}
         {templates.length > 0 && (
           <div className="space-y-1.5">
             <button
@@ -625,7 +656,7 @@ export default function TransactionsPage() {
                   <button
                     type="button"
                     className="absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-muted border border-border text-muted-foreground hover:text-destructive"
-                    onClick={(e) => { e.stopPropagation(); removeTemplate(tmpl.id) }}
+                    onClick={(e) => { e.stopPropagation(); void deleteTemplate(tmpl.id, tmpl.name) }}
                     aria-label={`Remove ${tmpl.name} template`}
                   >
                     <X className="w-2.5 h-2.5" />

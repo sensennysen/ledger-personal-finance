@@ -66,6 +66,8 @@ type RecurringSource = {
 /**
  * The recurring rows whose next occurrence is due by `today`, each with that date (LED-232).
  * Whether it was already posted is the database's call: `post_recurring_transaction` decides.
+ * Each row is its own series, keyed on its id; the description plays no part, so renaming a row
+ * changes nothing about what posts (LED-260).
  */
 export function dueRecurringPosts<T extends RecurringSource>(rows: T[], today: string): { source: T; date: string }[] {
   const due: { source: T; date: string }[] = []

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { RECURRING_INTERVALS } from '@/lib/recurringTransactions'
-import { isCrossCurrencyTransfer } from '@/lib/transferCredit'
+import { needsAmountReceived } from '@/lib/transferCredit'
 
 const transactionFields = z.object({
   type: z.enum(['income', 'expense', 'transfer']),
@@ -31,7 +31,8 @@ const transactionFields = z.object({
 /**
  * A loan repayment is an expense with a destination and needs a category; a card payment has
  * none by design (LED-146), so its form validates without that rule. `accountCurrency` names the
- * currency of an account, so a transfer into an account in another currency must say what arrives.
+ * currency of an account, so a transfer, card payment or loan repayment into an account in another
+ * currency must say what arrives (LED-185, LED-269).
  */
 export function buildTransactionSchema({
   destinationNeedsCategory = true,
@@ -66,7 +67,7 @@ export function buildTransactionSchema({
     }
 
     const toCurrency = data.to_account_id ? accountCurrency?.(data.to_account_id) : undefined
-    if (isCrossCurrencyTransfer(data, toCurrency) && !(data.destination_amount != null && data.destination_amount > 0)) {
+    if (needsAmountReceived(data, toCurrency) && !(data.destination_amount != null && data.destination_amount > 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Enter the amount ${toCurrency} the account received`,

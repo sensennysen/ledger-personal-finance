@@ -39,8 +39,15 @@ export interface Profile {
   budget_deficit_behaviour?: 'carry' | 'reset' | null
   exchange_rate_refresh?: 'open' | 'daily' | 'weekly' | 'manual' | null
   dashboard_widget_order?: string[] | null
+  /** The Home widgets turned off; null until the account stores one (LED-264). */
+  dashboard_hidden_widgets?: string[] | null
+  /** When the setup checklist was dismissed and the pay cycle confirmed; null until then (LED-265). */
+  setup_checklist_dismissed_at?: string | null
+  pay_cycle_confirmed_at?: string | null
   account_group_order?: AccountType[] | null
   account_view_mode?: 'all' | AccountType | null
+  /** Only the preferences the user changed; read through parsePreferences (LED-263). */
+  preferences?: Record<string, unknown> | null
   created_at: string
   updated_at: string
 }

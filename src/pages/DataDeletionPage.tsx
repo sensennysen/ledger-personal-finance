@@ -4,8 +4,9 @@ import { ExportDataCard } from '@/components/legal/ExportDataCard'
 import { cn } from '@/lib/utils'
 
 // Wording approved by the product owner before commit (LED-189, OD-9; step 02 and the reading time,
-// LED-142, 2026-10-05; rule OD-5).
-const LAST_UPDATED = 'October 5, 2026'
+// LED-142, 2026-10-05; rule OD-5). The error reports line (LED-258) is a draft the owner reviews in
+// the epic-22 pull request.
+const LAST_UPDATED = 'October 6, 2026'
 
 const dataItems = [
   'Your name, email address and profile picture link, from Google at sign-in.',
@@ -14,9 +15,11 @@ const dataItems = [
   'Receipt images you attached.',
   'Categories, subcategories and budgets.',
   'Savings goals, loans and financed purchases with their payment allocations, and credit card payments.',
-  'Auto-categorisation rules and saved filters.',
+  'Auto-categorisation rules, saved filters and saved transaction templates.',
   'Exchange rates Ledger fetched or you typed.',
-  'Your settings: default currency, pay cycle, deficit setting, rate schedule and Home widget order.',
+  'Error reports the app sent when something failed for you.',
+  'Your settings: default currency, pay cycle, deficit setting, rate schedule, Home layout, preferences and setup checklist progress.',
+  'The card reminders already shown to you, and your 13th Month picks.',
 ]
 
 const steps = [
@@ -140,8 +143,8 @@ export default function DataDeletionPage() {
           <h2 className="text-base font-semibold text-foreground mb-3">On this device</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Deleting signs you out on this device and clears this browser’s copy of your data, any changes waiting
-            to sync and any receipt images waiting to upload. Your settings, such as theme and widget order, stay
-            in this browser until you clear its site data. Other devices you signed in on keep their copies until
+            to sync and any receipt images waiting to upload. Your theme, text size and accent colour stay in this
+            browser until you clear its site data. Other devices you signed in on keep their copies until
             you open Ledger there or clear them.
           </p>
         </section>

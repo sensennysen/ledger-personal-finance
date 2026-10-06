@@ -49,10 +49,11 @@ export function QueueReviewSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <ul className="flex-1 overflow-y-auto px-4">
-          {items.length === 0 && (
-            <li className="py-6 text-sm text-muted-foreground">Nothing is waiting.</li>
-          )}
+        {/* Mounted with the sheet, so discarding the last item is announced (LED-273). */}
+        <p role="status" className={items.length === 0 ? 'flex-1 px-4 py-6 text-sm text-muted-foreground' : 'sr-only'}>
+          {items.length === 0 ? 'Nothing is waiting.' : ''}
+        </p>
+        <ul className="flex-1 overflow-y-auto px-4" hidden={items.length === 0}>
           {items.map((item) => {
             const Icon = item.status ? AlertTriangle : item.operation === 'insert' ? Plus : Pencil
             // Each item's buttons carry its title, so a list of them is not a run of identical "Discard" (LED-179).

@@ -15,10 +15,11 @@ test('detail defaults to null', () => {
 })
 
 test('each kind has a distinct message and action label', () => {
-  const kinds = ['profile', 'session', 'signout']
-  assert.equal(new Set(kinds.map((k) => makeAuthError(k).message)).size, 3)
+  const kinds = ['profile', 'session', 'signout', 'settings']
+  assert.equal(new Set(kinds.map((k) => makeAuthError(k).message)).size, 4)
   assert.equal(authErrorActionLabel('session'), 'Reload')
   assert.equal(authErrorActionLabel('signout'), 'Try again')
+  assert.equal(authErrorActionLabel('settings'), 'Retry')
 })
 
 test('a failed Google sign-in start gets a plain message that depends only on being online (LED-196)', () => {

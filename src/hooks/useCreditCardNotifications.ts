@@ -1,29 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccounts } from '@/hooks/useAccounts'
 import { usePreferences } from '@/hooks/usePreferences'
+import { supabase } from '@/lib/supabase'
+import { reportError } from '@/lib/reportError'
+import {
+  dueCardReminders,
+  forgetLegacyReminders,
+  legacyReminderRows,
+  pruneCutoff,
+  readLegacyReminders,
+} from '@/lib/cardReminders'
 import { daysUntilDayOfMonth } from '@/lib/creditCards'
 import { getLocalDateString } from '@/lib/utils'
-
-type NotifMemory = Record<string, true>
-
-function loadSentMap(userId: string): NotifMemory {
-  try {
-    const raw = localStorage.getItem(`${userId}:cc-notifs-sent`)
-    if (!raw) return {}
-    return JSON.parse(raw) as NotifMemory
-  } catch {
-    return {}
-  }
-}
-
-function saveSentMap(userId: string, map: NotifMemory) {
-  try {
-    localStorage.setItem(`${userId}:cc-notifs-sent`, JSON.stringify(map))
-  } catch {
-    // Ignore storage access failures and skip persisting this run.
-  }
-}
 
 async function showPushStyleNotification(title: string, body: string, tag: string) {
   if (!('Notification' in window)) return
@@ -47,10 +36,47 @@ async function showPushStyleNotification(title: string, body: string, tag: strin
   new Notification(title, { body, tag })
 }
 
+/**
+ * Moves this browser's record of reminders already shown into the account (LED-266), once per
+ * session: the rows keep their own keys, so a repeat inserts nothing. A failure keeps the key.
+ */
+async function moveLegacyReminders(userId: string): Promise<void> {
+  const raw = readLegacyReminders(userId)
+  if (raw === null) return
+  const rows = legacyReminderRows(raw, userId, getLocalDateString())
+  if (rows.length > 0) {
+    const { error } = await supabase
+      .from('card_reminders_sent')
+      .upsert(rows, { onConflict: 'user_id,reminder_key', ignoreDuplicates: true, defaultToNull: false })
+    if (error) throw error
+  }
+  forgetLegacyReminders(userId)
+}
+
+/**
+ * Shows each card reminder once per account, on whichever device gets there first (LED-266): a
+ * reminder shows only when this device's insert records it. Offline, nothing is checked; the
+ * reminder waits for the connection rather than risk showing twice. This runs in the background
+ * with no screen of its own, so a failure is logged and reported to the operator.
+ */
 export function useCreditCardNotifications() {
   const { user } = useAuth()
   const { accounts } = useAccounts()
   const { prefs } = usePreferences()
+  const movedFor = useRef<string | null>(null)
+
+  // The old record moves whether or not reminders are on, so it never lingers in this browser.
+  useEffect(() => {
+    if (!user || !navigator.onLine || movedFor.current === user.id) return
+    moveLegacyReminders(user.id)
+      .then(() => {
+        movedFor.current = user.id
+      })
+      .catch((error: unknown) => {
+        console.error('Card reminders already shown could not be moved to the account:', error)
+        reportError('error', error)
+      })
+  }, [user])
 
   useEffect(() => {
     if (!user) return
@@ -59,48 +85,50 @@ export function useCreditCardNotifications() {
     if (Notification.permission !== 'granted') return
 
     const runCheck = async () => {
-      const sentMap = loadSentMap(user.id)
-      const today = getLocalDateString()
-      let changed = false
-
-      for (const account of accounts) {
-        if (account.type !== 'credit_card') continue
-
-        const statementDays = daysUntilDayOfMonth(account.statement_day)
-        const dueDays = daysUntilDayOfMonth(account.due_day)
-        const remainingToPay = Math.max((account.statement_balance ?? 0) - (account.statement_paid_amount ?? 0), 0)
-        const reminderDays = account.payment_reminder_days ?? 3
-
-        if (statementDays === 0) {
-          const key = `${account.id}:statement:${today}`
-          if (!sentMap[key]) {
-            await showPushStyleNotification(
-              `${account.name}: Statement Day`,
-              'Your statement closes today. Check your locked statement balance.',
-              key
-            )
-            sentMap[key] = true
-            changed = true
-          }
+      if (!navigator.onLine) return
+      try {
+        // Until the old record is in the account, a reminder it lists could show again.
+        if (movedFor.current !== user.id) {
+          await moveLegacyReminders(user.id)
+          movedFor.current = user.id
         }
 
-        if (dueDays !== null && dueDays >= 0 && dueDays <= reminderDays && remainingToPay > 0) {
-          const key = `${account.id}:due:${today}:${dueDays}`
-          if (!sentMap[key]) {
-            await showPushStyleNotification(
-              `${account.name}: Payment ${dueDays === 0 ? 'Due Today' : 'Due Soon'}`,
-              dueDays === 0
-                ? `Payment due today. Remaining: ${remainingToPay.toFixed(2)} ${account.currency}.`
-                : `Payment due in ${dueDays} day(s). Remaining: ${remainingToPay.toFixed(2)} ${account.currency}.`,
-              key
+        const today = getLocalDateString()
+        const { error: pruneError } = await supabase
+          .from('card_reminders_sent')
+          .delete()
+          .eq('user_id', user.id)
+          .lt('sent_on', pruneCutoff(today))
+        if (pruneError) throw pruneError
+
+        const cards = accounts
+          .filter((account) => account.type === 'credit_card')
+          .map((account) => ({
+            id: account.id,
+            name: account.name,
+            currency: account.currency,
+            statementDays: daysUntilDayOfMonth(account.statement_day),
+            dueDays: daysUntilDayOfMonth(account.due_day),
+            remainingToPay: Math.max((account.statement_balance ?? 0) - (account.statement_paid_amount ?? 0), 0),
+            reminderDays: account.payment_reminder_days ?? 3,
+          }))
+
+        for (const reminder of dueCardReminders(cards, today)) {
+          const { data, error } = await supabase
+            .from('card_reminders_sent')
+            .upsert(
+              { user_id: user.id, reminder_key: reminder.key, sent_on: today },
+              { onConflict: 'user_id,reminder_key', ignoreDuplicates: true },
             )
-            sentMap[key] = true
-            changed = true
-          }
+            .select('reminder_key')
+          if (error) throw error
+          // No row back: another device, or an earlier run, already showed it.
+          if (data && data.length > 0) await showPushStyleNotification(reminder.title, reminder.body, reminder.key)
         }
+      } catch (error) {
+        console.error('Card reminders could not be checked:', error)
+        reportError('error', error)
       }
-
-      if (changed) saveSentMap(user.id, sentMap)
     }
 
     runCheck()

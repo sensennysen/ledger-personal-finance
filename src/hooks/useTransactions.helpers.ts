@@ -1,5 +1,5 @@
 import type { Account, Category, Transaction } from '@/types'
-import { transferCredit } from '@/lib/transferCredit'
+import { paymentCredit } from '@/lib/transferCredit'
 
 export interface TransactionFilters {
   accountId?: string
@@ -34,7 +34,7 @@ export function applyTxDelta(accounts: Account[], tx: TxShape): Account[] {
     }
 
     if ((tx.type === 'transfer' || tx.type === 'expense') && account.id === tx.to_account_id) {
-      const destinationAmount = tx.type === 'transfer' ? transferCredit(tx) : tx.amount
+      const destinationAmount = paymentCredit(tx)
       return { ...account, balance: account.balance + destinationAmount }
     }
 
@@ -56,7 +56,7 @@ export function reverseTxDelta(accounts: Account[], tx: TxShape): Account[] {
     }
 
     if ((tx.type === 'transfer' || tx.type === 'expense') && account.id === tx.to_account_id) {
-      const destinationAmount = tx.type === 'transfer' ? transferCredit(tx) : tx.amount
+      const destinationAmount = paymentCredit(tx)
       return { ...account, balance: account.balance - destinationAmount }
     }
 

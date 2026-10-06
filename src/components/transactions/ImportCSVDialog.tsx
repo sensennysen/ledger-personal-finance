@@ -34,8 +34,8 @@ import {
 import { suggestCategory, type Suggestion } from '@/lib/importCategories'
 import { convertAmount, currencyState, effectiveRate, formatSuggestedRate, rateInputValue } from '@/lib/importCurrency'
 import { useExchangeRates } from '@/contexts/exchangeRatesState'
-import { lookupRate, ratesAsOfLabel } from '@/lib/exchangeRates'
-import { looksLikeTransfer, transferCandidates, transferLegs } from '@/lib/importTransfer'
+import { amountInCurrency, lookupRate, ratesAsOfLabel } from '@/lib/exchangeRates'
+import { importTransferAmounts, looksLikeTransfer, transferCandidates, transferLegs } from '@/lib/importTransfer'
 import { WINDOW_STEP } from '@/lib/transactionWindow'
 import { CURRENCIES } from '@/types'
 import { cn, formatCurrency } from '@/lib/utils'
@@ -70,6 +70,8 @@ export interface ImportTx {
   to_account_id: string | null
   currency: string
   category_id: string | null
+  /** What the other account received, in its currency, for a transfer between two currencies (LED-269). */
+  destination_amount?: number | null
 }
 
 interface Props {
@@ -145,6 +147,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const [skipped, setSkipped] = useState<Set<CauseId>>(new Set())
   const [toggled, setToggled] = useState<Set<number>>(new Set())
   const [transfers, setTransfers] = useState<Map<number, string>>(new Map())
+  /** A cross-currency transfer's other side as typed, in the other account's currency; absent, the rate feed fills it (LED-269). */
+  const [otherAmounts, setOtherAmounts] = useState<Map<number, string>>(new Map())
   /** Categories the user chose; '' means they chose none. */
   const [picks, setPicks] = useState<Map<number, string>>(new Map())
   const [pickedCurrency, setPickedCurrency] = useState('')
@@ -214,6 +218,26 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const selection = { duplicates, skipped, toggled }
   const summary = summarise(rows, selection)
   const toImport = importableRows(rows, selection)
+
+  // A transfer to or from an account in another currency needs that side's figure too (LED-269).
+  const otherCurrency = (line: number) => {
+    const other = transfers.get(line)
+    const currency = other ? accounts.find((account) => account.id === other)?.currency : undefined
+    return currency && currency !== accountCurrency ? currency : null
+  }
+  const suggestedOther = (row: { line: number; amount: number | null }) => {
+    const currency = otherCurrency(row.line)
+    if (!currency || row.amount == null) return null
+    const converted = amountInCurrency({ amount: convertAmount(row.amount, rate), currency: accountCurrency, exchange_rate: null }, currency, rateTable)
+    return converted === null ? null : Math.round(converted * 100) / 100
+  }
+  const otherAmountFor = (row: { line: number; amount: number | null }) => {
+    const typed = otherAmounts.get(row.line)
+    if (typed === undefined) return suggestedOther(row)
+    const value = Number(typed)
+    return typed.trim() !== '' && Number.isFinite(value) && value > 0 ? Math.round(value * 100) / 100 : null
+  }
+  const otherAmountMissing = toImport.some((row) => otherCurrency(row.line) !== null && otherAmountFor(row) === null)
   const causes = groupProblems(rows, duplicates)
   const cause = causes.find((item) => item.id === activeCause) ?? causes[0]
 
@@ -237,6 +261,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     setSkipped(new Set())
     setToggled(new Set())
     setTransfers(new Map())
+    setOtherAmounts(new Map())
     setPicks(new Map())
     setDateOrderConfirmed(false)
     setPickedCurrency('')
@@ -281,6 +306,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         setSkipped(new Set())
         setToggled(new Set())
         setTransfers(new Map())
+        setOtherAmounts(new Map())
         setPicks(new Map())
         setActiveCause(null)
         setOnlyProblems(false)
@@ -312,12 +338,18 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     setAccountId(id)
     // Transfer counterparts depend on the account; its own rows can't be one.
     setTransfers(new Map())
+    setOtherAmounts(new Map())
     setSimilarOffer(null)
     setSimilarApplied(null)
   }
 
   const setKind = (line: number, value: string) => {
     const transferTo = value.startsWith('to:') ? value.slice(3) : null
+    setOtherAmounts((current) => {
+      const next = new Map(current)
+      next.delete(line)
+      return next
+    })
     setTransfers((current) => {
       const next = new Map(current)
       if (transferTo) next.set(line, transferTo)
@@ -370,7 +402,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
 
   const needsRate = conversion.kind === 'needs-rate'
   const blocked =
-    summary.errors > 0 || dupeCheck.loading || Boolean(dupeCheck.error) || needsRate || categoryMemory.loading
+    summary.errors > 0 || dupeCheck.loading || Boolean(dupeCheck.error) || needsRate || categoryMemory.loading || otherAmountMissing
   const selectableRows = rows.filter((row) => isSelectable(row, selection))
   const allSelected = selectableRows.length > 0 && selectableRows.every((row) => isSelected(row, selection))
 
@@ -386,8 +418,17 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         original: conversion.kind === 'ok' ? { amount: row.amount!, currency: statementCurrency } : null,
       }
       const other = transfers.get(row.line)
+      const otherSide = otherCurrency(row.line)
       return other
-        ? { ...base, type: 'transfer', category_id: null, ...transferLegs(row.type!, accountId, other) }
+        ? {
+            ...base,
+            ...(otherSide
+              ? importTransferAmounts(row.type!, base.amount, selectedAccount.currency, otherSide, otherAmountFor(row))
+              : {}),
+            type: 'transfer',
+            category_id: null,
+            ...transferLegs(row.type!, accountId, other),
+          }
         : { ...base, type: row.type!, account_id: accountId, to_account_id: null, category_id: categoryOf(row.line) }
     })
     const result = await onImport(txs)
@@ -908,6 +949,24 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                   </Select>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                                {transferTo && otherCurrency(row.line) && (
+                                  <label className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    {row.type === 'expense' ? 'Received' : 'Sent'} ({otherCurrency(row.line)})
+                                    <Input
+                                      type="number"
+                                      inputMode="decimal"
+                                      step="0.01"
+                                      min="0"
+                                      className="h-7 w-24 text-xs"
+                                      aria-invalid={otherAmountFor(row) === null}
+                                      value={otherAmounts.get(row.line) ?? suggestedOther(row)?.toFixed(2) ?? ''}
+                                      onChange={(event) => {
+                                        const text = event.target.value
+                                        setOtherAmounts((current) => new Map(current).set(row.line, text))
+                                      }}
+                                    />
+                                  </label>
                                 )}
                               </td>
                               <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">

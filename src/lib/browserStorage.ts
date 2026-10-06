@@ -3,6 +3,9 @@
 //
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). Every key below is
 // one the code writes; tests/legalPages.test.mjs fails when a new one appears without a row here.
+// The rows for settings moved to the account (LED-263 to LED-268: preferences, Home layout, setup
+// checklist, card reminders, 13th month picks) were approved by the owner on 2026-10-06. The templates
+// row (LED-257) is still a draft the owner reviews in the epic-22 pull request.
 
 /**
  * How Settings clears a group on this device. `keys` removes the matching local storage keys;
@@ -78,65 +81,65 @@ export const STORAGE_ROWS: StorageRow[] = [
   },
   {
     id: 'preferences',
-    what: 'Preferences',
+    what: 'Preferences (older copy)',
     keys: ['ledger-preferences'],
     where: 'local storage',
-    why: 'Number and date format, list view, notification and account-order settings',
-    removed: 'When you clear site data',
+    why: 'Number and date format, list view and notification settings saved on this browser before they were kept in your account. Ledger copies them to your account the next time you sign in, then removes them here',
+    removed: 'When they are copied to your account, or when you sign out',
     clear: 'keys',
     match: exactly('ledger-preferences'),
     reload: true,
   },
   {
     id: 'home-layout',
-    what: 'Home layout',
+    what: 'Home layout (older copy)',
     keys: ['ledger-dashboard-widgets', 'ledger-dashboard-widget-order'],
     where: 'local storage',
-    why: 'Which Home widgets show, and their order',
-    removed: 'When you clear site data',
+    why: 'Which Home widgets show, and their order, saved on this browser before they were kept in your account. Ledger copies them to your account the next time you sign in, then removes them here',
+    removed: 'When they are copied to your account, or when you sign out',
     clear: 'keys',
     match: exactly('ledger-dashboard-widgets', 'ledger-dashboard-widget-order'),
     reload: true,
   },
   {
     id: 'checklist',
-    what: 'Setup checklist',
+    what: 'Setup checklist (older copy)',
     keys: ['ledger-first-run'],
     where: 'local storage',
-    why: 'Whether you confirmed your pay cycle or dismissed the checklist',
-    removed: 'When you clear site data',
+    why: 'Whether you confirmed your pay cycle or dismissed the checklist, saved on this browser before it was kept in your account. Ledger copies it to your account the next time you sign in, then removes it here',
+    removed: 'When it is copied to your account, or when you sign out',
     clear: 'keys',
     match: exactly('ledger-first-run'),
     reload: true,
   },
   {
     id: 'templates',
-    what: 'Saved templates',
+    what: 'Saved templates (older copy)',
     keys: ['ledger_transaction_templates'],
     where: 'local storage',
-    why: 'Transactions you saved as templates',
-    removed: 'When you clear site data',
+    why: 'Templates saved on this browser before they were kept in your account. Ledger copies them to your account the next time you open Activity, then removes them here',
+    removed: 'When they are copied to your account, or when you sign out',
     clear: 'keys',
     match: exactly('ledger_transaction_templates'),
     reload: true,
   },
   {
     id: 'card-reminders',
-    what: 'Card reminders already shown',
+    what: 'Card reminders already shown (older copy)',
     keys: ['<your id>:cc-notifs-sent'],
     where: 'local storage',
-    why: 'Each card reminder appears once',
-    removed: 'When you clear site data',
+    why: 'The card reminders this browser showed before they were kept in your account. Ledger copies them to your account the next time it checks your cards, then removes them here',
+    removed: 'When they are copied to your account, or when you sign out',
     clear: 'keys',
     match: (key, userId) => userId !== null && key === `${userId}:cc-notifs-sent`,
   },
   {
     id: 'thirteenth-month',
-    what: '13th month picks',
+    what: '13th month picks (older copy)',
     keys: ['13th-month-selection:<your id>:<year>'],
     where: 'local storage',
-    why: 'The transactions you picked for the estimate',
-    removed: 'When you clear site data',
+    why: 'The transactions you picked for the estimate on this browser before they were kept in your account. Ledger copies them to your account the next time you open 13th Month Pay, then removes them here',
+    removed: 'When they are copied to your account, or when you sign out',
     clear: 'keys',
     match: (key, userId) => userId !== null && key.startsWith(`13th-month-selection:${userId}:`),
   },
@@ -161,6 +164,39 @@ export const STORAGE_ROWS: StorageRow[] = [
     clear: 'none',
   },
 ]
+
+// What sign-out removes as plain keys (LED-268): the data copy and every older copy of a group that now
+// lives in the account, whoever's they are, so the next person on this browser finds none of them.
+// The session, the queue and pending receipts go through their owners. Appearance and the install
+// banner flag stay: they are this device's, not the account's (decision C).
+const PERSONAL_EXACT = [
+  'ledger-preferences',
+  'ledger-dashboard-widgets',
+  'ledger-dashboard-widget-order',
+  'ledger-first-run',
+  'ledger_transaction_templates',
+]
+
+export function isPersonalKey(key: string): boolean {
+  return key.startsWith('ledger_cache:')
+    || PERSONAL_EXACT.includes(key)
+    || key.endsWith(':cc-notifs-sent')
+    || key.startsWith('13th-month-selection:')
+}
+
+/** Removes every personal key from this browser, at sign-out and account deletion. */
+export function forgetPersonalBrowserCopies(): void {
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && isPersonalKey(key)) keys.push(key)
+    }
+    keys.forEach((key) => localStorage.removeItem(key))
+  } catch {
+    /* storage unavailable: nothing to remove */
+  }
+}
 
 /** The keys among `allKeys` that clearing `row` removes: exactly its own, and only the signed-in user's. */
 export function keysInGroup(row: StorageRow, allKeys: string[], userId: string | null): string[] {

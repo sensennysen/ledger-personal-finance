@@ -1,6 +1,26 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "ledger-dev", "runtimeExecutable": "pnpm", "runtimeArgs": ["dev", "--port", "5173"], "port": 5173 }
+    {
+      "name": "ledger-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev",
+        "--port",
+        "5173"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "ledger-dev-mobile",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "dev",
+        "--port",
+        "5180",
+        "--strictPort"
+      ],
+      "port": 5180
+    }
   ]
 }

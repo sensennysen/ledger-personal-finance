@@ -6,10 +6,14 @@ import {
   isPending,
   markExpired,
   mergeDrainResult,
+  rebaseRevision,
+  rebaseRevisions,
   recordFailure,
+  recordRevisionMove,
   removeFlagged,
   rowKey,
   type QueueItem,
+  type RevisionMoves,
 } from './queueState.ts'
 
 /** The slice of the supabase client the drain uses. Left loose: the query builder is a long chain. */
@@ -79,10 +83,7 @@ async function resolveReceipt(item: QueueItem, receipts: ReceiptDeps, client: Dr
   return { ...item, payload: { ...item.payload, receipt_url: path } }
 }
 
-/**
- * Reads the server row an update or delete targets. Returns 'unknown' when the check itself
- * fails, so the write goes ahead as it always did.
- */
+/** Reads the server row an update or delete targets. Returns 'unknown' when the read itself fails. */
 async function readServerRow(item: QueueItem, client: DrainClient) {
   try {
     const columns = [...new Set(['updated_at', ...Object.keys(item.payload)])].join(',')
@@ -102,7 +103,68 @@ async function readServerRow(item: QueueItem, client: DrainClient) {
 const newerThanQueued = (row: Record<string, unknown>, item: QueueItem) =>
   typeof row.updated_at === 'string' && new Date(row.updated_at).getTime() > item.timestamp
 
-async function processItem(item: QueueItem, deps: DrainDeps, updatedRows: Set<string>): Promise<Outcome> {
+/** Shown on an item kept because the server copy could not be checked. Nothing was written. */
+export const SERVER_CHECK_FAILED = "Couldn't check the saved copy of this row, so nothing was written. It will be tried again."
+
+// The row is gone: an update has nothing left to change; a delete is already done.
+const gone = (item: QueueItem): Outcome =>
+  item.operation === 'delete'
+    ? { kind: 'synced' }
+    : { kind: 'keep', item: { ...item, status: 'conflict', conflictKind: 'deleted' } }
+
+// The row changed since the change was made against it.
+const editedOnServer = (item: QueueItem, row: Record<string, unknown>): Outcome => ({
+  kind: 'keep',
+  item:
+    item.operation === 'delete'
+      ? { ...item, status: 'conflict', conflictKind: 'edited' }
+      : { ...item, status: 'conflict', conflictKind: 'edited', serverSnapshot: row },
+})
+
+const checkFailed = (item: QueueItem): Outcome => ({ kind: 'keep', item: { ...item, lastError: SERVER_CHECK_FAILED } })
+
+/**
+ * An update or delete. It is sent with the revision it was made against, so the database applies
+ * it only while the row still has that revision: the check and the write are one statement
+ * (LED-297). "Keep mine" (`force`) is the only write without that condition.
+ */
+async function processWrite(item: QueueItem, deps: DrainDeps, moves: RevisionMoves): Promise<Outcome> {
+  const { client } = deps
+  let base = item.baseRevision
+  if (!item.force && base === undefined) {
+    // Queued before LED-297: take the revision from the server, then write against it.
+    const row = await readServerRow(item, client)
+    if (row === 'unknown') return checkFailed(item)
+    if (row === null) return gone(item)
+    if (newerThanQueued(row, item)) return editedOnServer(item, row)
+    if (typeof row.updated_at === 'string') base = row.updated_at
+  }
+
+  let query = (item.operation === 'update' ? client.from(item.table).update(item.payload) : client.from(item.table).delete())
+    .eq('id', item.rowId)
+    .eq('user_id', item.userId)
+  if (!item.force && base !== undefined) query = query.eq('updated_at', base)
+  const { data, error } = await query.select('id, updated_at')
+  if (error) return { kind: 'keep', item: recordFailure(item, messageOf(error), isCountableError(error)) }
+
+  const written = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined
+  if (written) {
+    if (item.operation === 'update' && typeof written.updated_at === 'string') {
+      recordRevisionMove(moves, rowKey(item), base, written.updated_at)
+    }
+    return { kind: 'synced' }
+  }
+  if (!Array.isArray(data)) return { kind: 'synced' }
+
+  // Nothing matched: the row was deleted, or someone changed it after `base`.
+  if (item.force) return gone(item)
+  const row = await readServerRow(item, client)
+  if (row === 'unknown') return checkFailed(item)
+  if (row === null) return gone(item)
+  return editedOnServer(item, row)
+}
+
+async function processItem(item: QueueItem, deps: DrainDeps, moves: RevisionMoves): Promise<Outcome> {
   const { client, receipts } = deps
   let current = item
 
@@ -119,46 +181,7 @@ async function processItem(item: QueueItem, deps: DrainDeps, updatedRows: Set<st
   }
 
   if (!current.rowId) return { kind: 'synced' }
-  const checked = !current.force && !updatedRows.has(rowKey(current))
-
-  if (current.operation === 'update') {
-    if (checked) {
-      const row = await readServerRow(current, client)
-      if (row === null) return { kind: 'keep', item: { ...current, status: 'conflict', conflictKind: 'deleted' } }
-      if (row !== 'unknown' && newerThanQueued(row, current)) {
-        return { kind: 'keep', item: { ...current, status: 'conflict', conflictKind: 'edited', serverSnapshot: row } }
-      }
-    }
-    const { data, error } = await client
-      .from(current.table)
-      .update(current.payload)
-      .eq('id', current.rowId)
-      .eq('user_id', current.userId)
-      .select('id')
-    if (error) return { kind: 'keep', item: recordFailure(current, messageOf(error), isCountableError(error)) }
-    // Zero rows touched: the row went away between the check and the write.
-    if (Array.isArray(data) && data.length === 0) {
-      return { kind: 'keep', item: { ...current, status: 'conflict', conflictKind: 'deleted' } }
-    }
-    updatedRows.add(rowKey(current))
-    return { kind: 'synced' }
-  }
-
-  // delete
-  if (checked) {
-    const row = await readServerRow(current, client)
-    if (row === null) return { kind: 'synced' } // already gone: nothing left to delete
-    if (row !== 'unknown' && newerThanQueued(row, current)) {
-      return { kind: 'keep', item: { ...current, status: 'conflict', conflictKind: 'edited' } }
-    }
-  }
-  const { error } = await client
-    .from(current.table)
-    .delete()
-    .eq('id', current.rowId)
-    .eq('user_id', current.userId)
-  if (error) return { kind: 'keep', item: recordFailure(current, messageOf(error), isCountableError(error)) }
-  return { kind: 'synced' }
+  return processWrite(rebaseRevision(current, moves), deps, moves)
 }
 
 /**
@@ -181,14 +204,14 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
   const remaining: QueueItem[] = queue.filter(isFlagged)
   const seenIds = new Set(queue.map((i) => i.id))
   const flaggedAtStart = new Set(stored.filter(isFlagged).map((i) => i.id))
-  // Rows this drain already updated: our own write bumps updated_at, so a later
-  // queued change to the same row must not be flagged as a conflict.
-  const updatedRows = new Set<string>()
+  // Revisions this drain wrote: our own write bumps updated_at, so a later queued
+  // change to the same row is moved onto it instead of being flagged as a conflict.
+  const moves: RevisionMoves = new Map()
   let synced = 0
 
   for (const [index, item] of fresh.entries()) {
     try {
-      const outcome = await processItem(item, deps, updatedRows)
+      const outcome = await processItem(item, deps, moves)
       if (outcome.kind === 'synced') {
         synced++
         if (outcome.inserted) {
@@ -204,7 +227,7 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
   }
 
   // Re-read: the user may have resolved or enqueued items while we awaited the network.
-  deps.writeQueue(mergeDrainResult(remaining, deps.readQueue(), seenIds, flaggedAtStart))
+  deps.writeQueue(rebaseRevisions(mergeDrainResult(remaining, deps.readQueue(), seenIds, flaggedAtStart), moves))
   return synced
 }
 

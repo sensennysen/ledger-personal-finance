@@ -231,7 +231,8 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     if (!navigator.onLine) {
       const existing = transactions.find((t) => t.id === id)
       if (existing) {
-        const merged: Transaction = { ...existing, ...values, updated_at: new Date().toISOString(), queued: true }
+        // updated_at stays the server's: it is the revision the queued change is made against (LED-297).
+        const merged: Transaction = { ...existing, ...values, queued: true }
         updateTransactionCache(transactions.map((t) => (t.id === id ? merged : t)))
 
         // Reverse old effect, apply new effect
@@ -247,6 +248,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
           operation: 'update',
           payload: values as Record<string, unknown>,
           rowId: id,
+          baseRevision: existing?.updated_at,
           userId: user.id,
           // The edit may not touch description (e.g. a category-only change), so
           // the queue sheet title still has a name to show (LED-160).
@@ -278,6 +280,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         operation: 'delete',
         payload: {},
         rowId: id,
+        baseRevision: existing?.updated_at,
         userId: user.id,
         // A delete's payload carries nothing to title the queue sheet with (LED-160).
         label: existing?.description,
@@ -311,7 +314,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       updateTransactionCache(transactions.filter((t) => !ids.includes(t.id)))
       toDelete.forEach((tx) => {
         optimisticAccountDelta((accounts) => reverseTxDelta(accounts, tx))
-        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, userId: user.id, label: tx.description })
+        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, baseRevision: tx.updated_at, userId: user.id, label: tx.description })
       })
       return { error: null, queued: true }
     }
@@ -332,7 +335,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     if (!navigator.onLine) {
       updateTransactionCache(transactions.map((t) =>
         ids.includes(t.id)
-          ? { ...t, category_id: categoryId, updated_at: new Date().toISOString(), queued: true }
+          ? { ...t, category_id: categoryId, queued: true }
           : t
       ))
       ids.forEach((id) => {
@@ -342,6 +345,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
           operation: 'update',
           payload: { category_id: categoryId },
           rowId: id,
+          baseRevision: existing?.updated_at,
           userId: user.id,
           // A category-only change doesn't touch description (LED-160).
           label: existing?.description,

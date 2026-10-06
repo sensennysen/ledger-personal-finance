@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { discardFlagged, drainWith, singleFlight } from '../src/lib/queueDrain.ts'
+import { SERVER_CHECK_FAILED, discardFlagged, drainWith, singleFlight } from '../src/lib/queueDrain.ts'
 import { MAX_ATTEMPTS, describeConflict } from '../src/lib/queueState.ts'
 import { fakeClient } from './helpers/fakeSupabase.mjs'
 import { NOW, depsFor, fakeQueueStore, fakeReceipts, queued } from './helpers/fakeQueueStore.mjs'
@@ -68,7 +68,9 @@ test('an update to a row deleted on the server becomes a conflict, not synced', 
 
 test('an update that touches zero rows is a deleted-row conflict even after the check passed', async () => {
   const store = fakeQueueStore([queued({})])
-  const client = fakeClient((call) => (call.op === 'select' ? { data: { updated_at: OLD } } : { data: [] }))
+  let reads = 0
+  // The first read finds the row; it is deleted before the write, so the re-read finds nothing.
+  const client = fakeClient((call) => (call.op === 'select' ? { data: reads++ === 0 ? { updated_at: OLD } : null } : { data: [] }))
   assert.equal(await drainWith(depsFor(client, store)), 0)
   assert.equal(store.read()[0].conflictKind, 'deleted')
 })
@@ -96,7 +98,7 @@ test('a second edit to the same row in one drain is not flagged by our own first
   // After the first write the server row looks newer than the queued items.
   let written = false
   const client = fakeClient((call) => {
-    if (call.op === 'update') { written = true; return { data: [{ id: 'row-a' }] } }
+    if (call.op === 'update') { written = true; return { data: [{ id: 'row-a', updated_at: NEWER }] } }
     return { data: { updated_at: written ? NEWER : OLD } }
   })
   assert.equal(await drainWith(depsFor(client, store)), 2)
@@ -124,7 +126,7 @@ test('a delete with no conflict is sent', async () => {
   const store = fakeQueueStore([queued({ operation: 'delete', payload: {} })])
   const client = fakeClient((call) => (call.op === 'select' ? { data: { updated_at: OLD } } : {}))
   assert.equal(await drainWith(depsFor(client, store)), 1)
-  assert.deepEqual(client.calls.at(-1).filters, { id: 'row-a', user_id: 'u' })
+  assert.deepEqual(client.calls.at(-1).filters, { id: 'row-a', user_id: 'u', updated_at: OLD })
 })
 
 test('repeated database errors flag an insert as failed after the limit, then it is skipped', async () => {
@@ -250,4 +252,138 @@ test('onSynced is not called for an insert the database rejected', async () => {
   const client = fakeClient(() => ({ error: { code: '23514', message: 'amount' } }))
   await drainWith({ ...depsFor(client, store), onSynced: (item) => heard.push(item.id) })
   assert.deepEqual(heard, [])
+})
+
+// LED-297: a queued update or delete applies only to the revision it was made against.
+// A one-row server: an update or delete matches only while `updated_at` still equals the filter.
+function revisionServer({ row = { id: 'row-a', updated_at: OLD, amount: 1 }, readFails = false, beforeWrite } = {}) {
+  const server = { row, writes: 0 }
+  server.client = fakeClient((call) => {
+    if (call.op === 'select') return readFails ? { error: { message: 'timeout' } } : { data: server.row && { ...server.row } }
+    beforeWrite?.(server)
+    const matches = server.row && (call.filters.updated_at === undefined || call.filters.updated_at === server.row.updated_at)
+    if (!matches) return { data: [] }
+    server.writes++
+    if (call.op === 'delete') { server.row = null; return { data: [{ id: 'row-a' }] } }
+    server.row = { ...server.row, ...call.payload, updated_at: new Date(NOW + server.writes).toISOString() }
+    return { data: [{ id: 'row-a', updated_at: server.row.updated_at }] }
+  })
+  return server
+}
+
+test('LED-297: an update is written in one request conditioned on its base revision', async () => {
+  const server = revisionServer()
+  const store = fakeQueueStore([queued({ baseRevision: OLD })])
+  assert.equal(await drainWith(depsFor(server.client, store)), 1)
+  assert.deepEqual(server.client.calls.map((c) => c.op), ['update'], 'no separate read before the write')
+  assert.equal(server.client.calls[0].filters.updated_at, OLD)
+  assert.equal(server.row.amount, 5)
+})
+
+test('LED-297: a stale cached revision is flagged edited with the server values, not written', async () => {
+  const server = revisionServer({ row: { id: 'row-a', updated_at: NEWER, amount: 9 } })
+  const store = fakeQueueStore([queued({ baseRevision: OLD })])
+  assert.equal(await drainWith(depsFor(server.client, store)), 0)
+  const [item] = store.read()
+  assert.deepEqual([item.status, item.conflictKind], ['conflict', 'edited'])
+  assert.equal(item.serverSnapshot.amount, 9)
+  assert.equal(server.row.amount, 9)
+})
+
+test('LED-297: a write landing between the read and the update is not overwritten', async () => {
+  // Queued before LED-297 (no revision): the read sees OLD, then another device saves first.
+  const server = revisionServer({
+    beforeWrite: (s) => { if (s.writes === 0 && s.row.amount === 1) s.row = { ...s.row, amount: 7, updated_at: NEWER } },
+  })
+  const store = fakeQueueStore([queued({})])
+  assert.equal(await drainWith(depsFor(server.client, store)), 0)
+  assert.equal(server.row.amount, 7)
+  assert.deepEqual([store.read()[0].status, store.read()[0].conflictKind], ['conflict', 'edited'])
+})
+
+test('LED-297: a skewed client clock cannot hide a newer server edit', async () => {
+  // The device clock is a day ahead: the item's timestamp is later than the server's edit.
+  const server = revisionServer({ row: { id: 'row-a', updated_at: NEWER, amount: 9 } })
+  const store = fakeQueueStore([queued({ baseRevision: OLD, timestamp: NOW + 86_400_000 })])
+  const deps = { ...depsFor(server.client, store), now: () => NOW + 86_400_000 }
+  assert.equal(await drainWith(deps), 0)
+  assert.equal(server.row.amount, 9)
+  assert.equal(store.read()[0].status, 'conflict')
+})
+
+test('LED-297: a skewed clock behind the server does not flag an unchanged row', async () => {
+  const server = revisionServer()
+  const store = fakeQueueStore([queued({ baseRevision: OLD, timestamp: NOW - 86_400_000 * 2 })])
+  const deps = { ...depsFor(server.client, store), now: () => NOW - 86_400_000 }
+  assert.equal(await drainWith(deps), 1)
+  assert.equal(server.row.amount, 5)
+})
+
+test('LED-297: a failed check keeps the item pending with a retryable message and writes nothing', async () => {
+  for (const item of [queued({}), queued({ operation: 'delete', payload: {} })]) {
+    const server = revisionServer({ readFails: true })
+    const store = fakeQueueStore([item])
+    assert.equal(await drainWith(depsFor(server.client, store)), 0)
+    const [kept] = store.read()
+    assert.equal(kept.status, undefined)
+    assert.equal(kept.lastError, SERVER_CHECK_FAILED)
+    assert.equal(server.writes, 0)
+  }
+})
+
+test('LED-297: a conditional write that matched nothing and cannot be re-read is kept, not flagged', async () => {
+  const client = fakeClient((call) => (call.op === 'select' ? { error: { message: 'timeout' } } : { data: [] }))
+  const store = fakeQueueStore([queued({ baseRevision: OLD })])
+  assert.equal(await drainWith(depsFor(client, store)), 0)
+  assert.equal(store.read()[0].status, undefined)
+  assert.equal(store.read()[0].lastError, SERVER_CHECK_FAILED)
+})
+
+test('LED-297: a delete against a stale revision is a conflict; against a deleted row it is synced', async () => {
+  const edited = revisionServer({ row: { id: 'row-a', updated_at: NEWER } })
+  const store = fakeQueueStore([queued({ operation: 'delete', payload: {}, baseRevision: OLD })])
+  assert.equal(await drainWith(depsFor(edited.client, store)), 0)
+  assert.ok(edited.row, 'the edited row is not deleted')
+  assert.equal(store.read()[0].conflictKind, 'edited')
+
+  const deleted = revisionServer({ row: null })
+  const store2 = fakeQueueStore([queued({ operation: 'delete', payload: {}, baseRevision: OLD })])
+  assert.equal(await drainWith(depsFor(deleted.client, store2)), 1)
+  assert.deepEqual(store2.read(), [])
+})
+
+test('LED-297: two edits made against the same revision both apply, in one drain or across two', async () => {
+  const server = revisionServer()
+  const store = fakeQueueStore([queued({ id: 'one', baseRevision: OLD }), queued({ id: 'two', payload: { amount: 6 }, baseRevision: OLD })])
+  assert.equal(await drainWith(depsFor(server.client, store)), 2)
+  assert.equal(server.row.amount, 6)
+
+  // Across drains: the second edit's write is cut off by a dropped connection, then retried.
+  const later = revisionServer()
+  let drops = 1
+  const flaky = {
+    ...later.client,
+    from(table) {
+      const query = later.client.from(table)
+      const update = query.update
+      query.update = (payload) => {
+        if (payload.amount === 6 && drops-- > 0) throw new Error('network')
+        return update(payload)
+      }
+      return query
+    },
+  }
+  const store2 = fakeQueueStore([queued({ id: 'one', baseRevision: OLD }), queued({ id: 'two', payload: { amount: 6 }, baseRevision: OLD })])
+  assert.equal(await drainWith(depsFor(flaky, store2)), 1)
+  assert.equal(store2.read()[0].baseRevision, later.row.updated_at, 'the kept edit moves onto our own write')
+  assert.equal(await drainWith(depsFor(flaky, store2)), 1)
+  assert.equal(later.row.amount, 6)
+})
+
+test('LED-297: keep mine is the only write without the revision condition', async () => {
+  const server = revisionServer({ row: { id: 'row-a', updated_at: NEWER, amount: 9 } })
+  const store = fakeQueueStore([queued({ baseRevision: OLD, force: true })])
+  assert.equal(await drainWith(depsFor(server.client, store)), 1)
+  assert.equal(server.client.calls[0].filters.updated_at, undefined)
+  assert.equal(server.row.amount, 5)
 })

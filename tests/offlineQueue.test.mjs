@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   MAX_QUEUE_AGE_MS, MAX_ATTEMPTS, markExpired, applyKeepMine, removeFlagged, isPending, isFlagged,
   mergeDrainResult, rowKey, expireNow, nextExpiryAt, isCountableError, recordFailure, retryFailed,
-  describeConflict, canKeepMine,
+  describeConflict, canKeepMine, recordRevisionMove, rebaseRevision, rebaseRevisions,
 } from '../src/lib/queueState.ts'
 
 const NOW = 1_000_000_000_000
@@ -181,4 +181,19 @@ test('an edit cannot move a queued create to another user or id', async () => {
   const { queue } = editQueuedInsert([create], 'tx-1', { id: 'other', user_id: 'someone-else', amount: 3 })
   assert.equal(queue[0].payload.id, 'tx-1')
   assert.equal(queue[0].payload.user_id, 'u')
+})
+
+// LED-297: our own write moves later changes onto its revision; someone else's revision is left alone.
+test('rebaseRevision follows the revisions a drain wrote, and only those', () => {
+  const moves = new Map()
+  recordRevisionMove(moves, 't:r', 'r1', 'r2')
+  recordRevisionMove(moves, 't:r', 'r2', 'r3')
+  assert.equal(rebaseRevision(item({ rowId: 'r', baseRevision: 'r1' }), moves).baseRevision, 'r3')
+  assert.equal(rebaseRevision(item({ rowId: 'r', baseRevision: 'other' }), moves).baseRevision, 'other')
+  assert.equal(rebaseRevision(item({ rowId: 'r' }), moves).baseRevision, 'r3', 'an item queued before LED-297 takes our latest write')
+  assert.equal(rebaseRevision(item({ rowId: 'x', baseRevision: 'r1' }), moves).baseRevision, 'r1', 'another row is untouched')
+  const insert = item({ operation: 'insert', rowId: undefined })
+  assert.equal(rebaseRevision(insert, moves), insert)
+  const queue = [item({ rowId: 'x' })]
+  assert.equal(rebaseRevisions(queue, new Map()), queue, 'no moves: the same array')
 })

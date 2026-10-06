@@ -1196,6 +1196,8 @@ export default function BudgetsPage() {
   const [goalFormError, setGoalFormError] = useState<FormErrorValue>(null)
   const [contributionGoal, setContributionGoal] = useState<GoalWithContributions | null>(null)
   const [contributionError, setContributionError] = useState<FormErrorValue>(null)
+  // One id per opened dialog: a retry after a lost response reuses it and is counted once (LED-312).
+  const [contributionOpId, setContributionOpId] = useState('')
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null)
 
   const defaultCurrency = profile?.default_currency ?? 'USD'
@@ -1252,13 +1254,18 @@ export default function BudgetsPage() {
 
   const handleContribution = async (amount: number) => {
     if (!contributionGoal) return
-    const { error, errorDetail } = await addContribution(contributionGoal.id, amount, contributionGoal.current_amount)
+    const { error, errorDetail } = await addContribution(contributionGoal.id, amount, contributionOpId)
     // A rejected or unsent contribution keeps the dialog and its amount, so Add Contribution retries (LED-313).
     if (error) { setContributionError({ message: error, detail: errorDetail ?? null }); return }
     setContributionError(null)
     setContributionGoal(null)
   }
 
+  const openContribution = (goal: GoalWithContributions) => {
+    setContributionOpId(crypto.randomUUID())
+    setContributionError(null)
+    setContributionGoal(goal)
+  }
   const closeContribution = () => { setContributionGoal(null); setContributionError(null) }
 
   const monthlyBudgets = budgets.filter((b) => b.period === 'monthly')
@@ -1600,7 +1607,7 @@ export default function BudgetsPage() {
                   goal={goal}
                   onEdit={() => setEditGoal(goal)}
                   onDelete={async () => { await deleteGoal(goal.id) }}
-                  onContribute={() => setContributionGoal(goal)}
+                  onContribute={() => openContribution(goal)}
                   onToggleComplete={() => updateGoal(goal.id, { is_completed: true })}
                 />
               ))}
@@ -1613,7 +1620,7 @@ export default function BudgetsPage() {
                       goal={goal}
                       onEdit={() => setEditGoal(goal)}
                       onDelete={async () => { await deleteGoal(goal.id) }}
-                      onContribute={() => setContributionGoal(goal)}
+                      onContribute={() => openContribution(goal)}
                       onToggleComplete={() => updateGoal(goal.id, { is_completed: false })}
                     />
                   ))}

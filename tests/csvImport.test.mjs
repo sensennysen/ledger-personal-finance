@@ -4,6 +4,8 @@ import {
   buildRows,
   dateOrderIsAmbiguous,
   detectDateOrder,
+  detectFormat,
+  fileCurrency,
   fixableByOtherOrder,
   groupProblems,
   importableRows,
@@ -19,7 +21,9 @@ import {
   summarise,
   withAmbiguousDateIssues,
   withCategoryIssues,
+  withCurrencyIssues,
 } from '../src/lib/csvImport.ts'
+import { buildReportCsv, buildTransactionsCsv } from '../src/lib/transactionCsv.ts'
 
 const rowsOf = (text, order) => {
   const file = processFile(text)
@@ -283,4 +287,117 @@ test('a file with a day over 12 is settled, not ambiguous', () => {
   const file = processFile(text)
   assert.equal(file.dateOrderAmbiguous, false)
   assert.equal(file.dateOrder, 'DMY')
+})
+
+// QA-001 / F-019c: Ledger's own export writes a positive Amount and puts the direction in Type.
+const LEDGER_REPORT = [
+  'Date,Description,Category,Account,Type,Amount,Currency,Standing Balance',
+  '2026-10-06,QA split first,,QA Cash,expense,7,USD,878',
+  '2026-10-06,QA transfer,,QA Cash,transfer,100,USD,950',
+  '2026-10-06,QA income,,QA Cash,income,50,USD,1050',
+].join('\n')
+
+test('a Ledger export is recognised by its Type, Amount and Currency columns', () => {
+  assert.equal(detectFormat(['Date', 'Description', 'Category', 'Account', 'Type', 'Amount', 'Currency']), 'Ledger')
+  assert.equal(processFile(LEDGER_REPORT).format, 'Ledger')
+  // A bank statement with a "Transaction Type" column is still a bank statement.
+  assert.equal(detectFormat(['Date', 'Description', 'Transaction Type', 'Amount']), 'BPI')
+})
+
+test('a positive exported expense imports as an expense, and income stays income (F-019c)', () => {
+  const { rows } = rowsOf(LEDGER_REPORT)
+  const expense = rows.find((row) => row.description === 'QA split first')
+  assert.equal(expense.type, 'expense')
+  assert.equal(expense.amount, 7)
+  assert.deepEqual(expense.issues, [])
+  const income = rows.find((row) => row.description === 'QA income')
+  assert.equal(income.type, 'income')
+  assert.equal(income.amount, 50)
+})
+
+test('an exported transfer is blocked, not guessed into income or expense', () => {
+  const { rows } = rowsOf(LEDGER_REPORT)
+  const transfer = rows.find((row) => row.description === 'QA transfer')
+  assert.equal(transfer.type, null)
+  assert.deepEqual(transfer.issues, ['transfer-row'])
+  assert.deepEqual(importableRows(rows, none), [])
+  // Skipping the transfers imports the rest with their own direction.
+  const ready = importableRows(rows, { ...none, skipped: new Set(['transfer-row']) })
+  assert.deepEqual(ready.map((row) => [row.description, row.type]), [['QA split first', 'expense'], ['QA income', 'income']])
+})
+
+test('reordered Ledger columns read the same', () => {
+  const { rows } = rowsOf(['Amount,Currency,Type,Description,Date', '7,USD,Expense,Coffee,2026-10-06'].join('\n'))
+  assert.deepEqual([rows[0].type, rows[0].amount, rows[0].date, rows[0].currency], ['expense', 7, '2026-10-06', 'USD'])
+})
+
+test('a missing or unknown Type and a negative amount with a Type are errors', () => {
+  const { rows } = rowsOf(
+    ['Date,Description,Type,Amount,Currency', '2026-10-06,Blank,,7,USD', '2026-10-06,Odd,refund,7,USD', '2026-10-06,Neg,income,-7,USD'].join('\n'),
+  )
+  assert.deepEqual(rows.map((row) => row.issues), [['bad-type'], ['bad-type'], ['sign-conflict']])
+  assert.equal(summarise(rows, none).errors, 3)
+  assert.deepEqual(groupProblems(rows, new Set()).map((cause) => [cause.id, cause.sample]), [
+    ['bad-type', ''],
+    ['sign-conflict', '-7'],
+  ])
+})
+
+test('a Ledger export without its Type or Currency column is refused, not read as all income', () => {
+  for (const header of ['Date,Description,Amount,Currency,Standing Balance', 'Date,Type,Description,Amount,Standing Balance']) {
+    const file = processFile([header, '2026-10-06,expense,Coffee,7,100'].join('\n'))
+    assert.match(file.error, /Ledger export/)
+  }
+})
+
+test('rows in another currency than the statement are blocked; a single-currency file names its currency', () => {
+  const { rows } = rowsOf(['Date,Description,Type,Amount,Currency', '2026-10-06,A,expense,7,USD', '2026-10-06,B,expense,9,PHP'].join('\n'))
+  assert.equal(fileCurrency(rows), null)
+  assert.equal(fileCurrency(rows.slice(0, 1)), 'USD')
+  const checked = withCurrencyIssues(rows, 'USD')
+  assert.deepEqual(checked.map((row) => row.issues), [[], ['other-currency']])
+  assert.equal(summarise(checked, none).errors, 1)
+})
+
+test('bank statements keep signed-amount and debit/credit direction', () => {
+  const bpi = rowsOf(BPI).rows
+  assert.ok(bpi.some((row) => row.type === 'expense') && bpi.some((row) => row.type === 'income'))
+  assert.ok(bpi.every((row) => row.currency === null && row.rawType === ''))
+  assert.deepEqual(withCurrencyIssues(bpi, 'USD'), bpi)
+  assert.deepEqual(rowsOf(BDO).rows.map((row) => row.type), ['expense', 'income'])
+})
+
+const exported = (over) => ({
+  id: 't1',
+  date: '2026-10-06',
+  type: 'expense',
+  description: 'Coffee',
+  category: null,
+  account: { name: 'QA Cash' },
+  account_id: 'a1',
+  to_account: null,
+  to_account_id: null,
+  amount: 7,
+  currency: 'USD',
+  exchange_rate: 1,
+  destination_amount: null,
+  transfer_fee: null,
+  notes: null,
+  ...over,
+})
+
+test('Reports and full exports round-trip through the importer with their direction', () => {
+  const transactions = [exported(), exported({ id: 't2', type: 'income', description: 'Pay', amount: 50 })]
+  const report = buildReportCsv(transactions, ['date', 'description', 'category', 'account', 'type', 'amount', 'balance'])
+  const full = buildTransactionsCsv(transactions)
+  for (const csv of [report, full]) {
+    const { rows } = rowsOf(csv)
+    assert.deepEqual(rows.map((row) => [row.type, row.amount, row.currency, row.issues.length]), [
+      ['expense', 7, 'USD', 0],
+      ['income', 50, 'USD', 0],
+    ])
+  }
+  // A transfer with a fee in the full export is blocked rather than imported as one side.
+  const { rows } = rowsOf(buildTransactionsCsv([exported({ type: 'transfer', to_account: { name: 'Bank' }, transfer_fee: 2 })]))
+  assert.deepEqual(rows[0].issues, ['transfer-row'])
 })

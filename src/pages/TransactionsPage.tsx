@@ -50,6 +50,7 @@ import { FilterTopCategories } from '@/components/transactions/FilterTopCategori
 import { buildMonthNets } from '@/lib/monthJump'
 import { searchMatcher } from '@/lib/globalSearch'
 import { filterFromParams, isFilterActive, type ActivityFilter, type FilterType } from '@/lib/savedFilters'
+import { filteredEmptyMessage } from '@/lib/filteredEmpty'
 import { SavedFiltersDialog } from '@/components/transactions/SavedFiltersDialog'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
 import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
@@ -848,7 +849,10 @@ export default function TransactionsPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={ArrowLeftRight}
-            title={`No ${filterType === 'all' ? 'transactions' : filterType} in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
+            {...filteredEmptyMessage(
+              { type: filterType, search, tag: activeTagFilter },
+              `${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`,
+            )}
             action={
               <Button variant="outline" size="sm" onClick={clearActivityFilters}>
                 Show all {cycleOnly.length}

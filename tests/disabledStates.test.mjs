@@ -2,9 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // A disabled control is solid ink on a solid surface (--disabled tokens), never opacity (LED-119, LED-120).
-const root = new URL('../src/', import.meta.url).pathname
+const root = fileURLToPath(new URL('../src/', import.meta.url))
 
 // Any class token with a disabled variant (disabled:, has-disabled:, aria-disabled:, data-disabled:,
 // peer-disabled:, group-data-[disabled=true]/name:, dark:disabled:) that ends in an opacity utility.

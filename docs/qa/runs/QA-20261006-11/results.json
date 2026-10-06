@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "id": "F-009a",
+      "title": "Scheduled expense is visibly disclosed in account scheduled column",
+      "result": "Pass"
+    },
+    {
+      "id": "F-007a",
+      "title": "Loan repayment credits loan and creates matching allocation",
+      "result": "Pass"
+    }
+  ],
+  "browser": "154.0.8037.94",
+  "userId": "c70215a2-24ff-47bc-a6e1-2970529b8d29"
+}

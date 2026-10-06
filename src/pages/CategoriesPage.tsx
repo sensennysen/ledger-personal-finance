@@ -181,40 +181,40 @@ function CategoryForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Icon</FormLabel>
-              <FormControl>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-border bg-muted/50 text-2xl">
-                    {field.value || DEFAULT_EMOJI_PLACEHOLDER}
-                  </div>
-                  <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-border bg-muted/50 text-2xl">
+                  {field.value || DEFAULT_EMOJI_PLACEHOLDER}
+                </div>
+                <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                  <FormControl>
                     <PopoverTrigger render={
                       <Button type="button" variant="outline" className="gap-2">
                         <Smile className="w-4 h-4" />
                         Choose Emoji
                       </Button>
                     } />
-                    <PopoverContent
-                      align="start"
-                      sideOffset={8}
-                      className="w-[min(calc(100vw-2rem),20rem)] max-w-[calc(100vw-2rem)] overflow-hidden border-0 p-0 shadow-xl"
-                    >
-                      <EmojiPicker
-                        onEmojiClick={(emoji) => {
-                          field.onChange(emoji.emoji)
-                          setEmojiPickerOpen(false)
-                        }}
-                        emojiStyle={EmojiStyle.NATIVE}
-                        theme={Theme.AUTO}
-                        width="100%"
-                        height={380}
-                        skinTonesDisabled
-                        previewConfig={{ showPreview: false }}
-                        searchPlaceholder="Search emoji..."
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </FormControl>
+                  </FormControl>
+                  <PopoverContent
+                    align="start"
+                    sideOffset={8}
+                    className="w-[min(calc(100vw-2rem),20rem)] max-w-[calc(100vw-2rem)] overflow-hidden border-0 p-0 shadow-xl"
+                  >
+                    <EmojiPicker
+                      onEmojiClick={(emoji) => {
+                        field.onChange(emoji.emoji)
+                        setEmojiPickerOpen(false)
+                      }}
+                      emojiStyle={EmojiStyle.NATIVE}
+                      theme={Theme.AUTO}
+                      width="100%"
+                      height={380}
+                      skinTonesDisabled
+                      previewConfig={{ showPreview: false }}
+                      searchPlaceholder="Search emoji..."
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </FormItem>
           )}
         />

@@ -1,0 +1,10 @@
+Date,Description,Category,Account,Type,Amount,Currency,Standing Balance
+2026-10-13,QA scheduled,,QA Cash,expense,5,USD,870
+2026-10-06,QA offline,,QA Cash,expense,3,USD,875
+2026-10-06,QA split first,,QA Cash,expense,7,USD,878
+2026-10-06,QA split second,,QA Cash,expense,13,USD,885
+2026-10-06,QA FX transfer,,QA Cash,transfer,10,USD,898
+2026-10-06,QA fee transfer,,QA Cash,transfer,10,USD,908
+2026-10-06,QA card payment,,QA Cash,transfer,30,USD,920
+2026-10-06,QA transfer,,QA Cash,transfer,100,USD,950
+2026-10-06,QA income,,QA Cash,income,50,USD,1050

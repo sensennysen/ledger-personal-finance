@@ -490,40 +490,40 @@ function GoalForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Icon</FormLabel>
-                <FormControl>
-                  <div className="flex items-center justify-end gap-2">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-xl">
-                      {field.value || DEFAULT_EMOJI_PLACEHOLDER}
-                    </div>
-                    <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                <div className="flex items-center justify-end gap-2">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-xl">
+                    {field.value || DEFAULT_EMOJI_PLACEHOLDER}
+                  </div>
+                  <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                    <FormControl>
                       <PopoverTrigger render={
                         <Button type="button" variant="outline" className="h-10 gap-2 px-3">
                           <Smile className="h-4 w-4" />
                           Select
                         </Button>
                       } />
-                      <PopoverContent
-                        align="end"
-                        sideOffset={8}
-                        className="w-[min(calc(100vw-2rem),20rem)] max-w-[calc(100vw-2rem)] overflow-hidden border-0 p-0 shadow-xl"
-                      >
-                        <EmojiPicker
-                          onEmojiClick={(emoji) => {
-                            field.onChange(emoji.emoji)
-                            setEmojiPickerOpen(false)
-                          }}
-                          emojiStyle={EmojiStyle.NATIVE}
-                          theme={Theme.AUTO}
-                          width="100%"
-                          height={380}
-                          skinTonesDisabled
-                          previewConfig={{ showPreview: false }}
-                          searchPlaceholder="Search emoji..."
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </FormControl>
+                    </FormControl>
+                    <PopoverContent
+                      align="end"
+                      sideOffset={8}
+                      className="w-[min(calc(100vw-2rem),20rem)] max-w-[calc(100vw-2rem)] overflow-hidden border-0 p-0 shadow-xl"
+                    >
+                      <EmojiPicker
+                        onEmojiClick={(emoji) => {
+                          field.onChange(emoji.emoji)
+                          setEmojiPickerOpen(false)
+                        }}
+                        emojiStyle={EmojiStyle.NATIVE}
+                        theme={Theme.AUTO}
+                        width="100%"
+                        height={380}
+                        skinTonesDisabled
+                        previewConfig={{ showPreview: false }}
+                        searchPlaceholder="Search emoji..."
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </FormItem>
             )}
           />
@@ -659,11 +659,13 @@ function GoalForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Color</FormLabel>
-              <ColorPicker
-                value={field.value}
-                onChange={field.onChange}
-                palette={ACCOUNT_COLORS}
-              />
+              <FormControl>
+                <ColorPicker
+                  value={field.value}
+                  onChange={field.onChange}
+                  palette={ACCOUNT_COLORS}
+                />
+              </FormControl>
             </FormItem>
           )}
         />

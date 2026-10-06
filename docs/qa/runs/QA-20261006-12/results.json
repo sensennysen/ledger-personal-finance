@@ -1,0 +1,27 @@
+{
+  "results": [
+    {
+      "id": "F-019b",
+      "title": "Reimport detects existing CSV row and skips it by default",
+      "result": "Pass"
+    },
+    {
+      "id": "F-024a",
+      "title": "Save and reopen a transaction template",
+      "result": "Fail",
+      "error": "locator.click: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Use QA Template template', exact: true })\u001b[22m\n"
+    },
+    {
+      "id": "F-026a",
+      "title": "13th-month inclusion selection persists after reload",
+      "result": "Pass"
+    },
+    {
+      "id": "F-025a",
+      "title": "Attach receipt PNG and persist its reference",
+      "result": "Pass"
+    }
+  ],
+  "browser": "154.0.8037.94",
+  "userId": "c70215a2-24ff-47bc-a6e1-2970529b8d29"
+}

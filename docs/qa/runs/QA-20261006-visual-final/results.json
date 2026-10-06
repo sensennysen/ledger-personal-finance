@@ -1,0 +1,1256 @@
+{
+  "browser": "154.0.8037.94",
+  "results": [
+    {
+      "route": "/",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 151,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2814,
+          "clientHeight": 748
+        }
+      },
+      "errors": [],
+      "screenshot": "home-390-light.png"
+    },
+    {
+      "route": "/accounts",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/accounts",
+      "scan": {
+        "checked": 98,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1442,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-390-light.png"
+    },
+    {
+      "route": "/accounts/22222222-0000-4000-8000-000000000002",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/accounts/22222222-0000-4000-8000-000000000002",
+      "scan": {
+        "checked": 218,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 3831,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-22222222-0000-4000-8000-000000000002-390-light.png"
+    },
+    {
+      "route": "/transactions",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/transactions",
+      "scan": {
+        "checked": 55,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 826,
+          "clientHeight": 748
+        }
+      },
+      "errors": [],
+      "screenshot": "transactions-390-light.png"
+    },
+    {
+      "route": "/budgets",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/budgets",
+      "scan": {
+        "checked": 212,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2959,
+          "clientHeight": 748
+        }
+      },
+      "errors": [],
+      "screenshot": "budgets-390-light.png"
+    },
+    {
+      "route": "/categories",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/categories",
+      "scan": {
+        "checked": 84,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1408,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "categories-390-light.png"
+    },
+    {
+      "route": "/reports",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/reports",
+      "scan": {
+        "checked": 129,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2870,
+          "clientHeight": 748
+        }
+      },
+      "errors": [],
+      "screenshot": "reports-390-light.png"
+    },
+    {
+      "route": "/thirteenth-month",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/thirteenth-month",
+      "scan": {
+        "checked": 129,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2015,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "thirteenth-month-390-light.png"
+    },
+    {
+      "route": "/settings",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/settings",
+      "scan": {
+        "checked": 138,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 5068,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "settings-390-light.png"
+    },
+    {
+      "route": "/more",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/more",
+      "scan": {
+        "checked": 16,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 788,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "more-390-light.png"
+    },
+    {
+      "route": "/",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 166,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2836,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "home-768-light.png"
+    },
+    {
+      "route": "/accounts",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/accounts",
+      "scan": {
+        "checked": 98,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1314,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-768-light.png"
+    },
+    {
+      "route": "/accounts/22222222-0000-4000-8000-000000000002",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/accounts/22222222-0000-4000-8000-000000000002",
+      "scan": {
+        "checked": 320,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 5099,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-22222222-0000-4000-8000-000000000002-768-light.png"
+    },
+    {
+      "route": "/transactions",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/transactions",
+      "scan": {
+        "checked": 83,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 952,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "transactions-768-light.png"
+    },
+    {
+      "route": "/budgets",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/budgets",
+      "scan": {
+        "checked": 188,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2164,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "budgets-768-light.png"
+    },
+    {
+      "route": "/categories",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/categories",
+      "scan": {
+        "checked": 101,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1022,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "categories-768-light.png"
+    },
+    {
+      "route": "/reports",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/reports",
+      "scan": {
+        "checked": 148,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2175,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "reports-768-light.png"
+    },
+    {
+      "route": "/thirteenth-month",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/thirteenth-month",
+      "scan": {
+        "checked": 124,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1819,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "thirteenth-month-768-light.png"
+    },
+    {
+      "route": "/settings",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/settings",
+      "scan": {
+        "checked": 133,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 3944,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "settings-768-light.png"
+    },
+    {
+      "route": "/more",
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 166,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2836,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "more-768-light.png"
+    },
+    {
+      "route": "/",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 169,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1435,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "home-1920-light.png"
+    },
+    {
+      "route": "/accounts",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/accounts",
+      "scan": {
+        "checked": 110,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 960,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-1920-light.png"
+    },
+    {
+      "route": "/accounts/22222222-0000-4000-8000-000000000002",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/accounts/22222222-0000-4000-8000-000000000002",
+      "scan": {
+        "checked": 339,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 4892,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-22222222-0000-4000-8000-000000000002-1920-light.png"
+    },
+    {
+      "route": "/transactions",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/transactions",
+      "scan": {
+        "checked": 106,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 960,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "transactions-1920-light.png"
+    },
+    {
+      "route": "/budgets",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/budgets",
+      "scan": {
+        "checked": 191,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2046,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "budgets-1920-light.png"
+    },
+    {
+      "route": "/categories",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/categories",
+      "scan": {
+        "checked": 121,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1022,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "categories-1920-light.png"
+    },
+    {
+      "route": "/reports",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/reports",
+      "scan": {
+        "checked": 151,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1585,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "reports-1920-light.png"
+    },
+    {
+      "route": "/thirteenth-month",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/thirteenth-month",
+      "scan": {
+        "checked": 127,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1161,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "thirteenth-month-1920-light.png"
+    },
+    {
+      "route": "/settings",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/settings",
+      "scan": {
+        "checked": 136,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2921,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "settings-1920-light.png"
+    },
+    {
+      "route": "/more",
+      "width": 1920,
+      "height": 1080,
+      "theme": "light",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 169,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1435,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "more-1920-light.png"
+    },
+    {
+      "route": "/",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 151,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2814,
+          "clientHeight": 748
+        }
+      },
+      "errors": [],
+      "screenshot": "home-390-dark.png"
+    },
+    {
+      "route": "/accounts",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/accounts",
+      "scan": {
+        "checked": 98,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1442,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-390-dark.png"
+    },
+    {
+      "route": "/accounts/22222222-0000-4000-8000-000000000002",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/accounts/22222222-0000-4000-8000-000000000002",
+      "scan": {
+        "checked": 218,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 3831,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-22222222-0000-4000-8000-000000000002-390-dark.png"
+    },
+    {
+      "route": "/transactions",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/transactions",
+      "scan": {
+        "checked": 55,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 826,
+          "clientHeight": 748
+        }
+      },
+      "errors": [],
+      "screenshot": "transactions-390-dark.png"
+    },
+    {
+      "route": "/budgets",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/budgets",
+      "scan": {
+        "checked": 212,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2959,
+          "clientHeight": 748
+        }
+      },
+      "errors": [],
+      "screenshot": "budgets-390-dark.png"
+    },
+    {
+      "route": "/categories",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/categories",
+      "scan": {
+        "checked": 84,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1408,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "categories-390-dark.png"
+    },
+    {
+      "route": "/reports",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/reports",
+      "scan": {
+        "checked": 129,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2870,
+          "clientHeight": 748
+        }
+      },
+      "errors": [],
+      "screenshot": "reports-390-dark.png"
+    },
+    {
+      "route": "/thirteenth-month",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/thirteenth-month",
+      "scan": {
+        "checked": 129,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2015,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "thirteenth-month-390-dark.png"
+    },
+    {
+      "route": "/settings",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/settings",
+      "scan": {
+        "checked": 138,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [
+          {
+            "tag": "span",
+            "text": "",
+            "alpha": 1
+          }
+        ],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 5068,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "settings-390-dark.png"
+    },
+    {
+      "route": "/more",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/more",
+      "scan": {
+        "checked": 16,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 788,
+          "clientHeight": 788
+        }
+      },
+      "errors": [],
+      "screenshot": "more-390-dark.png"
+    },
+    {
+      "route": "/",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 166,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2836,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "home-768-dark.png"
+    },
+    {
+      "route": "/accounts",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/accounts",
+      "scan": {
+        "checked": 98,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1314,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-768-dark.png"
+    },
+    {
+      "route": "/accounts/22222222-0000-4000-8000-000000000002",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/accounts/22222222-0000-4000-8000-000000000002",
+      "scan": {
+        "checked": 320,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 5099,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-22222222-0000-4000-8000-000000000002-768-dark.png"
+    },
+    {
+      "route": "/transactions",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/transactions",
+      "scan": {
+        "checked": 83,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 952,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "transactions-768-dark.png"
+    },
+    {
+      "route": "/budgets",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/budgets",
+      "scan": {
+        "checked": 188,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2164,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "budgets-768-dark.png"
+    },
+    {
+      "route": "/categories",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/categories",
+      "scan": {
+        "checked": 101,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1022,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "categories-768-dark.png"
+    },
+    {
+      "route": "/reports",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/reports",
+      "scan": {
+        "checked": 148,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2175,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "reports-768-dark.png"
+    },
+    {
+      "route": "/thirteenth-month",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/thirteenth-month",
+      "scan": {
+        "checked": 124,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [
+          {
+            "tag": "span",
+            "text": "",
+            "alpha": 1
+          },
+          {
+            "tag": "span",
+            "text": "",
+            "alpha": 1
+          },
+          {
+            "tag": "span",
+            "text": "",
+            "alpha": 1
+          }
+        ],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1819,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "thirteenth-month-768-dark.png"
+    },
+    {
+      "route": "/settings",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/settings",
+      "scan": {
+        "checked": 133,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [
+          {
+            "tag": "span",
+            "text": "",
+            "alpha": 1
+          }
+        ],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 3944,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "settings-768-dark.png"
+    },
+    {
+      "route": "/more",
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 166,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2836,
+          "clientHeight": 904
+        }
+      },
+      "errors": [],
+      "screenshot": "more-768-dark.png"
+    },
+    {
+      "route": "/",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 169,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1435,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "home-1920-dark.png"
+    },
+    {
+      "route": "/accounts",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/accounts",
+      "scan": {
+        "checked": 110,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 960,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-1920-dark.png"
+    },
+    {
+      "route": "/accounts/22222222-0000-4000-8000-000000000002",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/accounts/22222222-0000-4000-8000-000000000002",
+      "scan": {
+        "checked": 339,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 4892,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "accounts-22222222-0000-4000-8000-000000000002-1920-dark.png"
+    },
+    {
+      "route": "/transactions",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/transactions",
+      "scan": {
+        "checked": 106,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 960,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "transactions-1920-dark.png"
+    },
+    {
+      "route": "/budgets",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/budgets",
+      "scan": {
+        "checked": 191,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2046,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "budgets-1920-dark.png"
+    },
+    {
+      "route": "/categories",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/categories",
+      "scan": {
+        "checked": 121,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1022,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "categories-1920-dark.png"
+    },
+    {
+      "route": "/reports",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/reports",
+      "scan": {
+        "checked": 151,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1585,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "reports-1920-dark.png"
+    },
+    {
+      "route": "/thirteenth-month",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/thirteenth-month",
+      "scan": {
+        "checked": 127,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [
+          {
+            "tag": "span",
+            "text": "",
+            "alpha": 1
+          },
+          {
+            "tag": "span",
+            "text": "",
+            "alpha": 1
+          },
+          {
+            "tag": "span",
+            "text": "",
+            "alpha": 1
+          }
+        ],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1161,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "thirteenth-month-1920-dark.png"
+    },
+    {
+      "route": "/settings",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/settings",
+      "scan": {
+        "checked": 136,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [
+          {
+            "tag": "span",
+            "text": "",
+            "alpha": 1
+          }
+        ],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 2921,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "settings-1920-dark.png"
+    },
+    {
+      "route": "/more",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "actualUrl": "http://127.0.0.1:5173/",
+      "scan": {
+        "checked": 169,
+        "failures": [],
+        "exempt": [],
+        "lightSurfaces": [],
+        "overflowX": false,
+        "main": {
+          "scrollHeight": 1435,
+          "clientHeight": 960
+        }
+      },
+      "errors": [],
+      "screenshot": "more-1920-dark.png"
+    }
+  ],
+  "navigationIssues": []
+}

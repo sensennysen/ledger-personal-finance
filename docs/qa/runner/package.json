@@ -1,0 +1,1 @@
+{"name":"ledger-qa-runner","private":true,"type":"module","packageManager":"pnpm@12.4.2","devDependencies":{"playwright":"1.63.0"}}

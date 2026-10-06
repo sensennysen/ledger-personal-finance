@@ -2,9 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // Colors must come from the index.css tokens so they follow the theme (LED-100).
-const root = new URL('../src/', import.meta.url).pathname
+const root = fileURLToPath(new URL('../src/', import.meta.url))
 
 // Tailwind palette literals, e.g. text-yellow-600, bg-white/4, border-amber-300.
 const PALETTE =

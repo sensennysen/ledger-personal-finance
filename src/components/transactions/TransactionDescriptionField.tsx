@@ -50,8 +50,8 @@ export function TransactionDescriptionField({
               Description
               {isOptional ? <span className="font-normal text-muted-foreground"> (optional)</span> : null}
             </FormLabel>
-            <FormControl>
-              <div className="relative">
+            <div className="relative">
+              <FormControl>
                 <Input
                   placeholder={isOptional ? 'e.g. Move money to savings' : 'e.g. Grocery run'}
                   autoComplete="off"
@@ -89,34 +89,34 @@ export function TransactionDescriptionField({
                     }
                   }}
                 />
-                {showSuggestions && filteredSuggestions.length > 0 && (
-                  <div
-                    id={listboxId}
-                    role="listbox"
-                    aria-label="Previous descriptions"
-                    className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-md"
-                  >
-                    {filteredSuggestions.map((suggestion, index) => (
-                      <button
-                        key={suggestion}
-                        id={`${listboxId}-${index}`}
-                        type="button"
-                        role="option"
-                        aria-selected={index === activeIndex}
-                        className="w-full truncate rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
-                        onMouseEnter={() => setActiveIndex(index)}
-                        onMouseDown={(event) => {
-                          event.preventDefault()
-                          selectSuggestion(suggestion)
-                        }}
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </FormControl>
+              </FormControl>
+              {showSuggestions && filteredSuggestions.length > 0 && (
+                <div
+                  id={listboxId}
+                  role="listbox"
+                  aria-label="Previous descriptions"
+                  className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-md"
+                >
+                  {filteredSuggestions.map((suggestion, index) => (
+                    <button
+                      key={suggestion}
+                      id={`${listboxId}-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={index === activeIndex}
+                      className="w-full truncate rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onMouseDown={(event) => {
+                        event.preventDefault()
+                        selectSuggestion(suggestion)
+                      }}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <FormMessage />
           </FormItem>
         )

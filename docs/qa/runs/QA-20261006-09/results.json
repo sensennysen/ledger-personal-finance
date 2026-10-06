@@ -1,0 +1,223 @@
+{
+  "runTag": "muwot5mv",
+  "userId": "c70215a2-24ff-47bc-a6e1-2970529b8d29",
+  "browser": "154.0.8037.94",
+  "base": "http://127.0.0.1:5173",
+  "results": [
+    {
+      "id": "F-001c",
+      "title": "Invalid seeded credentials show an error",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:09.830Z"
+    },
+    {
+      "id": "F-001d",
+      "title": "Fresh fixture user password login and reload",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:11.531Z"
+    },
+    {
+      "id": "F-002a",
+      "title": "Fresh user sees setup and locked navigation",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:13.935Z"
+    },
+    {
+      "id": "F-003a",
+      "title": "Reject empty account name",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:14.052Z"
+    },
+    {
+      "id": "V-007a",
+      "title": "Account form labels reference actual form controls",
+      "result": "Fail",
+      "started": "2026-10-06T13:01:15.201Z",
+      "error": "{\"for\":\"_r_e_-form-item\",\"target\":\"DIV\"}"
+    },
+    {
+      "id": "F-003b",
+      "title": "Create cash account with opening balance",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:15.926Z"
+    },
+    {
+      "id": "F-003c",
+      "title": "Create savings and card accounts",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:17.760Z"
+    },
+    {
+      "id": "F-002b",
+      "title": "Confirm a changed pay cycle persists",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:20.733Z"
+    },
+    {
+      "id": "F-004a",
+      "title": "Reject zero expense amount",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:23.593Z"
+    },
+    {
+      "id": "F-004b",
+      "title": "Expense saves once and debits balance",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:24.864Z"
+    },
+    {
+      "id": "F-004c",
+      "title": "Income credits balance",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:26.902Z"
+    },
+    {
+      "id": "F-005a",
+      "title": "Transfer credits destination and debits source",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:28.622Z"
+    },
+    {
+      "id": "F-016a",
+      "title": "Search filters to a matching transaction",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:30.538Z"
+    },
+    {
+      "id": "F-016b",
+      "title": "No-match search is filtered empty, not data loss",
+      "result": "Fail",
+      "started": "2026-10-06T13:01:31.767Z",
+      "error": "locator.waitFor: Timeout 9000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText(/No .*match|No transactions found|No results/i).first() to be visible\u001b[22m\n"
+    },
+    {
+      "id": "F-004d",
+      "title": "Edit expense and recompute original balance delta",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:40.956Z"
+    },
+    {
+      "id": "F-018a",
+      "title": "Global search finds account and navigates",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:42.409Z"
+    },
+    {
+      "id": "F-012a",
+      "title": "Failed accounts read shows error, not empty",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:43.629Z"
+    },
+    {
+      "id": "F-012b",
+      "title": "Read retry recovers after service is restored",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:52.924Z"
+    },
+    {
+      "id": "F-012c",
+      "title": "Failed transaction save preserves entered data",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:54.106Z"
+    },
+    {
+      "id": "F-013a",
+      "title": "Second user cannot read or update first user account",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:55.577Z"
+    },
+    {
+      "id": "F-002c",
+      "title": "Setup completion persists in second browser context",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:55.994Z"
+    },
+    {
+      "id": "F-004e",
+      "title": "Delete expense and undo restores its financial effect once",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:58.318Z"
+    },
+    {
+      "id": "F-006a",
+      "title": "Transfer into credit card creates linked payment and reduces debt",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:00.348Z"
+    },
+    {
+      "id": "F-005b",
+      "title": "Transfer fee debits source in addition to principal",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:01.797Z"
+    },
+    {
+      "id": "F-008a",
+      "title": "Cross-currency transfer credits explicit received amount",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:03.453Z"
+    },
+    {
+      "id": "F-010a",
+      "title": "Split an expense conserves total and account balance",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:05.577Z"
+    },
+    {
+      "id": "F-009a",
+      "title": "Future expense updates stored balance and displays scheduled amount",
+      "result": "Fail",
+      "started": "2026-10-06T13:02:06.798Z",
+      "error": "locator.waitFor: Timeout 9000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText(/after.*5\\\\.00.*scheduled/).first() to be visible\u001b[22m\n"
+    },
+    {
+      "id": "F-011a",
+      "title": "Offline expense queues and syncs once after reconnection",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:18.014Z"
+    },
+    {
+      "id": "F-014a",
+      "title": "Create category budget and persist amount",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:21.727Z"
+    },
+    {
+      "id": "F-020a",
+      "title": "Report CSV download contains persisted transactions",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:24.339Z"
+    },
+    {
+      "id": "F-009b",
+      "title": "Recurring occurrence posts once across two browser contexts",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:26.835Z"
+    },
+    {
+      "id": "F-017a",
+      "title": "CSV export includes all 1105 additional records beyond API page limit",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:30.036Z"
+    },
+    {
+      "id": "F-001e",
+      "title": "Logout redirects and protects a deep link",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:33.818Z"
+    },
+    {
+      "id": "F-029a",
+      "title": "Public legal routes render logged out",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:42.914Z"
+    },
+    {
+      "id": "F-029b",
+      "title": "Unknown URL has a meaningful fallback",
+      "result": "Fail",
+      "started": "2026-10-06T13:02:45.437Z",
+      "error": "The input did not match the regular expression /not found|doesn.t exist|Good day|Home|404/i. Input:\n\n''\n"
+    }
+  ],
+  "errors": []
+}

@@ -5,6 +5,7 @@ import { MINUS } from '@/lib/netSign'
 import type { DashboardCashFlowForecast } from '@/hooks/useDashboardData'
 import { DashboardCardHeader } from '@/components/dashboard/DashboardCardHeader'
 import { SkeletonText } from '@/components/ui/skeleton'
+import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 
 interface DashboardCashFlowForecastCardProps {
   forecast: DashboardCashFlowForecast
@@ -109,6 +110,8 @@ export function DashboardCashFlowForecastCard({
             </div>
           </div>
 
+          <UnratedCurrencyNotice currencies={forecast.excludedCurrencies} subject="recurring items" />
+
           {forecast.forecastItems.length > 0 ? (
             <div className="pt-1 border-t border-border/30 space-y-1">
               <p className="text-[0.625rem] text-muted-foreground uppercase tracking-wider mb-2">Recurring items</p>
@@ -126,7 +129,8 @@ export function DashboardCashFlowForecastCard({
                     style={{ color: item.tx.type === 'income' ? INCOME : EXPENSE }}
                   >
                     {item.tx.type === 'income' ? '+' : MINUS}
-                    {formatCurrency(item.total, currency)}
+                    {/* An unrated item shows its own currency; it is not in the totals above (LED-310). */}
+                    {item.converted === null ? formatCurrency(item.total, item.tx.currency) : formatCurrency(item.converted, currency)}
                   </span>
                 </div>
               ))}

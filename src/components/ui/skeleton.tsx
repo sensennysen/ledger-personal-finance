@@ -7,7 +7,7 @@ function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="skeleton"
-      className={cn("animate-pulse motion-reduce:animate-none rounded-md bg-muted", className)}
+      className={cn("animate-pulse motion-reduce:animate-none rounded-md bg-skeleton", className)}
       {...props}
     />
   )
@@ -20,7 +20,7 @@ function SkeletonText({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="skeleton"
-      className={cn("inline-block h-[0.75em] align-middle animate-pulse motion-reduce:animate-none rounded-md bg-muted", className)}
+      className={cn("inline-block h-[0.75em] align-middle animate-pulse motion-reduce:animate-none rounded-md bg-skeleton", className)}
       {...props}
     />
   )

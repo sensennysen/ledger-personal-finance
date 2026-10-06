@@ -21,6 +21,8 @@ export interface QueueItem {
   label?: string
   userId: string
   timestamp: number
+  /** Bumped by each edit of a queued create, so a drain confirms only the version it sent (LED-299). Absent = 0. */
+  version?: number
   /** Absent = pending. Flagged items are retained until the user resolves them. */
   status?: QueueStatus
   /** Set by "keep mine": skip the conflict check on the next drain. */
@@ -109,6 +111,7 @@ export function editQueuedInsert(
     const fixed: QueueItem = {
       ...item,
       payload: { ...item.payload, ...values, id: rowId, user_id: item.payload.user_id },
+      version: (item.version ?? 0) + 1,
     }
     if (typeof values.description === 'string') fixed.label = values.description
     delete fixed.status
@@ -219,6 +222,32 @@ export function rebaseRevision(item: QueueItem, moves: RevisionMoves): QueueItem
 export const rebaseRevisions = (items: QueueItem[], moves: RevisionMoves) =>
   moves.size === 0 ? items : items.map((item) => rebaseRevision(item, moves))
 
+/** A queued create the drain saved: the version it sent, and its payload as the drain read it. */
+export interface SentInsert {
+  version: number
+  payload: Record<string, unknown>
+}
+
+/**
+ * A queued create that was edited while the drain was sending an older version. The row now
+ * exists, so the edit becomes an update of the fields that changed (LED-299). It takes the
+ * insert's revision from the drain's revision moves. Null when nothing changed.
+ */
+export function followUpUpdate(current: QueueItem, sent: SentInsert): QueueItem | null {
+  const changed: Record<string, unknown> = {}
+  for (const [field, value] of Object.entries(current.payload)) {
+    if (field === 'id' || field === 'user_id') continue
+    if (JSON.stringify(value) !== JSON.stringify(sent.payload[field])) changed[field] = value
+  }
+  if (Object.keys(changed).length === 0) return null
+  const next: QueueItem = { ...current, operation: 'update', rowId: String(current.payload.id), payload: changed }
+  delete next.status
+  delete next.attempts
+  delete next.lastError
+  delete next.baseRevision
+  return next
+}
+
 /**
  * Combines a drain's result with the queue as it is now, so changes made while
  * the drain was awaiting the network are not overwritten.
@@ -226,6 +255,9 @@ export const rebaseRevisions = (items: QueueItem[], moves: RevisionMoves) =>
  * - `remaining`: items the drain wants to keep (unsynced, failed, flagged).
  * - `flaggedAtStart`: ids that were already flagged in storage when the drain began;
  *   the user may have resolved these mid-drain, so the current copy wins.
+ * - A kept item edited mid-drain (a newer `version`) keeps the current copy.
+ * - `sent`: creates the drain saved. One edited while it was sent leaves its newer
+ *   version behind as an update (LED-299).
  * - Items no longer in `current` (resolved via keep-theirs or cleared) are dropped.
  * - Items in `current` that the drain never saw (enqueued mid-drain) are appended.
  */
@@ -233,14 +265,22 @@ export function mergeDrainResult(
   remaining: QueueItem[],
   current: QueueItem[],
   seenIds: Set<string>,
-  flaggedAtStart: Set<string>
+  flaggedAtStart: Set<string>,
+  sent: Map<string, SentInsert> = new Map(),
 ): QueueItem[] {
   const currentById = new Map(current.map((i) => [i.id, i]))
   const merged: QueueItem[] = []
   for (const item of remaining) {
     const cur = currentById.get(item.id)
     if (!cur) continue
-    merged.push(flaggedAtStart.has(item.id) ? cur : item)
+    const editedMidDrain = (cur.version ?? 0) > (item.version ?? 0)
+    merged.push(flaggedAtStart.has(item.id) || editedMidDrain ? cur : item)
+  }
+  for (const [id, saved] of sent) {
+    const cur = currentById.get(id)
+    if (!cur || (cur.version ?? 0) <= saved.version) continue
+    const update = followUpUpdate(cur, saved)
+    if (update) merged.push(update)
   }
   for (const item of current) if (!seenIds.has(item.id)) merged.push(item)
   return merged

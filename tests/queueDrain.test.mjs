@@ -462,3 +462,53 @@ test('LED-298: a change to a row whose insert has not been sent waits for it', a
   assert.deepEqual(store.read().map((i) => i.id), ['q-tx-1', 'd'])
   assert.ok(!server.client.calls.some((c) => c.op === 'delete' || c.op === 'select'))
 })
+
+// LED-299: the drain confirms only the version of a queued create it sent.
+test('LED-299: an amount changed while its insert is in flight is still queued, then reaches the database', async () => {
+  const server = tableServer()
+  const store = fakeQueueStore([queuedInsert('tx-1')])
+  let paused = true
+  const client = {
+    ...server.client,
+    from(table) {
+      const query = server.client.from(table)
+      const insert = query.insert
+      query.insert = (payload) => {
+        if (paused) {
+          paused = false
+          // The user fixes the amount while the original request is on the wire.
+          store.write(editQueuedInsert(store.read(), 'tx-1', { amount: 42 }).queue)
+        }
+        return insert(payload)
+      }
+      return query
+    },
+  }
+  assert.equal(await drainWith(depsFor(client, store)), 1)
+  assert.equal(server.rows.get('tx-1').amount, 1, 'the request that was in flight saved the old amount')
+  const [follow] = store.read()
+  assert.deepEqual([follow.operation, follow.rowId, follow.payload], ['update', 'tx-1', { amount: 42 }])
+  assert.equal(follow.baseRevision, server.rows.get('tx-1').updated_at, 'made against the revision the insert produced')
+
+  assert.equal(await drainWith(depsFor(client, store)), 1)
+  assert.equal(server.rows.get('tx-1').amount, 42)
+  assert.deepEqual(store.read(), [])
+})
+
+test('LED-299: an edit made while a failing insert is in flight keeps the edited copy', async () => {
+  const store = fakeQueueStore([queuedInsert('tx-1')])
+  const client = fakeClient(() => {
+    store.write(editQueuedInsert(store.read(), 'tx-1', { amount: 42 }).queue)
+    return { error: { code: '23514', message: 'amount' } }
+  })
+  await drainWith(depsFor(client, store))
+  const [item] = store.read()
+  assert.deepEqual([item.operation, item.payload.amount, item.attempts], ['insert', 42, undefined])
+})
+
+test('LED-299: an insert sent at its current version leaves nothing behind', async () => {
+  const server = tableServer()
+  const store = fakeQueueStore([queuedInsert('tx-1', { version: 3 })])
+  assert.equal(await drainWith(depsFor(server.client, store)), 1)
+  assert.deepEqual(store.read(), [])
+})

@@ -77,8 +77,8 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
           </div>
           {result.rows.map((row) => {
             const category = categoryById.get(row.categoryId)
-            // Only a monthly row has a cycle streak; any other names its window instead (LED-244, LED-271)
-            const spendWindow = overspendingWindow(row.period)
+            // Only a monthly row has a cycle streak; any other names its window instead (LED-244, LED-271, LED-284)
+            const spendWindow = overspendingWindow(row.period, row.window)
             return (
               <div
                 key={row.budgetId}

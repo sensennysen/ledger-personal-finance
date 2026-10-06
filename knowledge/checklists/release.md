@@ -87,6 +87,7 @@ With a real account, after B and C. Undo what you add.
 | D4 | Pay a credit card from an account | The payment shows in the card's history and statement || PASS (owner, 2026-10-05) |
 | D5 | Open Home with a recurring row due | It posts once; reload in a second browser and it does not post again || PASS (owner, 2026-10-05) |
 | D6 | Merge one test category into another, save a filter, open 13th Month | Each works || PASS (owner, 2026-10-05) |
+| D7 | Signed out, open `/login`, `/privacy` and `/terms` with the console open | No console errors. Errors on signed-out pages are not reported to `error_events` (LED-279, decision B), so this check is the only one || |
 
 ## Report back
 Paste the Result columns and the CI run link. They go into the release's retro, with a ticket for each FAIL.

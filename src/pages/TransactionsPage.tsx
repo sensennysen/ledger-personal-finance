@@ -125,7 +125,7 @@ export default function TransactionsPage() {
   }, [handoffKey, setSearchParams])
 
   // ── Templates ─────────────────────────────────────────────
-  const { templates, loading: templatesLoading, error: templatesError, refetch: refetchTemplates, addTemplate, removeTemplate } = useTransactionTemplates()
+  const { templates, loading: templatesLoading, error: templatesError, errorMessage: templatesErrorMessage, refetch: refetchTemplates, addTemplate, removeTemplate } = useTransactionTemplates()
   const templatesLoadState = resolveLoadState({ loading: templatesLoading, error: templatesError, hasData: templates.length > 0 })
   const { accounts } = useAccounts()
 
@@ -622,7 +622,7 @@ export default function TransactionsPage() {
         {/* Templates strip */}
         {(templatesLoadState === 'error' || templatesLoadState === 'stale-error') && (
           <InlineLoadError
-            message={templatesLoadState === 'stale-error' ? `Couldn't refresh your templates. ${templatesError}` : `Couldn't load your templates. ${templatesError}`}
+            message={templatesErrorMessage(templatesLoadState === 'stale-error') ?? ''}
             onRetry={() => void refetchTemplates()}
           />
         )}
@@ -814,7 +814,7 @@ export default function TransactionsPage() {
         {loadState === 'error' ? (
           <ErrorState title="Couldn't load your transactions" description={error} detail={errorDetail} onRetry={() => void refetch()} />
         ) : loadState === 'loading' ? (
-          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 bg-skeleton-page" />)}</div>
         ) : transactions.length === 0 ? (
           <EmptyState
             icon={ArrowLeftRight}

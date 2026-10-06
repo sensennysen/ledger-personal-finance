@@ -660,7 +660,7 @@ export default function AccountsPage() {
               <section key={heading} className="min-w-0 space-y-3">
                 <div className="flex items-baseline justify-between">
                   <h2 className="text-sm font-semibold">{heading}</h2>
-                  <p className="text-sm"><SkeletonText className="w-20" /></p>
+                  <p className="text-sm"><SkeletonText className="w-20 bg-skeleton-page" /></p>
                 </div>
                 {heading === 'Liabilities' ? (
                   // A liability is a card, not a row: a group heading over a 148px card (a card, then a
@@ -669,8 +669,8 @@ export default function AccountsPage() {
                     {[0, 1].map((group) => (
                       <div key={group}>
                         <div className="mb-2 flex items-center justify-between">
-                          <p className="text-xs"><SkeletonText className="w-20" /></p>
-                          <p className="text-xs"><SkeletonText className="w-12" /></p>
+                          <p className="text-xs"><SkeletonText className="w-20 bg-skeleton-page" /></p>
+                          <p className="text-xs"><SkeletonText className="w-12 bg-skeleton-page" /></p>
                         </div>
                         <div className="rounded-xl border border-border bg-card p-4">
                           <div className="flex items-start justify-between gap-3">

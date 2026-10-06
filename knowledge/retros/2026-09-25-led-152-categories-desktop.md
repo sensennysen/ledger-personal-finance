@@ -17,7 +17,7 @@
 |---|---|---|
 | Categories | `max-w-3xl` | **Changed**: `max-w-3xl xl:max-w-6xl`, list plus pane. |
 | Activity (`TransactionsPage`) | `max-w-3xl` | **Keep.** At 1920 the list has a month-jump rail beside it (viewed live, light theme); the detail pane is LED-99's and was not opened in this check. |
-| Account detail | `max-w-3xl lg:max-w-6xl` | **Keep.** It already widens and has a rail. Decided from the code; not viewed at 1920. |
+| Account detail | `max-w-3xl lg:max-w-6xl` | **Keep.** It already widens and has a rail. Viewed at 1280 and 1920 (LED-289, 2026-10-06): the content is 1152px at both, a 480px list beside a 320px side column, no horizontal scroll. 4a's 400px column assumes no cap; at the cap it would shrink the list to 400px. Owner kept the cap. Screenshots: `shots/289-account-1280.jpg`, `shots/289-account-1920.jpg`. |
 | Budgets | `max-w-6xl` | **Keep.** The tiles and table fit comfortably at 1152px (viewed live at 1920, light). |
 | Settings | `max-w-6xl` | **Keep.** Two-column grid. Decided from the code; not viewed at 1920. |
 

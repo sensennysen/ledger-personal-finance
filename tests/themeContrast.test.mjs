@@ -191,6 +191,13 @@ test('dark: --skeleton is the muted surface, unchanged', () => {
   assert.equal(themes.dark['--skeleton'], 'var(--muted)')
 })
 
+// Bars that sit on the grey page, not a card (LED-288): #C5C3CB is 1.29:1 there.
+test('light: --skeleton-page on --background holds 1.5:1; dark keeps --muted', () => {
+  const ratio = contrastRatio(resolve(themes.light, '--skeleton-page'), resolve(themes.light, '--background'))
+  assert.ok(ratio >= 1.5, `--background: ${ratio.toFixed(2)}:1`)
+  assert.equal(themes.dark['--skeleton-page'], 'var(--muted)')
+})
+
 test('skeletons draw with the skeleton token, not --muted', () => {
   const src = readFileSync(new URL('../src/components/ui/skeleton.tsx', import.meta.url), 'utf8')
   assert.equal(src.match(/(?<![\w:-])bg-skeleton(?![\w/-])/g)?.length, 2)

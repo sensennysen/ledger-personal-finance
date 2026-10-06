@@ -1373,7 +1373,7 @@ export default function BudgetsPage() {
           {budgetsLoadState === 'error' ? (
             <ErrorState title="Couldn't load your budgets" description={budgetError} detail={budgetErrorDetail} onRetry={() => void refetchBudgets()} />
           ) : budgetsLoadState === 'loading' ? (
-            <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36" />)}</div>
+            <div className="space-y-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36 bg-skeleton-page" />)}</div>
           ) : budgets.length === 0 ? (
             <Card className="text-center py-16">
               <CardContent>
@@ -1576,7 +1576,7 @@ export default function BudgetsPage() {
           {goalsLoadState === 'error' ? (
             <ErrorState title="Couldn't load your savings goals" description={goalsError} detail={goalsErrorDetail} onRetry={() => void refetchGoals()} />
           ) : goalsLoading ? (
-            <div className="space-y-4">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-40" />)}</div>
+            <div className="space-y-4">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-40 bg-skeleton-page" />)}</div>
           ) : goals.length === 0 ? (
             <Card className="text-center py-16">
               <CardContent>

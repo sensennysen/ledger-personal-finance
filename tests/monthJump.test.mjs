@@ -100,3 +100,15 @@ test('jump target is null for a month with no rows', () => {
   const groups = groupByDay(history)
   assert.equal(monthJumpTarget(groups, { start: '2026-06-01', end: '2026-06-30' }), null)
 })
+
+test('Month jump totals match the Sum: a transfer between two currencies opens no bucket (LED-282)', async () => {
+  const { sumByCurrency } = await import('../src/lib/transactionWindow.ts')
+  const rows = [
+    tx({ date: '2026-09-10', type: 'transfer', amount: 1000, currency: 'EUR', to_account_id: 'checking', destination_amount: 1100, to_account: { currency: 'USD' } }),
+    tx({ date: '2026-09-12', type: 'expense', amount: 1817.4, currency: 'USD' }),
+  ]
+  const [month] = buildMonthNets(rows, { startDay: 1, currentKey: '2026-09' })
+  assert.equal(month.count, 2)
+  assert.deepEqual(month.net, { USD: -1817.4 })
+  assert.deepEqual(month.net, sumByCurrency(rows))
+})

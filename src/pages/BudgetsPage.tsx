@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { amountInCurrency } from '@/lib/exchangeRates'
+import { goalContributionTotal } from '@/lib/goalContributions'
 import { useBudgets } from '@/hooks/useBudgets'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { budgetAllowance, canRollover, nextCycleOpensAt } from '@/lib/budgetRollover'
@@ -1011,6 +1012,8 @@ function SavingsGoalCard({
 }) {
   const ink = useCategoryInk()
   const [expanded, setExpanded] = useState(false)
+  const { table: rateTable } = useExchangeRates()
+  const contributed = goalContributionTotal(goal.linkedTransactions ?? [], goal.currency, rateTable)
   const pace = goalPace({ target: goal.target_amount, saved: goal.current_amount, deadline: goal.deadline })
   const { pct, remaining } = pace
   const status = goalStatus({
@@ -1138,12 +1141,11 @@ function SavingsGoalCard({
             >
               {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronR className="w-3 h-3" />}
               {goal.linkedTransactions!.length} linked transaction{goal.linkedTransactions!.length !== 1 ? 's' : ''}
-              {goal.totalContributed !== undefined && (
-                <span className="ml-1 font-medium" style={{ color: goal.totalContributed >= 0 ? INCOME : EXPENSE }}>
-                  ({goal.totalContributed >= 0 ? '+' : ''}{formatCurrency(goal.totalContributed, goal.currency)})
-                </span>
-              )}
+              <span className="ml-1 font-medium" style={{ color: contributed.total >= 0 ? INCOME : EXPENSE }}>
+                ({contributed.total >= 0 ? '+' : ''}{formatCurrency(contributed.total, goal.currency)})
+              </span>
             </button>
+            <UnratedCurrencyNotice currencies={contributed.excludedCurrencies} subject="linked transactions" />
             {expanded && (
               <div className="mt-2 space-y-1">
                 <p className="text-xs text-muted-foreground">Shown for reference — they don't change Saved so far.</p>

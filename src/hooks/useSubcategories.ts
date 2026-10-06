@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
+import { readAllPages } from '@/lib/pagedRead'
 import type { Subcategory } from '@/types'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
@@ -126,7 +127,8 @@ export function useAllSubcategories() {
   const fetch = useCallback(async () => {
     if (!user) { setLoading(false); return }
     setLoading(true)
-    const { data, error } = await supabase
+    // The export reads every subcategory, so page past PostgREST's 1,000-row cap (LED-308).
+    const { rows: data, error } = await readAllPages<Subcategory>((from, to) => supabase
       .from('subcategories')
       .select('*')
       .eq('user_id', user.id)
@@ -134,13 +136,15 @@ export function useAllSubcategories() {
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true })
       .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to))
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load', entity: 'subcategory' }))
       setLoading(false)
       return
     }
     const map: Record<string, Subcategory[]> = {}
-    for (const sub of data as Subcategory[]) {
+    for (const sub of data) {
       if (!map[sub.category_id]) map[sub.category_id] = []
       map[sub.category_id].push(sub)
     }

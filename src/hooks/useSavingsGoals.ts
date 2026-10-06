@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
+import { readInBatches } from '@/lib/idBatches'
 import { readWithPolicy } from '@/lib/readRetry'
 import type { SavingsGoal, Transaction } from '@/types'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
@@ -51,17 +52,18 @@ export function useSavingsGoals() {
     const goalIds = (data as SavingsGoal[]).map((g) => g.id)
     let linkedTxs: Transaction[] = []
     if (goalIds.length > 0) {
-      const { rows, error: txError } = await readWithPolicy((retry) => readAllPages<Transaction>((from, to) =>
+      // Batched so the goal id filter stays short enough for a URL (LED-308).
+      const { rows, error: txError } = await readWithPolicy((retry) => readInBatches(goalIds, (batch) => readAllPages<Transaction>((from, to) =>
         supabase
           .from('transactions')
           .select('*, category:categories(id,name,color,icon), account:accounts!transactions_account_id_fkey(id,name,color,currency)')
           .eq('user_id', user.id)
-          .in('goal_id', goalIds)
+          .in('goal_id', batch)
           .order('date', { ascending: false })
           .order('id', { ascending: false })
           .range(from, to)
           .retry(retry),
-      ), { background })
+      )), { background })
       if (txError) {
         setLoadFailure(describeDataError(txError, { action: 'load' }))
         setLoading(false)

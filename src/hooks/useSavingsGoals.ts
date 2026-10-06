@@ -118,8 +118,17 @@ export function useSavingsGoals() {
     return toResult(error, { action: 'delete', entity: 'goal' })
   }
 
-  const addContribution = async (id: string, amount: number, currentAmount: number) => {
-    return updateGoal(id, { current_amount: currentAmount + amount })
+  /**
+   * Adds to a goal in one database call that locks the goal and increments in SQL, so concurrent
+   * contributions all count (LED-312). `opId` is one per contribution: a retry with the same id after
+   * a lost response is counted once.
+   */
+  const addContribution = async (id: string, amount: number, opId: string): Promise<MutationResult> => {
+    if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to add to this savings goal.' }
+    const { error } = await supabase.rpc('add_goal_contribution', { p_goal_id: id, p_amount: amount, p_op_id: opId })
+    if (!error) await fetch()
+    return toResult(error, { action: 'save', entity: 'goal' })
   }
 
   const error = loadFailure?.message ?? null

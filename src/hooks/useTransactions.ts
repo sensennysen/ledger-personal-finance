@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { editQueuedInsert, enqueue, pendingCount as queueSize, revisionFor } from '@/lib/offlineQueue'
-import { registerSyncListener } from '@/hooks/useNetworkStatus'
+import { drainQueue, editQueuedInsert, enqueue, pendingCount as queueSize, revisionFor } from '@/lib/offlineQueue'
+import { splitPendingReceipt } from '@/lib/receiptJob'
+import { notifySyncListeners, registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
 import { readWithPolicy } from '@/lib/readRetry'
@@ -185,6 +186,22 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     })
   }, [user])
 
+  // A receipt whose upload failed while saving online follows the row as a queued edit, made
+  // against the revision just saved, and uploads when it can (LED-300).
+  const queueReceipt = useCallback((row: { id: string; updated_at: string }, marker: string, label?: string) => {
+    if (!user) return
+    enqueue({
+      table: 'transactions',
+      operation: 'update',
+      payload: { receipt_url: marker },
+      rowId: row.id,
+      baseRevision: row.updated_at,
+      userId: user.id,
+      label,
+    })
+    void drainQueue().then(() => notifySyncListeners(), () => {})
+  }, [user])
+
   // ---------- mutations ----------
 
   const createTransaction = async (values: TransactionUpsertValues): Promise<MutationResult & { queued?: boolean; id?: string }> => {
@@ -214,11 +231,13 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       enqueueInsert(values, queuedId)
       return { error: null, queued: true, id: queuedId }
     }
+    const { values: saved, marker } = splitPendingReceipt(values)
     const { data, error } = await supabase
       .from('transactions')
-      .insert({ ...withTransactionDefaults(values), user_id: user.id })
-      .select('id')
+      .insert({ ...withTransactionDefaults(saved), user_id: user.id })
+      .select('id, updated_at')
       .single()
+    if (!error && data && marker) queueReceipt(data, marker, values.description)
     if (!error) {
       await fetch()
       notifyLoanPurchasesRefresh()
@@ -257,7 +276,15 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       }
       return { error: null, queued: true }
     }
-    const { error } = await supabase.from('transactions').update(values).eq('id', id).eq('user_id', user.id)
+    const { values: saved, marker } = splitPendingReceipt(values)
+    const { data, error } = await supabase
+      .from('transactions')
+      .update(saved)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select('id, updated_at')
+      .maybeSingle()
+    if (!error && data && marker) queueReceipt(data, marker, values.description ?? transactions.find((t) => t.id === id)?.description)
     if (!error) {
       await fetch()
       notifyLoanPurchasesRefresh()

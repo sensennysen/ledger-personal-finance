@@ -4,6 +4,9 @@
 // transfer is written once, as a `transfer` from one account to the other,
 // and the other statement's matching row is then flagged as a duplicate.
 
+import type { Account } from '@/types'
+import { generatedCardPayment } from './cardPayment.ts'
+
 export interface TransferRule {
   keyword: string
   type_hint: 'income' | 'expense' | 'transfer' | null
@@ -52,4 +55,40 @@ export function transferLegs(
   return direction === 'expense'
     ? { account_id: importAccountId, to_account_id: otherAccountId }
     : { account_id: otherAccountId, to_account_id: importAccountId }
+}
+
+export interface SavedImportRow {
+  id: string
+  type: 'income' | 'expense' | 'transfer'
+  to_account_id: string | null
+  amount: number
+  exchange_rate?: number | null
+  destination_amount?: number | null
+  date: string
+}
+
+/**
+ * The imported rows that pay a credit card (LED-270), oldest first. Each one gets the statement
+ * steps a manual payment gets (`card-payment-is-a-transfer.md`); in date order, so two payments to
+ * one card move its statement in the order they were made.
+ */
+export function importedCardPayments<A extends Pick<Account, 'id' | 'type'>>(
+  rows: readonly SavedImportRow[],
+  accounts: A[],
+): { card: A; amount: number; date: string; transactionId: string }[] {
+  return rows
+    .flatMap((row) => {
+      // PostgREST may return numeric columns as strings.
+      const payment = generatedCardPayment(
+        {
+          ...row,
+          amount: Number(row.amount),
+          exchange_rate: row.exchange_rate == null ? null : Number(row.exchange_rate),
+          destination_amount: row.destination_amount == null ? null : Number(row.destination_amount),
+        },
+        accounts,
+      )
+      return payment ? [{ ...payment, date: row.date, transactionId: row.id }] : []
+    })
+    .sort((a, b) => a.date.localeCompare(b.date))
 }

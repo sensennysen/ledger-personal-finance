@@ -14,6 +14,7 @@ import {
   subscribeQueue,
 } from '@/lib/offlineQueue'
 import { notifySyncListeners } from '@/hooks/useNetworkStatus'
+import { retryDelay, shouldDrain } from '@/lib/syncReadiness'
 import { NetworkStatusContext, type NetworkStatus } from './networkStatusState'
 
 // setTimeout stores its delay in 32 bits; a longer one fires immediately.
@@ -33,6 +34,11 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
   const [storageError, setStorageError] = useState<string | null>(() => queueUnavailable())
   // A ref, not the isSyncing state: two triggers in one tick would both see the stale false.
   const syncing = useRef(false)
+  const queueReady = useRef(false)
+  const retryAttempt = useRef(0)
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // The retry timer calls the current autoSync through this ref (a callback cannot name itself).
+  const retryLater = useRef<() => void>(() => {})
 
   const refreshCount = useCallback(() => {
     setCount(readPendingCount())
@@ -64,11 +70,60 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => subscribeQueue(refreshCount), [refreshCount])
 
+  /**
+   * Drains without the user asking (LED-305): when the app opens online with items waiting, when
+   * the tab comes back, and on reconnect. A drain that leaves items pending while online retries
+   * a few times (retryDelay). Another tab's drain holds the queue lock, so this one waits and
+   * finds nothing left to send.
+   */
+  const autoSync = useCallback(async () => {
+    clearTimeout(retryTimer.current)
+    const ready = { ready: queueReady.current, online: navigator.onLine, pending: readPendingCount(), syncing: syncing.current }
+    if (!shouldDrain(ready)) return
+    await syncNow()
+    if (!navigator.onLine || readPendingCount() === 0) {
+      retryAttempt.current = 0
+      return
+    }
+    const delay = retryDelay(retryAttempt.current++)
+    if (delay !== null) retryTimer.current = setTimeout(() => retryLater.current(), delay)
+  }, [syncNow])
+
+  useEffect(() => {
+    retryLater.current = () => void autoSync()
+  }, [autoSync])
+
   // The queue opens asynchronously (IndexedDB); the counts start at 0 and catch up once it has.
   // A failure is kept by the queue and shown through storageError.
   useEffect(() => {
-    loadQueue().catch((err) => console.error('Failed to open the offline queue:', err))
-  }, [])
+    let active = true
+    loadQueue().then(
+      () => {
+        queueReady.current = true
+        if (active) void autoSync()
+      },
+      (err) => console.error('Failed to open the offline queue:', err),
+    )
+    return () => {
+      active = false
+    }
+  }, [autoSync])
+
+  // Coming back to the app is a fresh chance: the retry count starts over.
+  useEffect(() => {
+    const comeBack = () => {
+      if (document.visibilityState !== 'visible') return
+      retryAttempt.current = 0
+      void autoSync()
+    }
+    window.addEventListener('focus', comeBack)
+    document.addEventListener('visibilitychange', comeBack)
+    return () => {
+      window.removeEventListener('focus', comeBack)
+      document.removeEventListener('visibilitychange', comeBack)
+      clearTimeout(retryTimer.current)
+    }
+  }, [autoSync])
 
   // An offline item flags as expired when the clock passes the limit, not only on the next drain.
   useEffect(() => {
@@ -119,9 +174,13 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true)
-      void syncNow()
+      retryAttempt.current = 0
+      void autoSync()
     }
-    const handleOffline = () => setIsOnline(false)
+    const handleOffline = () => {
+      setIsOnline(false)
+      clearTimeout(retryTimer.current)
+    }
 
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
@@ -129,7 +188,7 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [syncNow])
+  }, [autoSync])
 
   const value = useMemo<NetworkStatus>(
     () => ({

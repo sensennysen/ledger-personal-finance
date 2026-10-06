@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { SERVER_CHECK_FAILED, discardFlagged, drainWith, exclusive, singleFlight } from '../src/lib/queueDrain.ts'
-import { MAX_ATTEMPTS, describeConflict, editQueuedInsert, hasQueuedInsert, setResolvedReceipt } from '../src/lib/queueState.ts'
+import { MAX_ATTEMPTS, appendItems, describeConflict, editQueuedInsert, hasQueuedInsert, setResolvedReceipt } from '../src/lib/queueState.ts'
 import { fakeClient } from './helpers/fakeSupabase.mjs'
 import { NOW, depsFor, fakeLocks, fakeQueueStore, fakeReceipts, queueDeps, queued } from './helpers/fakeQueueStore.mjs'
 
@@ -682,4 +682,19 @@ test('LED-302: two tabs reconnecting at once send every item once', async () => 
 test('LED-302: without Web Locks the drain still runs', async () => {
   const store = fakeQueueStore([queued({ id: 'i', operation: 'insert', rowId: undefined })])
   assert.equal(await exclusive(undefined, 'ledger_queue_drain', () => drainWith(depsFor(fakeClient(happy), store))), 1)
+})
+
+const importRow = (n) => ({ table: 'transactions', operation: 'insert', payload: { id: `row-${n}`, amount: n }, userId: 'u' })
+
+test('LED-318: a 10000-row import is stored in one write', async () => {
+  const store = fakeQueueStore([queued({ id: 'earlier' })])
+  const rows = Array.from({ length: 10_000 }, (_, n) => importRow(n))
+  let n = 0
+  const started = performance.now()
+  await store.mutate((q) => appendItems(q, rows, NOW, () => `q${n++}`))
+  const ms = performance.now() - started
+  assert.equal(store.writes.length, 1, 'one durable commit')
+  assert.equal(store.read().length, 10_001)
+  assert.deepEqual(store.read().slice(1, 3).map((i) => i.payload.id), ['row-0', 'row-1'], 'rows keep their order')
+  assert.ok(ms < 2000, `appending 10000 rows took ${ms.toFixed(0)} ms`)
 })

@@ -58,3 +58,20 @@ export function destinationAmountFor(
   const amount = values.destination_amount
   return amount != null && Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) / 100 : null
 }
+
+/**
+ * The amounts after Pay from changes on a card payment or loan repayment whose amount came from a preset
+ * (LED-293). A preset is what the card or loan receives, in its currency, so the switch keeps it: in the
+ * target's currency it is the amount; from another currency it is the amount received, and the amount
+ * sent is converted from it (`convert`, the rate feed), or null when there is no rate.
+ */
+export function paySourceAmounts(
+  presetReceived: number,
+  sourceCurrency: string,
+  targetCurrency: string,
+  convert: (amount: number, from: string, to: string) => number | null,
+): { amount: number | null; destination_amount: number | null } {
+  if (sourceCurrency === targetCurrency) return { amount: presetReceived, destination_amount: null }
+  const sent = convert(presetReceived, targetCurrency, sourceCurrency)
+  return { amount: sent === null ? null : Math.round(sent * 100) / 100, destination_amount: presetReceived }
+}

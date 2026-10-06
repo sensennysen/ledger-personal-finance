@@ -108,38 +108,40 @@ export function AccountForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Type</FormLabel>
-              <div role="radiogroup" aria-label="Account type" className="grid grid-cols-4 gap-2">
-                {ACCOUNT_TYPES.map((value, index) => {
-                  const TypeIcon = ACCOUNT_ICONS[value]
-                  const selected = field.value === value
-                  return (
-                    <button
-                      key={value}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      tabIndex={selected ? 0 : -1}
-                      onClick={() => field.onChange(value)}
-                      onKeyDown={(event) => {
-                        const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
-                        if (!step) return
-                        event.preventDefault()
-                        const nextIndex = (index + step + ACCOUNT_TYPES.length) % ACCOUNT_TYPES.length
-                        field.onChange(ACCOUNT_TYPES[nextIndex])
-                        const siblings = event.currentTarget.parentElement?.children
-                        ;(siblings?.[nextIndex] as HTMLElement | undefined)?.focus()
-                      }}
-                      className={cn(
-                        'flex min-w-0 flex-col items-center gap-1 rounded-lg border px-1 py-2 text-[0.6875rem] leading-tight transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
-                        selected ? 'border-primary bg-primary/10 font-medium text-foreground' : 'border-border text-muted-foreground hover:bg-muted'
-                      )}
-                    >
-                      <TypeIcon className="size-4 shrink-0" aria-hidden />
-                      <span className="text-center">{ACCOUNT_TYPE_LABELS[value]}</span>
-                    </button>
-                  )
-                })}
-              </div>
+              <FormControl>
+                <div role="radiogroup" className="grid grid-cols-4 gap-2">
+                  {ACCOUNT_TYPES.map((value, index) => {
+                    const TypeIcon = ACCOUNT_ICONS[value]
+                    const selected = field.value === value
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        tabIndex={selected ? 0 : -1}
+                        onClick={() => field.onChange(value)}
+                        onKeyDown={(event) => {
+                          const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+                          if (!step) return
+                          event.preventDefault()
+                          const nextIndex = (index + step + ACCOUNT_TYPES.length) % ACCOUNT_TYPES.length
+                          field.onChange(ACCOUNT_TYPES[nextIndex])
+                          const siblings = event.currentTarget.parentElement?.children
+                          ;(siblings?.[nextIndex] as HTMLElement | undefined)?.focus()
+                        }}
+                        className={cn(
+                          'flex min-w-0 flex-col items-center gap-1 rounded-lg border px-1 py-2 text-[0.6875rem] leading-tight transition-colors focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring',
+                          selected ? 'border-primary bg-primary/10 font-medium text-foreground' : 'border-border text-muted-foreground hover:bg-muted'
+                        )}
+                      >
+                        <TypeIcon className="size-4 shrink-0" aria-hidden />
+                        <span className="text-center">{ACCOUNT_TYPE_LABELS[value]}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -392,25 +394,27 @@ export function AccountForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Payments Due</FormLabel>
-                    <div className="grid grid-cols-2 gap-4">
-                      {[0, 1].map((index) => (
-                        <Input
-                          key={index}
-                          type="number"
-                          min={1}
-                          max={31}
-                          placeholder={index === 0 ? 'First day' : 'Second day'}
-                          aria-label={index === 0 ? 'First due day' : 'Second due day'}
-                          onBlur={field.onBlur}
-                          value={field.value?.[index] || ''}
-                          onChange={(event) => {
-                            const next = [...(field.value ?? [])]
-                            next[index] = event.target.value ? Number(event.target.value) : 0
-                            field.onChange(next)
-                          }}
-                        />
-                      ))}
-                    </div>
+                    <FormControl>
+                      <div role="group" className="grid grid-cols-2 gap-4">
+                        {[0, 1].map((index) => (
+                          <Input
+                            key={index}
+                            type="number"
+                            min={1}
+                            max={31}
+                            placeholder={index === 0 ? 'First day' : 'Second day'}
+                            aria-label={index === 0 ? 'First due day' : 'Second due day'}
+                            onBlur={field.onBlur}
+                            value={field.value?.[index] || ''}
+                            onChange={(event) => {
+                              const next = [...(field.value ?? [])]
+                              next[index] = event.target.value ? Number(event.target.value) : 0
+                              field.onChange(next)
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

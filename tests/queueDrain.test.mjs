@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { SERVER_CHECK_FAILED, discardFlagged, drainWith, singleFlight } from '../src/lib/queueDrain.ts'
-import { MAX_ATTEMPTS, describeConflict, editQueuedInsert, hasQueuedInsert } from '../src/lib/queueState.ts'
+import { MAX_ATTEMPTS, describeConflict, editQueuedInsert, hasQueuedInsert, setResolvedReceipt } from '../src/lib/queueState.ts'
 import { fakeClient } from './helpers/fakeSupabase.mjs'
 import { NOW, depsFor, fakeQueueStore, fakeReceipts, queued } from './helpers/fakeQueueStore.mjs'
 
@@ -511,4 +511,90 @@ test('LED-299: an insert sent at its current version leaves nothing behind', asy
   const store = fakeQueueStore([queuedInsert('tx-1', { version: 3 })])
   assert.equal(await drainWith(depsFor(server.client, store)), 1)
   assert.deepEqual(store.read(), [])
+})
+
+// LED-301: an uploaded receipt is recorded before the row is saved.
+const receiptInsert = (o = {}) =>
+  queuedInsert('tx-1', { payload: { id: 'tx-1', user_id: 'u', amount: 1, receipt_url: 'pending-receipt:t1' }, ...o })
+
+test('LED-301: a receipt uploaded before a failed insert stays attached on retry, with no second upload', async () => {
+  const removed = []
+  const receipts = fakeReceipts({ files: { t1: { name: 'r.jpg' } }, removed })
+  const server = tableServer()
+  let fail = true
+  const client = {
+    ...server.client,
+    from(table) {
+      const query = server.client.from(table)
+      const insert = query.insert
+      query.insert = (payload) => {
+        if (fail) { fail = false; throw new Error('network') }
+        return insert(payload)
+      }
+      return query
+    },
+  }
+  const store = fakeQueueStore([receiptInsert()])
+  assert.equal(await drainWith(depsFor(client, store, receipts)), 0)
+  // As after a reload: only what was stored survives.
+  assert.equal(store.read()[0].payload.receipt_url, 'u/r.jpg')
+  assert.deepEqual(removed, ['t1'], 'the local file goes once the path is stored')
+
+  assert.equal(await drainWith(depsFor(client, store, receipts)), 1)
+  assert.equal(server.rows.get('tx-1').receipt_url, 'u/r.jpg')
+  assert.equal(client.uploads.length, 1)
+})
+
+test('LED-301: the local file is kept when the uploaded path cannot be stored', async () => {
+  const removed = []
+  const receipts = fakeReceipts({ files: { t1: { name: 'r.jpg' } }, removed })
+  const store = fakeQueueStore([receiptInsert()])
+  const deps = { ...depsFor(fakeClient(happy), store, receipts) }
+  let writes = 0
+  deps.writeQueue = (items) => { if (writes++ === 0) throw new Error('QuotaExceededError'); store.write(items) }
+  assert.equal(await drainWith(deps), 1)
+  assert.deepEqual(removed, [])
+})
+
+test('LED-301: a receipt replaced while the old one uploaded removes the unused file and sends the new one after', async () => {
+  const receipts = fakeReceipts({ files: { t1: { name: 'old.jpg' } } })
+  const server = tableServer()
+  const store = fakeQueueStore([receiptInsert()])
+  const client = {
+    ...server.client,
+    storage: {
+      from: (bucket) => {
+        const b = server.client.storage.from(bucket)
+        return {
+          ...b,
+          async upload(path, file) {
+            store.write(editQueuedInsert(store.read(), 'tx-1', { receipt_url: 'pending-receipt:t2' }).queue)
+            return b.upload(path, file)
+          },
+        }
+      },
+    },
+  }
+  assert.equal(await drainWith(depsFor(client, store, receipts)), 1)
+  assert.deepEqual(server.client.removedFiles, [{ bucket: 'receipts', path: 'u/old.jpg' }])
+  assert.equal(server.rows.get('tx-1').receipt_url, null)
+  const [follow] = store.read()
+  assert.deepEqual([follow.operation, follow.payload], ['update', { receipt_url: 'pending-receipt:t2' }])
+})
+
+test('LED-301: discarding an item whose receipt was uploaded deletes that file', async () => {
+  const client = fakeClient(happy)
+  const store = fakeQueueStore([receiptInsert({ status: 'failed', uploadedReceipt: 'u/r.jpg', payload: { id: 'tx-1', receipt_url: 'u/r.jpg' } })])
+  await discardFlagged({ readQueue: store.read, writeQueue: store.write, receipts: fakeReceipts(), client }, 'q-tx-1')
+  assert.deepEqual(store.read(), [])
+  assert.deepEqual(client.removedFiles, [{ bucket: 'receipts', path: 'u/r.jpg' }])
+})
+
+test('setResolvedReceipt applies only while the item still points at the same pending file', () => {
+  const item = receiptInsert({ version: 2 })
+  const { queue, applied } = setResolvedReceipt([item], 'q-tx-1', 'pending-receipt:t1', 'u/r.jpg')
+  assert.equal(applied, true)
+  assert.deepEqual([queue[0].payload.receipt_url, queue[0].uploadedReceipt, queue[0].version], ['u/r.jpg', 'u/r.jpg', 2])
+  assert.equal(setResolvedReceipt([item], 'q-tx-1', 'pending-receipt:other', 'u/r.jpg').applied, false)
+  assert.equal(setResolvedReceipt([], 'q-tx-1', 'pending-receipt:t1', 'u/r.jpg').applied, false)
 })

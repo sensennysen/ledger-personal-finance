@@ -162,7 +162,7 @@ export default function TransactionsPage() {
     bulkUpdateCategory,
     bulkCreateTransactions,
   } = useTransactions()
-  const { createWithStatement, recordGenerated } = useCardPayment(createTransaction)
+  const { createWithStatement } = useCardPayment(createTransaction)
 
   const notify = useNotify()
   const { categories } = useCategories()
@@ -463,7 +463,7 @@ export default function TransactionsPage() {
       // A converted row keeps the statement's own amount and currency, so a re-import at another rate is still caught.
       ...(t.original ? { original_amount: t.original.amount, original_currency: t.original.currency } : {}),
     }))
-    const result = await bulkCreateTransactions(rows, recordGenerated)
+    const result = await bulkCreateTransactions(rows)
     return { imported: result.imported ?? 0, error: result.error ?? null }
   }
 

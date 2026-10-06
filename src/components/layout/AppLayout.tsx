@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { registerSyncedListener } from '@/lib/offlineQueue'
+import { notifyAccountsRefresh, notifyCardPaymentsRefresh } from '@/lib/cacheEvents'
 import { hiddenByScroll, isNearScrollEnd } from '@/lib/scrollEnd'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import {
@@ -101,7 +102,7 @@ function LayoutShell() {
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
   const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
-  const { createWithStatement, recordGenerated, recordSynced } = useCardPayment(createTransaction)
+  const { createWithStatement } = useCardPayment(createTransaction)
   const notify = useNotify()
   const { accounts, loading: accountsLoading } = useAccounts()
   // ⌘F in search scopes to the account page it opened over.
@@ -231,20 +232,25 @@ function LayoutShell() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
   useCreditCardNotifications()
-  // A card payment made offline records its statement when the queue drains (LED-193). One owner: here.
-  useEffect(() => registerSyncedListener((item) => void recordSynced(item)), [recordSynced])
+  // A queued transfer into a card is recorded as a payment by the database when it drains (LED-193,
+  // LED-296); the card views re-read then. One owner: here.
+  useEffect(() => registerSyncedListener((item) => {
+    if (item.table !== 'transactions' || item.payload.type !== 'transfer' || typeof item.payload.to_account_id !== 'string') return
+    notifyAccountsRefresh()
+    notifyCardPaymentsRefresh()
+  }), [])
   useEffect(() => {
     if (hasGenerated.current) return
     hasGenerated.current = true
     // A recurring row that could not be posted, or a failed read of them, is reported with Retry,
     // not skipped silently (LED-232).
     const run = async () => {
-      const notice = recurringRunNotice(await generateDueRecurring(recordGenerated))
+      const notice = recurringRunNotice(await generateDueRecurring())
       if (!notice) return
       notify({ severity: 'failure', ...notice, action: { label: 'Retry', run: () => void run() } })
     }
     void run()
-  }, [generateDueRecurring, recordGenerated, notify])
+  }, [generateDueRecurring, notify])
   const handleCreate = async (values: TransactionFormValues) => {
     const { error, errorDetail } = await createWithStatement(
       values as Parameters<typeof createTransaction>[0],

@@ -5,7 +5,7 @@ import {
   creditedAmount,
   defaultCardPaymentDescription,
   defaultPaymentSource,
-  planStatementPayment,
+  shiftStatementPaid,
   transferCard,
   getCardPaymentPresets,
   getCardDateInfo,
@@ -222,22 +222,29 @@ test('a cross-currency credit is converted', () => {
 
 test('a payment raises the paid amount up to the statement and lowers Amount to pay', () => {
   const card = { balance: -1500, statement_balance: 1000, statement_paid_amount: 200 }
-  const patch = planStatementPayment(card, 300, '2026-09-25')
-  assert.deepEqual(patch, { statement_paid_amount: 500, last_payment_amount: 300, last_payment_date: '2026-09-25' })
-  assert.equal(cardAmountDue({ ...card, ...patch }), 500)
-  assert.equal(planStatementPayment(card, 5000, '2026-09-25').statement_paid_amount, 1000)
+  const paid = shiftStatementPaid(card.statement_paid_amount, card.statement_balance, 300)
+  assert.equal(paid, 500)
+  assert.equal(cardAmountDue({ ...card, statement_paid_amount: paid }), 500)
+  assert.equal(shiftStatementPaid(card.statement_paid_amount, card.statement_balance, 5000), 1000)
 })
 
-test('with no statement the paid amount is left alone', () => {
-  const patch = planStatementPayment({ statement_balance: null, statement_paid_amount: null }, 300, '2026-09-25')
-  assert.equal(patch.statement_paid_amount, 0)
-  assert.equal(patch.last_payment_amount, 300)
+// LED-296: the figures the insert trigger produced on a local database (card with an 800 statement,
+// nothing paid): a payment of 200, an import of 50 and 60 that credited 55, a recurring source of 100
+// and its posted occurrence of 100, then 500 that reaches the statement.
+test('the insert trigger moves the paid amount like shiftStatementPaid', () => {
+  let paid = shiftStatementPaid(0, 800, 200)
+  assert.equal(paid, 200)
+  paid = shiftStatementPaid(shiftStatementPaid(paid, 800, 50), 800, 55)
+  assert.equal(paid, 305)
+  paid = shiftStatementPaid(shiftStatementPaid(paid, 800, 100), 800, 100)
+  assert.equal(paid, 505)
+  assert.equal(shiftStatementPaid(paid, 800, 500), 800)
+  assert.equal(shiftStatementPaid(null, null, 300), 0) // no statement: left alone
 })
 
 // LED-191: the same figures `card_statement_shift` produced on a local database (card with a
 // 500 statement; two payments of 100 and 150, then edits and deletes).
-test('shiftStatementPaid matches card_statement_shift', async () => {
-  const { shiftStatementPaid } = await import('../src/lib/cardPayment.ts')
+test('shiftStatementPaid matches card_statement_shift', () => {
   assert.equal(shiftStatementPaid(250, 500, 50), 300) // 150 -> 200
   assert.equal(shiftStatementPaid(300, 500, -20), 280) // 100 -> 80
   assert.equal(shiftStatementPaid(280, 500, 700), 500) // never above the statement

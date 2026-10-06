@@ -30,6 +30,8 @@ export interface OverspendingRow {
   streak: number
   /** Overspend the 'carry' clamp did not absorb into the next cycle. Always 0 under 'reset'. */
   uncarried: number
+  /** The week, quarter or year the row covers (rangeFor, before any cut). Monthly rows have none. */
+  window?: Range
 }
 
 export interface OverspendingResult {
@@ -99,12 +101,13 @@ export function computeOverspending(input: Input): OverspendingResult {
 
   for (const b of budgets) {
     if (!canRollover(b.period)) {
-      const { start, end } = rangeFor(b.period)
+      const window = rangeFor(b.period)
+      const { start, end } = window
       const { spent, unrated: u } = sumBudgetSpend(txs, b, start, cut(end), rates)
       u.forEach((c) => unrated.add(c))
       if (spent > b.amount) {
         // No streak: only monthly budgets are walked cycle by cycle (LED-271).
-        rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, period: b.period, spent, limit: b.amount, over: spent - b.amount, streak: 0, uncarried: 0 })
+        rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, period: b.period, spent, limit: b.amount, over: spent - b.amount, streak: 0, uncarried: 0, window })
       }
       continue
     }
@@ -163,12 +166,33 @@ export function spendWindowLabel(period: OverspendingBudget['period']): string |
  * What an Overspending row shows in place of a cycle streak (LED-271): only a monthly budget is walked
  * cycle by cycle, so a weekly, quarterly or yearly row names its own window instead. `inline` follows
  * the spent figure; `chip` fills the Cycles column. Null for a monthly row, which shows its streak.
+ * The chip says "This week", "This quarter" or "This year" while `window` holds today, and names a past
+ * or future window by its dates (LED-284): "Sep 22 to 28", "Q3 2026", "2025".
  */
-export function overspendingWindow(period: OverspendingBudget['period']): { inline: string; chip: string } | null {
-  if (period === 'yearly') return { inline: spendWindowLabel(period)!, chip: 'This year' }
-  if (period === 'quarterly') return { inline: 'quarterly budget', chip: 'This quarter' }
-  if (period === 'weekly') return { inline: 'weekly budget', chip: 'This week' }
-  return null
+export function overspendingWindow(
+  period: OverspendingBudget['period'],
+  window?: Range,
+  today: Date = new Date(),
+): { inline: string; chip: string } | null {
+  if (period === 'monthly') return null
+  const todayString = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`
+  const current = !window || (window.start <= todayString && todayString <= window.end)
+  if (period === 'yearly') return { inline: spendWindowLabel(period)!, chip: current ? 'This year' : window!.start.slice(0, 4) }
+  if (period === 'quarterly') {
+    const quarter = Math.floor((Number(window?.start.slice(5, 7) ?? 1) - 1) / 3) + 1
+    return { inline: 'quarterly budget', chip: current ? 'This quarter' : `Q${quarter} ${window!.start.slice(0, 4)}` }
+  }
+  return { inline: 'weekly budget', chip: current ? 'This week' : weekLabel(window!) }
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** "Sep 22 to 28", or "Sep 29 to Oct 5" when the week crosses a month. */
+function weekLabel({ start, end }: Range): string {
+  const [, startMonth, startDay] = start.split('-').map(Number)
+  const [, endMonth, endDay] = end.split('-').map(Number)
+  const from = `${MONTHS[startMonth - 1]} ${startDay}`
+  return startMonth === endMonth ? `${from} to ${endDay}` : `${from} to ${MONTHS[endMonth - 1]} ${endDay}`
 }
 
 export function streakLabel(streak: number): string {

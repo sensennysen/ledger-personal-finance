@@ -197,3 +197,29 @@ test('countUntil does not change rollover carried from closed cycles (LED-238)',
   assert.equal(row.limit, 400)
   assert.equal(row.spent, 500)
 })
+
+// LED-284: a past or future cycle names its window; the one holding today keeps "This …".
+const oct6 = new Date(2026, 9, 6)
+
+test('the current week, quarter and year keep "This week", "This quarter" and "This year" (LED-284)', () => {
+  assert.equal(overspendingWindow('weekly', { start: '2026-10-05', end: '2026-10-11' }, oct6).chip, 'This week')
+  assert.equal(overspendingWindow('quarterly', { start: '2026-10-01', end: '2026-12-31' }, oct6).chip, 'This quarter')
+  assert.equal(overspendingWindow('yearly', { start: '2026-01-01', end: '2026-12-31' }, oct6).chip, 'This year')
+})
+
+test('a past week, quarter and year name their window (LED-284)', () => {
+  assert.equal(overspendingWindow('weekly', { start: '2026-09-21', end: '2026-09-27' }, oct6).chip, 'Sep 21 to 27')
+  assert.equal(overspendingWindow('weekly', { start: '2026-09-28', end: '2026-10-04' }, oct6).chip, 'Sep 28 to Oct 4')
+  assert.equal(overspendingWindow('quarterly', { start: '2026-07-01', end: '2026-09-30' }, oct6).chip, 'Q3 2026')
+  assert.equal(overspendingWindow('yearly', { start: '2025-01-01', end: '2025-12-31' }, oct6).chip, '2025')
+  // The inline text after the spent figure is unchanged.
+  assert.equal(overspendingWindow('weekly', { start: '2026-09-21', end: '2026-09-27' }, oct6).inline, 'weekly budget')
+})
+
+test('a weekly, quarterly or yearly row carries the window it was summed over (LED-284)', () => {
+  const r = run({ budgets: [budget({ period: 'quarterly', amount: 100 })], txs: [tx('2026-09-02', 150)] }).rows[0]
+  assert.ok(r.window, 'the row has its window')
+  assert.ok(r.window.start <= '2026-09-02' && '2026-09-02' <= r.window.end)
+  const m = run({ txs: [tx('2026-09-05', 700)] }).rows[0]
+  assert.equal(m.window, undefined)
+})

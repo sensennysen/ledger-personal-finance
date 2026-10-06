@@ -102,10 +102,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
   return (
     <section className="space-y-4" aria-labelledby="financed-purchases-title">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 id="financed-purchases-title" className="text-base font-semibold">Financed Purchases</h2>
-          <p className="text-xs text-muted-foreground">Each purchase keeps its own term while shared deadlines are totaled.</p>
-        </div>
+        <h2 id="financed-purchases-title" className="text-base font-semibold">Financed Purchases</h2>
         <Button size="sm" className="gap-1.5" disabled={!isOnline} onClick={() => { setAddMode('purchase'); setCreateOpen(true) }}>
           <Plus className="h-3.5 w-3.5" />Add Purchase
         </Button>
@@ -205,7 +202,6 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
         <div className="rounded-xl border border-dashed px-4 py-8 text-center">
           <Layers3 className="mx-auto h-6 w-6 text-muted-foreground" />
           <p className="mt-2 text-sm font-medium">No financed purchases yet</p>
-          <p className="mt-1 text-xs text-muted-foreground">Add each item separately to build a combined repayment schedule.</p>
         </div>
       ) : (
         <>
@@ -370,7 +366,7 @@ export function LoanPurchaseTracker({ account, onAccountChanged, loanData, onSet
                 <h3 className="text-sm font-semibold">Recent Payment Splits</h3>
               </div>
               {recentAllocations.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Repayments will show how much was applied to each purchase.</p>
+                <p className="text-xs text-muted-foreground">None yet</p>
               ) : (
                 <div className="space-y-2.5">
                   {recentAllocations.map((allocation) => (

@@ -13,7 +13,8 @@ import { supabase } from '@/lib/supabase'
 import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/types'
 import { cn, formatCurrency, getLocalDateString } from '@/lib/utils'
 import { useTransactions } from '@/hooks/useTransactions'
-import { afterScheduledLabel, scheduledByAccount, scheduledNetWorth } from '@/lib/scheduledBalances'
+import { afterScheduledLabel, scheduledByAccount } from '@/lib/scheduledBalances'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -30,11 +31,16 @@ import { ACCOUNT_ICONS } from '@/constants/accounts'
 import type { Account } from '@/types'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import { normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
-import { formatLoanSchedule, loansOwed } from '@/lib/loans'
+import { formatLoanSchedule } from '@/lib/loans'
 import { buildAccountsOverview, formatShare, isLiability, type AssetRow, type LiabilityRow } from '@/lib/accountsOverview'
 import type { AppLayoutContext } from '@/components/layout/AppLayout'
 import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
+
+// One column template for the header, group headers and rows (density pass 1a). Narrower
+// fixed columns from lg; the handoff's full widths once 2xl has the room.
+const TABLE_COLS =
+  'grid-cols-[minmax(0,1.6fr)_96px_60px_minmax(0,1.2fr)_112px_136px_108px] gap-x-3 px-4 2xl:grid-cols-[minmax(240px,1.6fr)_150px_72px_minmax(200px,1.2fr)_150px_170px_120px] 2xl:gap-x-5 2xl:px-5'
 
 function formatDueIn(days: number) {
   if (days < 0) return `${-days}d overdue`
@@ -65,6 +71,7 @@ export default function AccountsPage() {
   )
 
   const { openAddTransactionModal } = useOutletContext<AppLayoutContext>()
+  const wideTable = useMediaQuery('(min-width: 1024px)')
   const { purchases: loanPurchases, allocations: loanAllocations, error: loansError, refetch: refetchLoans } = useLoanPurchases()
   const defaultCurrency = profile?.default_currency ?? 'USD'
   const { table: rateTable } = useExchangeRates()
@@ -84,10 +91,6 @@ export default function AccountsPage() {
   }, [today])
   const { transactions: laterRows, error: scheduledError, refetch: refetchScheduled } = useTransactions({ startDate: tomorrow })
   const scheduled = useMemo(() => scheduledByAccount(accounts, laterRows, today), [accounts, laterRows, today])
-  const netWorthScheduled = useMemo(
-    () => scheduledNetWorth(accounts, laterRows, today, defaultCurrency, convertToDefault),
-    [accounts, laterRows, today, defaultCurrency, convertToDefault],
-  )
   const afterScheduled = (account: Account) => {
     const label = afterScheduledLabel(scheduled.get(account.id) ?? 0, account.currency, formatCurrency)
     return label && <p className="text-xs text-muted-foreground">{label}</p>
@@ -563,19 +566,244 @@ export default function AccountsPage() {
     )
   }
 
-  const cardCount = accounts.filter((account) => account.type === 'credit_card').length
-  // A fully repaid loan does not count (LED-181 item, OD-8), matching the search palette
-  // and the Add Transaction kind menu's shared loansOwed() definition (LED-156).
-  const loanCount = loansOwed(accounts).length
-  const liabilityMix = [
-    cardCount > 0 && `${cardCount} card${cardCount > 1 ? 's' : ''}`,
-    loanCount > 0 && `${loanCount} loan${loanCount > 1 ? 's' : ''}`,
-  ].filter(Boolean).join(' · ') || 'None'
+  // Wide screens (density pass 1a): Assets and Liabilities share one full-width table, one column template.
+  const inBase = (account: Account) => {
+    const asset = assetRows.get(account.id)
+    if (asset) return asset.excluded ? 0 : asset.converted ?? asset.balance
+    const liability = liabilityRows.get(account.id)
+    return !liability || liability.excluded ? 0 : liability.convertedOwed ?? liability.owed
+  }
+  const groupTotal = (groupAccounts: Account[]) =>
+    Math.round(groupAccounts.reduce((sum, account) => sum + inBase(account), 0) * 100) / 100
+
+  const shareCell = (account: Account) => {
+    const asset = assetRows.get(account.id)
+    const liability = liabilityRows.get(account.id)
+    const label = (text: string, className?: string, style?: React.CSSProperties) => (
+      <span className={cn('money min-w-[84px] shrink-0 text-right text-xs text-muted-foreground', className)} style={style}>{text}</span>
+    )
+    if (asset?.excluded || liability?.excluded) return <span className="text-xs text-muted-foreground">Not in totals</span>
+    if (asset) {
+      return (
+        <>
+          <Progress value={asset.sharePct ?? 0} className="flex-1" aria-label={`${account.name} share of assets`} />
+          {label(formatShare(asset.sharePct ?? 0))}
+        </>
+      )
+    }
+    if (liability && account.type === 'credit_card' && liability.utilizationPct !== null) {
+      const tone = utilizationToneStyle(liability.utilizationPct, account.utilization_target_pct ?? 30) as React.CSSProperties
+      const limit = formatCurrency(account.credit_limit ?? 0, account.currency, { notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1 })
+      return (
+        <>
+          <Progress value={Math.min(liability.utilizationPct, 100)} className={cn('flex-1', TONED_PROGRESS_CLASS)} style={tone} aria-label={`${account.name} utilisation`} />
+          {label(`${liability.utilizationPct.toFixed(0)}% of ${limit}`)}
+        </>
+      )
+    }
+    if (liability?.loanProgress) {
+      const { pct, paidInstallments, totalInstallments } = liability.loanProgress
+      return (
+        <>
+          <Progress value={pct} className="flex-1" aria-label={`${account.name} repayment progress`} />
+          {label(`${paidInstallments} of ${totalInstallments} paid`)}
+        </>
+      )
+    }
+    return <span className="text-xs text-muted-foreground">—</span>
+  }
+
+  const renderTableRow = (account: Account, idx: number, columnIds: string[], flatRearrange: boolean) => {
+    const asset = assetRows.get(account.id)
+    const liability = liabilityRows.get(account.id)
+    const delta = scheduled.get(account.id) ?? 0
+    const isCard = account.type === 'credit_card'
+    return (
+      <div
+        key={account.id}
+        {...dragProps(account, flatRearrange)}
+        {...openProps(account, flatRearrange)}
+        className={cn(
+          'reorder-motion grid min-h-14 items-center border-b border-border/60 py-2 animate-fade-up last:border-b-0',
+          TABLE_COLS,
+          'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring',
+          flatRearrange ? 'cursor-grab' : 'cursor-pointer hover:bg-muted',
+          draggedAccountId === account.id && 'is-dragging',
+          dropTargetAccountId === account.id && 'is-drop-target'
+        )}
+        style={{ '--anim-delay': `${Math.min(idx * 30, 240)}ms` } as React.CSSProperties}
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          {rearrangeControls(account, flatRearrange, columnIds)}
+          {accountIcon(account)}
+          <p className="truncate text-sm font-medium">{account.name}</p>
+        </div>
+        <span className="truncate text-[13px] text-muted-foreground">{ACCOUNT_TYPE_LABELS[account.type]}</span>
+        <span className="text-[13px] text-muted-foreground">{account.currency}</span>
+        <div className="flex min-w-0 items-center gap-3">{shareCell(account)}</div>
+        <span className="money truncate text-right text-[13px] text-muted-foreground">
+          {delta ? `${delta < 0 ? '−' : '+'}${formatCurrency(Math.abs(delta), account.currency)}` : '—'}
+        </span>
+        <div className="min-w-0 text-right">
+          {asset ? (
+            <>
+              <p className="money truncate text-sm font-medium" style={{ color: account.balance < 0 ? 'var(--destructive)' : undefined }}>
+                {formatCurrency(asset.balance, account.currency)}
+              </p>
+              {asset.converted !== null && (
+                <p className="money truncate text-xs text-muted-foreground">≈ {formatCurrency(asset.converted, defaultCurrency)}</p>
+              )}
+            </>
+          ) : liability ? (
+            <>
+              <p className="money truncate text-sm font-medium">{liability.owed > 0 ? '−' : ''}{formatCurrency(liability.owed, account.currency)}</p>
+              {liability.convertedOwed !== null && (
+                <p className="money truncate text-xs text-muted-foreground">≈ {liability.convertedOwed > 0 ? '−' : ''}{formatCurrency(liability.convertedOwed, defaultCurrency)}</p>
+              )}
+            </>
+          ) : null}
+        </div>
+        <div className="flex items-center justify-end gap-1">
+          {liability && !flatRearrange && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(event) => {
+                event.stopPropagation()
+                openAddTransactionModal(isCard ? 'card-payment' : 'loan-repayment', { targetAccountId: account.id })
+              }}
+            >
+              {isCard ? 'Pay' : 'Repay'}
+            </Button>
+          )}
+          {accountMenu(account)}
+        </div>
+      </div>
+    )
+  }
+
+  const tableGroupHeader = (title: string, count: number, total: number, liabilities: boolean, lead?: React.ReactNode) => (
+    <div className={cn('grid items-baseline border-b border-border/60 bg-surface pt-3.5 pb-2', TABLE_COLS)}>
+      <div className="col-span-5 flex min-w-0 items-center gap-2">
+        {lead}
+        <p className="truncate text-sm font-semibold">
+          {title} <span className="font-normal text-muted-foreground">· {count}</span>
+        </p>
+      </div>
+      <p className="money text-right text-sm font-medium">
+        {liabilities && total > 0 ? '−' : ''}{formatCurrency(total, defaultCurrency)}
+      </p>
+    </div>
+  )
+
+  const renderTable = () => {
+    let body: React.ReactNode
+    if (prefs.accView === 'flat') {
+      body = (['assets', 'liabilities'] as const).map((column) => {
+        const columnAccounts = accounts.filter((account) => isLiability(account) === (column === 'liabilities'))
+        if (columnAccounts.length === 0) return null
+        const ids = columnAccounts.map((account) => account.id)
+        return (
+          <div key={column}>
+            {tableGroupHeader(
+              column === 'assets' ? 'Assets' : 'Liabilities',
+              columnAccounts.length,
+              column === 'assets' ? overview.totals.assets : overview.totals.liabilities,
+              column === 'liabilities',
+            )}
+            {columnAccounts.map((account, idx) => renderTableRow(account, idx, ids, rearrangeMode))}
+          </div>
+        )
+      })
+    } else {
+      body = groupedAccounts.map(([type, groupAccounts]) => (
+        <div
+          key={type}
+          ref={setGroupRef(type)}
+          draggable={rearrangeMode}
+          onDragStart={() => {
+            setDraggedGroupType(type)
+            setDropTargetGroupType(null)
+          }}
+          onDragEnter={() => {
+            if (draggedGroupType && draggedGroupType !== type) setDropTargetGroupType(type)
+          }}
+          onDragOver={(event) => {
+            event.preventDefault()
+            if (draggedGroupType && draggedGroupType !== type) setDropTargetGroupType(type)
+          }}
+          onDrop={(event) => {
+            event.preventDefault()
+            if (draggedGroupType) reorderGroup(draggedGroupType, type)
+            setDraggedGroupType(null)
+            setDropTargetGroupType(null)
+          }}
+          onDragEnd={() => {
+            setDraggedGroupType(null)
+            setDropTargetGroupType(null)
+          }}
+          className={cn(
+            rearrangeMode && 'reorder-motion cursor-grab',
+            draggedGroupType === type && 'is-dragging',
+            dropTargetGroupType === type && 'is-drop-target'
+          )}
+        >
+          {tableGroupHeader(
+            ACCOUNT_TYPE_LABELS[type],
+            groupAccounts.length,
+            groupTotal(groupAccounts),
+            isLiability({ type }),
+            rearrangeMode && (
+              <button
+                type="button"
+                className="reorder-handle text-muted-foreground cursor-grab rounded-md p-1 hover:bg-muted"
+                aria-label={`Drag to rearrange ${ACCOUNT_TYPE_LABELS[type]} group`}
+              >
+                <GripVertical className="w-3.5 h-3.5" />
+              </button>
+            ),
+          )}
+          {groupAccounts.map((account, idx) => renderTableRow(account, idx, [], false))}
+        </div>
+      ))
+    }
+    return (
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className={cn('grid border-b border-border py-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground', TABLE_COLS)}>
+          <span>Account</span>
+          <span>Type</span>
+          <span>Currency</span>
+          <span>Share · Usage</span>
+          <span className="text-right">Scheduled</span>
+          <span className="text-right">Balance</span>
+          <span />
+        </div>
+        {body}
+      </div>
+    )
+  }
+
   const currencyCount = new Set(accounts.map((account) => account.currency)).size
-  const assetCount = overview.assets.length
+  const ratesFootnote = (
+    <>
+      {overview.convertedCurrencies.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Totals in {defaultCurrency}. {overview.convertedCurrencies.join(', ')} converted
+          {ratesAsOf ? ` at rates as of ${ratesAsOf}` : ''}.{' '}
+          <Link to="/settings" className="underline">Exchange rates</Link>
+        </p>
+      )}
+      {overview.excludedCurrencies.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Totals leave out {overview.excludedCurrencies.join(', ')} — no exchange rate.{' '}
+          <Link to="/settings" className="underline">Add a rate</Link>
+        </p>
+      )}
+    </>
+  )
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 lg:px-8 space-y-6 max-w-[1600px] mx-auto">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           {accounts.length > 0 && (
@@ -636,7 +864,7 @@ export default function AccountsPage() {
         <ErrorState title="Couldn't load your accounts" description={error} detail={errorDetail} onRetry={() => void refetch()} />
       ) : loading ? (
         <div className="space-y-6" aria-busy="true" aria-label="Loading accounts">
-          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[1fr_1fr_1fr_1.4fr]">
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[1fr_1fr_1fr_1.6fr]">
             {['Assets', 'Liabilities', 'Net Worth', 'Coming up'].map((label, index) => (
               <div
                 key={label}
@@ -650,12 +878,40 @@ export default function AccountsPage() {
                 )}
               >
                 <p className="text-xs text-muted-foreground">{label}</p>
-                <p className="mt-1 text-lg"><SkeletonText className="w-24" /></p>
-                <p className="text-xs"><SkeletonText className="w-16" /></p>
+                <p className="mt-1 text-lg sm:text-[22px]"><SkeletonText className="w-28" /></p>
               </div>
             ))}
           </div>
-          <div className="grid items-start gap-6 lg:grid-cols-2">
+          {/* Mirrors the wide table: three asset rows, two liability rows. */}
+          <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+            <div className={cn('grid border-b border-border py-2.5 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground', TABLE_COLS)}>
+              <span>Account</span><span>Type</span><span>Currency</span><span>Share · Usage</span>
+              <span className="text-right">Scheduled</span><span className="text-right">Balance</span><span />
+            </div>
+            {[3, 2].map((rows, group) => (
+              <div key={group}>
+                <div className={cn('grid items-baseline border-b border-border/60 bg-surface pt-3.5 pb-2', TABLE_COLS)}>
+                  <p className="col-span-5 text-sm"><SkeletonText className="w-24" /></p>
+                  <p className="text-right text-sm"><SkeletonText className="w-24" /></p>
+                </div>
+                {[...Array(rows)].map((_, row) => (
+                  <div key={row} className={cn('grid min-h-14 items-center border-b border-border/60 py-2 last:border-b-0', TABLE_COLS)}>
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="size-8 shrink-0 rounded-lg bg-muted" />
+                      <p className="text-sm"><SkeletonText className="w-32" /></p>
+                    </div>
+                    <p className="text-[13px]"><SkeletonText className="w-16" /></p>
+                    <p className="text-[13px]"><SkeletonText className="w-8" /></p>
+                    <div className="h-1 rounded-full bg-muted" />
+                    <span />
+                    <p className="text-right text-sm"><SkeletonText className="w-24" /></p>
+                    <span />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="grid items-start gap-6 lg:hidden">
             {['Assets', 'Liabilities'].map((heading) => (
               <section key={heading} className="min-w-0 space-y-3">
                 <div className="flex items-baseline justify-between">
@@ -720,36 +976,23 @@ export default function AccountsPage() {
         <EmptyState
           icon={Wallet}
           title="No accounts yet"
-          description="Add your first account to get started"
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[1fr_1fr_1fr_1.4fr]">
+          <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-border bg-card lg:grid-cols-[1fr_1fr_1fr_1.6fr]">
             <div className="border-b border-r border-border/60 p-4 lg:border-b-0">
               <p className="text-xs text-muted-foreground">Assets</p>
-              <p className="money mt-1 text-lg font-semibold">{formatCurrency(overview.totals.assets, defaultCurrency)}</p>
-              <p className="text-xs text-muted-foreground">{assetCount} account{assetCount === 1 ? '' : 's'}</p>
+              <p className="money mt-1 whitespace-nowrap text-lg font-medium tracking-[-0.03em] sm:text-[22px]">{formatCurrency(overview.totals.assets, defaultCurrency)}</p>
             </div>
             <div className="border-b border-border/60 p-4 lg:border-b-0 lg:border-r">
               <p className="text-xs text-muted-foreground">Liabilities</p>
-              <p className="money mt-1 text-lg font-semibold">{formatCurrency(overview.totals.liabilities, defaultCurrency)}</p>
-              <p className="text-xs text-muted-foreground">{liabilityMix}</p>
+              <p className="money mt-1 whitespace-nowrap text-lg font-medium tracking-[-0.03em] sm:text-[22px]">
+                {overview.totals.liabilities > 0 ? '−' : ''}{formatCurrency(overview.totals.liabilities, defaultCurrency)}
+              </p>
             </div>
             <div className="col-span-2 border-b border-border/60 p-4 lg:col-span-1 lg:border-b-0 lg:border-r">
               <p className="text-xs text-muted-foreground">Net Worth</p>
-              <p className="money mt-1 text-lg font-bold">{formatCurrency(overview.totals.netWorth, defaultCurrency)}</p>
-              {netWorthScheduled !== 0 && (
-                <p className="text-xs text-muted-foreground">{afterScheduledLabel(netWorthScheduled, defaultCurrency, formatCurrency)}</p>
-              )}
-              {overview.excludedCurrencies.length > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {overview.convertedCurrencies.length > 0
-                    ? `Leaves out ${overview.excludedCurrencies.join(', ')}`
-                    : `${defaultCurrency} accounts only`}
-                </p>
-              ) : overview.convertedCurrencies.length > 0 ? (
-                <p className="text-xs text-muted-foreground">Includes {overview.convertedCurrencies.join(', ')} converted</p>
-              ) : null}
+              <p className="money mt-1 whitespace-nowrap text-lg font-medium tracking-[-0.03em] sm:text-[22px]">{formatCurrency(overview.totals.netWorth, defaultCurrency)}</p>
             </div>
             <div className="col-span-2 p-4 lg:col-span-1">
               <p className="text-xs text-muted-foreground">Coming up</p>
@@ -758,14 +1001,14 @@ export default function AccountsPage() {
               ) : overview.comingUp.length === 0 ? (
                 <p className="mt-1 text-sm text-muted-foreground">Nothing due</p>
               ) : (
-                <ul className="mt-1 space-y-1">
+                <ul className="mt-1.5 grid gap-2 sm:grid-cols-3 sm:gap-4">
                   {overview.comingUp.slice(0, 3).map((item) => (
-                    <li key={item.account.id} className="flex items-baseline justify-between gap-2 text-sm">
-                      <span className="truncate">{item.label}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        <span className="money font-medium text-foreground">{formatCurrency(item.amount, item.account.currency)}</span>
+                    <li key={item.account.id} className="min-w-0">
+                      <p className="truncate text-sm font-medium">{item.label}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        <span className="money text-foreground">{formatCurrency(item.amount, item.account.currency)}</span>
                         {' '}{formatDueIn(item.days)}
-                      </span>
+                      </p>
                     </li>
                   ))}
                 </ul>
@@ -777,49 +1020,47 @@ export default function AccountsPage() {
             <InlineLoadError message="Couldn't load scheduled transactions, so balances don't show what is still scheduled." onRetry={() => void refetchScheduled()} />
           )}
 
-          <div className="grid items-start gap-6 lg:grid-cols-2">
-            {overview.assets.length > 0 && (
-              <section className="min-w-0 space-y-3">
-                <div className="flex items-baseline justify-between">
-                  <h2 className="text-sm font-semibold">Assets</h2>
-                  <p className="money text-sm font-semibold">{formatCurrency(overview.totals.assets, defaultCurrency)}</p>
-                </div>
-                {prefs.accView === 'flat' && (
-                  <div className="hidden grid-cols-[minmax(0,1.5fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] gap-x-3 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] px-4 text-[0.6875rem] uppercase tracking-wide text-muted-foreground md:grid">
-                    <span>Account</span><span className="hidden 2xl:block">Type</span><span>Currency</span><span>Share</span><span className="text-right">Balance</span><span />
+          {wideTable ? (
+            <div className="space-y-3">
+              {loansError && (
+                <InlineLoadError message="Couldn't load loan progress and due dates." onRetry={() => void refetchLoans()} />
+              )}
+              {renderTable()}
+              {ratesFootnote}
+            </div>
+          ) : (
+            <div className="grid items-start gap-6 lg:grid-cols-2">
+              {overview.assets.length > 0 && (
+                <section className="min-w-0 space-y-3">
+                  <div className="flex items-baseline justify-between">
+                    <h2 className="text-sm font-semibold">Assets</h2>
+                    <p className="money text-sm font-semibold">{formatCurrency(overview.totals.assets, defaultCurrency)}</p>
                   </div>
-                )}
-                {renderColumn('assets')}
-                {overview.convertedCurrencies.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Totals are in {defaultCurrency}. {overview.convertedCurrencies.join(', ')} accounts are converted
-                    {ratesAsOf ? ` at rates as of ${ratesAsOf}` : ''}.{' '}
-                    <Link to="/settings" className="underline">Exchange rates</Link>
-                  </p>
-                )}
-                {overview.excludedCurrencies.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Totals are in {defaultCurrency} and leave out {overview.excludedCurrencies.join(', ')} accounts — Ledger has no exchange rate for them.{' '}
-                    <Link to="/settings" className="underline">Add a rate</Link>
-                  </p>
-                )}
-              </section>
-            )}
-            {overview.liabilities.length > 0 && (
-              <section className="min-w-0 space-y-3">
-                <div className="flex items-baseline justify-between">
-                  <h2 className="text-sm font-semibold">Liabilities</h2>
-                  <p className="money text-sm font-semibold">
-                    {overview.totals.liabilities > 0 ? '−' : ''}{formatCurrency(overview.totals.liabilities, defaultCurrency)}
-                  </p>
-                </div>
-                {loansError && (
-                  <InlineLoadError message="Couldn't load loan progress and due dates." onRetry={() => void refetchLoans()} />
-                )}
-                {renderColumn('liabilities')}
-              </section>
-            )}
-          </div>
+                  {prefs.accView === 'flat' && (
+                    <div className="hidden grid-cols-[minmax(0,1.5fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] gap-x-3 2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_3.5rem_minmax(0,1.2fr)_7.5rem_1.75rem] px-4 text-[0.6875rem] uppercase tracking-wide text-muted-foreground md:grid">
+                      <span>Account</span><span className="hidden 2xl:block">Type</span><span>Currency</span><span>Share</span><span className="text-right">Balance</span><span />
+                    </div>
+                  )}
+                  {renderColumn('assets')}
+                  {ratesFootnote}
+                </section>
+              )}
+              {overview.liabilities.length > 0 && (
+                <section className="min-w-0 space-y-3">
+                  <div className="flex items-baseline justify-between">
+                    <h2 className="text-sm font-semibold">Liabilities</h2>
+                    <p className="money text-sm font-semibold">
+                      {overview.totals.liabilities > 0 ? '−' : ''}{formatCurrency(overview.totals.liabilities, defaultCurrency)}
+                    </p>
+                  </div>
+                  {loansError && (
+                    <InlineLoadError message="Couldn't load loan progress and due dates." onRetry={() => void refetchLoans()} />
+                  )}
+                  {renderColumn('liabilities')}
+                </section>
+              )}
+            </div>
+          )}
         </>
       )}
 

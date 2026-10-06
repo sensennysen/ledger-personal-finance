@@ -29,7 +29,6 @@ export function ExchangeRatesCard() {
   const [frequencyError, setFrequencyError] = useState<FormErrorValue>(null)
   const [refreshResult, setRefreshResult] = useState<FormErrorValue>(null)
   const statusLabel = rateStatusLabel(table, needed.length)
-  const current = REFRESH_FREQUENCIES.find((option) => option.value === frequency)
 
   const onFrequency = async (value: string | null) => {
     if (!isRefreshFrequency(value) || value === frequency) return
@@ -71,7 +70,6 @@ export function ExchangeRatesCard() {
               ))}
             </SelectContent>
           </Select>
-          {current && <p className="text-xs text-muted-foreground">{current.hint}</p>}
           <FormError error={frequencyError} className="mt-1 px-0" />
         </div>
 

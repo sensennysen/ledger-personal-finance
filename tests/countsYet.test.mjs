@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { countsYet, countedEnd, splitCounted, scheduledIn, msUntilNextLocalMidnight, scheduledSumNote } from '../src/lib/countsYet.ts'
+import { countsYet, countedEnd, splitCounted, scheduledIn, msUntilNextLocalMidnight } from '../src/lib/countsYet.ts'
 
 test('a row counts on its date and before, not after', () => {
   assert.equal(countsYet('2026-10-04', '2026-10-04'), true)
@@ -54,10 +54,4 @@ test('the next local midnight is when today changes', () => {
   assert.equal(msUntilNextLocalMidnight(new Date(2026, 9, 5, 0, 0, 0)), 24 * 60 * 60 * 1000)
   // Month end rolls into the next month.
   assert.equal(msUntilNextLocalMidnight(new Date(2026, 9, 31, 12, 0, 0)), 12 * 60 * 60 * 1000)
-})
-
-test('the Sum notes scheduled rows only when there are some', () => {
-  assert.equal(scheduledSumNote(0), null)
-  assert.equal(scheduledSumNote(1), 'incl. 1 scheduled')
-  assert.equal(scheduledSumNote(3), 'incl. 3 scheduled')
 })

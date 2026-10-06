@@ -259,7 +259,7 @@ export function LoanPurchaseForm({ accountId, currency, categories, initialValue
                       </FormItem>
                     )} />
                   </div>
-                  <p className="text-xs text-muted-foreground">Opening progress only: no past expenses are created, and nothing lands in your transaction history.</p>
+                  <p className="text-xs text-muted-foreground">No history created</p>
                   <FormField control={form.control} name="notes" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Notes <span className="font-normal text-muted-foreground">(optional)</span></FormLabel>
@@ -274,9 +274,7 @@ export function LoanPurchaseForm({ accountId, currency, categories, initialValue
           {showFinancing && (
             <aside className="space-y-3 self-start rounded-lg border bg-muted/30 p-3 text-sm" aria-label="What this costs" aria-live="polite">
               <h3 className="text-xs font-semibold text-muted-foreground">What this costs</h3>
-              {!preview ? (
-                <p className="text-xs text-muted-foreground">Enter the amount, term and installment to see the total cost and schedule.</p>
-              ) : (
+              {!preview ? null : (
                 <>
                   <div>
                     <p className="text-xs text-muted-foreground">Total payable</p>

@@ -33,8 +33,3 @@ export function msUntilNextLocalMidnight(now: Date): number {
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   return next.getTime() - now.getTime()
 }
-
-/** The note beside a list's Sum when scheduled rows are in it: the Sum adds every listed row (LED-251). */
-export function scheduledSumNote(scheduledCount: number): string | null {
-  return scheduledCount > 0 ? `incl. ${scheduledCount} scheduled` : null
-}

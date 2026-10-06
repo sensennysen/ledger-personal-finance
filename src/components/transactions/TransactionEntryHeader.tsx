@@ -8,9 +8,8 @@ import {
   type TransactionKind,
 } from '@/components/transactions/transactionKinds'
 import { useAccounts } from '@/hooks/useAccounts'
-import { useKindMenuItems } from '@/hooks/useKindMenuItems'
 import { resolveEditTarget } from '@/lib/editTarget'
-import { canChangeKind, kindDialogSubtitle } from '@/lib/kindMenu'
+import { canChangeKind } from '@/lib/kindMenu'
 import type { TransactionType } from '@/types'
 
 interface TransactionEntryHeaderProps {
@@ -26,7 +25,8 @@ interface TransactionEntryHeaderProps {
 
 /**
  * A new-transaction dialog's identity: the kind the user just picked, stated once
- * (4c, 5b, 12a), with a Change kind link back to the menu so a mis-pick is not a dead end.
+ * (4c, 5b, 12a), with a Change kind link beside the title so a mis-pick is not a dead end.
+ * No subtitle: it only restated the title (density pass 4a).
  */
 export function TransactionEntryHeader({
   kind,
@@ -35,36 +35,28 @@ export function TransactionEntryHeader({
   showLoanRepayment,
   showCardPayment,
 }: TransactionEntryHeaderProps) {
-  const items = useKindMenuItems({ showLoanRepayment, showCardPayment })
   const { icon: Icon, tile, color } = KIND_VISUALS[kind]
-  const subtitle = kindDialogSubtitle(kind, items)
   return (
     <DialogHeader className="flex-row items-center gap-3 pr-8">
       <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${tile}`} aria-hidden>
         <Icon className={color} />
       </span>
-      <div className="min-w-0 space-y-1">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         <DialogTitle>{title ?? TRANSACTION_KIND_DIALOG_TITLES[kind]}</DialogTitle>
-        <p className="text-sm text-muted-foreground">
-          {subtitle}
-          {onChangeKind && canChangeKind(kind) && (
-            <>
-              {' · '}
-              <TransactionKindMenu
-                selectedKind={kind}
-                showLoanRepayment={showLoanRepayment}
-                showCardPayment={showCardPayment}
-                onSelect={onChangeKind}
-                align="start"
-                trigger={
-                  <Button type="button" variant="link" className="h-auto p-0 text-sm">
-                    Change kind
-                  </Button>
-                }
-              />
-            </>
-          )}
-        </p>
+        {onChangeKind && canChangeKind(kind) && (
+          <TransactionKindMenu
+            selectedKind={kind}
+            showLoanRepayment={showLoanRepayment}
+            showCardPayment={showCardPayment}
+            onSelect={onChangeKind}
+            align="start"
+            trigger={
+              <Button type="button" variant="link" className="h-auto p-0 text-sm">
+                Change kind
+              </Button>
+            }
+          />
+        )}
       </div>
     </DialogHeader>
   )
@@ -93,10 +85,7 @@ export function TransactionEditHeader({ type, toAccountId }: { type: Transaction
       <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${tile}`} aria-hidden>
         <Icon className={color} />
       </span>
-      <div className="min-w-0 space-y-1">
-        <DialogTitle>{`Edit ${TRANSACTION_KIND_LABELS[kind].toLowerCase()}`}</DialogTitle>
-        <p className="text-sm text-muted-foreground">{kindDialogSubtitle(kind, [])}</p>
-      </div>
+      <DialogTitle className="min-w-0">{`Edit ${TRANSACTION_KIND_LABELS[kind].toLowerCase()}`}</DialogTitle>
     </DialogHeader>
   )
 }

@@ -536,13 +536,15 @@ export function TransactionForm({
                 }}
               />
             </FormControl>
-            <p className="text-xs text-muted-foreground">
-              {destinationTyped
-                ? `What arrived in the ${toAccountCurrency} account.`
-                : suggestedDestination !== null
-                  ? `Filled in from the exchange-rate feed${ratesAsOfLabel(rateTable) ? `, as of ${ratesAsOfLabel(rateTable)}` : ''}. Change it to what the account received.`
-                  : `No exchange rate for ${currencyValue} to ${toAccountCurrency}. Enter what the account received.`}
-            </p>
+            {destinationTyped ? null : suggestedDestination !== null ? (
+              ratesAsOfLabel(rateTable) && (
+                <p className="text-xs text-muted-foreground">Rate as of {ratesAsOfLabel(rateTable)}</p>
+              )
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No exchange rate for {currencyValue} to {toAccountCurrency}. Enter what the account received.
+              </p>
+            )}
             <FormMessage />
           </FormItem>
         )}
@@ -567,7 +569,6 @@ export function TransactionForm({
               Statement balance
             </Button>
           )}
-          <span className="text-xs text-muted-foreground">or type a custom amount</span>
         </div>
         {selectedCard?.credit_limit ? (
           <p className="text-xs text-muted-foreground">
@@ -599,10 +600,6 @@ export function TransactionForm({
             )}
           </div>
         )}
-        <p className="text-xs text-muted-foreground">
-          Ledger tracks one running balance per card, not a statement balance. Full balance clears everything owed
-          today, including purchases made after the statement closed.
-        </p>
       </div>
     )}
     </>
@@ -845,7 +842,6 @@ export function TransactionForm({
                 <span aria-hidden="true">💳</span>
                 <span className="font-medium">Card payments</span>
               </div>
-              <p className="text-xs text-muted-foreground">Excluded from spending reports</p>
             </div>
           ) : (
             <FormField
@@ -1004,13 +1000,7 @@ export function TransactionForm({
             onClick={() => setShowMoreDetails((value) => !value)}
             aria-expanded={showMoreDetails}
           >
-            <div>
-              <p className="text-sm font-medium leading-none">More details</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Notes, tags, goals, recurring settings, and receipt
-                {hasExtraDetails ? ' included' : ' optional'}
-              </p>
-            </div>
+            <p className="text-sm font-medium leading-none">More details</p>
             <span className="text-xs font-medium text-muted-foreground">
               {showMoreDetails ? 'Hide' : hasExtraDetails ? 'Review' : 'Add'}
             </span>
@@ -1052,10 +1042,7 @@ export function TransactionForm({
                 name="is_recurring"
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <FormLabel className="text-sm font-medium">Recurring transaction</FormLabel>
-                      <p className="text-xs text-muted-foreground">Repeat this transaction automatically</p>
-                    </div>
+                    <FormLabel className="text-sm font-medium">Recurring</FormLabel>
                     <FormControl>
                       <Switch checked={field.value} onCheckedChange={field.onChange} />
                     </FormControl>

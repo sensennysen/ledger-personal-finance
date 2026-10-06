@@ -123,7 +123,6 @@ export function DashboardDetailDialogs({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Net Worth</DialogTitle>
-            <p className="text-xs text-muted-foreground">Assets minus liabilities</p>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             <div className="space-y-2 pr-2">

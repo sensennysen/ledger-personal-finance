@@ -37,12 +37,10 @@ import { TransactionEditHeader, TransactionEntryHeader } from '@/components/tran
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { entryDialogWidthClass, inferTransactionKind, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
-import { DayCard, TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
+import { DayCard, TableSurface, TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
 import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
 import { MonthRail } from '@/components/transactions/MonthJump'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
-import { useLocalDate } from '@/hooks/useLocalDate'
-import { countsYet } from '@/lib/countsYet'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { ACTIVITY_SORTS, effectiveDensity, groupByDay, isAmountSort, sliceGroups, sortByAmount, sortByDate, sumByCurrency, WINDOW_STEP, type ActivitySort } from '@/lib/transactionWindow'
 import { amountInCurrency } from '@/lib/exchangeRates'
@@ -327,13 +325,12 @@ export default function TransactionsPage() {
     [filtered, sort, baseCurrency, rateTable]
   )
   const matchSum = useMemo(() => sumByCurrency(filtered), [filtered])
-  const today = useLocalDate()
-  const matchScheduled = useMemo(() => filtered.filter((tx) => !countsYet(tx.date, today)).length, [filtered, today])
 
   // Window the list (LED-60). The cycle is left out of the reset key so
   // stepping it keeps the window and the scroll position.
   const compactList = useMediaQuery('(max-width: 767px)')
   const density = effectiveDensity(prefs.txDensity, compactList)
+  const tableList = !compactList && density === 'compact'
   const { rendered, sentinelRef } = useRenderWindow(filtered.length, {
     step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
     resetKey: JSON.stringify([filterType, search, activeTagFilter, prefs.txView, sort]),
@@ -496,7 +493,7 @@ export default function TransactionsPage() {
       onSelect={toggleSelect}
       dense={density === 'compact'}
       showDate={amountSorted}
-      variant={compactList ? 'list' : 'card'}
+      variant={compactList ? 'list' : tableList ? 'table' : 'card'}
       baseCurrency={baseCurrency}
     />
   )
@@ -513,9 +510,7 @@ export default function TransactionsPage() {
       matchCount={filtered.length}
       total={cycleOnly.length}
       totalLabel="this cycle"
-      rangeLabel={`${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
       sum={matchSum}
-      scheduledCount={matchScheduled}
       sort={sort}
       onSortChange={changeSort}
       sortOptions={ACTIVITY_SORTS}
@@ -854,7 +849,6 @@ export default function TransactionsPage() {
           <EmptyState
             icon={ArrowLeftRight}
             title={`No ${filterType === 'all' ? 'transactions' : filterType} in ${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`}
-            description={`${cycleOnly.length} transaction${cycleOnly.length === 1 ? '' : 's'} this cycle`}
             action={
               <Button variant="outline" size="sm" onClick={clearActivityFilters}>
                 Show all {cycleOnly.length}
@@ -865,15 +859,17 @@ export default function TransactionsPage() {
           <ResultBarLayout bar={resultBar}>
             {compactList ? (
               <DayCard>{flatSorted.slice(0, rendered).map(renderRow)}</DayCard>
+            ) : tableList ? (
+              <TableSurface>{flatSorted.slice(0, rendered).map(renderRow)}</TableSurface>
             ) : (
               <div className="space-y-1">{flatSorted.slice(0, rendered).map(renderRow)}</div>
             )}
-            <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
+            <WindowFooter rendered={rendered} total={filtered.length} compact={compactList || tableList} sentinelRef={sentinelRef} />
           </ResultBarLayout>
         ) : (
           <ResultBarLayout bar={resultBar}>
-            <TransactionDayList groups={sliceGroups(grouped, rendered)} renderRow={renderRow} compact={compactList} />
-            <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
+            <TransactionDayList groups={sliceGroups(grouped, rendered)} renderRow={renderRow} compact={compactList} table={tableList} />
+            <WindowFooter rendered={rendered} total={filtered.length} compact={compactList || tableList} sentinelRef={sentinelRef} />
           </ResultBarLayout>
         )}
 

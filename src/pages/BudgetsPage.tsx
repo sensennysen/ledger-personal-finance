@@ -1567,9 +1567,6 @@ export default function BudgetsPage() {
 
         {/* Goals view */}
         <TabsContent value="goals" className="mt-4 space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Goals are tracked by hand. They aren't linked to an account, so update Saved so far or add a contribution when you move money.
-          </p>
           {goalsLoadState === 'stale-error' && (
             <InlineLoadError message="Couldn't refresh your savings goals. Showing what was last loaded." onRetry={() => void refetchGoals()} />
           )}

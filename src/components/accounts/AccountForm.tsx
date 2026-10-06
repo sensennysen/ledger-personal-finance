@@ -12,19 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { getCreditCardSpending } from '@/lib/creditCards'
 import { formatLoanSchedule, getLoanAmountOwed, LOAN_PAY_PERIOD_LABELS, WEEKDAY_LABELS } from '@/lib/loans'
-import { accountSchema, loanScheduleControl, type AccountFormValues, type LoanScheduleControl } from '@/lib/accountSchema'
+import { accountSchema, loanScheduleControl, type AccountFormValues } from '@/lib/accountSchema'
 import { availableCredit, daysToPay, ordinal } from '@/lib/accountFormHints'
 
 export type { AccountFormValues }
 
 const ACCOUNT_TYPES = Object.keys(ACCOUNT_TYPE_LABELS) as AccountType[]
-
-const SCHEDULE_CONTROL_HINTS: Record<LoanScheduleControl, string> = {
-  'two-days': 'Twice-a-month loans need two different days of the month.',
-  weekday: 'Weekly loans need the weekday payments fall on.',
-  none: 'Daily loans need no due day.',
-  'one-day': 'Pick the day of the month payments are due.',
-}
 
 function OptionalMark() {
   return <span className="font-normal text-muted-foreground">(optional)</span>
@@ -115,7 +108,6 @@ export function AccountForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Type</FormLabel>
-              <p className="text-xs text-muted-foreground">The type decides which fields you'll be asked for.</p>
               <div role="radiogroup" aria-label="Account type" className="grid grid-cols-4 gap-2">
                 {ACCOUNT_TYPES.map((value, index) => {
                   const TypeIcon = ACCOUNT_ICONS[value]
@@ -202,11 +194,11 @@ export function AccountForm({
               {isLiability && (
                 <div className="space-y-1 text-xs text-muted-foreground">
                   <p>
-                    Enter what you owe as a positive number — Ledger stores it as a liability and subtracts it from net worth.
+                    Enter what you owe as a positive number.
                     {Number(watchedBalance) < 0 && ` ${formatCurrency(Number(watchedBalance), account?.currency ?? DEFAULT_CURRENCY)} is saved the same way, as ${formatCurrency(Math.abs(Number(watchedBalance)), account?.currency ?? DEFAULT_CURRENCY)} owed.`}
                   </p>
                   {type === 'loan' && (
-                    <p>Use 0 when you will add financed purchases separately. Any amount entered here is treated as additional unitemized opening debt.</p>
+                    <p>Use 0 if you'll add financed purchases separately.</p>
                   )}
                 </div>
               )}
@@ -230,7 +222,6 @@ export function AccountForm({
                       onChange={(e) => field.onChange(e.target.value === '' ? null : Number(e.target.value))}
                     />
                   </FormControl>
-                  <p className="text-xs text-muted-foreground">Needed for the utilisation bar on Home and Accounts.</p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -275,11 +266,11 @@ export function AccountForm({
                 )}
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {statementDay && dueDay && paymentWindow !== null
-                ? <>Statement closes the <strong className="text-foreground">{ordinal(statementDay)}</strong>, payment due the <strong className="text-foreground">{ordinal(dueDay)}</strong> — about {paymentWindow} days to pay. Both appear as countdowns on Home.</>
-                : 'Statement and due days can be left blank — countdowns just won\'t show.'}
-            </p>
+            {statementDay && dueDay && paymentWindow !== null && (
+              <p className="text-xs text-muted-foreground">
+                Statement closes the <strong className="text-foreground">{ordinal(statementDay)}</strong>, payment due the <strong className="text-foreground">{ordinal(dueDay)}</strong> — about {paymentWindow} days to pay.
+              </p>
+            )}
             {available !== null && (
               <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2 text-sm">
                 <span className="text-muted-foreground">Available credit <span className="text-xs">· limit minus what you owe</span></span>
@@ -361,9 +352,6 @@ export function AccountForm({
                     </SelectContent>
                   </Select>
                   <FormMessage />
-                  <p className="text-xs text-muted-foreground">
-                    {scheduleControl ? SCHEDULE_CONTROL_HINTS[scheduleControl] : 'Each financed purchase can keep its own first due date and repayment term.'}
-                  </p>
                 </FormItem>
               )}
             />
@@ -445,7 +433,7 @@ export function AccountForm({
             )}
             {schedulePreview && (
               <p className="text-xs text-muted-foreground">
-                Reads <strong className="text-foreground">{schedulePreview}</strong> on the Accounts page and drives the repayment reminders.
+                Shows as <strong className="text-foreground">{schedulePreview}</strong>
               </p>
             )}
           </div>

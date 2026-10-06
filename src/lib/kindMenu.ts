@@ -11,7 +11,8 @@ export type KindMenuGroup = 'primary' | 'liabilities'
 export interface KindMenuItem {
   kind: TransactionKind
   label: string
-  description: string
+  /** Data only ("2 cards · ₱68,920 due"); the primary kinds carry none (density pass 4a). */
+  description?: string
   group: KindMenuGroup
   /** Key cap on the desktop dropdown; absent for kinds that open a second step. */
   shortcut?: string
@@ -41,13 +42,10 @@ export function kindForShortcut(key: string): ShortcutKind | null {
 }
 
 const PRIMARY_ITEMS: KindMenuItem[] = [
-  { kind: 'expense', label: 'Expense', description: 'Money spent from an account', group: 'primary', shortcut: KIND_SHORTCUTS.expense },
-  { kind: 'income', label: 'Income', description: 'Money received into an account', group: 'primary', shortcut: KIND_SHORTCUTS.income },
-  { kind: 'transfer', label: 'Transfer', description: 'Move money between accounts', group: 'primary', shortcut: KIND_SHORTCUTS.transfer },
+  { kind: 'expense', label: 'Expense', group: 'primary', shortcut: KIND_SHORTCUTS.expense },
+  { kind: 'income', label: 'Income', group: 'primary', shortcut: KIND_SHORTCUTS.income },
+  { kind: 'transfer', label: 'Transfer', group: 'primary', shortcut: KIND_SHORTCUTS.transfer },
 ]
-
-const LOAN_FALLBACK = 'Pay down a loan from another account'
-const CARD_FALLBACK = 'Pay down a credit card from another account'
 
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
 
@@ -55,11 +53,11 @@ export function loanRepaymentDescription(
   accounts: Account[],
   baseCurrency: string,
   formatMoney: (amount: number) => string,
-): string {
+): string | undefined {
   // Totals only count the base currency (LED-135); a loan in another currency
   // has no rate to convert with, so it is left out of the sentence.
   const loans = loansOwed(accounts, baseCurrency)
-  if (loans.length === 0) return LOAN_FALLBACK
+  if (loans.length === 0) return undefined
   const { totalLoanDebt } = summarizeBalances(loans, baseCurrency)
   return `${plural(loans.length, 'loan')} · ${formatMoney(totalLoanDebt)} owed`
 }
@@ -68,11 +66,11 @@ export function cardPaymentDescription(
   accounts: Account[],
   baseCurrency: string,
   formatMoney: (amount: number) => string,
-): string {
+): string | undefined {
   const cards = accounts.filter(
     (account) => account.type === 'credit_card' && account.balance !== 0 && account.currency === baseCurrency,
   )
-  if (cards.length === 0) return CARD_FALLBACK
+  if (cards.length === 0) return undefined
   const { totalCreditCardDebt } = summarizeBalances(cards, baseCurrency)
   if (cards.length === 1) return `${cards[0].name} · ${formatMoney(totalCreditCardDebt)} due`
   return `${cards.length} cards · ${formatMoney(totalCreditCardDebt)} due`
@@ -102,20 +100,6 @@ export function kindMenuItems(accounts: Account[], options: KindMenuOptions): Ki
     })
   }
   return items
-}
-
-// A payment dialog is already about one loan or card, so the menu's aggregate
-// line ("2 cards · $x due") would be wrong there. The designs (5b, 12a) draw
-// this caption instead (LED-111).
-const LIABILITY_DIALOG_SUBTITLES = {
-  'loan-repayment': 'Posts as an expense against the loan · type locked',
-  'card-payment': 'Posts as a transfer to the card · type locked',
-} as const
-
-/** The line under a new-transaction dialog's title: the menu's own text for the three primary kinds. */
-export function kindDialogSubtitle(kind: TransactionKind, items: KindMenuItem[]): string {
-  if (kind === 'loan-repayment' || kind === 'card-payment') return LIABILITY_DIALOG_SUBTITLES[kind]
-  return items.find((item) => item.kind === kind)?.description ?? ''
 }
 
 /** Change kind is offered only from the three primary kinds; a payment's form cannot be swapped safely. */

@@ -9,10 +9,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { useCycle } from '@/contexts/cycleState'
 import { ACCOUNT_TYPE_LABELS } from '@/types'
-import { formatCurrency, formatDate, formatDateShort, getCurrentCycleMonthKey, getCustomMonthRange, getLocalDateString } from '@/lib/utils'
+import { formatCurrency, formatDate, getCurrentCycleMonthKey, getCustomMonthRange, getLocalDateString } from '@/lib/utils'
 import { getCreditCardSpending, getCreditUtilizationPct, daysUntilDayOfMonth, normalizeCreditCardBalanceForStorage } from '@/lib/creditCards'
 import { daysUntilDue, formatLoanSchedule, formatOverdue, getLoanAmountOwed } from '@/lib/loans'
-import { afterScheduledLabel, scheduledByAccount } from '@/lib/scheduledBalances'
+import { scheduledByAccount } from '@/lib/scheduledBalances'
+import { formatNet } from '@/lib/formatNet'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,9 +42,8 @@ import { MonthJumpBar, MonthRail } from '@/components/transactions/MonthJump'
 import { usePreferences } from '@/hooks/usePreferences'
 import { useRenderWindow } from '@/hooks/useRenderWindow'
 import { useLocalDate } from '@/hooks/useLocalDate'
-import { countsYet } from '@/lib/countsYet'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { dateSpan, effectiveDensity, groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
+import { effectiveDensity, groupByDay, sliceGroups, sortByDate, sumByCurrency, WINDOW_STEP, type TxSort } from '@/lib/transactionWindow'
 import { buildRunningBalanceMap } from '@/lib/runningBalance'
 import { buildTransactionsCsv, downloadCsv } from '@/lib/transactionCsv'
 import { FilterTopCategories } from '@/components/transactions/FilterTopCategories'
@@ -57,13 +57,12 @@ import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import type { CreditCardPayment, Transaction } from '@/types'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
-import { transferCredit } from '@/lib/transferCredit'
 
-function bandCell(label: string, value: string, sub?: string, money = true, wrapValue = false) {
+function bandCell(label: string, value: string, sub?: string, money = true, wrapValue = false, muted = false) {
   return (
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`${money ? 'money ' : ''}mt-1 ${wrapValue ? 'break-words' : 'truncate'} text-lg font-semibold`}>{value}</p>
+      <p className={`${money ? 'money ' : ''}mt-1 ${wrapValue ? 'break-words' : 'truncate'} text-lg font-semibold${muted ? ' text-muted-foreground' : ''}`}>{value}</p>
       {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
     </div>
   )
@@ -184,6 +183,7 @@ export default function AccountTransactionsPage() {
   // Window the list (LED-60); nets in the day headers are relative to this account.
   const compactList = useMediaQuery('(max-width: 767px)')
   const density = effectiveDensity(prefs.txDensity, compactList)
+  const tableList = !compactList && density === 'compact'
   // Export match (29a): exactly the rows the result bar counts, in the order on screen.
   const exportMatch = () =>
     downloadCsv(
@@ -241,42 +241,21 @@ export default function AccountTransactionsPage() {
   // Result bar (LED-61): the sum is relative to this account, the range spans its history.
   const matchSum = useMemo(() => sumByCurrency(filtered, accountId), [filtered, accountId])
   const today = useLocalDate()
-  const matchScheduled = useMemo(() => filtered.filter((tx) => !countsYet(tx.date, today)).length, [filtered, today])
-  const historyRange = useMemo(() => {
-    const span = dateSpan(accountTransactions)
-    if (!span) return null
-    const month = (value: string) =>
-      new Date(value + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
-    const start = month(span.start)
-    const end = month(span.end)
-    return start === end ? start : `${start} – ${end}`
-  }, [accountTransactions])
-
-  // Summary stats for this account's transactions
-  const stats = useMemo(() => {
-    const income = accountTransactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const expenses = accountTransactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    // Outgoing transfers debit amount + fee; incoming transfers credit what the trigger credits (transferCredit)
-    const transfersSent = accountTransactions
-      .filter((t) => t.type === 'transfer' && t.account_id === accountId)
-      .reduce((s, t) => s + t.amount + (t.transfer_fee ?? 0), 0)
-    const transfersReceived = accountTransactions
-      .filter((t) => t.type === 'transfer' && t.to_account_id === accountId)
-      .reduce((s, t) => s + transferCredit(t), 0)
-    return { income, expenses, transfersSent, transfersReceived }
-  }, [accountTransactions, accountId])
-
   const currency = account?.currency ?? profile?.default_currency ?? 'USD'
   // The stored balance already holds rows dated after today; say how much beside it (LED-251).
   const scheduledDelta = useMemo(
     () => (accountId ? scheduledByAccount(accounts, transactions, today).get(accountId) ?? 0 : 0),
     [accounts, transactions, today, accountId],
   )
-  const afterScheduled = afterScheduledLabel(scheduledDelta, currency, formatCurrency)
-  const withAfterScheduled = (sub: string) => (afterScheduled ? `${sub} · ${afterScheduled}` : sub)
+  const scheduledLabel = scheduledDelta
+    ? `${scheduledDelta < 0 ? '−' : '+'}${formatCurrency(Math.abs(scheduledDelta), currency)}`
+    : '—'
   // "Where it went" (LED-98): this cycle's spending from this account, by category.
   const cycleRange = getCustomMonthRange(selectedMonth, startDay)
-  const cycleLabel = `${formatDateShort(cycleRange.start)} – ${formatDateShort(cycleRange.end)}`
+  const cycleNet = sumByCurrency(
+    accountTransactions.filter((t) => t.date >= cycleRange.start && t.date <= cycleRange.end),
+    accountId,
+  )
   const categoryById = new Map(categories.map((category) => [category.id, category]))
   // Every row here belongs to this one account, so it is already in `currency`; no conversion needed.
   const { rows: cycleBreakdown } = buildCategoryBreakdown(
@@ -409,8 +388,7 @@ export default function AccountTransactionsPage() {
     <>
       {account.type !== 'loan' && (
         <section className="space-y-2 rounded-xl border border-border bg-card p-4">
-          <h2 className="text-sm font-semibold">Where it went</h2>
-          <p className="text-xs text-muted-foreground">Spending from this account in {cycleLabel}</p>
+          <h2 className="text-sm font-semibold">This cycle</h2>
           {cycleBreakdown.length === 0 ? (
             <p className="text-sm text-muted-foreground">No spending this cycle.</p>
           ) : (
@@ -422,9 +400,6 @@ export default function AccountTransactionsPage() {
                   <span className="money shrink-0 font-medium">{formatCurrency(slice.amount, currency)}</span>
                 </li>
               ))}
-              {cycleBreakdown.length > 4 && (
-                <li className="text-xs text-muted-foreground">+{cycleBreakdown.length - 4} more categories</li>
-              )}
             </ul>
           )}
         </section>
@@ -587,21 +562,23 @@ export default function AccountTransactionsPage() {
         {/* Key figures (LED-98): one ruled band instead of stacked cards */}
         {account && (account.type !== 'loan' || loanSection === 'summary') && (
           <div className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="grid grid-cols-2 lg:grid-cols-4 [&>div]:border-border/60 [&>div]:p-4 [&>div:nth-child(odd)]:border-r [&>div:nth-child(-n+2)]:border-b lg:[&>div]:border-b-0 lg:[&>div:not(:last-child)]:border-r">
+            <div className="grid grid-cols-2 gap-px bg-border/60 lg:grid-flow-col lg:grid-cols-none lg:auto-cols-fr [&>div]:bg-card [&>div]:p-4 [&>div:last-child:nth-child(odd)]:col-span-2 lg:[&>div:last-child:nth-child(odd)]:col-span-1">
               {account.type === 'credit_card' ? (
                 <>
-                  {bandCell('Current balance', formatCurrency(getCreditCardSpending(account), currency), withAfterScheduled(account.balance < 0 ? 'owed' : 'nothing owed'))}
+                  {bandCell('Current balance', formatCurrency(getCreditCardSpending(account), currency))}
+                  {bandCell('Scheduled', scheduledLabel, undefined, true, false, true)}
                   {bandCell(
                     'Credit limit',
                     account.credit_limit != null ? formatCurrency(account.credit_limit, currency) : 'Not set',
-                    account.credit_limit ? `${getCreditUtilizationPct(account).toFixed(0)}% used` : 'Add one to track utilisation',
+                    account.credit_limit ? `${getCreditUtilizationPct(account).toFixed(0)}% used` : undefined,
                   )}
-                  {bandCell('Statement closes', account.statement_day ? dayInDaysLabel(statementDays) : 'Not set', account.statement_day ? formatDueIn(statementDays) : 'No countdown', false)}
-                  {bandCell('Payment due', account.due_day ? dayInDaysLabel(dueDays) : 'Not set', account.due_day ? formatDueIn(dueDays) : 'No countdown', false)}
+                  {bandCell('Statement closes', account.statement_day ? dayInDaysLabel(statementDays) : 'Not set', account.statement_day ? formatDueIn(statementDays) : undefined, false)}
+                  {bandCell('Payment due', account.due_day ? dayInDaysLabel(dueDays) : 'Not set', account.due_day ? formatDueIn(dueDays) : undefined, false)}
                 </>
               ) : account.type === 'loan' ? (
                 <>
-                  {bandCell('Outstanding', formatCurrency(getLoanAmountOwed(account), currency), withAfterScheduled('owed'))}
+                  {bandCell('Outstanding', formatCurrency(getLoanAmountOwed(account), currency))}
+                  {bandCell('Scheduled', scheduledLabel, undefined, true, false, true)}
                   {bandCell(
                     'Repaid',
                     formatCurrency(loanRepayment?.totalPaid ?? 0, currency),
@@ -612,14 +589,13 @@ export default function AccountTransactionsPage() {
                     nextLoanDeadline ? formatCurrency(nextLoanDeadline.total, currency) : 'None due',
                     nextLoanDeadline ? formatDate(nextLoanDeadline.dueDate) : undefined,
                   )}
-                  {bandCell('Schedule', formatLoanSchedule(account) ?? 'Per purchase', 'Subtracted from net worth', false, true)}
+                  {bandCell('Schedule', formatLoanSchedule(account) ?? 'Per purchase', undefined, false, true)}
                 </>
               ) : (
                 <>
-                  {bandCell('Current balance', formatCurrency(account.balance, currency), afterScheduled ?? undefined)}
-                  {bandCell('Income', `+${formatCurrency(stats.income, currency)}`)}
-                  {bandCell('Expenses', `−${formatCurrency(stats.expenses, currency)}`)}
-                  {bandCell('Transfers', `−${formatCurrency(stats.transfersSent, currency)}`, `+${formatCurrency(stats.transfersReceived, currency)} received`)}
+                  {bandCell('Balance', formatCurrency(account.balance, currency))}
+                  {bandCell('Scheduled', scheduledLabel, undefined, true, false, true)}
+                  {bandCell('This cycle', formatNet(cycleNet))}
                 </>
               )}
             </div>
@@ -791,7 +767,6 @@ export default function AccountTransactionsPage() {
           <EmptyState
             icon={ArrowLeftRight}
             title="Nothing recorded yet"
-            description="Add your first transaction for this account"
             action={
               <>
                 <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/transactions?import=1')}>
@@ -811,7 +786,6 @@ export default function AccountTransactionsPage() {
           <EmptyState
             icon={ArrowLeftRight}
             title={`No ${filterType === 'all' ? 'transactions' : filterType} matching your filters`}
-            description={`${accountTransactions.length} transaction${accountTransactions.length === 1 ? '' : 's'} on this account`}
             action={
               <Button variant="outline" size="sm" onClick={clearAccountFilters}>
                 Show all {accountTransactions.length}
@@ -824,10 +798,8 @@ export default function AccountTransactionsPage() {
               <ResultBar
                 matchCount={filtered.length}
                 total={accountTransactions.length}
-                totalLabel="on this account"
-                rangeLabel={historyRange}
+                totalLabel=""
                 sum={matchSum}
-                scheduledCount={matchScheduled}
                 sort={sort}
                 onSortChange={(next) => setSort(next as TxSort)}
                 density={density}
@@ -840,6 +812,7 @@ export default function AccountTransactionsPage() {
             <TransactionDayList
               groups={sliceGroups(grouped, rendered)}
               compact={compactList}
+              table={tableList}
               renderRow={(tx) => (
                 <TransactionRow
                   key={tx.id}
@@ -848,12 +821,12 @@ export default function AccountTransactionsPage() {
                   onDelete={handleDelete}
                   contextAccountId={accountId}
                   dense={density === 'compact'}
-                  variant={compactList ? 'list' : 'card'}
+                  variant={compactList ? 'list' : tableList ? 'table' : 'card'}
                   baseCurrency={currency}
                 />
               )}
             />
-            <WindowFooter rendered={rendered} total={filtered.length} compact={compactList} sentinelRef={sentinelRef} />
+            <WindowFooter rendered={rendered} total={filtered.length} compact={compactList || tableList} sentinelRef={sentinelRef} />
           </ResultBarLayout>
         ))}
         </div>

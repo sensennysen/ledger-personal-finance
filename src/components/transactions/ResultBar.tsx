@@ -12,7 +12,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatNet } from '@/lib/formatNet'
-import { scheduledSumNote } from '@/lib/countsYet'
 import type { ActivitySort, TxSort } from '@/lib/transactionWindow'
 
 type Density = 'comfortable' | 'compact'
@@ -34,17 +33,15 @@ function sumColor(sum: Record<string, number>): string {
 }
 
 /**
- * Sticky result bar above a transaction list (spec §7 V2): match count, total,
- * active range and the sum of the match, with sort and density controls.
+ * Sticky result bar above a transaction list (spec §7 V2): match count, total
+ * and the net of the match, with sort and density controls.
  * Counts and sums describe the whole filtered set, not the rendered window.
  */
 export function ResultBar({
   matchCount,
   total,
   totalLabel,
-  rangeLabel,
   sum,
-  scheduledCount = 0,
   sort,
   onSortChange,
   sortOptions = DATE_SORTS,
@@ -59,11 +56,9 @@ export function ResultBar({
 }: {
   matchCount: number
   total: number
+  /** Follows the count when nothing narrows the list, e.g. "this cycle"; empty for none. */
   totalLabel: string
-  rangeLabel: string | null
   sum: Record<string, number>
-  /** Listed rows dated after today: the Sum includes them, so say so (LED-251). */
-  scheduledCount?: number
   sort: ActivitySort
   onSortChange: (sort: ActivitySort) => void
   /** The sorts offered: dates only unless the page lists amounts flat (Activity, LED-241). */
@@ -80,7 +75,6 @@ export function ResultBar({
   onImport?: () => void
   compact: boolean
 }) {
-  const sumNote = scheduledSumNote(scheduledCount)
   const { label: sortLabel, icon: SortIcon } = SORT_OPTIONS[sort]
   const sortMenu = (triggerClassName: string, iconClassName: string) => (
     <DropdownMenu>
@@ -108,6 +102,14 @@ export function ResultBar({
     </DropdownMenu>
   )
   const showSavedFilters = savedFilters && (savedFilters.canSave || savedFilters.count > 0)
+  // One line on every width (density pass 2a): the count, "of N" only when narrowed, and the net.
+  const summary = (
+    <p className={`min-w-0 truncate text-muted-foreground ${compact ? 'text-[0.8125rem]' : 'text-sm'}`}>
+      <b className="money font-semibold text-foreground">{matchCount.toLocaleString()}</b>
+      {matchCount === total ? (totalLabel ? ` ${totalLabel}` : '') : ` of ${total.toLocaleString()}`} ·{' '}
+      <span className={`money font-medium ${sumColor(sum)}`}>{formatNet(sum)}</span>
+    </p>
+  )
 
   if (compact) {
     // Phones (M-05): one plain line, sort, and every list action behind ⋯, labelled.
@@ -115,11 +117,7 @@ export function ResultBar({
     const hasOverflow = onSelect || showSavedFilters || onExport || onImport
     return (
       <div className="-mr-2 flex items-center justify-between gap-2 bg-background py-0.5">
-        <p className="min-w-0 truncate text-[0.8125rem] text-muted-foreground">
-          <b className="money font-semibold text-foreground">{matchCount.toLocaleString()}</b>{' '}
-          {matchCount === total ? totalLabel : `of ${total.toLocaleString()}`} ·{' '}
-          <span className={`money font-medium ${sumColor(sum)}`}>{formatNet(sum)}</span>
-        </p>
+        {summary}
         <div className="flex shrink-0">
           {sortMenu(iconTrigger, '')}
           {hasOverflow && (
@@ -143,7 +141,7 @@ export function ResultBar({
                 {onExport && (
                   <DropdownMenuItem onClick={onExport} disabled={matchCount === 0}>
                     <Download className="text-muted-foreground" />
-                    Export match
+                    Export
                   </DropdownMenuItem>
                 )}
                 {onImport && (
@@ -161,22 +159,8 @@ export function ResultBar({
   }
 
   return (
-    <div className="relative flex items-center justify-between gap-3 overflow-hidden rounded-md border border-border bg-muted px-4 py-2">
-      <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 bg-primary" />
-      <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-0.5">
-        <span className="text-sm font-bold">
-          <span className="money">{matchCount.toLocaleString()}</span>{' '}
-          {`transaction${matchCount === 1 ? '' : 's'} match`}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          of <span className="money">{total.toLocaleString()}</span> {totalLabel}
-          {rangeLabel ? ` · ${rangeLabel}` : ''}
-        </span>
-        <span className="text-xs text-muted-foreground">
-          Sum <span className={`money font-bold ${sumColor(sum)}`}>{formatNet(sum)}</span>
-          {sumNote ? ` · ${sumNote}` : ''}
-        </span>
-      </div>
+    <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted px-4 py-2">
+      {summary}
       <div className="flex shrink-0 items-center gap-1">
         {sortMenu(buttonVariants({ variant: 'ghost', size: 'sm', className: 'gap-1.5 text-xs' }), 'w-3.5 h-3.5')}
         <Button
@@ -211,7 +195,7 @@ export function ResultBar({
             aria-label={`Export ${matchCount.toLocaleString()} matching transactions as CSV`}
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Export match</span>
+            <span>Export</span>
           </Button>
         )}
       </div>

@@ -48,8 +48,11 @@ interface TransactionRowProps {
   dense?: boolean
   /** Shows the date on the row, for a flat list sorted by amount (LED-241). */
   showDate?: boolean
-  /** 'list' (phones, M-06): a flat one-line row inside a day card; the whole row opens the entry sheet. */
-  variant?: 'card' | 'list'
+  /**
+   * 'list' (phones, M-06): a flat one-line row inside a day card; the whole row opens the entry sheet.
+   * 'table' (desktop Compact, density pass 3a): a 36px ledger line with aligned columns, no badges or buttons.
+   */
+  variant?: 'card' | 'list' | 'table'
   /** The profile's currency; the list variant names a row's currency only when it differs. */
   baseCurrency?: string
 }
@@ -124,6 +127,83 @@ function TransactionRowImpl({
           onSaveTemplate: onSaveTemplate ? () => onSaveTemplate(tx) : undefined,
         })
       : onEdit(tx)
+
+  if (variant === 'table') {
+    const scheduled = !countsYet(tx.date, getLocalDateString())
+    const flag = 'size-[13px] shrink-0 text-muted-foreground'
+    const category =
+      paymentKind === 'card-payment'
+        ? 'Card payment'
+        : paymentKind === 'loan-repayment'
+          ? 'Loan repayment'
+          : tx.type === 'transfer'
+            ? 'Transfer'
+            : [tx.category?.name ?? 'Uncategorized', tx.subcategory?.name].filter(Boolean).join(' · ')
+    const accountLabel =
+      tx.type === 'transfer' || isLoanRepayment
+        ? contextAccountId !== undefined
+          ? isIncoming
+            ? `← from ${tx.account?.name ?? ''}`
+            : `→ to ${tx.to_account?.name ?? ''}`
+          : `${tx.account?.name ?? ''} → ${tx.to_account?.name ?? ''}`
+        : (tx.account?.name ?? '')
+    // On an account's own page every row is that account, so the Account column goes and a
+    // transfer's direction takes the Category cell instead.
+    const onAccountPage = contextAccountId !== undefined
+    const columns = [
+      selectable && '32px',
+      showDate && '56px',
+      'minmax(0,2fr)',
+      'minmax(0,1fr)',
+      !onAccountPage && 'minmax(0,1fr)',
+      onAccountPage ? '120px' : '150px',
+    ].filter(Boolean).join(' ')
+    return (
+      <InteractiveRow
+        as="div"
+        onActivate={open}
+        className="grid h-9 cursor-pointer items-center gap-4 border-b border-border/60 px-4 text-[13px] last:border-b-0 hover:bg-muted focus-visible:ring-inset"
+        style={{ gridTemplateColumns: columns }}
+      >
+        {selectable && (
+          <label className="flex h-full items-center cursor-pointer" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onSelect?.(tx.id)}
+              className="size-4 rounded accent-primary cursor-pointer"
+              aria-label={`Select ${tx.description}`}
+            />
+          </label>
+        )}
+        {showDate && (
+          <time dateTime={tx.date} className="text-muted-foreground">{formatDateShort(tx.date)}</time>
+        )}
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="flex w-[18px] shrink-0 justify-center text-[15px] leading-none" aria-hidden>
+            {tx.category ? tx.category.icon : <Icon className={`size-[13px] ${TRANSACTION_TYPE_COLOR[tx.type]}`} />}
+          </span>
+          <span className="truncate font-medium">{tx.description}</span>
+          {tx.is_recurring && (
+            <Repeat role="img" aria-label={`Repeats ${tx.recurrence_interval ?? ''}`.trim()} className={flag} />
+          )}
+          {scheduled && <CalendarClock role="img" aria-label="Scheduled" className={flag} />}
+          {tx.receipt_url && <Paperclip role="img" aria-label="Has receipt" className={flag} />}
+          {tx.queued && <Clock role="img" aria-label="Not synced yet" className="size-[13px] shrink-0 text-warning" />}
+        </span>
+        <span className="truncate text-muted-foreground">
+          {onAccountPage && (tx.type === 'transfer' || isLoanRepayment) ? accountLabel : category}
+        </span>
+        {!onAccountPage && <span className="truncate text-muted-foreground">{accountLabel}</span>}
+        <span className={`money truncate text-right font-medium ${amountColorClass}`}>
+          {amountPrefix}{formatCurrency(displayAmount, displayCurrency)}
+          {baseCurrency && displayCurrency !== baseCurrency && (
+            <span className="ml-1 font-normal text-muted-foreground">{displayCurrency}</span>
+          )}
+        </span>
+      </InteractiveRow>
+    )
+  }
 
   if (variant === 'list') {
     const today = getLocalDateString()

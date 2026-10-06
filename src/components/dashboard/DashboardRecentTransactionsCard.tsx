@@ -65,7 +65,6 @@ export function DashboardRecentTransactionsCard({
         <EmptyState
           icon={ArrowLeftRight}
           title="No transactions yet"
-          description="Your first entry will show up here."
           bare
         />
       ) : (

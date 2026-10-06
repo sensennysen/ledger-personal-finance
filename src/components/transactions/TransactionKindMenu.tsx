@@ -55,17 +55,19 @@ export function TransactionKindMenu({
         key={item.kind}
         onClick={() => onSelect(item.kind)}
         aria-current={selected || undefined}
-        className={cn('items-start gap-3 px-2 py-2.5', selected && 'bg-muted')}
+        className={cn('items-center gap-3 px-2 py-2', selected && 'bg-muted')}
       >
-        <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md ${tile}`}>
+        <span className={`flex size-8 shrink-0 items-center justify-center rounded-md ${tile}`}>
           <Icon className={color} />
         </span>
         <span className="min-w-0">
           <span className="block font-medium leading-tight">{item.label}</span>
-          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{item.description}</span>
+          {item.description && (
+            <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{item.description}</span>
+          )}
         </span>
-        {selected && <Check className="ml-auto mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden />}
-        {item.shortcut && <DropdownMenuShortcut className="mt-0.5 tracking-normal">{item.shortcut}</DropdownMenuShortcut>}
+        {selected && <Check className="ml-auto size-4 shrink-0 text-muted-foreground" aria-hidden />}
+        {item.shortcut && <DropdownMenuShortcut className="tracking-normal">{item.shortcut}</DropdownMenuShortcut>}
       </DropdownMenuItem>
     )
   }
@@ -93,7 +95,9 @@ export function TransactionKindMenu({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-medium leading-tight">{item.label}</span>
-            <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.description}</span>
+            {item.description && (
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.description}</span>
+            )}
           </span>
           {selected ? (
             <Check className="size-4 shrink-0 text-muted-foreground" aria-hidden />

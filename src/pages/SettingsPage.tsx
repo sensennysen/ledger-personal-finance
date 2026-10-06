@@ -213,7 +213,6 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
-          <CardDescription>Manage your account details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4">
@@ -278,7 +277,6 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
-          <CardDescription>Choose your preferred colour scheme</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-5">
@@ -348,7 +346,6 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Settings2 className="w-4 h-4" /> Preferences</CardTitle>
-          <CardDescription>Number format, date display, and page views</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -432,7 +429,6 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><BellRing className="w-4 h-4" /> Notifications</CardTitle>
-          <CardDescription>Enable mobile/browser reminders for credit card statement and due dates</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between gap-4 rounded-xl border border-border px-4 py-3">
@@ -496,7 +492,6 @@ export default function SettingsPage() {
           <CardTitle className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4" /> Month Cycle
           </CardTitle>
-          <CardDescription>Set the day your financial month starts (e.g. payday)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-3">
@@ -585,7 +580,6 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Legal</CardTitle>
-          <CardDescription>Review policies and terms</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <Link
@@ -647,7 +641,6 @@ export default function SettingsPage() {
       <Card className="border-destructive/30">
         <CardHeader>
           <CardTitle className="text-destructive">Account</CardTitle>
-          <CardDescription>Sign out or permanently delete your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Button variant="outline" onClick={() => void signOut()}>Sign Out</Button>

@@ -103,7 +103,8 @@ export function computeOverspending(input: Input): OverspendingResult {
       const { spent, unrated: u } = sumBudgetSpend(txs, b, start, cut(end), rates)
       u.forEach((c) => unrated.add(c))
       if (spent > b.amount) {
-        rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, period: b.period, spent, limit: b.amount, over: spent - b.amount, streak: 1, uncarried: 0 })
+        // No streak: only monthly budgets are walked cycle by cycle (LED-271).
+        rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, period: b.period, spent, limit: b.amount, over: spent - b.amount, streak: 0, uncarried: 0 })
       }
       continue
     }
@@ -156,6 +157,18 @@ export function computeOverspending(input: Input): OverspendingResult {
  */
 export function spendWindowLabel(period: OverspendingBudget['period']): string | null {
   return period === 'yearly' ? 'year to date' : null
+}
+
+/**
+ * What an Overspending row shows in place of a cycle streak (LED-271): only a monthly budget is walked
+ * cycle by cycle, so a weekly, quarterly or yearly row names its own window instead. `inline` follows
+ * the spent figure; `chip` fills the Cycles column. Null for a monthly row, which shows its streak.
+ */
+export function overspendingWindow(period: OverspendingBudget['period']): { inline: string; chip: string } | null {
+  if (period === 'yearly') return { inline: spendWindowLabel(period)!, chip: 'This year' }
+  if (period === 'quarterly') return { inline: 'quarterly budget', chip: 'This quarter' }
+  if (period === 'weekly') return { inline: 'weekly budget', chip: 'This week' }
+  return null
 }
 
 export function streakLabel(streak: number): string {

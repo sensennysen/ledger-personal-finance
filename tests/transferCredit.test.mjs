@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { destinationAmountFor, isCrossCurrencyTransfer, transferCredit } from '../src/lib/transferCredit.ts'
+import { destinationAmountFor, isCrossCurrencyTransfer, needsAmountReceived, paymentCredit, transferCredit } from '../src/lib/transferCredit.ts'
 
 test('a transfer with a destination amount credits that amount', () => {
   assert.equal(transferCredit({ amount: 100, exchange_rate: 1, destination_amount: 91.5 }), 91.5)
@@ -29,4 +29,18 @@ test('the saved destination amount is the entered figure to the cent, else null'
   assert.equal(destinationAmountFor(values({ type: 'income', to_account_id: null }), 'EUR'), null)
   assert.equal(destinationAmountFor(values({ destination_amount: null }), 'EUR'), null)
   assert.equal(destinationAmountFor(values({ destination_amount: 0 }), 'EUR'), null)
+})
+
+test('a loan repayment credits what the loan received, else its amount (LED-269)', () => {
+  assert.equal(paymentCredit({ type: 'expense', amount: 100, exchange_rate: 1, destination_amount: 5600 }), 5600)
+  assert.equal(paymentCredit({ type: 'expense', amount: 100, exchange_rate: 1.5, destination_amount: null }), 100)
+  assert.equal(paymentCredit({ type: 'transfer', amount: 100, exchange_rate: 1, destination_amount: 91.5 }), 91.5)
+})
+
+test('card payments and loan repayments between two currencies ask for the amount received (LED-269)', () => {
+  assert.equal(needsAmountReceived(values({ type: 'expense', to_account_id: 'loan' }), 'PHP'), true)
+  assert.equal(needsAmountReceived(values({ type: 'expense', to_account_id: 'loan' }), 'USD'), false)
+  assert.equal(needsAmountReceived(values({ type: 'expense', to_account_id: null }), 'PHP'), false)
+  assert.equal(needsAmountReceived(values({ type: 'income' }), 'EUR'), false)
+  assert.equal(destinationAmountFor(values({ type: 'expense', to_account_id: 'loan', destination_amount: 5600 }), 'PHP'), 5600)
 })

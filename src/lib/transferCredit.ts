@@ -15,6 +15,16 @@ export function transferCredit(tx: TransferCreditInput): number {
   return tx.destination_amount ?? tx.amount * (tx.exchange_rate ?? 1)
 }
 
+/**
+ * What a row credits its destination account (LED-269). A transfer credits transferCredit; a loan
+ * repayment (an expense into a loan) credits coalesce(destination_amount, amount), as the balance
+ * trigger and allocate_loan_payment do: supabase/migrations/20261006130000_liability_payment_destination_amount.sql.
+ * destination_amount is set only when the loan holds another currency than the payment.
+ */
+export function paymentCredit(tx: TransferCreditInput & { type: 'income' | 'expense' | 'transfer' }): number {
+  return tx.type === 'transfer' ? transferCredit(tx) : (tx.destination_amount ?? tx.amount)
+}
+
 export interface TransferValues {
   type: 'income' | 'expense' | 'transfer'
   currency: string
@@ -30,12 +40,21 @@ export function isCrossCurrencyTransfer(values: TransferValues, toCurrency: stri
   return values.type === 'transfer' && Boolean(values.to_account_id) && Boolean(toCurrency) && toCurrency !== values.currency
 }
 
-/** The destination amount to save: the entered figure for a transfer between two currencies, else null. */
+/**
+ * A payment whose destination holds another currency than the amount sent, so the form asks for the
+ * amount received (LED-269): a transfer, a card payment, or a loan repayment (an expense into a loan;
+ * no other expense has a destination). `toCurrency` as in isCrossCurrencyTransfer.
+ */
+export function needsAmountReceived(values: TransferValues, toCurrency: string | null | undefined): boolean {
+  return values.type !== 'income' && Boolean(values.to_account_id) && Boolean(toCurrency) && toCurrency !== values.currency
+}
+
+/** The destination amount to save: the entered figure for a payment between two currencies, else null. */
 export function destinationAmountFor(
   values: TransferValues & { destination_amount?: number | null },
   toCurrency: string | null | undefined,
 ): number | null {
-  if (!isCrossCurrencyTransfer(values, toCurrency)) return null
+  if (!needsAmountReceived(values, toCurrency)) return null
   const amount = values.destination_amount
   return amount != null && Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) / 100 : null
 }

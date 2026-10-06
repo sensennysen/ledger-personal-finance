@@ -3,6 +3,7 @@ import type { CSSProperties, ErrorInfo, ReactNode } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { reportError } from '@/lib/reportError'
 
 interface Props {
   children: ReactNode
@@ -39,6 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error('[ErrorBoundary]', error, info.componentStack)
+    reportError(this.props.variant === 'card' ? 'card' : 'boundary', error, info.componentStack)
     this.setState({ componentStack: info.componentStack ?? null })
   }
 

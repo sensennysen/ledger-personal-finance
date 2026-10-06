@@ -4,6 +4,8 @@ import { CalendarCheck, CheckSquare, SquareMinus, Square, ChevronDown, ChevronRi
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCategories } from '@/hooks/useCategories'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNotify } from '@/contexts/notificationState'
+import { useThirteenthMonthPicks } from '@/hooks/useThirteenthMonthPicks'
 import { formatCurrency, formatDate, getLocalDateString, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -29,25 +31,6 @@ const MONTH_NAMES = [
 const CURRENT_YEAR = new Date().getFullYear()
 const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i)
 
-// --- localStorage helpers ---
-
-function selectionKey(userId: string, year: number) {
-  return `13th-month-selection:${userId}:${year}`
-}
-
-function loadSelection(userId: string, year: number): Set<string> | null {
-  try {
-    const raw = localStorage.getItem(selectionKey(userId, year))
-    return raw ? new Set(JSON.parse(raw) as string[]) : null
-  } catch {
-    return null
-  }
-}
-
-function persistSelection(userId: string, year: number, ids: Set<string>) {
-  localStorage.setItem(selectionKey(userId, year), JSON.stringify([...ids]))
-}
-
 // --- helpers ---
 
 function txAmt(tx: Transaction) {
@@ -57,12 +40,12 @@ function txAmt(tx: Transaction) {
 // --- page ---
 
 export default function ThirteenthMonthPage() {
-  const { profile, user } = useAuth()
+  const { profile } = useAuth()
+  const notify = useNotify()
   const currency = profile?.default_currency ?? 'PHP'
-  const userId = user?.id ?? ''
 
   const [year, setYear] = useState(CURRENT_YEAR)
-  const [included, setIncluded] = useState<Set<string> | null>(() => loadSelection(userId, CURRENT_YEAR))
+  const picks = useThirteenthMonthPicks(year)
   // Months start open (LED-97): the include checkbox shouldn't sit on a closed row.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
@@ -78,7 +61,6 @@ export default function ThirteenthMonthPage() {
   const mismatch = dataYear !== null && dataYear !== year
   const failed = mismatch && !loading && !!error
   const refreshing = mismatch && !failed
-  const showSkeleton = loading && !refreshing
   const transactions = useMemo(() => (failed ? [] : fetched), [failed, fetched])
   const shownYear = refreshing ? dataYear : year
   const { transactions: anyIncomeEver, loading: anyIncomeLoading } = useTransactions({ type: 'income', limit: 1 })
@@ -95,18 +77,30 @@ export default function ThirteenthMonthPage() {
     if (!v) return
     const y = Number(v)
     setYear(y)
-    setIncluded(loadSelection(userId, y))
   }
 
-  // While the old year is still showing, its own saved selection applies, not the new year's.
+  // While the old year is still showing, its own saved picks apply, not the new year's. Picks that
+  // could not be read are never passed off as "every record counts": the estimate waits for them.
+  const shownPicks = picks.forYear(shownYear!)
+  const picksUnavailable = shownPicks.picks === null && (shownPicks.loading || shownPicks.error !== null)
   const effectiveIncluded = useMemo(
-    () => (refreshing ? loadSelection(userId, shownYear!) : included) ?? new Set(transactions.map((transaction) => transaction.id)),
-    [refreshing, userId, shownYear, included, transactions]
+    () => shownPicks.picks ?? new Set(picksUnavailable ? [] : transactions.map((transaction) => transaction.id)),
+    [shownPicks.picks, picksUnavailable, transactions]
   )
+  const showSkeleton = (loading && !refreshing) || (shownPicks.loading && shownPicks.picks === null)
 
-  const updateIncluded = (next: Set<string>) => {
-    setIncluded(next)
-    persistSelection(userId, year, next)
+  const updateIncluded = async (next: Set<string>) => {
+    // Editing on top of picks that failed to load would replace them with a guess.
+    if (picksUnavailable) return
+    const forYear = shownYear!
+    const { error } = await picks.save(forYear, next)
+    if (!error) return
+    notify({
+      severity: 'failure',
+      title: `Couldn't save your ${forYear} picks`,
+      body: error,
+      action: { label: 'Retry', run: () => void updateIncluded(next) },
+    })
   }
 
   const byMonth = useMemo(() => groupByMonth(transactions), [transactions])
@@ -208,6 +202,15 @@ export default function ThirteenthMonthPage() {
         />
       )}
 
+      {shownPicks.error && !shownPicks.loading && (
+        <InlineLoadError
+          message={shownPicks.picks === null
+            ? `Couldn't load your saved picks for ${shownYear}, so there is no estimate yet.`
+            : shownPicks.error.message}
+          onRetry={() => void picks.reload(shownYear!)}
+        />
+      )}
+
       <RefreshingRegion refreshing={refreshing} label={`Loading ${year}…`}>
       <div className="space-y-6 xl:grid xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start xl:gap-6 xl:space-y-0">
       <div className="space-y-6 xl:order-2 xl:sticky xl:top-6">
@@ -215,9 +218,11 @@ export default function ThirteenthMonthPage() {
         <p className="text-xs uppercase tracking-[.14em]">Estimated 13th month pay</p>
         {showSkeleton
           ? <p className="text-[40px] leading-tight mt-3"><SkeletonText className="w-40" /></p>
-          : <p className="money text-[40px] leading-tight mt-3">{formatCurrency(thirteenthMonthPay, currency)}</p>
+          : picksUnavailable
+            ? <p className="text-[40px] leading-tight mt-3" aria-label="No estimate">—</p>
+            : <p className="money text-[40px] leading-tight mt-3">{formatCurrency(thirteenthMonthPay, currency)}</p>
         }
-        <p className="text-sm mt-3">{formatCurrency(totalIncluded, currency)} basic salary ÷ 12</p>
+        {!picksUnavailable && <p className="text-sm mt-3">{formatCurrency(totalIncluded, currency)} basic salary ÷ 12</p>}
         {showSkeleton ? (
           <p className="text-xs mt-1"><SkeletonText className="w-48" /></p>
         ) : (
@@ -251,7 +256,7 @@ export default function ThirteenthMonthPage() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={salaryFlagsUnavailable}
+                disabled={salaryFlagsUnavailable || picksUnavailable}
                 onClick={() => updateIncluded(salaryOnlySelection(transactions, salaryCategoryIds))}
               >
                 Auto-select salary only
@@ -259,11 +264,12 @@ export default function ThirteenthMonthPage() {
               <Button
                 variant="ghost"
                 size="sm"
+                disabled={picksUnavailable}
                 onClick={() => updateIncluded(new Set(transactions.map((t) => t.id)))}
               >
                 Select all
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => updateIncluded(new Set())}>
+              <Button variant="ghost" size="sm" disabled={picksUnavailable} onClick={() => updateIncluded(new Set())}>
                 Clear
               </Button>
             </div>
@@ -353,6 +359,7 @@ export default function ThirteenthMonthPage() {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); toggleMonth(txs) }}
+                        disabled={picksUnavailable}
                         className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
                         title={allOn ? 'Deselect all in month' : 'Select all in month'}
                       >
@@ -400,6 +407,7 @@ export default function ThirteenthMonthPage() {
                                 type="checkbox"
                               checked={isOn}
                                 onChange={() => toggleTx(tx.id)}
+                                disabled={picksUnavailable}
                                 className="w-4 h-4 accent-primary rounded shrink-0"
                               />
                               <div className="flex-1 min-w-0">

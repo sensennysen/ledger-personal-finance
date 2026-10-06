@@ -37,6 +37,26 @@ test('a month-end row keeps the date the generator has always posted (Jan 31 + 1
   assert.equal(dueRecurringPosts([row({ date: '2026-01-31' })], '2026-10-03')[0].date, '2026-03-03')
 })
 
+// LED-260: a series is the row itself (its id, and recurrence_next_posted in the database), never its
+// description. The LED-232 backfill grouped by description once; the generator never has.
+test('renaming a recurring row changes nothing about what posts, or when', () => {
+  const before = row({ id: 'rent', description: 'Rent' })
+  const after = { ...before, description: 'Rent (new flat)' }
+  const strip = (due) => due.map(({ source, date }) => ({ id: source.id, date }))
+  assert.deepEqual(strip(dueRecurringPosts([after], '2026-10-03')), strip(dueRecurringPosts([before], '2026-10-03')))
+})
+
+test('two rows that share a description are separate series, each posting its own date', () => {
+  const rows = [
+    row({ id: 'payroll-15', description: 'Payroll', date: '2026-09-15' }),
+    row({ id: 'payroll-30', description: 'Payroll', date: '2026-09-30' }),
+  ]
+  assert.deepEqual(dueRecurringPosts(rows, '2026-10-31').map(({ source, date }) => [source.id, date]), [
+    ['payroll-15', '2026-10-15'],
+    ['payroll-30', '2026-10-30'],
+  ])
+})
+
 import { recurringRunNotice } from '../src/lib/recurringTransactions.ts'
 
 test('a clean run reports nothing', () => {

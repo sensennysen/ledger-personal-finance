@@ -5,7 +5,7 @@
 // expense with a target, and 20261003120000_transfer_destination_amount.sql for what a transfer
 // credits. Reports and the deletion export share it.
 
-import { transferCredit } from './transferCredit.ts'
+import { paymentCredit, transferCredit } from './transferCredit.ts'
 
 export interface BalanceAccount {
   id: string
@@ -65,7 +65,7 @@ export function balanceEffects(
   if (tx.type === 'income') return [[tx.account_id, tx.amount]]
   if (tx.type === 'expense') {
     const effects: [string, number][] = [[tx.account_id, -tx.amount]]
-    if (tx.to_account_id && types.get(tx.to_account_id) === 'loan') effects.push([tx.to_account_id, tx.amount])
+    if (tx.to_account_id && types.get(tx.to_account_id) === 'loan') effects.push([tx.to_account_id, paymentCredit(tx)])
     return effects
   }
   const effects: [string, number][] = [[tx.account_id, -(tx.amount + (tx.transfer_fee ?? 0))]]

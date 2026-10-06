@@ -96,12 +96,12 @@ export default function AccountsPage() {
   const defaultGroupOrder = useMemo(() => Object.keys(ACCOUNT_TYPE_LABELS) as AccountType[], [])
   const accountGroupOrder = useMemo(() => {
     const valid = new Set(defaultGroupOrder)
-    const source = groupOrderOverride ?? profile?.account_group_order ?? prefs.accGroupOrder
+    const source = groupOrderOverride ?? profile?.account_group_order
     const parsed = Array.isArray(source)
       ? source.filter((type): type is AccountType => valid.has(type as AccountType))
       : []
     return [...parsed, ...defaultGroupOrder.filter((type) => !parsed.includes(type))]
-  }, [defaultGroupOrder, groupOrderOverride, prefs.accGroupOrder, profile?.account_group_order])
+  }, [defaultGroupOrder, groupOrderOverride, profile?.account_group_order])
   const groupedAccounts = useMemo(() => {
     const groups = new Map<AccountType, Account[]>()
     for (const account of accounts) {
@@ -148,7 +148,6 @@ export default function AccountsPage() {
       ...next,
       ...defaultGroupOrder.filter((type) => !next.includes(type)),
     ]
-    setPref('accGroupOrder', order)
     setGroupOrderOverride(order)
     if (!user || !navigator.onLine) return
     supabase

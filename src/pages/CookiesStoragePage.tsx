@@ -5,7 +5,7 @@ import { STORAGE_ROWS } from '@/lib/browserStorage'
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). The rows live in
 // src/lib/browserStorage.ts, which Settings also reads to clear them (LED-245). The link to Settings in
 // "Removing them" was approved on 2026-10-04.
-const LAST_UPDATED = 'October 4, 2026'
+const LAST_UPDATED = 'October 6, 2026'
 
 const TOC = [
   { id: 'what-ledger-keeps', label: 'What Ledger keeps in your browser' },
@@ -58,9 +58,11 @@ export default function CookiesStoragePage() {
         <section id="removing-them" className="scroll-mt-8">
           <h2 className="mb-3 text-base font-semibold text-foreground">Removing them</h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Signing out removes your session, your data copy, changes waiting to sync and pending receipts. To remove
-            the rest, clear this site’s data in your browser settings. You can also see and clear them one group at a
-            time in{' '}
+            Your preferences, Home layout, setup checklist, saved templates, card reminders already shown and 13th
+            Month picks are kept in your account, not in this browser. Signing out removes your session, your data
+            copy, changes waiting to sync, pending receipts and any older copy of those settings this browser still
+            holds. Your theme, text size, accent colour and the install banner choice stay on this device; to remove
+            them, clear this site’s data in your browser settings. You can also see and clear each group in{' '}
             <Link to="/settings#browser-storage" className="underline underline-offset-2 hover:text-foreground transition-colors">
               Settings → Browser storage
             </Link>
@@ -71,8 +73,9 @@ export default function CookiesStoragePage() {
         <section id="notifications" className="scroll-mt-8">
           <h2 className="mb-3 text-base font-semibold text-foreground">Notifications</h2>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Card reminders, if you turn them on in Settings, are shown by your browser on this device. No notification
-            service is involved.
+            Card reminders, if you turn them on in Settings, are shown by your browser. Your account records each
+            reminder once it is shown, so it appears on one of your devices, not on each. No notification service is
+            involved.
           </p>
         </section>
       </div>

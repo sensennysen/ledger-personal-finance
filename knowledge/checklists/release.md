@@ -47,6 +47,19 @@ Every file is idempotent, so re-running one that the remote already has is a no-
 | `20261004110000_category_counts_as_salary` | LED-236 | Saving a category fails (the form sends `counts_as_salary`), and the 13th Month page finds no salary category. |
 | `20261004120000_merge_category_rpc` | LED-239 | Merging a category fails (`merge_category` does not exist). |
 
+Epic 22 (branch `epic-22`) adds the files below. They reach the hosted database (B1–B3) before the branch merges to `main`.
+
+| Migration | Ticket | If it is missing |
+|---|---|---|
+| `20261005100000_transaction_templates` | LED-257 | Activity's templates fail to load and to save (`transaction_templates` does not exist); the old browser copy stays where it is, so nothing is lost. |
+| `20261005110000_error_events` | LED-258 | Error reports are not stored (the insert fails and is only logged to the console); nothing the user sees breaks. |
+| `20261005120000_recurring_flag_keeps_updated_at` | LED-262 | Nothing fails; an offline edit of a recurring row that the generator posted from reports a conflict when it syncs, as before. |
+| `20261006120000_profile_preferences` | LED-263 | Every preference reads as its default, and each change shows "Couldn't save your settings" (`merge_profile_preferences` and `profiles.preferences` do not exist); the old browser copy stays, so nothing is lost. |
+| `20261006120100_dashboard_hidden_widgets` | LED-264 | Every Home widget shows, and hiding one shows "Couldn't save your settings" (`profiles.dashboard_hidden_widgets` does not exist); the old browser copy stays. |
+| `20261006120200_setup_checklist` | LED-265 | The setup checklist shows again and the pay cycle reads as unconfirmed; dismissing shows "Couldn't save your settings" (the two `profiles` columns do not exist). The old browser copy stays. |
+| `20261006120300_card_reminders_sent` | LED-266 | No card reminder shows (the check fails and is logged and reported; `card_reminders_sent` does not exist). The old browser copy stays. |
+| `20261006120400_thirteenth_month_picks` | LED-267 | 13th Month Pay shows "Couldn't load your saved picks" and no estimate (the two tables and `set_thirteenth_month_picks` do not exist). The old browser copy stays. |
+
 When this list grows: add the row in the same commit as the migration, with the client query or call that needs it.
 
 ## C. CSP on Vercel
@@ -58,6 +71,10 @@ The policy is two strings that nothing compares: the `<meta>` in `index.html` (d
 | C2 | Read `connect-src` in that header | Has Supabase (`https://*.supabase.co`, `wss://*.supabase.co`), `https://accounts.google.com` and `https://api.frankfurter.dev` || PASS (owner, 2026-10-05) |
 | C3 | Compare `index.html` with `vercel.json` | They differ only in `%VITE_SUPABASE_URL%` (meta only) and `frame-ancestors 'none'` (header only; browsers ignore it in a meta) || PASS (owner, 2026-10-05) |
 | C4 | On the live site, open Settings and refresh rates; watch the console | No "Refused to connect" || PASS (owner, 2026-10-05) |
+
+"Creating a worker from 'blob:…' violates … worker-src 'self'" on the **dev server** is expected (LED-259). After the dev server restarts, Vite's client (`waitForSuccessfulPing`, vite 8.3 `dist/client/client.mjs`) starts a `SharedWorker` from a `blob:` URL to wait for it; the policy blocks it, so the page does not reload by itself. Reload by hand. The production bundle creates no worker: the only `new Worker` in it is Supabase Realtime's heartbeat, which is off unless `realtime.worker` is set, and Ledger opens no Realtime channel. Do not add `blob:` to `worker-src` for it.
+
+| C5 | On the live site, signed in, open Home, Activity, Reports and Import; watch the console | No "violates the following Content Security Policy directive" || |
 
 ## D. Smoke test on the live site
 With a real account, after B and C. Undo what you add.

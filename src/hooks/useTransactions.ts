@@ -17,6 +17,7 @@ import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/
 import { dueRecurringPosts, type RecurringRun } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
 import { generatedCardPayment } from '@/lib/cardPayment'
+import { importedCardPayments, type SavedImportRow } from '@/lib/importTransfer'
 import type { Transaction, Account, Category } from '@/types'
 import {
   applyTxDelta,
@@ -357,7 +358,15 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     return toResult(error, { action: 'save' })
   }
 
-  const bulkCreateTransactions = async (rows: TransactionUpsertValues[]): Promise<MutationResult & { imported: number }> => {
+  /**
+   * Saves an import in one insert. `onCardPayment` runs for each saved transfer into a credit card,
+   * oldest first and awaited, so the statement steps follow like a manual payment (LED-270). A queued
+   * import gets them when it drains (`recordSynced`).
+   */
+  const bulkCreateTransactions = async (
+    rows: TransactionUpsertValues[],
+    onCardPayment?: CardPaymentHandler,
+  ): Promise<MutationResult & { imported: number }> => {
     if (!user) return { error: 'Not authenticated', imported: 0 }
     if (!navigator.onLine) {
       const now = new Date().toISOString()
@@ -375,10 +384,20 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       })
       return { error: null, imported: rows.length }
     }
-    const { error } = await supabase
+    const { data: saved, error } = await supabase
       .from('transactions')
       .insert(rows.map((row) => ({ ...withTransactionDefaults(row), user_id: user.id })))
+      .select('id, type, to_account_id, amount, exchange_rate, destination_amount, date')
     if (!error) await fetch()
+    if (!error && onCardPayment && saved) {
+      const savedRows = saved as SavedImportRow[]
+      const cardIds = [...new Set(savedRows.filter((row) => row.type === 'transfer' && row.to_account_id).map((row) => row.to_account_id!))]
+      if (cardIds.length) {
+        // The destinations as they are now, like generateDueRecurring: the statement steps read the card.
+        const { data: destinations } = await supabase.from('accounts').select('*').in('id', cardIds)
+        for (const payment of importedCardPayments(savedRows, (destinations ?? []) as Account[])) await onCardPayment(payment)
+      }
+    }
     return { ...toResult(error, { action: 'save' }), imported: error ? 0 : rows.length }
   }
 

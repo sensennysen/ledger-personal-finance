@@ -53,6 +53,7 @@ const useFormField = () => {
     id,
     name: fieldContext.name,
     formItemId: `${id}-form-item`,
+    formLabelId: `${id}-form-item-label`,
     formDescriptionId: `${id}-form-item-description`,
     formMessageId: `${id}-form-item-message`,
     ...fieldState,
@@ -85,11 +86,12 @@ const FormLabel = React.forwardRef<
   React.ElementRef<typeof Label>,
   React.ComponentPropsWithoutRef<typeof Label>
 >(({ className, ...props }, ref) => {
-  const { error, formItemId } = useFormField()
+  const { error, formItemId, formLabelId } = useFormField()
 
   return (
     <Label
       ref={ref}
+      id={formLabelId}
       className={cn(error && "text-destructive", className)}
       htmlFor={formItemId}
       {...props}
@@ -98,26 +100,42 @@ const FormLabel = React.forwardRef<
 })
 FormLabel.displayName = "FormLabel"
 
-const FormControl = React.forwardRef<
-  React.ElementRef<"div">,
-  React.HTMLAttributes<HTMLDivElement>
->(({ ...props }, ref) => {
-  const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
+type ControlProps = {
+  id?: string
+  className?: string
+  "aria-describedby"?: string
+  "aria-invalid"?: boolean
+  "aria-labelledby"?: string
+}
 
-  return (
-    <div
-      ref={ref}
-      id={formItemId}
-      aria-describedby={
-        !error
-          ? `${formDescriptionId}`
-          : `${formDescriptionId} ${formMessageId}`
-      }
-      aria-invalid={!!error}
-      {...props}
-    />
-  )
-})
+// The field's id and ARIA go on its one child, the control itself, so the label's
+// `for` and the error's `aria-describedby` reach the input, not a wrapper (QA-002).
+// A component child (a combobox, a color group) passes them to its own control.
+const FormControl = ({
+  children,
+  className,
+}: {
+  children: React.ReactElement<ControlProps>
+  className?: string
+}) => {
+  const { error, formItemId, formLabelId, formDescriptionId, formMessageId } = useFormField()
+  const child = React.Children.only(children)
+
+  return React.cloneElement(child, {
+    id: formItemId,
+    className: cn(child.props.className, className) || undefined,
+    "aria-describedby": [
+      child.props["aria-describedby"],
+      formDescriptionId,
+      error ? formMessageId : null,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    "aria-invalid": !!error,
+    // A group or a custom trigger isn't labelable by `for`; the label names it by id.
+    "aria-labelledby": child.props["aria-labelledby"] ?? formLabelId,
+  })
+}
 FormControl.displayName = "FormControl"
 
 const FormDescription = React.forwardRef<

@@ -26,6 +26,11 @@ interface AccountComboboxProps {
   emptyMessage?: string
   disabled?: boolean
   className?: string
+  /** From FormControl: the field's id and ARIA land on the trigger (QA-002). */
+  id?: string
+  'aria-describedby'?: string
+  'aria-invalid'?: boolean
+  'aria-labelledby'?: string
 }
 
 const defaultGroupOrder = Object.keys(ACCOUNT_TYPE_LABELS) as AccountType[]
@@ -39,6 +44,7 @@ export function AccountCombobox({
   emptyMessage = 'No accounts found.',
   disabled = false,
   className,
+  ...control
 }: AccountComboboxProps) {
   const ink = useCategoryInk()
   const { profile } = useAuth()
@@ -70,6 +76,7 @@ export function AccountCombobox({
             variant="outline"
             role="combobox"
             aria-expanded={open}
+            {...control}
             className={cn('w-full justify-between px-3 font-normal', !selectedAccount && 'text-muted-foreground', className)}
           />
         }

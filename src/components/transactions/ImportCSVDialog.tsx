@@ -10,6 +10,7 @@ import { duplicateSpan, findIdenticalRows, identicalRowsLabel, matchDuplicates, 
 import {
   buildRows,
   EMPTY_DESCRIPTION,
+  fileCurrency,
   fixableByOtherOrder,
   groupProblems,
   hasError,
@@ -25,6 +26,7 @@ import {
   summarise,
   withAmbiguousDateIssues,
   withCategoryIssues,
+  withCurrencyIssues,
   type BankFormat,
   type CauseId,
   type DateOrder,
@@ -83,6 +85,7 @@ interface Props {
 const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024
 
 const FORMAT_LABELS: Record<BankFormat, string> = {
+  Ledger: 'Ledger export',
   BDO: 'BDO',
   BPI: 'BPI',
   Metrobank: 'Metrobank',
@@ -165,7 +168,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
   const categoryById = new Map(categories.map((category) => [category.id, category]))
   const selectedAccount = accounts.find((account) => account.id === accountId)
   const accountCurrency = selectedAccount?.currency ?? ''
-  const statementCurrency = pickedCurrency || accountCurrency
+  // A Ledger export's own currency is picked on load; it applies once there is an account to convert to.
+  const statementCurrency = selectedAccount ? pickedCurrency || accountCurrency : ''
   const { table: rateTable } = useExchangeRates()
   const tableRate = lookupRate(rateTable, statementCurrency, accountCurrency)
   const suggestedRate = formatSuggestedRate(tableRate.kind === 'rate' ? tableRate.rate : null)
@@ -206,9 +210,12 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     if (suggestion) suggestions.set(row.line, suggestion)
     else if (!leftOut && !picks.has(row.line) && !categoryMemory.loading) uncategorised.add(row.line)
   }
-  const rows = withCategoryIssues(
-    withAmbiguousDateIssues(built.rows, Boolean(file?.dateOrderAmbiguous) && !dateOrderConfirmed),
-    uncategorised,
+  const rows = withCurrencyIssues(
+    withCategoryIssues(
+      withAmbiguousDateIssues(built.rows, Boolean(file?.dateOrderAmbiguous) && !dateOrderConfirmed),
+      uncategorised,
+    ),
+    statementCurrency,
   )
   const categoryOf = (line: number): string | null => {
     const pick = picks.get(line)
@@ -309,6 +316,9 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
         setTransfers(new Map())
         setOtherAmounts(new Map())
         setPicks(new Map())
+        // A Ledger export says its currency; a bank statement leaves it to the account's (QA-001).
+        setPickedCurrency(fileCurrency(buildRows(result.raw, result.headerIdx, result.format, result.dateOrder).rows) ?? '')
+        setRateInput(null)
         setActiveCause(null)
         setOnlyProblems(false)
         setSimilarOffer(null)
@@ -748,6 +758,35 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                         </p>
                       )}
 
+                      {cause.id === 'bad-type' && (
+                        <p className="text-muted-foreground">
+                          Type in these rows reads <code className="text-foreground">{cause.sample || '(empty)'}</code>.
+                          Set it to income or expense in the file, or skip these rows.
+                        </p>
+                      )}
+
+                      {cause.id === 'transfer-row' && (
+                        <p className="text-muted-foreground">
+                          An export lists a transfer once, without which way it moved for this account. Skip these
+                          rows and record the transfers in Ledger.
+                        </p>
+                      )}
+
+                      {cause.id === 'sign-conflict' && (
+                        <p className="text-muted-foreground">
+                          Amounts in these rows read <code className="text-foreground">{cause.sample}</code>, but a
+                          Ledger export writes positive amounts and puts the direction in Type. Correct them in the
+                          file, or skip these rows.
+                        </p>
+                      )}
+
+                      {cause.id === 'other-currency' && (
+                        <p className="text-muted-foreground">
+                          These rows are in <code className="text-foreground">{cause.sample}</code>, not{' '}
+                          {statementCurrency}. Import them separately with that statement currency, or skip them.
+                        </p>
+                      )}
+
                       {cause.id === 'no-category' && (
                         <p className="text-muted-foreground">
                           No rule or past transaction matches these payees. Choose a category in the table, or they
@@ -985,8 +1024,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                   </span>
                                 ) : (
                                   <>
-                                    <span className={cn('block', transferTo ? 'text-foreground' : row.type === 'expense' ? 'text-expense' : 'text-income')}>
-                                      {row.type === 'expense' ? MINUS : '+'}
+                                    <span className={cn('block', transferTo || row.type === null ? 'text-foreground' : row.type === 'expense' ? 'text-expense' : 'text-income')}>
+                                      {row.type === null ? '' : row.type === 'expense' ? MINUS : '+'}
                                       {statementCurrency
                                         ? formatCurrency(row.amount ?? 0, statementCurrency)
                                         : (row.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

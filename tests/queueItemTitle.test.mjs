@@ -53,3 +53,10 @@ test('itemNote never shows a raw table name either', () => {
   const item = { ...base, table: 'profiles', payload: {} }
   assert.equal(itemNote(item), 'Edit · Profile')
 })
+
+test('a pending item whose server check failed says so, and that it will be tried again (LED-297)', async () => {
+  const { SERVER_CHECK_FAILED } = await import('../src/lib/queueDrain.ts')
+  assert.equal(itemNote({ ...base, lastError: SERVER_CHECK_FAILED }), SERVER_CHECK_FAILED)
+  assert.match(SERVER_CHECK_FAILED, /tried again/)
+  assert.equal(itemNote({ ...base, lastError: 'amount', attempts: 2 }), 'Edit · Transaction', 'a database error under the limit keeps its usual note')
+})

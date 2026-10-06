@@ -12,6 +12,11 @@ export interface QueueItem {
   payload: Record<string, unknown>
   /** For update/delete: the row id to target */
   rowId?: string
+  /**
+   * For update/delete: the server's updated_at the change was made against. The write only
+   * applies while the row still has it (LED-297). Absent on items queued before that.
+   */
+  baseRevision?: string
   /** Display name captured at enqueue time, for the queue sheet. Never sent to the database. */
   label?: string
   userId: string
@@ -166,6 +171,42 @@ export function applyKeepMine(queue: QueueItem[], id: string, now: number): Queu
 
 /** Key identifying the server row an update/delete targets. */
 export const rowKey = (item: QueueItem) => `${item.table}:${item.rowId}`
+
+/**
+ * The revisions a drain wrote, per row: which revision each write replaced, and the latest one.
+ * A later queued change made against a revision we replaced is moved onto ours, so our own
+ * write is never mistaken for someone else's edit (LED-297).
+ */
+export type RevisionMoves = Map<string, { replaced: Map<string, string>; latest: string }>
+
+export function recordRevisionMove(moves: RevisionMoves, key: string, from: string | undefined, to: string): void {
+  const entry = moves.get(key) ?? { replaced: new Map<string, string>(), latest: to }
+  if (from !== undefined && from !== to) entry.replaced.set(from, to)
+  entry.latest = to
+  moves.set(key, entry)
+}
+
+/**
+ * Moves an update/delete onto the revision this drain left the row at. An item with no
+ * revision (queued before LED-297) takes the latest one: the row holds what we wrote.
+ * A revision we did not replace is someone else's, and is left alone.
+ */
+export function rebaseRevision(item: QueueItem, moves: RevisionMoves): QueueItem {
+  if (item.operation === 'insert' || !item.rowId) return item
+  const entry = moves.get(rowKey(item))
+  if (!entry) return item
+  if (item.baseRevision === undefined) return { ...item, baseRevision: entry.latest }
+  let revision = item.baseRevision
+  const seen = new Set<string>()
+  while (entry.replaced.has(revision) && !seen.has(revision)) {
+    seen.add(revision)
+    revision = entry.replaced.get(revision)!
+  }
+  return revision === item.baseRevision ? item : { ...item, baseRevision: revision }
+}
+
+export const rebaseRevisions = (items: QueueItem[], moves: RevisionMoves) =>
+  moves.size === 0 ? items : items.map((item) => rebaseRevision(item, moves))
 
 /**
  * Combines a drain's result with the queue as it is now, so changes made while

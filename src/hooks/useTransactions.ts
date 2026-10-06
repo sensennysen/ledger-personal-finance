@@ -9,6 +9,7 @@ import { readWithPolicy } from '@/lib/readRetry'
 import { dedupeAsync } from '@/lib/inFlightRequest'
 import {
   notifyAccountsRefresh,
+  notifyCardPaymentsRefresh,
   notifyLoanPurchasesRefresh,
   notifyTransactionsRefresh,
   registerTransactionsListener,
@@ -38,7 +39,6 @@ import { describeDataError, toResult, type DescribedError, type MutationResult }
 export type { RecurringRun }
 
 /** What a generated card payment hands back so the statement steps can run (LED-190). */
-export type CardPaymentHandler = (payment: { card: Account; amount: number; date: string; transactionId: string }) => Promise<void>
 
 export interface UseTransactionsOptions {
   /**
@@ -359,13 +359,12 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
   }
 
   /**
-   * Saves an import in one insert. `onCardPayment` runs for each saved transfer into a credit card,
-   * oldest first and awaited, so the statement steps follow like a manual payment (LED-270). A queued
-   * import gets them when it drains (`recordSynced`).
+   * Saves an import in one insert. The database records each transfer into a credit card as a
+   * payment in the same insert (LED-270, LED-296), so the card views are asked to re-read when the
+   * import held one. A queued import gets them when it drains.
    */
   const bulkCreateTransactions = async (
     rows: TransactionUpsertValues[],
-    onCardPayment?: CardPaymentHandler,
   ): Promise<MutationResult & { imported: number }> => {
     if (!user) return { error: 'Not authenticated', imported: 0 }
     if (!navigator.onLine) {
@@ -389,13 +388,15 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       .insert(rows.map((row) => ({ ...withTransactionDefaults(row), user_id: user.id })))
       .select('id, type, to_account_id, amount, exchange_rate, destination_amount, date')
     if (!error) await fetch()
-    if (!error && onCardPayment && saved) {
+    if (!error && saved) {
       const savedRows = saved as SavedImportRow[]
       const cardIds = [...new Set(savedRows.filter((row) => row.type === 'transfer' && row.to_account_id).map((row) => row.to_account_id!))]
       if (cardIds.length) {
-        // The destinations as they are now, like generateDueRecurring: the statement steps read the card.
         const { data: destinations } = await supabase.from('accounts').select('*').in('id', cardIds)
-        for (const payment of importedCardPayments(savedRows, (destinations ?? []) as Account[])) await onCardPayment(payment)
+        if (importedCardPayments(savedRows, (destinations ?? []) as Account[]).length > 0) {
+          notifyAccountsRefresh()
+          notifyCardPaymentsRefresh()
+        }
       }
     }
     return { ...toResult(error, { action: 'save' }), imported: error ? 0 : rows.length }
@@ -404,11 +405,10 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
   /**
    * Posts every recurring row that has come due. The database decides whether a row's next
    * occurrence is already posted (LED-232), so another browser or device never posts it twice.
-   * `onCardPayment` runs for a generated transfer
-   * into a credit card, with the card as it is now, so the statement steps follow (LED-190).
-   * It is awaited, so two payments to one card never read the same statement.
+   * A posted transfer into a credit card is recorded as a payment by the database in the same
+   * insert (LED-190, LED-296); the card views are asked to re-read.
    */
-  const generateDueRecurring = useCallback(async (onCardPayment?: CardPaymentHandler): Promise<RecurringRun> => {
+  const generateDueRecurring = useCallback(async (): Promise<RecurringRun> => {
     if (!user || !navigator.onLine) return { posted: 0, failed: 0 }
     forgetLegacyRecurringMap()
     const today = getLocalDateString()
@@ -429,6 +429,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
 
     let posted = 0
     let failed = 0
+    let cardPaid = false
     for (const { source: tx, date: nextDate } of dueRecurringPosts(allRecurring, today)) {
       const { data: insertedId, error } = await supabase.rpc('post_recurring_transaction', {
         p_source: tx.id,
@@ -441,13 +442,16 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       // null: already posted, by this or another device.
       if (typeof insertedId !== 'string') continue
       posted++
-      if (onCardPayment && tx.type === 'transfer' && tx.to_account_id) {
-        const { data: destination } = await supabase.from('accounts').select('*').eq('id', tx.to_account_id).maybeSingle()
-        const payment = destination ? generatedCardPayment(tx, [destination as Account]) : null
-        if (payment) await onCardPayment({ ...payment, date: nextDate, transactionId: insertedId })
+      if (!cardPaid && tx.type === 'transfer' && tx.to_account_id) {
+        const { data: destination } = await supabase.from('accounts').select('id, type').eq('id', tx.to_account_id).maybeSingle()
+        cardPaid = destination !== null && generatedCardPayment(tx, [destination as Account]) !== null
       }
     }
     if (posted > 0) await fetch()
+    if (cardPaid) {
+      notifyAccountsRefresh()
+      notifyCardPaymentsRefresh()
+    }
     return { posted, failed }
   }, [user, fetch])
 

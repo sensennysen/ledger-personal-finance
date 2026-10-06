@@ -71,9 +71,10 @@ export function DetailContent({
     return <DialogContent className={className}>{children}</DialogContent>
   if (!target) return null
   return createPortal(
+    // 400 as drawn in 17a from 2xl; at 1280 the 340 pane already leaves Home 940px (LED-274).
     <aside
       aria-label="Dashboard details"
-      className="animate-page-in relative w-[340px] border-l border-border bg-sidebar p-5 pt-6 space-y-5 overflow-y-auto"
+      className="animate-page-in relative w-[340px] 2xl:w-[400px] border-l border-border bg-sidebar p-5 pt-6 space-y-5 overflow-y-auto"
     >
       <Button
         variant="ghost"

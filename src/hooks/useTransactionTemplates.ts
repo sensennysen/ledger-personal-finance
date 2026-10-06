@@ -13,6 +13,7 @@ import {
   parseTemplateRows,
   serializeTemplateFields,
   shouldUploadLegacy,
+  templatesErrorMessage,
   type TransactionTemplate as StoredTemplate,
   type TransactionTemplateRow,
 } from '@/lib/transactionTemplates'
@@ -37,6 +38,7 @@ export function useTransactionTemplates() {
   const [templates, setTemplates] = useState<TransactionTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [failure, setFailure] = useState<DescribedError | null>(null)
+  const [failureKind, setFailureKind] = useState<'load' | 'save'>('load')
   const loadedOnce = useRef(false)
 
   const read = useCallback(async (userId: string) => readWithPolicy((retry) => readAllPages<TransactionTemplateRow>((from, to) =>
@@ -59,6 +61,7 @@ export function useTransactionTemplates() {
     let { rows, error } = await read(user.id)
     if (error) {
       setFailure(describeDataError(error, { action: 'load', entity: 'template' }))
+      setFailureKind('load')
       setLoading(false)
       return
     }
@@ -80,6 +83,7 @@ export function useTransactionTemplates() {
           ;({ rows, error } = await read(user.id))
           if (error) {
             setFailure(describeDataError(error, { action: 'load', entity: 'template' }))
+            setFailureKind('load')
             setLoading(false)
             return
           }
@@ -92,6 +96,7 @@ export function useTransactionTemplates() {
 
     loadedOnce.current = true
     setFailure(uploadFailure)
+    setFailureKind('save')
     setTemplates(parseTemplateRows(rows).templates as TransactionTemplate[])
     setLoading(false)
   }, [read, user])
@@ -128,6 +133,8 @@ export function useTransactionTemplates() {
     templates,
     loading,
     error: failure?.message ?? null,
+    /** The banner's sentence: a failed upload is a save, not a failed load (LED-285). */
+    errorMessage: (stale: boolean) => (failure ? templatesErrorMessage(failureKind, stale, failure.message) : null),
     refetch,
     addTemplate,
     removeTemplate,

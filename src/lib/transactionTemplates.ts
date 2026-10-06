@@ -124,3 +124,12 @@ export function legacyTemplateRows(raw: string | null, userId: string): { id?: s
 export function shouldUploadLegacy(legacyCount: number, accountCount: number): boolean {
   return legacyCount > 0 && accountCount === 0
 }
+
+/**
+ * The Activity banner's sentence for a templates failure. A failed read says which read failed; a
+ * failed upload of this browser's old templates is a save, and says so on its own (LED-285).
+ */
+export function templatesErrorMessage(kind: 'load' | 'save', stale: boolean, error: string): string {
+  if (kind === 'save') return error
+  return stale ? `Couldn't refresh your templates. ${error}` : `Couldn't load your templates. ${error}`
+}

@@ -420,16 +420,16 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         ...buildOptimisticTransaction({ values, userId: user.id, now, id: ids[index] }),
         queued: true,
       }))
-      // The whole import is stored, or none of it is shown (LED-303).
+      // One queue write for the whole import: all of it is stored, or none of it is shown
+      // (LED-303). Then one list update and one balance pass, so one cache write and one notice
+      // each, however many rows (LED-318).
       const { error } = await enqueueMany(rows.map((values, index) => insertItem(values, user.id, ids[index])))
       if (error) return { error, imported: 0 }
       const filtered = optimistics.filter((tx) => txMatchesFilters(tx, filters))
       if (filtered.length) {
         updateTransactionCache(limitTransactions([...filtered, ...transactions], filters.limit))
       }
-      rows.forEach((values) => {
-        optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
-      })
+      optimisticAccountDelta((accounts) => rows.reduce((next, values) => applyTxDelta(next, values), accounts))
       return { error: null, imported: rows.length }
     }
     const { data: saved, error } = await supabase

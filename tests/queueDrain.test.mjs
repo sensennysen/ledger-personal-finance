@@ -598,3 +598,44 @@ test('setResolvedReceipt applies only while the item still points at the same pe
   assert.equal(setResolvedReceipt([item], 'q-tx-1', 'pending-receipt:other', 'u/r.jpg').applied, false)
   assert.equal(setResolvedReceipt([], 'q-tx-1', 'pending-receipt:t1', 'u/r.jpg').applied, false)
 })
+
+// LED-300: a receipt is a job of its own, for an edit as much as a create.
+test('LED-300: a receipt queued on an existing row uploads, then the row points at the uploaded path', async () => {
+  // An online save whose upload failed: the row saved without it, and the receipt follows as an edit.
+  const server = tableServer({ rows: [{ id: 'tx-1', user_id: 'u', amount: 1, receipt_url: null, updated_at: OLD }] })
+  const removed = []
+  const receipts = fakeReceipts({ files: { t1: { name: 'r.jpg' } }, removed })
+  const store = fakeQueueStore([queued({ rowId: 'tx-1', payload: { receipt_url: 'pending-receipt:t1' }, baseRevision: OLD })])
+  assert.equal(await drainWith(depsFor(server.client, store, receipts)), 1)
+  assert.equal(server.client.uploads[0].path, 'u/r.jpg')
+  assert.equal(server.rows.get('tx-1').receipt_url, 'u/r.jpg')
+  assert.equal(server.client.calls.find((c) => c.op === 'update').filters.updated_at, OLD)
+  assert.deepEqual(removed, ['t1'])
+})
+
+test('LED-300: an offline edit that attaches a receipt and changes the amount saves both', async () => {
+  const server = tableServer({ rows: [{ id: 'tx-1', user_id: 'u', amount: 1, receipt_url: null, updated_at: OLD }] })
+  const receipts = fakeReceipts({ files: { t1: { name: 'r.jpg' } } })
+  const store = fakeQueueStore([queued({ rowId: 'tx-1', payload: { amount: 3, receipt_url: 'pending-receipt:t1' }, baseRevision: OLD })])
+  assert.equal(await drainWith(depsFor(server.client, store, receipts)), 1)
+  assert.deepEqual([server.rows.get('tx-1').amount, server.rows.get('tx-1').receipt_url], [3, 'u/r.jpg'])
+})
+
+test("LED-300: an edit's receipt that failed to upload waits; one whose file is gone leaves the row's receipt alone", async () => {
+  const waiting = tableServer({ rows: [{ id: 'tx-1', user_id: 'u', receipt_url: 'u/old.jpg', updated_at: OLD }] })
+  const store = fakeQueueStore([queued({ rowId: 'tx-1', payload: { receipt_url: 'pending-receipt:t1' }, baseRevision: OLD })])
+  const failing = { ...waiting.client, storage: { from: () => ({ upload: async () => ({ error: { message: 'offline' } }), remove: async () => ({ error: null }) }) } }
+  assert.equal(await drainWith(depsFor(failing, store, fakeReceipts({ files: { t1: { name: 'r.jpg' } } }))), 0)
+  assert.equal(store.read()[0].payload.receipt_url, 'pending-receipt:t1')
+
+  assert.equal(await drainWith(depsFor(waiting.client, store, fakeReceipts())), 1, 'the file is gone')
+  assert.equal(waiting.rows.get('tx-1').receipt_url, 'u/old.jpg')
+  assert.ok(!waiting.client.calls.some((c) => c.op === 'update'), 'nothing left to send')
+})
+
+test('LED-300: discarding a flagged edit drops its pending receipt file', async () => {
+  const removed = []
+  const store = fakeQueueStore([queued({ id: 'e', status: 'conflict', conflictKind: 'edited', payload: { receipt_url: 'pending-receipt:t3' } })])
+  await discardFlagged({ readQueue: store.read, writeQueue: store.write, receipts: fakeReceipts({ removed }) }, 'e')
+  assert.deepEqual(removed, ['t3'])
+})

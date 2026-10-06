@@ -58,10 +58,22 @@ const messageOf = (error: unknown) =>
     ? (error as { message: string }).message
     : 'Unknown error'
 
+// Any create or edit can carry a receipt waiting in the local store (LED-300).
 const isPendingReceipt = (item: QueueItem, prefix: string) =>
-  item.operation === 'insert' &&
+  item.operation !== 'delete' &&
   typeof item.payload.receipt_url === 'string' &&
   item.payload.receipt_url.startsWith(prefix)
+
+/**
+ * The item without its pending receipt: a create saves no receipt, an edit leaves the row's
+ * current receipt alone. A pending marker is never written to the database.
+ */
+function withoutReceipt(item: QueueItem): QueueItem {
+  if (item.operation === 'insert') return { ...item, payload: { ...item.payload, receipt_url: null } }
+  const payload = { ...item.payload }
+  delete payload.receipt_url
+  return { ...item, payload }
+}
 
 /** Deletes an uploaded receipt that no row will point at. Best-effort: a stray file is harmless. */
 async function removeUploaded(client: DrainClient, path: string) {
@@ -82,9 +94,9 @@ async function resolveReceipt(item: QueueItem, deps: DrainDeps): Promise<QueueIt
   try {
     file = await receipts.get(tempId)
   } catch {
-    // IndexedDB unavailable: treat as a missing file and insert without a receipt
+    // IndexedDB unavailable: treat as a missing file and save without a receipt
   }
-  if (!file) return { ...item, payload: { ...item.payload, receipt_url: null } }
+  if (!file) return withoutReceipt(item)
 
   // A File read back from IndexedDB can come back as a plain Blob without a name.
   const path = receipts.buildPath(item.userId, (file as File).name ?? 'receipt.jpg')
@@ -104,7 +116,7 @@ async function resolveReceipt(item: QueueItem, deps: DrainDeps): Promise<QueueIt
       // The receipt was replaced (or the item resolved) while this one uploaded: nothing will use it.
       await removeUploaded(client, path)
       try { await receipts.remove(tempId) } catch { /* best-effort */ }
-      return { ...item, payload: { ...item.payload, receipt_url: null } }
+      return withoutReceipt(item)
     }
     recorded = true
   } catch {
@@ -253,7 +265,8 @@ async function processItem(item: QueueItem, deps: DrainDeps, moves: RevisionMove
       return { kind: 'synced', inserted: current }
     }
 
-    if (!current.rowId) return { kind: 'synced' }
+    // An edit that only carried a receipt whose file is gone: nothing left to send.
+    if (!current.rowId || (current.operation === 'update' && Object.keys(current.payload).length === 0)) return { kind: 'synced' }
     return await processWrite(rebaseRevision(current, moves), deps, moves)
   } catch {
     // Unexpected error (usually a dropped connection): keep the item as far as it got, so a

@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { SERVER_CHECK_FAILED, discardFlagged, drainWith, singleFlight } from '../src/lib/queueDrain.ts'
+import { SERVER_CHECK_FAILED, discardFlagged, drainWith, exclusive, singleFlight } from '../src/lib/queueDrain.ts'
 import { MAX_ATTEMPTS, describeConflict, editQueuedInsert, hasQueuedInsert, setResolvedReceipt } from '../src/lib/queueState.ts'
 import { fakeClient } from './helpers/fakeSupabase.mjs'
-import { NOW, depsFor, fakeQueueStore, fakeReceipts, queueDeps, queued } from './helpers/fakeQueueStore.mjs'
+import { NOW, depsFor, fakeLocks, fakeQueueStore, fakeReceipts, queueDeps, queued } from './helpers/fakeQueueStore.mjs'
 
 const OLD = new Date(NOW - 10_000).toISOString()
 const NEWER = new Date(NOW + 10_000).toISOString()
@@ -649,4 +649,37 @@ test('LED-303: a change stored by another tab while the drain awaits the network
   })
   assert.equal(await drainWith(depsFor(client, store)), 1)
   assert.deepEqual(store.read().map((i) => i.id), ['other-tab'])
+})
+
+// Two tabs: one stored queue, one lock manager, and each tab's own single-flight drain.
+function twoTabs(store, client, locks) {
+  const tab = () => singleFlight((p) => exclusive(locks, 'ledger_queue_drain', () => drainWith(depsFor(client, store), p)))
+  return [tab(), tab()]
+}
+
+test('LED-302: enqueues from two tabs at once are all kept', async () => {
+  const store = fakeQueueStore()
+  const add = (id) => store.mutate((q) => [...q, queued({ id, operation: 'insert', rowId: undefined, payload: { id: `row-${id}` } })])
+  await Promise.all([add('tab-a-1'), add('tab-b-1'), add('tab-a-2'), add('tab-b-2')])
+  assert.deepEqual(store.read().map((i) => i.id).sort(), ['tab-a-1', 'tab-a-2', 'tab-b-1', 'tab-b-2'])
+})
+
+test('LED-302: two tabs reconnecting at once send every item once', async () => {
+  const store = fakeQueueStore([
+    queued({ id: 'i1', operation: 'insert', rowId: undefined, payload: { id: 'row-1' } }),
+    queued({ id: 'i2', operation: 'insert', rowId: undefined, payload: { id: 'row-2' } }),
+    queued({ id: 'u1' }),
+  ])
+  const client = fakeClient(happy)
+  const [a, b] = twoTabs(store, client, fakeLocks())
+  const [sentA, sentB] = await Promise.all([a(), b()])
+  assert.equal(sentA + sentB, 3)
+  const writes = client.calls.filter((c) => c.op === 'insert' || c.op === 'update')
+  assert.equal(writes.length, 3, 'no item is sent by both tabs')
+  assert.deepEqual(store.read(), [])
+})
+
+test('LED-302: without Web Locks the drain still runs', async () => {
+  const store = fakeQueueStore([queued({ id: 'i', operation: 'insert', rowId: undefined })])
+  assert.equal(await exclusive(undefined, 'ledger_queue_drain', () => drainWith(depsFor(fakeClient(happy), store))), 1)
 })

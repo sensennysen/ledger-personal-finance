@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { PENDING_RECEIPT_PREFIX, getPendingReceipt, removePendingReceipt } from './receiptStore'
 import { buildReceiptObjectPath } from './receiptUrls'
-import { discardFlagged, drainWith, singleFlight, type DrainClient, type DrainDeps } from './queueDrain'
+import { discardFlagged, drainWith, exclusive, singleFlight, type DrainClient, type DrainDeps, type LockManagerLike } from './queueDrain'
 import { mutateStoredQueue, readStoredQueue } from './queueStorage'
 import {
   QUEUE_STORAGE_FAILED,
@@ -45,9 +45,23 @@ export function subscribeQueue(cb: QueueListener): () => void {
   }
 }
 
-function committed(queue: QueueItem[]): void {
+// Other tabs share the stored queue (LED-302): each commit tells them to re-read it, so their
+// counts, review sheet and expiry timer follow. The message carries no queue contents.
+const QUEUE_CHANNEL = 'ledger_offline_queue'
+const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(QUEUE_CHANNEL)
+if (channel) {
+  channel.onmessage = () => {
+    readStoredQueue().then(
+      (queue) => committed(queue, false),
+      (err) => console.error('Failed to re-read the offline queue:', err),
+    )
+  }
+}
+
+function committed(queue: QueueItem[], announce = true): void {
   snapshot = queue
   queueListeners.forEach((cb) => cb())
+  if (announce) channel?.postMessage('changed')
 }
 
 function readLegacyQueue(): QueueItem[] {
@@ -234,5 +248,9 @@ const deps: DrainDeps = {
  * Replays all pending operations against Supabase in order (see drainWith).
  * Only one drain runs at a time: a second call while one is running shares its result
  * instead of starting another, so two triggers can never replay the same items twice.
+ * Across tabs the drain holds a Web Lock, so another tab's drain waits and then sends only
+ * what is left (LED-302). Follow-ups (`onSynced`) run in the tab that sent the row.
  */
-export const drainQueue = singleFlight((onProgress) => drainWith(deps, onProgress))
+export const drainQueue = singleFlight((onProgress) =>
+  exclusive(navigator.locks as LockManagerLike | undefined, 'ledger_queue_drain', () => drainWith(deps, onProgress)),
+)

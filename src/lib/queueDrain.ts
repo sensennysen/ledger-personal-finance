@@ -364,6 +364,21 @@ export async function discardFlagged(
   }
 }
 
+/** The part of the Web Locks API the drain uses (navigator.locks). */
+export interface LockManagerLike {
+  request: <T>(name: string, callback: () => Promise<T>) => Promise<T>
+}
+
+/**
+ * Runs `run` while holding the named lock, so tabs sharing one queue drain one after another and
+ * never send the same item twice (LED-302). A tab that waits drains what is left, usually nothing.
+ * Without Web Locks it runs unlocked; replays stay safe because inserts are idempotent (LED-298)
+ * and changes carry their revision (LED-297).
+ */
+export function exclusive<T>(locks: LockManagerLike | undefined, name: string, run: () => Promise<T>): Promise<T> {
+  return locks ? locks.request(name, run) : run()
+}
+
 /**
  * Wraps a drain so only one runs at a time: a call made while one is running gets that
  * run's result (and progress) instead of starting a second replay of the same items.

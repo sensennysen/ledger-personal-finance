@@ -43,3 +43,15 @@ export function depsFor(client, store, receipts = fakeReceipts()) {
 export function queueDeps(store) {
   return { readQueue: async () => store.read(), mutateQueue: (fn) => store.mutate(fn) }
 }
+
+/** A stand-in for navigator.locks: callers holding the same name run one after another. */
+export function fakeLocks() {
+  const tails = new Map()
+  return {
+    request(name, callback) {
+      const run = (tails.get(name) ?? Promise.resolve()).then(() => callback())
+      tails.set(name, run.catch(() => {}))
+      return run
+    },
+  }
+}

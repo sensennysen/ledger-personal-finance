@@ -5,6 +5,7 @@ import {
   convertOverspendingTotals,
   spendWindowLabel,
   streakLabel,
+  overspendingWindow,
   shiftMonthKey,
 } from '../src/lib/overspending.ts'
 
@@ -72,7 +73,17 @@ test('non-monthly budgets report only the selected cycle', () => {
   const r = run({ budgets: [b], txs: [tx('2026-09-02', 150), tx('2026-08-20', 500)] })
   assert.equal(r.rows.length, 1)
   assert.equal(r.rows[0].over, 50)
-  assert.equal(r.rows[0].streak, 1)
+  assert.equal(r.rows[0].streak, 0) // no cycle streak outside monthly (LED-271)
+})
+
+test('weekly and quarterly rows name their window instead of a "1st" streak (LED-271)', () => {
+  assert.deepEqual(overspendingWindow('weekly'), { inline: 'weekly budget', chip: 'This week' })
+  assert.deepEqual(overspendingWindow('quarterly'), { inline: 'quarterly budget', chip: 'This quarter' })
+  // Yearly unchanged (LED-244); monthly keeps its streak.
+  assert.deepEqual(overspendingWindow('yearly'), { inline: 'year to date', chip: 'This year' })
+  assert.equal(overspendingWindow('monthly'), null)
+  const q = run({ budgets: [budget({ period: 'quarterly', amount: 100 })], txs: [tx('2026-09-02', 150)] }).rows[0]
+  assert.equal(q.streak, 0)
 })
 
 test('unrated foreign currency is named, not silently dropped', () => {

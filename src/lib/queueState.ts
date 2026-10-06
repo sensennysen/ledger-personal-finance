@@ -51,6 +51,13 @@ export function isCountableError(error: unknown): boolean {
   return typeof code === 'string' && code !== ''
 }
 
+/** True for the database's duplicate-key error on a table's primary key (`<table>_pkey`). */
+export function isDuplicateRowId(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const { code, message } = error as { code?: unknown; message?: unknown }
+  return code === '23505' && typeof message === 'string' && /_pkey"?\s*$/.test(message)
+}
+
 /**
  * Records one failed attempt. A countable error adds to `attempts` and flags the
  * item 'failed' at the limit; anything else (a dropped connection) keeps it pending untouched.
@@ -111,6 +118,10 @@ export function editQueuedInsert(
   })
   return { queue: edited ? next : queue, edited }
 }
+
+/** True when the row is still only a queued create (pending, failed or flagged), so it has no server revision yet. */
+export const hasQueuedInsert = (queue: QueueItem[], table: string, rowId: string) =>
+  queue.some((item) => item.table === table && item.operation === 'insert' && item.payload.id === rowId)
 
 /** When the earliest pending item passes the max age, or null when nothing is pending. */
 export function nextExpiryAt(queue: QueueItem[]): number | null {

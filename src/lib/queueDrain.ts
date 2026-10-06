@@ -2,6 +2,7 @@
 // offlineQueue.ts wires the real supabase client, localStorage and receipt store.
 import {
   isCountableError,
+  isDuplicateRowId,
   isFlagged,
   isPending,
   markExpired,
@@ -164,6 +165,43 @@ async function processWrite(item: QueueItem, deps: DrainDeps, moves: RevisionMov
   return editedOnServer(item, row)
 }
 
+/**
+ * A change queued against a row that was itself still queued has no revision of its own: it
+ * takes the one the insert produced (LED-298).
+ */
+const insertKey = (item: QueueItem) => `${item.table}:${String(item.payload.id)}`
+
+function noteInserted(item: QueueItem, row: unknown, moves: RevisionMoves) {
+  const revision = (row as { updated_at?: unknown } | null | undefined)?.updated_at
+  if (typeof item.payload.id === 'string' && typeof revision === 'string') {
+    recordRevisionMove(moves, insertKey(item), undefined, revision)
+  }
+}
+
+/**
+ * The row id is already taken. When it is our own row, an earlier send committed and only its
+ * response was lost: count it synced, once (LED-298). Someone else's id (hidden by RLS) is a
+ * genuine failure.
+ */
+async function reconcileInsert(item: QueueItem, client: DrainClient, moves: RevisionMoves): Promise<Outcome> {
+  try {
+    const { data, error } = await client
+      .from(item.table)
+      .select('id, updated_at')
+      .eq('id', item.payload.id)
+      .eq('user_id', item.userId)
+      .maybeSingle()
+    if (error) return checkFailed(item)
+    if (data) {
+      noteInserted(item, data, moves)
+      return { kind: 'synced', inserted: item }
+    }
+  } catch {
+    return checkFailed(item)
+  }
+  return { kind: 'keep', item: recordFailure(item, 'This row id is already in use.', true) }
+}
+
 async function processItem(item: QueueItem, deps: DrainDeps, moves: RevisionMoves): Promise<Outcome> {
   const { client, receipts } = deps
   let current = item
@@ -175,8 +213,10 @@ async function processItem(item: QueueItem, deps: DrainDeps, moves: RevisionMove
   }
 
   if (current.operation === 'insert') {
-    const { error } = await client.from(current.table).insert(current.payload)
+    const { data, error } = await client.from(current.table).insert(current.payload).select('id, updated_at')
+    if (error && isDuplicateRowId(error) && typeof current.payload.id === 'string') return reconcileInsert(current, client, moves)
     if (error) return { kind: 'keep', item: recordFailure(current, messageOf(error), isCountableError(error)) }
+    noteInserted(current, Array.isArray(data) ? data[0] : data, moves)
     return { kind: 'synced', inserted: current }
   }
 
@@ -207,9 +247,17 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
   // Revisions this drain wrote: our own write bumps updated_at, so a later queued
   // change to the same row is moved onto it instead of being flagged as a conflict.
   const moves: RevisionMoves = new Map()
+  // Rows whose queued create has not reached the database: a change to one waits for it,
+  // or a delete would find nothing and be dropped while the insert later creates the row.
+  const unsentRows = new Set(queue.filter((i) => isFlagged(i) && i.operation === 'insert').map(insertKey))
   let synced = 0
 
   for (const [index, item] of fresh.entries()) {
+    if (item.operation !== 'insert' && unsentRows.has(rowKey(item))) {
+      remaining.push(item)
+      onProgress?.(index + 1, fresh.length)
+      continue
+    }
     try {
       const outcome = await processItem(item, deps, moves)
       if (outcome.kind === 'synced') {
@@ -217,10 +265,14 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
         if (outcome.inserted) {
           try { deps.onSynced?.(outcome.inserted) } catch { /* the row is saved; a follow-up reports its own failure */ }
         }
-      } else remaining.push(outcome.item)
+      } else {
+        remaining.push(outcome.item)
+        if (item.operation === 'insert') unsentRows.add(insertKey(item))
+      }
     } catch {
       // Unexpected error (usually a dropped connection): keep the item for the next drain.
       remaining.push(item)
+      if (item.operation === 'insert') unsentRows.add(insertKey(item))
     } finally {
       onProgress?.(index + 1, fresh.length)
     }

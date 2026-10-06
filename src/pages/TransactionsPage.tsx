@@ -814,7 +814,7 @@ export default function TransactionsPage() {
         {loadState === 'error' ? (
           <ErrorState title="Couldn't load your transactions" description={error} detail={errorDetail} onRetry={() => void refetch()} />
         ) : loadState === 'loading' ? (
-          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 bg-skeleton-page" />)}</div>
         ) : transactions.length === 0 ? (
           <EmptyState
             icon={ArrowLeftRight}

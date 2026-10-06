@@ -36,6 +36,7 @@
 
   --muted: #F1F0F4;               /* surface-container     */
   --muted-foreground: #55545B;    /* design ink-2; ink-3 #6B6A72 is 3.96:1 on the page */
+  --skeleton: #C5C3CB;            /* loading bars: 1.5:1 on card and frame (LED-275) */
 
   --accent: #E4E7F5;              /* primary-container     */
   --accent-foreground: #2E3A63;
@@ -119,6 +120,7 @@
 
   --muted: #2C2B34;               /* surface-container     */
   --muted-foreground: #A9A7B1;    /* muted ink             */
+  --skeleton: var(--muted);
 
   --accent: #333C5C;              /* primary-container     */
   --accent-foreground: #DBE1F7;
@@ -222,6 +224,7 @@
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
+  --color-skeleton: var(--skeleton);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);

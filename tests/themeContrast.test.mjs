@@ -177,3 +177,22 @@ test('button variants hover to solid fills, not a see-through primary or destruc
   assert.match(variants, /hover:bg-primary-hover/)
   assert.match(variants, /(?<!dark:)hover:bg-destructive-hover[\s\S]*dark:hover:bg-destructive-hover/)
 })
+
+// Skeleton bars (LED-275): bg-muted drew 1.08:1 on the light card, so loading looked empty. They are
+// decorative, not text, so 1.5:1 applies, on the card and on the frame the detail pane uses. Dark keeps --muted.
+test('light: --skeleton on --card and --sidebar holds 1.5:1', () => {
+  for (const surface of ['--card', '--sidebar']) {
+    const ratio = contrastRatio(resolve(themes.light, '--skeleton'), resolve(themes.light, surface))
+    assert.ok(ratio >= 1.5, `${surface}: ${ratio.toFixed(2)}:1`)
+  }
+})
+
+test('dark: --skeleton is the muted surface, unchanged', () => {
+  assert.equal(themes.dark['--skeleton'], 'var(--muted)')
+})
+
+test('skeletons draw with the skeleton token, not --muted', () => {
+  const src = readFileSync(new URL('../src/components/ui/skeleton.tsx', import.meta.url), 'utf8')
+  assert.equal(src.match(/(?<![\w:-])bg-skeleton(?![\w/-])/g)?.length, 2)
+  assert.doesNotMatch(src, /(?<![\w:-])bg-muted(?![\w/-])/)
+})

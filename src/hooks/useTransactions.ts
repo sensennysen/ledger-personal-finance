@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { drainQueue, editQueuedInsert, enqueue, pendingCount as queueSize, revisionFor } from '@/lib/offlineQueue'
+import { drainQueue, editQueuedInsert, enqueue, enqueueMany, pendingCount as queueSize, revisionFor } from '@/lib/offlineQueue'
 import { splitPendingReceipt } from '@/lib/receiptJob'
 import { notifySyncListeners, registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
@@ -175,22 +175,18 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
 
   // `id` is chosen here, not by the database, so a queued create keeps one identity: a later edit of
   // it finds the queued insert (LED-193) and a card payment's statement can name the row it came from.
-  const enqueueInsert = useCallback((values: TransactionUpsertValues, id?: string) => {
-    if (!user) return
-
-    enqueue({
-      table: 'transactions',
-      operation: 'insert',
-      payload: { ...(id ? { id } : {}), ...withTransactionDefaults(values), user_id: user.id },
-      userId: user.id,
-    })
-  }, [user])
+  const insertItem = useCallback((values: TransactionUpsertValues, userId: string, id?: string) => ({
+    table: 'transactions',
+    operation: 'insert' as const,
+    payload: { ...(id ? { id } : {}), ...withTransactionDefaults(values), user_id: userId },
+    userId,
+  }), [])
 
   // A receipt whose upload failed while saving online follows the row as a queued edit, made
   // against the revision just saved, and uploads when it can (LED-300).
-  const queueReceipt = useCallback((row: { id: string; updated_at: string }, marker: string, label?: string) => {
+  const queueReceipt = useCallback(async (row: { id: string; updated_at: string }, marker: string, label?: string) => {
     if (!user) return
-    enqueue({
+    const { error } = await enqueue({
       table: 'transactions',
       operation: 'update',
       payload: { receipt_url: marker },
@@ -199,6 +195,11 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       userId: user.id,
       label,
     })
+    if (error) {
+      // The row is saved; only its receipt could not be kept for a later upload.
+      console.error('The transaction was saved without its receipt:', error)
+      return
+    }
     void drainQueue().then(() => notifySyncListeners(), () => {})
   }, [user])
 
@@ -223,12 +224,15 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         queued: true,
       }
 
+      // Stored first: nothing is shown as saved until the queue holds it (LED-303).
+      const { error } = await enqueue(insertItem(values, user.id, queuedId))
+      if (error) return { error }
+
       if (txMatchesFilters(optimistic, filters)) {
         updateTransactionCache(limitTransactions([optimistic, ...transactions], filters.limit))
       }
 
       optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
-      enqueueInsert(values, queuedId)
       return { error: null, queued: true, id: queuedId }
     }
     const { values: saved, marker } = splitPendingReceipt(values)
@@ -237,7 +241,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       .insert({ ...withTransactionDefaults(saved), user_id: user.id })
       .select('id, updated_at')
       .single()
-    if (!error && data && marker) queueReceipt(data, marker, values.description)
+    if (!error && data && marker) await queueReceipt(data, marker, values.description)
     if (!error) {
       await fetch()
       notifyLoanPurchasesRefresh()
@@ -249,20 +253,12 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const existing = transactions.find((t) => t.id === id)
-      if (existing) {
-        // updated_at stays the server's: it is the revision the queued change is made against (LED-297).
-        const merged: Transaction = { ...existing, ...values, queued: true }
-        updateTransactionCache(transactions.map((t) => (t.id === id ? merged : t)))
-
-        // Reverse old effect, apply new effect
-        optimisticAccountDelta((accounts) =>
-          applyTxDelta(reverseTxDelta(accounts, existing), merged)
-        )
-      }
       // A row that is still only a queued create is fixed in the queue; an update would target a
-      // row the database has not seen (LED-193).
-      if (!editQueuedInsert(id, values as Record<string, unknown>)) {
-        enqueue({
+      // row the database has not seen (LED-193). Stored before it is shown (LED-303).
+      const queuedEdit = await editQueuedInsert(id, values as Record<string, unknown>)
+      if (queuedEdit.error) return { error: queuedEdit.error }
+      if (!queuedEdit.edited) {
+        const { error } = await enqueue({
           table: 'transactions',
           operation: 'update',
           payload: values as Record<string, unknown>,
@@ -273,6 +269,17 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
           // the queue sheet title still has a name to show (LED-160).
           label: existing?.description,
         })
+        if (error) return { error }
+      }
+      if (existing) {
+        // updated_at stays the server's: it is the revision the queued change is made against (LED-297).
+        const merged: Transaction = { ...existing, ...values, queued: true }
+        updateTransactionCache(transactions.map((t) => (t.id === id ? merged : t)))
+
+        // Reverse old effect, apply new effect
+        optimisticAccountDelta((accounts) =>
+          applyTxDelta(reverseTxDelta(accounts, existing), merged)
+        )
       }
       return { error: null, queued: true }
     }
@@ -284,7 +291,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       .eq('user_id', user.id)
       .select('id, updated_at')
       .maybeSingle()
-    if (!error && data && marker) queueReceipt(data, marker, values.description ?? transactions.find((t) => t.id === id)?.description)
+    if (!error && data && marker) await queueReceipt(data, marker, values.description ?? transactions.find((t) => t.id === id)?.description)
     if (!error) {
       await fetch()
       notifyLoanPurchasesRefresh()
@@ -298,11 +305,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const existing = transactions.find((t) => t.id === id)
-      if (existing) {
-        updateTransactionCache(transactions.filter((t) => t.id !== id))
-        optimisticAccountDelta((accounts) => reverseTxDelta(accounts, existing))
-      }
-      enqueue({
+      const { error } = await enqueue({
         table: 'transactions',
         operation: 'delete',
         payload: {},
@@ -312,6 +315,11 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         // A delete's payload carries nothing to title the queue sheet with (LED-160).
         label: existing?.description,
       })
+      if (error) return { error }
+      if (existing) {
+        updateTransactionCache(transactions.filter((t) => t.id !== id))
+        optimisticAccountDelta((accounts) => reverseTxDelta(accounts, existing))
+      }
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
@@ -338,10 +346,14 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const toDelete = transactions.filter((t) => ids.includes(t.id))
+      // One write for the selection: all of it is stored, or none of it is shown (LED-303).
+      const { error } = await enqueueMany(toDelete.map((tx) => (
+        { table: 'transactions', operation: 'delete' as const, payload: {}, rowId: tx.id, baseRevision: revisionFor('transactions', tx), userId: user.id, label: tx.description }
+      )))
+      if (error) return { error }
       updateTransactionCache(transactions.filter((t) => !ids.includes(t.id)))
       toDelete.forEach((tx) => {
         optimisticAccountDelta((accounts) => reverseTxDelta(accounts, tx))
-        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, baseRevision: revisionFor('transactions', tx), userId: user.id, label: tx.description })
       })
       return { error: null, queued: true }
     }
@@ -360,24 +372,25 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
   const bulkUpdateCategory = async (ids: string[], categoryId: string | null): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
-      updateTransactionCache(transactions.map((t) =>
-        ids.includes(t.id)
-          ? { ...t, category_id: categoryId, queued: true }
-          : t
-      ))
-      ids.forEach((id) => {
+      const { error } = await enqueueMany(ids.map((id) => {
         const existing = transactions.find((t) => t.id === id)
-        enqueue({
+        return {
           table: 'transactions',
-          operation: 'update',
+          operation: 'update' as const,
           payload: { category_id: categoryId },
           rowId: id,
           baseRevision: revisionFor('transactions', existing),
           userId: user.id,
           // A category-only change doesn't touch description (LED-160).
           label: existing?.description,
-        })
-      })
+        }
+      }))
+      if (error) return { error }
+      updateTransactionCache(transactions.map((t) =>
+        ids.includes(t.id)
+          ? { ...t, category_id: categoryId, queued: true }
+          : t
+      ))
       return { error: null, queued: true }
     }
     const { error } = await supabase
@@ -407,13 +420,15 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         ...buildOptimisticTransaction({ values, userId: user.id, now, id: ids[index] }),
         queued: true,
       }))
+      // The whole import is stored, or none of it is shown (LED-303).
+      const { error } = await enqueueMany(rows.map((values, index) => insertItem(values, user.id, ids[index])))
+      if (error) return { error, imported: 0 }
       const filtered = optimistics.filter((tx) => txMatchesFilters(tx, filters))
       if (filtered.length) {
         updateTransactionCache(limitTransactions([...filtered, ...transactions], filters.limit))
       }
-      rows.forEach((values, index) => {
+      rows.forEach((values) => {
         optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
-        enqueueInsert(values, ids[index])
       })
       return { error: null, imported: rows.length }
     }

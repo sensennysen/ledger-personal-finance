@@ -320,3 +320,26 @@ export function removeFlagged(queue: QueueItem[], id?: string) {
   const kept = queue.filter((i) => !removed.includes(i))
   return { kept, removed }
 }
+
+/** Shown when a change could not be stored in this browser: nothing was saved or shown (LED-303). */
+export const QUEUE_STORAGE_FAILED =
+  "This browser couldn't store the change, so it wasn't saved. Free up some space or reconnect, then try again."
+
+/** A new item as a caller gives it: the queue assigns its id and timestamp. */
+export type NewQueueItem = Omit<QueueItem, 'id' | 'timestamp'>
+
+/** Appends new items in order, each with its own id and the same timestamp (LED-318: one write for a batch). */
+export function appendItems(queue: QueueItem[], items: NewQueueItem[], now: number, newId: () => string): QueueItem[] {
+  if (items.length === 0) return queue
+  return [...queue, ...items.map((item) => ({ ...item, id: newId(), timestamp: now }))]
+}
+
+/**
+ * Moves a queue stored before LED-303 (localStorage) into the stored queue. An item already there
+ * (by id) is kept as stored, so a second tab running the same move adds nothing.
+ */
+export function mergeLegacyQueue(stored: QueueItem[], legacy: QueueItem[]): QueueItem[] {
+  const ids = new Set(stored.map((item) => item.id))
+  const added = legacy.filter((item) => item && typeof item.id === 'string' && !ids.has(item.id))
+  return added.length === 0 ? stored : [...stored, ...added]
+}

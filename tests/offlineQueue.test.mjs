@@ -4,6 +4,7 @@ import {
   MAX_QUEUE_AGE_MS, MAX_ATTEMPTS, markExpired, applyKeepMine, removeFlagged, isPending, isFlagged,
   mergeDrainResult, rowKey, expireNow, nextExpiryAt, isCountableError, recordFailure, retryFailed,
   describeConflict, canKeepMine, recordRevisionMove, rebaseRevision, rebaseRevisions, isDuplicateRowId, editQueuedInsert, followUpUpdate,
+  appendItems, mergeLegacyQueue,
 } from '../src/lib/queueState.ts'
 
 const NOW = 1_000_000_000_000
@@ -230,4 +231,27 @@ test('merge turns a create edited mid-send into an update, and keeps the newer c
   const failed = { ...sentCopy, attempts: 1 }
   const [kept] = mergeDrainResult([failed], [edited], new Set(['s']), new Set())
   assert.equal(kept.payload.amount, 5)
+})
+
+test('LED-303: appendItems adds every new item in order with its own id, leaving the queue as it was', () => {
+  const before = [item({ id: 'old' })]
+  let n = 0
+  const next = appendItems(before, [{ table: 't', operation: 'insert', payload: { a: 1 }, userId: 'u' }, { table: 't', operation: 'delete', payload: {}, rowId: 'r', userId: 'u' }], NOW, () => `n${++n}`)
+  assert.deepEqual(next.map((i) => i.id), ['old', 'n1', 'n2'])
+  assert.ok(next.slice(1).every((i) => i.timestamp === NOW))
+  assert.equal(before.length, 1)
+  assert.equal(appendItems(before, [], NOW, () => 'x'), before, 'nothing to add writes nothing')
+})
+
+test('LED-303: a queue kept in localStorage moves once, and a second move adds nothing', () => {
+  const legacy = [item({ id: 'l1', baseRevision: 'r1', version: 2, uploadedReceipt: 'u/x.jpg' }), item({ id: 'l2' })]
+  const moved = mergeLegacyQueue([], legacy)
+  assert.deepEqual(moved, legacy, 'baseRevision, version and uploadedReceipt survive the move')
+  assert.equal(mergeLegacyQueue(moved, legacy), moved, 'another tab running the move changes nothing')
+})
+
+test('LED-303: an item already stored wins over its leftover localStorage copy, and new ones keep their order', () => {
+  const stored = [item({ id: 'l1', status: 'conflict' })]
+  const merged = mergeLegacyQueue(stored, [item({ id: 'l1' }), item({ id: 'l3' }), null])
+  assert.deepEqual(merged.map((i) => [i.id, i.status]), [['l1', 'conflict'], ['l3', undefined]])
 })

@@ -49,10 +49,24 @@ export function subscribeQueue(cb: QueueListener): () => void {
 // counts, review sheet and expiry timer follow. The message carries no queue contents.
 const QUEUE_CHANNEL = 'ledger_offline_queue'
 const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(QUEUE_CHANNEL)
+// 'synced' also means rows reached the server from that tab, so this tab's lists re-read too.
+const remoteSyncListeners = new Set<() => void>()
+
+/** Hears another tab finishing a drain that saved something. Returns an unsubscribe fn. */
+export function subscribeRemoteSync(cb: () => void): () => void {
+  remoteSyncListeners.add(cb)
+  return () => {
+    remoteSyncListeners.delete(cb)
+  }
+}
+
 if (channel) {
-  channel.onmessage = () => {
+  channel.onmessage = (event: MessageEvent) => {
     readStoredQueue().then(
-      (queue) => committed(queue, false),
+      (queue) => {
+        committed(queue, false)
+        if (event.data === 'synced') remoteSyncListeners.forEach((cb) => cb())
+      },
       (err) => console.error('Failed to re-read the offline queue:', err),
     )
   }
@@ -251,6 +265,8 @@ const deps: DrainDeps = {
  * Across tabs the drain holds a Web Lock, so another tab's drain waits and then sends only
  * what is left (LED-302). Follow-ups (`onSynced`) run in the tab that sent the row.
  */
-export const drainQueue = singleFlight((onProgress) =>
-  exclusive(navigator.locks as LockManagerLike | undefined, 'ledger_queue_drain', () => drainWith(deps, onProgress)),
-)
+export const drainQueue = singleFlight(async (onProgress) => {
+  const synced = await exclusive(navigator.locks as LockManagerLike | undefined, 'ledger_queue_drain', () => drainWith(deps, onProgress))
+  if (synced > 0) channel?.postMessage('synced')
+  return synced
+})

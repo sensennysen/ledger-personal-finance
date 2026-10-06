@@ -13,6 +13,8 @@ Three layers, so the drain can be tested without Supabase or localStorage (LED-0
 - Only a database error carrying a `code` counts toward `failed`. A dropped connection never does.
 - Expiry flags on a timer in `NetworkStatusProvider`, not only on the next drain.
 
+**Tabs share one queue (LED-302).** Each commit posts `changed` on the BroadcastChannel `ledger_offline_queue`; other tabs re-read the stored queue into their snapshot and fire their listeners. `drainQueue` holds the Web Lock `ledger_queue_drain` (`exclusive`), so a second tab's drain waits and sends only what is left. `onSynced` follow-ups run in the tab that sent the row. Without Web Locks the drain runs unlocked and relies on idempotent inserts and revisions. Test with `fakeLocks()` and one `fakeQueueStore` shared by two `singleFlight` drains.
+
 **One drain at a time.** `drainQueue` is wrapped in `singleFlight`, and `mergeDrainResult` re-reads the queue before writing so items enqueued or resolved mid-drain survive.
 
 **`useNetworkStatus()` reads one provider.** `NetworkStatusProvider` (mounted in `AppLayout`) owns the `online`/`offline` listeners and the drain trigger; the hook is a context read, so a second call site adds nothing. `useIsOnline()` in `LoanPurchaseTracker.tsx` predates this and is still a plain listener.

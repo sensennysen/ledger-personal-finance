@@ -13,7 +13,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { getCreditCardSpending } from '@/lib/creditCards'
 import { formatLoanSchedule, getLoanAmountOwed, LOAN_PAY_PERIOD_LABELS, WEEKDAY_LABELS } from '@/lib/loans'
 import { accountSchema, loanScheduleControl, type AccountFormValues } from '@/lib/accountSchema'
-import { availableCredit, daysToPay, ordinal } from '@/lib/accountFormHints'
+import { availableCredit, currencyLocked, currencyLockHint, daysToPay, ordinal } from '@/lib/accountFormHints'
+import { useAccountHistory } from '@/hooks/useAccountHistory'
 
 export type { AccountFormValues }
 
@@ -50,6 +51,10 @@ export function AccountForm({
   onClose: () => void
 }) {
   const originalBalance = account?.balance
+  // A currency change would relabel old transactions' amounts, so history locks it (LED-316).
+  const history = useAccountHistory(account?.id)
+  const currencyLockedNow = currencyLocked(history)
+  const currencyHint = currencyLockHint(history)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<AccountFormValues, any, AccountFormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -164,7 +169,7 @@ export function AccountForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Currency</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={currencyLockedNow}>
                   <FormControl><SelectTrigger><SelectValue>{(v: string | null) => v ?? 'Select currency'}</SelectValue></SelectTrigger></FormControl>
                   <SelectContent>
                     {CURRENCIES.map((c) => (
@@ -172,6 +177,7 @@ export function AccountForm({
                     ))}
                   </SelectContent>
                 </Select>
+                {currencyHint && <p className="text-xs text-muted-foreground">{currencyHint}</p>}
                 <FormMessage />
               </FormItem>
             )}

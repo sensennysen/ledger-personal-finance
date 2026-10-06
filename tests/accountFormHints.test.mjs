@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { availableCredit, daysToPay, ordinal } from '../src/lib/accountFormHints.ts'
+import { availableCredit, currencyLocked, currencyLockHint, daysToPay, ordinal } from '../src/lib/accountFormHints.ts'
 import { loanScheduleControl } from '../src/lib/accountSchema.ts'
 
 test('days to pay runs from the next statement close to the due day after it', () => {
@@ -33,4 +33,15 @@ test('each loan period names the control it needs', () => {
   assert.equal(loanScheduleControl('daily'), 'none')
   for (const period of ['monthly', 'quarterly', 'bi_yearly', 'yearly']) assert.equal(loanScheduleControl(period), 'one-day')
   assert.equal(loanScheduleControl(null), null)
+})
+
+test('the currency is locked unless the account is known to have no history (LED-316)', () => {
+  assert.equal(currencyLocked('none'), false)
+  assert.equal(currencyLockHint('none'), null)
+  for (const state of ['loading', 'history', 'unknown']) {
+    assert.equal(currencyLocked(state), true)
+    assert.ok(currencyLockHint(state))
+  }
+  assert.match(currencyLockHint('history'), /has transactions/)
+  assert.match(currencyLockHint('unknown'), /couldn’t check/)
 })

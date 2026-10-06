@@ -17,7 +17,9 @@ export function reportError(kind: ErrorKind, error: unknown, componentStack?: st
   if (!gate(event)) return
   void (async () => {
     try {
-      // Reports are for signed-in users only; the table takes the owner from the session.
+      // Reports are for signed-in users only; the table takes the owner from the session. Errors on
+      // signed-out pages (/login, /privacy, /terms, /data-deletion) are not reported: taking them would
+      // let anyone write to error_events (LED-279, decision B). Release checklist D7 checks them by hand.
       const { data } = await supabase.auth.getSession()
       if (!data.session) return
       const { error: insertError } = await supabase.from('error_events').insert(event)

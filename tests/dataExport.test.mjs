@@ -30,6 +30,13 @@ test('every account is one row under the header, blanks for what does not apply'
   assert.equal(lines[2], 'Visa,credit_card,PHP,-3000,yes,20000,16,5,3000,0,,,')
 })
 
+test('an archived account is exported with Active = no and its balance (LED-309)', () => {
+  const csv = buildAccountsCsv([account(), account({ name: 'Old Wallet', type: 'cash', balance: 42.5, is_active: false, notes: 'closed' })])
+  const lines = csv.split('\n')
+  assert.equal(lines.length, 3)
+  assert.equal(lines[2], 'Old Wallet,cash,PHP,42.5,no,,,,,,,,closed')
+})
+
 test('a loan account carries its due days or due weekday (LED-181 item, OD-8)', () => {
   const csv = buildAccountsCsv([
     account({ name: 'Car Loan', type: 'loan', balance: -5000, loan_pay_period: 'twice_monthly', loan_due_days: [1, 15] }),

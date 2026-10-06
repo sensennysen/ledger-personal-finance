@@ -76,7 +76,8 @@ export function ExportDataCard() {
 
 function SignedInExport() {
   const transactions = useTransactions()
-  const accounts = useAccounts()
+  // Every account, archived ones included: their history stays in the export (LED-309).
+  const accounts = useAccounts({ includeArchived: true })
   const categories = useCategories()
   const expenseTx = useMemo(() => transactions.transactions.filter((t) => t.type === 'expense'), [transactions.transactions])
   const savingsGoals = useSavingsGoals()

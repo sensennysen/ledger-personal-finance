@@ -11,7 +11,13 @@ import { planAccountSave, type BalanceAdjustment } from '@/lib/accountAdjustment
 import type { Account } from '@/types'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
-export function useAccounts() {
+/**
+ * The user's accounts. Pickers and screens see active accounts only; `includeArchived` reads every
+ * account for the data export, which must keep archived accounts and the history they carry (LED-309).
+ * The two reads cache under separate keys, so an archived account never reaches a picker.
+ */
+export function useAccounts({ includeArchived = false }: { includeArchived?: boolean } = {}) {
+  const cacheSuffix = includeArchived ? ':all' : ''
   const { user } = useAuth()
   const notify = useNotify()
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -23,7 +29,7 @@ export function useAccounts() {
       setLoading(false)
       return
     }
-    const cacheKey = `${user.id}:accounts`
+    const cacheKey = `${user.id}:accounts${cacheSuffix}`
     const cached = readCache<Account[]>(cacheKey)
     if (cached) {
       setAccounts(cached)
@@ -33,14 +39,17 @@ export function useAccounts() {
     }
     if (!navigator.onLine) return
     // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
-    const { data, error } = await readWithPolicy((retry) => supabase
-      .from('accounts')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true })
-      .retry(retry), { background: cached !== null })
+    const { data, error } = await readWithPolicy((retry) => {
+      let query = supabase
+        .from('accounts')
+        .select('*')
+        .eq('user_id', user.id)
+      if (!includeArchived) query = query.eq('is_active', true)
+      return query
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
+        .retry(retry)
+    }, { background: cached !== null })
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load' }))
     } else {
@@ -49,7 +58,7 @@ export function useAccounts() {
       writeCache(cacheKey, data)
     }
     setLoading(false)
-  }, [user])
+  }, [user, includeArchived, cacheSuffix])
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -60,9 +69,9 @@ export function useAccounts() {
   // Re-read cache when an offline transaction mutation updates account balances
   const reloadFromCache = useCallback(() => {
     if (!user) return
-    const cached = readCache<Account[]>(`${user.id}:accounts`)
+    const cached = readCache<Account[]>(`${user.id}:accounts${cacheSuffix}`)
     if (cached) setAccounts(cached)
-  }, [user])
+  }, [user, cacheSuffix])
 
   useEffect(() => registerAccountsListener(reloadFromCache), [reloadFromCache])
 
@@ -170,7 +179,7 @@ export function useAccounts() {
       .map((account) => ({ ...account, sort_order: orderMap.get(account.id) ?? account.sort_order ?? accounts.length }))
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.created_at.localeCompare(b.created_at))
     setAccounts(nextAccounts)
-    writeCache(`${user.id}:accounts`, nextAccounts)
+    writeCache(`${user.id}:accounts${cacheSuffix}`, nextAccounts)
 
     const updates = orderedIds.map((id, sort_order) =>
       supabase

@@ -5,6 +5,7 @@
 export function fakeClient(respond, { upload } = {}) {
   const calls = []
   const uploads = []
+  const removedFiles = []
 
   function builder(table) {
     const call = { table, op: null, columns: null, payload: null, filters: {}, single: false, returning: null }
@@ -32,12 +33,17 @@ export function fakeClient(respond, { upload } = {}) {
   return {
     calls,
     uploads,
+    removedFiles,
     from: builder,
     storage: {
       from: (bucket) => ({
         async upload(path, file) {
           uploads.push({ bucket, path, file })
           return { error: upload ? upload({ bucket, path, file }) : null }
+        },
+        async remove(paths) {
+          removedFiles.push(...paths.map((path) => ({ bucket, path })))
+          return { error: null }
         },
       }),
     },

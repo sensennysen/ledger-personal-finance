@@ -13,6 +13,7 @@ import {
   recordRevisionMove,
   removeFlagged,
   rowKey,
+  setResolvedReceipt,
   type QueueItem,
   type RevisionMoves,
   type SentInsert,
@@ -25,6 +26,7 @@ export interface DrainClient {
   storage: {
     from: (bucket: string) => {
       upload: (path: string, file: File) => Promise<{ error: unknown }>
+      remove: (paths: string[]) => Promise<{ error: unknown }>
     }
   }
 }
@@ -61,9 +63,21 @@ const isPendingReceipt = (item: QueueItem, prefix: string) =>
   typeof item.payload.receipt_url === 'string' &&
   item.payload.receipt_url.startsWith(prefix)
 
-/** Uploads a queued receipt file and points the payload at it. Returns null when the upload failed and the item must wait. */
-async function resolveReceipt(item: QueueItem, receipts: ReceiptDeps, client: DrainClient): Promise<QueueItem | null> {
-  const tempId = (item.payload.receipt_url as string).slice(receipts.prefix.length)
+/** Deletes an uploaded receipt that no row will point at. Best-effort: a stray file is harmless. */
+async function removeUploaded(client: DrainClient, path: string) {
+  try { await client.storage.from('receipts').remove([path]) } catch { /* best-effort */ }
+}
+
+/**
+ * Uploads a queued receipt file and points the payload at it. The uploaded path is written to
+ * the stored queue before the row is saved, and only then is the local file removed: a save that
+ * fails afterwards retries with the path, not with a file that is gone (LED-301). Returns null
+ * when the upload failed and the item must wait.
+ */
+async function resolveReceipt(item: QueueItem, deps: DrainDeps): Promise<QueueItem | null> {
+  const { receipts, client } = deps
+  const marker = item.payload.receipt_url as string
+  const tempId = marker.slice(receipts.prefix.length)
   let file: File | null = null
   try {
     file = await receipts.get(tempId)
@@ -81,8 +95,25 @@ async function resolveReceipt(item: QueueItem, receipts: ReceiptDeps, client: Dr
     uploadError = e
   }
   if (uploadError) return null
-  try { await receipts.remove(tempId) } catch { /* best-effort */ }
-  return { ...item, payload: { ...item.payload, receipt_url: path } }
+
+  let recorded = false
+  try {
+    const { queue, applied } = setResolvedReceipt(deps.readQueue(), item.id, marker, path)
+    if (applied) deps.writeQueue(queue)
+    else {
+      // The receipt was replaced (or the item resolved) while this one uploaded: nothing will use it.
+      await removeUploaded(client, path)
+      try { await receipts.remove(tempId) } catch { /* best-effort */ }
+      return { ...item, payload: { ...item.payload, receipt_url: null } }
+    }
+    recorded = true
+  } catch {
+    // Storage is full or unavailable: keep the local file so a retry can upload it again.
+  }
+  if (recorded) {
+    try { await receipts.remove(tempId) } catch { /* best-effort */ }
+  }
+  return { ...item, uploadedReceipt: path, payload: { ...item.payload, receipt_url: path } }
 }
 
 /** Reads the server row an update or delete targets. Returns 'unknown' when the read itself fails. */
@@ -207,22 +238,28 @@ async function processItem(item: QueueItem, deps: DrainDeps, moves: RevisionMove
   const { client, receipts } = deps
   let current = item
 
-  if (isPendingReceipt(current, receipts.prefix)) {
-    const resolved = await resolveReceipt(current, receipts, client)
-    if (!resolved) return { kind: 'keep', item: current } // upload failed; retry next drain
-    current = resolved
-  }
+  try {
+    if (isPendingReceipt(current, receipts.prefix)) {
+      const resolved = await resolveReceipt(current, deps)
+      if (!resolved) return { kind: 'keep', item: current } // upload failed; retry next drain
+      current = resolved
+    }
 
-  if (current.operation === 'insert') {
-    const { data, error } = await client.from(current.table).insert(current.payload).select('id, updated_at')
-    if (error && isDuplicateRowId(error) && typeof current.payload.id === 'string') return reconcileInsert(current, client, moves)
-    if (error) return { kind: 'keep', item: recordFailure(current, messageOf(error), isCountableError(error)) }
-    noteInserted(current, Array.isArray(data) ? data[0] : data, moves)
-    return { kind: 'synced', inserted: current }
-  }
+    if (current.operation === 'insert') {
+      const { data, error } = await client.from(current.table).insert(current.payload).select('id, updated_at')
+      if (error && isDuplicateRowId(error) && typeof current.payload.id === 'string') return await reconcileInsert(current, client, moves)
+      if (error) return { kind: 'keep', item: recordFailure(current, messageOf(error), isCountableError(error)) }
+      noteInserted(current, Array.isArray(data) ? data[0] : data, moves)
+      return { kind: 'synced', inserted: current }
+    }
 
-  if (!current.rowId) return { kind: 'synced' }
-  return processWrite(rebaseRevision(current, moves), deps, moves)
+    if (!current.rowId) return { kind: 'synced' }
+    return await processWrite(rebaseRevision(current, moves), deps, moves)
+  } catch {
+    // Unexpected error (usually a dropped connection): keep the item as far as it got, so a
+    // receipt that already uploaded stays attached (LED-301).
+    return { kind: 'keep', item: current }
+  }
 }
 
 /**
@@ -266,7 +303,7 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
       if (outcome.kind === 'synced') {
         synced++
         if (outcome.inserted) {
-          sent.set(item.id, { version: item.version ?? 0, payload: item.payload })
+          sent.set(item.id, { version: item.version ?? 0, payload: outcome.inserted.payload })
           try { deps.onSynced?.(outcome.inserted) } catch { /* the row is saved; a follow-up reports its own failure */ }
         }
       } else {
@@ -289,12 +326,14 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
 
 /** "Keep theirs" / "Discard": drop the flagged item (or all of them) and any receipt file it held. */
 export async function discardFlagged(
-  deps: Pick<DrainDeps, 'readQueue' | 'writeQueue' | 'receipts'>,
+  deps: Pick<DrainDeps, 'readQueue' | 'writeQueue' | 'receipts'> & { client?: DrainClient },
   id?: string,
 ): Promise<void> {
   const { kept, removed } = removeFlagged(deps.readQueue(), id)
   deps.writeQueue(kept)
   for (const item of removed) {
+    // A receipt the drain uploaded for a change that never reached its row.
+    if (item.uploadedReceipt && deps.client) await removeUploaded(deps.client, item.uploadedReceipt)
     if (!isPendingReceipt(item, deps.receipts.prefix)) continue
     try { await deps.receipts.remove((item.payload.receipt_url as string).slice(deps.receipts.prefix.length)) } catch { /* best-effort */ }
   }

@@ -21,6 +21,11 @@ export interface QueueItem {
   label?: string
   userId: string
   timestamp: number
+  /**
+   * A receipt the drain uploaded for this item, already in payload.receipt_url. Deleted from storage
+   * if the item is discarded, since no row points at it (LED-301).
+   */
+  uploadedReceipt?: string
   /** Bumped by each edit of a queued create, so a drain confirms only the version it sent (LED-299). Absent = 0. */
   version?: number
   /** Absent = pending. Flagged items are retained until the user resolves them. */
@@ -125,6 +130,27 @@ export function editQueuedInsert(
 /** True when the row is still only a queued create (pending, failed or flagged), so it has no server revision yet. */
 export const hasQueuedInsert = (queue: QueueItem[], table: string, rowId: string) =>
   queue.some((item) => item.table === table && item.operation === 'insert' && item.payload.id === rowId)
+
+/**
+ * Records a receipt the drain uploaded on the stored item, before the row is saved (LED-301).
+ * Applies only while the item still points at the same pending file; the version is not bumped,
+ * since this is the drain's own step, not an edit. `applied` is false when the receipt was
+ * replaced or the item is gone.
+ */
+export function setResolvedReceipt(
+  queue: QueueItem[],
+  itemId: string,
+  marker: string,
+  path: string,
+): { queue: QueueItem[]; applied: boolean } {
+  let applied = false
+  const next = queue.map((item) => {
+    if (item.id !== itemId || item.payload.receipt_url !== marker) return item
+    applied = true
+    return { ...item, uploadedReceipt: path, payload: { ...item.payload, receipt_url: path } }
+  })
+  return { queue: applied ? next : queue, applied }
+}
 
 /** When the earliest pending item passes the max age, or null when nothing is pending. */
 export function nextExpiryAt(queue: QueueItem[]): number | null {
@@ -245,6 +271,8 @@ export function followUpUpdate(current: QueueItem, sent: SentInsert): QueueItem 
   delete next.attempts
   delete next.lastError
   delete next.baseRevision
+  // The insert saved that file: discarding this follow-up must not delete it.
+  delete next.uploadedReceipt
   return next
 }
 

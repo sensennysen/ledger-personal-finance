@@ -14,7 +14,7 @@ export const FIRST_RUN_STEPS: FirstRunStep[] = [
   {
     id: 'transaction',
     title: 'Record something, or import a statement',
-    description: 'One transaction is enough to start. Or drop in a bank CSV.',
+    description: 'Or import a CSV',
   },
   {
     id: 'cycle',

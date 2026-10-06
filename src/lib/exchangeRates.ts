@@ -7,11 +7,11 @@
 
 export type RefreshFrequency = 'open' | 'daily' | 'weekly' | 'manual'
 
-export const REFRESH_FREQUENCIES: { value: RefreshFrequency; label: string; hint: string }[] = [
-  { value: 'open', label: 'Every time I open Ledger', hint: 'Fetches once each time the app loads.' },
-  { value: 'daily', label: 'Once a day', hint: 'Fetches on the first visit of each day.' },
-  { value: 'weekly', label: 'Once a week', hint: 'Fetches on the first visit after seven days.' },
-  { value: 'manual', label: 'Only when I press Refresh', hint: 'Never fetches on its own.' },
+export const REFRESH_FREQUENCIES: { value: RefreshFrequency; label: string }[] = [
+  { value: 'open', label: 'Every time I open Ledger' },
+  { value: 'daily', label: 'Once a day' },
+  { value: 'weekly', label: 'Once a week' },
+  { value: 'manual', label: 'Only when I press Refresh' },
 ]
 
 export const DEFAULT_REFRESH_FREQUENCY: RefreshFrequency = 'daily'

@@ -191,8 +191,9 @@ function CategoryTreemap({ rows, currency }: { rows: CategorySlice[]; currency: 
           </Treemap>
         </ResponsiveContainer>
       </div>
-      {/* The cells cannot be reached by keyboard; Ranked is the accessible equivalent (LED-148). */}
-      <p className="text-xs text-muted-foreground">Switch to Ranked for the full list, with keyboard access.</p>
+      {/* The cells cannot be reached by keyboard; Ranked is the accessible equivalent (LED-148). Said to
+          screen readers only (density pass 4a). */}
+      <p className="sr-only">Switch to Ranked for the full list, with keyboard access.</p>
     </div>
   )
 }

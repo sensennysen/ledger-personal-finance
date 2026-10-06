@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { canChangeKind, kindDialogSubtitle, kindMenuItems } from '../src/lib/kindMenu.ts'
+import { canChangeKind, kindMenuItems } from '../src/lib/kindMenu.ts'
 
 const money = (n) => `$${n.toFixed(2)}`
 const acct = (over) => ({ id: over.name, name: over.name, type: 'checking', currency: 'USD', balance: 0, ...over })
@@ -14,13 +14,9 @@ test('with no liabilities the menu is the three primary kinds', () => {
   assert.ok(items.every((i) => i.group === 'primary'))
 })
 
-test('primary descriptions are the static strings', () => {
+test('the primary kinds carry no description, only label and key cap (density pass 4a)', () => {
   const items = kindMenuItems([cash], opts)
-  assert.deepEqual(items.map((i) => i.description), [
-    'Money spent from an account',
-    'Money received into an account',
-    'Move money between accounts',
-  ])
+  assert.deepEqual(items.map((i) => i.description), [undefined, undefined, undefined])
 })
 
 test('loan repayment shows the count and total owed, pluralised', () => {
@@ -36,7 +32,7 @@ test('loan repayment shows the count and total owed, pluralised', () => {
 test('a repaid loan does not count, whether alone or alongside one still owed (LED-156)', () => {
   const repaid = acct({ name: 'Old car', type: 'loan', balance: 0 })
   const alone = kindMenuItems([cash, repaid], opts)
-  assert.equal(alone.find((i) => i.kind === 'loan-repayment').description, 'Pay down a loan from another account')
+  assert.equal(alone.find((i) => i.kind === 'loan-repayment').description, undefined)
   const mixed = kindMenuItems([cash, repaid, acct({ name: 'Phone', type: 'loan', balance: -500 })], opts)
   assert.equal(mixed.find((i) => i.kind === 'loan-repayment').description, '1 loan · $500.00 owed')
 })
@@ -85,7 +81,7 @@ test('visibility flags hide their own item', () => {
 
 test('a loan in another currency is left out of the sentence, not summed', () => {
   const items = kindMenuItems([cash, acct({ name: 'Euro loan', type: 'loan', currency: 'EUR', balance: -900 })], opts)
-  assert.equal(items.find((i) => i.kind === 'loan-repayment').description, 'Pay down a loan from another account')
+  assert.equal(items.find((i) => i.kind === 'loan-repayment').description, undefined)
 })
 
 test('the menu component renders the list and hard-codes no kind labels', () => {
@@ -150,19 +146,6 @@ test('the search palette reads the shared mapping instead of its own letters', (
 const loan = acct({ name: 'Car', type: 'loan', balance: -100 })
 const visa = acct({ name: 'Visa', type: 'credit_card', balance: -50 })
 
-test('the dialog subtitle for a primary kind is the menu\'s own description', () => {
-  const items = kindMenuItems([cash, loan, visa], opts)
-  for (const kind of ['expense', 'income', 'transfer']) {
-    assert.equal(kindDialogSubtitle(kind, items), items.find((i) => i.kind === kind).description)
-  }
-})
-
-test('a payment dialog states its kind with the design caption, not the aggregate line', () => {
-  const items = kindMenuItems([cash, loan, visa], opts)
-  assert.equal(kindDialogSubtitle('loan-repayment', items), 'Posts as an expense against the loan · type locked')
-  assert.equal(kindDialogSubtitle('card-payment', items), 'Posts as a transfer to the card · type locked')
-})
-
 test('Change kind is offered from the three primary kinds only', () => {
   assert.equal(canChangeKind('expense'), true)
   assert.equal(canChangeKind('income'), true)
@@ -171,12 +154,10 @@ test('Change kind is offered from the three primary kinds only', () => {
   assert.equal(canChangeKind('card-payment'), false)
 })
 
-test('the entry header takes its text from the shared list and hard-codes none', () => {
+test('the entry header has no subtitle and sets Change kind beside the title', () => {
   const source = readFileSync(new URL('../src/components/transactions/TransactionEntryHeader.tsx', import.meta.url), 'utf8')
-  assert.match(source, /useKindMenuItems\(/)
-  assert.match(source, /kindDialogSubtitle\(/)
-  for (const text of ['Money spent from an account', 'Money received into an account', 'Move money between accounts']) {
-    assert.ok(!source.includes(text), `${text} should come from kindMenuItems`)
+  for (const text of ['Money spent from an account', 'Move money between accounts', 'type locked', 'kindDialogSubtitle']) {
+    assert.ok(!source.includes(text), `${text} should be gone`)
   }
   assert.match(source, /Change kind/)
 })

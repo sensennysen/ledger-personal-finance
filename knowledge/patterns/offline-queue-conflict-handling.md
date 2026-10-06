@@ -19,3 +19,18 @@ Three layers, so the drain can be tested without Supabase or localStorage (LED-0
 **Not queued:** reordering accounts or categories (one write per row) and splitting a transaction. Both refuse offline with a message.
 
 **A queued create is edited in the queue (LED-193).** An offline create is given its row id on the device (`payload.id`), and `editQueuedInsert` merges a later edit into that queued insert (a `failed` one becomes pending again). Queuing an update instead would target a row the database has never seen, and it would be flagged as deleted. `drainWith` calls `deps.onSynced(item)` for each saved insert; `registerSyncedListener` in `offlineQueue.ts` lets one owner (AppLayout) run follow-up steps, such as a card payment's statement, once per row. Register one listener only, or the follow-up runs twice.
+
+**A queued change is made against a revision (LED-297).** Updates and deletes carry `baseRevision`, the server's `updated_at` the edit was made against, and are sent in one request filtered `.eq('updated_at', baseRevision)`, so the check and the write are one statement. Zero rows back means a re-read decides: gone (an update becomes conflict `deleted`, a delete is synced) or edited (conflict). A failed read keeps the item pending with `SERVER_CHECK_FAILED` and writes nothing. Items without a revision (queued before LED-297) read first, then write against the revision they read. `force` (Keep mine) is the only unconditional write.
+- Optimistic rows keep the server's `updated_at`; never stamp `new Date()` on a cached row, or the next edit's base is a guess.
+- `RevisionMoves` records the drain's own writes; `rebaseRevision` moves later changes to the same row onto them, in the loop and in the merge.
+- `revisionFor(table, row)` gives none to a row that is still a queued create. It takes the insert's revision, and waits while that insert is unsent (`unsentRows`).
+
+**Inserts replay idempotently (LED-298).** Every queued create carries its own `payload.id` (imports too). A `23505` on `<table>_pkey` re-reads by id and owner: our row means the earlier send committed, so it is synced once; anything else is a countable failure.
+
+**Versions (LED-299).** `editQueuedInsert` bumps `version`. The drain records what it sent (`SentInsert`); `mergeDrainResult` turns a newer version of a sent create into an update of the changed fields (`followUpUpdate`), and keeps the newer copy of a kept one.
+
+**Receipts are a job of their own (LED-300, LED-301).** Any create or edit can carry a `pending-receipt:` marker. The drain uploads, writes the path to the stored item (`setResolvedReceipt`, no version bump) and only then removes the local file. A thrown error keeps the item as far as it got. `uploadedReceipt` marks a file the drain uploaded; discarding the item deletes it from storage. An online save whose upload fell back to the local copy saves the row without the marker (`splitPendingReceipt`) and queues the receipt as an edit against the saved revision. A marker is never written to the database.
+
+**Show what a pending item is waiting on.** `itemNote` shows a pending item's `lastError` when it has no attempts (the check-failed case). A new reason to keep an item pending needs a note here too, or the sheet only says "Edit · Transaction".
+
+**Check the drain live from Node.** `queueDrain.ts` is pure, so a scratchpad script can import it with the real supabase-js client (`createRequire(<repo>/package.json)`), sign in as the seed's demo user and run `drainWith` against local PostgREST and Storage. That proves the timestamp filter round-trip, zero-row responses and the `23505` message without a browser. Wrap `client.from(t).insert` to hold or throw a request mid-drain.

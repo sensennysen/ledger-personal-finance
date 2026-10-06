@@ -5,7 +5,7 @@ import {
   getLocalDateString,
   groupExpensesByCategory,
 } from '@/lib/utils'
-import { addRecurringInterval, computeNextDueDate } from '@/lib/recurringTransactions'
+import { computeNextDueDate } from '@/lib/recurringTransactions'
 import {
   getCreditCardSpending,
   getCreditUtilizationPct,
@@ -17,6 +17,7 @@ import { countedEnd, countsYet } from '@/lib/countsYet'
 import { scheduledNetWorth } from '@/lib/scheduledBalances'
 import type { ConvertFn, RateTable } from '@/lib/exchangeRates'
 import { buildUpcomingLoanBills } from '@/lib/loanInstallments'
+import { buildCashFlowForecast, type CashFlowForecast, type CashFlowForecastItem as ForecastItem } from '@/lib/cashFlowForecast'
 import type { Account, Category, LoanPaymentAllocation, LoanPurchase, Transaction } from '@/types'
 
 export type DashboardChartPeriod = 'week' | 'month' | 'quarterly' | 'yearly'
@@ -81,18 +82,9 @@ export type UpcomingBill = {
   payment: { accountId: string; amount: number; date: string } | null
 }
 
-export type CashFlowForecastItem = {
-  tx: RecurringTransaction
-  occurrences: number
-  total: number
-}
+export type CashFlowForecastItem = ForecastItem<RecurringTransaction>
 
-export type DashboardCashFlowForecast = {
-  projectedIncome: number
-  projectedExpenses: number
-  projectedBalance: number
-  forecastItems: CashFlowForecastItem[]
-}
+export type DashboardCashFlowForecast = CashFlowForecast<RecurringTransaction>
 
 export type CreditCardWithState = {
   acc: Account
@@ -229,49 +221,6 @@ function buildUpcomingBills(
   }
 
   return bills.sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
-}
-
-function buildCashFlowForecast(
-  recurringSeries: RecurringSeriesItem[],
-  cycleStart: Date,
-  cycleEnd: Date,
-  floor: Date,
-  currentBalance: number,
-): DashboardCashFlowForecast {
-  let projectedIncome = 0
-  let projectedExpenses = 0
-  const forecastItems: CashFlowForecastItem[] = []
-
-  for (const { tx } of recurringSeries) {
-    let dateCursor = computeNextDueDate(tx.date, tx.recurrence_interval, floor)
-    let occurrences = 0
-
-    while (dateCursor <= cycleEnd) {
-      if (dateCursor >= cycleStart) {
-        if (!tx.recurrence_end_date || dateCursor <= createDateAtLocalMidnight(tx.recurrence_end_date)) {
-          occurrences++
-        }
-      }
-      dateCursor = addRecurringInterval(dateCursor, tx.recurrence_interval)
-    }
-
-    if (occurrences === 0) continue
-
-    const total = occurrences * tx.amount
-    if (tx.type === 'income') projectedIncome += total
-    else projectedExpenses += total
-
-    forecastItems.push({ tx, occurrences, total })
-  }
-
-  forecastItems.sort((a, b) => b.total - a.total)
-
-  return {
-    projectedIncome,
-    projectedExpenses,
-    projectedBalance: currentBalance + projectedIncome - projectedExpenses,
-    forecastItems,
-  }
 }
 
 export function useDashboardData({
@@ -485,8 +434,17 @@ export function useDashboardData({
       (tx) => tx.is_recurring && (tx.type === 'income' || tx.type === 'expense')
     )
 
-    return buildCashFlowForecast(recurringSeries, cycleStart, cycleEnd, floor, stats.totalBalance)
-  }, [transactions, monthStart, monthEnd, isCurrentMonth, stats.totalBalance])
+    // The balance is already in the base currency, so each occurrence converts into it (LED-310).
+    return buildCashFlowForecast({
+      series: recurringSeries.map(({ tx }) => tx),
+      cycleStart,
+      cycleEnd,
+      floor,
+      currentBalance: stats.totalBalance,
+      baseCurrency,
+      table: rateTable,
+    })
+  }, [transactions, monthStart, monthEnd, isCurrentMonth, stats.totalBalance, baseCurrency, rateTable])
 
   const creditCards = useMemo(
     () => accounts.filter((account) => account.type === 'credit_card'),

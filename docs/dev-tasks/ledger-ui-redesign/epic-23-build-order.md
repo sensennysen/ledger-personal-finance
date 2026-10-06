@@ -6,7 +6,7 @@ Tickets in `epic-23-post-release-followups-tasks.csv`. Refer to a phase as **"ep
 
 Written 2026-10-06, after epic 22 (PR #13) merged to `main`, its nine migrations reached the hosted database and the production deploy went live. It collects what the four epic 22 phase retros (`knowledge/retros/2026-10-06-epic-22-phase-{1..4}.md`) left in their Backlogs, ranked by risk. Each ticket's DESCRIPTION cites its retro.
 
-- **Tickets:** 15 (LED-277 to LED-291). **Points:** 23.
+- **Tickets:** 17 (LED-277 to LED-293). **Points:** 27. LED-292 and LED-293 came from LED-280's live checks (phase 1 retro).
 - **Branch convention:** one branch, `epic-23`, one commit per LED-NN ticket. Push and open the pull request when the owner says so; CI runs on the pull request, the Vercel production deploy on the merge to `main`.
 - **Migrations** (maybe LED-277, maybe LED-279) reach production before the client: release checklist B, `pnpm db:push:remote` only when the owner asks.
 - **Owner decisions** in `/plan`: LED-277 (what a split does to the series) and LED-279 (report signed-out errors or not).
@@ -24,6 +24,8 @@ Written 2026-10-06, after epic 22 (PR #13) merged to `main`, its nine migrations
 
 | # | Ticket | Summary | Pts | Why here |
 |---|---|---|---|---|
+| 5a | LED-292 | Paying an overdue loan bill opens dated today | 2 | LED-280 FAIL: an overdue payment is recorded on a later or earlier date. |
+| 5b | LED-293 | Choosing a Pay from account in another currency keeps the amount owed | 2 | LED-280 finding: a currency switch can overpay. |
 | 5 | LED-281 | The receiving account's list shows the payment's own currency | 2 | Wrong label on a money amount. |
 | 6 | LED-282 | Activity Sum and Month jump skip the empty currency bucket of a transfer | 2 | Same LED-269 family. |
 | 7 | LED-283 | Import says why it is blocked | 1 | |

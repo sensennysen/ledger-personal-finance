@@ -3,10 +3,22 @@
 // grouped by cause so fixing one cause (a date order, say) clears every row
 // under it. Errors block the import; warnings import anyway. Rows with no
 // category match (LED-74) are a warning: they import uncategorized.
+// Ledger's own export (QA-001) carries an explicit Type next to a positive
+// Amount, so its direction comes from Type, never from the amount's sign.
 
-export type BankFormat = 'BDO' | 'BPI' | 'Metrobank' | 'Generic'
+export type BankFormat = 'Ledger' | 'BDO' | 'BPI' | 'Metrobank' | 'Generic'
 export type DateOrder = 'MDY' | 'DMY'
-export type CauseId = 'bad-date' | 'ambiguous-date' | 'bad-amount' | 'empty-description' | 'no-category' | 'duplicate'
+export type CauseId =
+  | 'bad-date'
+  | 'ambiguous-date'
+  | 'bad-amount'
+  | 'bad-type'
+  | 'transfer-row'
+  | 'sign-conflict'
+  | 'other-currency'
+  | 'empty-description'
+  | 'no-category'
+  | 'duplicate'
 export type Severity = 'error' | 'warning' | 'duplicate'
 
 export const MAX_IMPORT_ROWS = 5000
@@ -16,12 +28,27 @@ export const CAUSES: Record<CauseId, { label: string; severity: Severity }> = {
   'bad-date': { label: 'Unparseable date', severity: 'error' },
   'ambiguous-date': { label: 'Ambiguous date order', severity: 'warning' },
   'bad-amount': { label: 'Amount not a number', severity: 'error' },
+  'bad-type': { label: 'Type not income or expense', severity: 'error' },
+  'transfer-row': { label: 'Transfer needs its other account', severity: 'error' },
+  'sign-conflict': { label: 'Negative amount with a Type', severity: 'error' },
+  'other-currency': { label: 'Different currency from the statement', severity: 'error' },
   'empty-description': { label: 'Description empty', severity: 'warning' },
   'no-category': { label: 'No category match', severity: 'warning' },
   duplicate: { label: 'Matches existing row', severity: 'duplicate' },
 }
 
-const CAUSE_ORDER: CauseId[] = ['bad-date', 'ambiguous-date', 'bad-amount', 'empty-description', 'no-category', 'duplicate']
+const CAUSE_ORDER: CauseId[] = [
+  'bad-date',
+  'ambiguous-date',
+  'bad-amount',
+  'bad-type',
+  'transfer-row',
+  'sign-conflict',
+  'other-currency',
+  'empty-description',
+  'no-category',
+  'duplicate',
+]
 
 export interface ImportRow {
   /** 1-based data row number, counted from the row after the header. */
@@ -32,6 +59,10 @@ export interface ImportRow {
   description: string
   amount: number | null
   type: 'income' | 'expense' | null
+  /** The Type cell of a Ledger export; '' for a bank statement. */
+  rawType: string
+  /** The Currency cell of a Ledger export; null for a bank statement, which doesn't say. */
+  currency: string | null
   /** Parse problems; duplicates and category misses are added later. */
   issues: CauseId[]
 }
@@ -109,9 +140,15 @@ export function findHeaderRowIndex(rows: string[][]): number {
   return -1
 }
 
+// Column names only Ledger's exporters write (transactionCsv.ts).
+const LEDGER_ONLY_HEADERS = ['standing balance', 'to account', 'amount received', 'transfer fee']
+
 export function detectFormat(headers: string[]): BankFormat {
   const normalized = headers.map((cell) => cell.toLowerCase().trim())
   const has = (term: string) => normalized.some((cell) => cell.includes(term))
+  const exact = (term: string) => normalized.includes(term)
+  // Both exporters write Amount with Currency; Type is a column the user can leave out of Reports.
+  if (exact('type') && exact('amount') && exact('currency')) return 'Ledger'
   if (has('post date') || has('ref. no') || has('reference no')) return 'Metrobank'
   if (has('transaction date') || (has('date') && has('debit') && has('credit'))) return 'BDO'
   if (has('date') && has('amount') && !has('debit') && !has('credit')) return 'BPI'
@@ -240,6 +277,9 @@ export function buildRows(
   const amountIdx = col(['amount'])
   const debitIdx = col(['debit amount', 'debit'])
   const creditIdx = col(['credit amount', 'credit'])
+  const typeIdx = headers.indexOf('type')
+  const currencyIdx = headers.indexOf('currency')
+  const ledger = format === 'Ledger'
   const signedAmount = format === 'BPI' || (format === 'Generic' && amountIdx >= 0)
 
   const rows: ImportRow[] = []
@@ -260,8 +300,20 @@ export function buildRows(
     let amount: number | null
     let type: ImportRow['type'] = null
     let rawAmount: string
+    const rawType = ledger ? (row[typeIdx] ?? '').trim() : ''
+    const currency = ledger ? (row[currencyIdx] ?? '').trim().toUpperCase() || null : null
 
-    if (signedAmount) {
+    if (ledger) {
+      rawAmount = row[amountIdx] ?? ''
+      const value = parseAmount(rawAmount)
+      amount = value === null ? null : Math.abs(value)
+      const kind = rawType.toLowerCase()
+      if (kind === 'income' || kind === 'expense') type = kind
+      else if (kind === 'transfer') issues.push('transfer-row')
+      else issues.push('bad-type')
+      // Ledger never writes a negative amount; one here was edited, and which half to believe is a guess.
+      if (value !== null && value < 0) issues.push('sign-conflict')
+    } else if (signedAmount) {
       rawAmount = row[amountIdx] ?? ''
       const value = parseAmount(rawAmount)
       amount = value === null ? null : Math.abs(value)
@@ -296,7 +348,7 @@ export function buildRows(
     if (!date) issues.push('bad-date')
     if (!description) issues.push('empty-description')
 
-    rows.push({ line: i - headerIdx, rawDate, rawAmount, date, description, amount, type, issues })
+    rows.push({ line: i - headerIdx, rawDate, rawAmount, date, description, amount, type, rawType, currency, issues })
   }
 
   return { rows, ignored }
@@ -324,6 +376,14 @@ export function processFile(text: string): ParsedFile | { error: string } {
 
   const format = detectFormat(raw[headerIdx])
   const headers = raw[headerIdx].map((cell) => cell.toLowerCase().trim())
+  // A Ledger export missing Type or Currency would otherwise read as a bank statement, and its positive
+  // amounts would all import as income.
+  if (format !== 'Ledger' && headers.some((header) => LEDGER_ONLY_HEADERS.includes(header))) {
+    return {
+      error:
+        'This looks like a Ledger export without its Type or Currency column, so income and spending cannot be told apart. Export again with the Type and Amount columns included.',
+    }
+  }
   const dateIdx = headers.findIndex((header) => ['transaction date', 'post date', 'date'].some((term) => header.includes(term)))
   const detected = dateIdx >= 0 ? detectDateOrder(raw.slice(headerIdx + 1).map((row) => row[dateIdx] ?? '')) : 'either'
   const dateOrder: DateOrder = detected === 'either' ? 'MDY' : detected
@@ -353,6 +413,20 @@ export function withCategoryIssues(rows: ImportRow[], uncategorised: ReadonlySet
 export function withAmbiguousDateIssues(rows: ImportRow[], ambiguous: boolean): ImportRow[] {
   if (!ambiguous) return rows
   return rows.map((row) => (isAmbiguousSlashDate(row.rawDate) ? { ...row, issues: [...row.issues, 'ambiguous-date'] } : row))
+}
+
+/** The one currency every row of a Ledger export is in; null for a bank statement or a mixed file. */
+export function fileCurrency(rows: ImportRow[]): string | null {
+  const currencies = new Set(rows.map((row) => row.currency).filter((currency) => currency !== null))
+  return currencies.size === 1 ? [...currencies][0] : null
+}
+
+/** The rows with `other-currency` added to those whose own currency isn't the statement's: one rate can't convert them all. */
+export function withCurrencyIssues(rows: ImportRow[], statementCurrency: string): ImportRow[] {
+  if (!statementCurrency) return rows
+  return rows.map((row) =>
+    row.currency !== null && row.currency !== statementCurrency ? { ...row, issues: [...row.issues, 'other-currency'] } : row,
+  )
 }
 
 /** A row's parse issues plus `duplicate` when the check matched it. */
@@ -393,9 +467,17 @@ export function groupProblems(
       id,
       ...CAUSES[id],
       lines: affected.map((row) => row.line),
-      sample: id === 'bad-date' || id === 'ambiguous-date' ? first.rawDate : id === 'bad-amount' ? first.rawAmount : first.description,
+      sample: causeSample(id, first),
     }
   })
+}
+
+function causeSample(id: CauseId, row: ImportRow): string {
+  if (id === 'bad-date' || id === 'ambiguous-date') return row.rawDate
+  if (id === 'bad-amount' || id === 'sign-conflict') return row.rawAmount
+  if (id === 'bad-type' || id === 'transfer-row') return row.rawType
+  if (id === 'other-currency') return row.currency ?? ''
+  return row.description
 }
 
 /** How many of the file's unparseable dates would parse in the other order. */

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readWithPolicy } from '@/lib/readRetry'
+import { readAllPages } from '@/lib/pagedRead'
 import type { CreditCardPayment } from '@/types'
 import { describeDataError, type DescribedError } from '@/lib/dataErrors'
 
@@ -31,12 +32,15 @@ export function useCreditCardPayments() {
     if (!navigator.onLine) return
 
     // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
-    const { data, error } = await readWithPolicy((retry) => supabase
+    // The export reads every payment, so page past PostgREST's 1,000-row cap (LED-308).
+    const { rows: data, error } = await readWithPolicy((retry) => readAllPages<CreditCardPayment>((from, to) => supabase
       .from('credit_card_payments')
       .select('*')
       .eq('user_id', user.id)
       .order('payment_date', { ascending: false })
-      .retry(retry), { background: cached !== null })
+      .order('id', { ascending: false })
+      .range(from, to)
+      .retry(retry)), { background: cached !== null })
 
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load' }))

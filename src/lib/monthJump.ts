@@ -1,7 +1,7 @@
 // Month jump (spec §7 V3): a list of cycle months, each with its net, that
 // jumps straight to a month instead of stepping one cycle at a time.
 import { monthCycleRange, type DateRange } from './cycleRange.ts'
-import { signedAmount, signedCurrency, type DayGroup } from './transactionWindow.ts'
+import { netByCurrency, type DayGroup } from './transactionWindow.ts'
 
 interface MonthTx {
   date: string
@@ -54,6 +54,7 @@ export function buildMonthNets(
 ): MonthNet[] {
   if (txs.length === 0) return []
   const byKey = new Map<string, MonthNet>()
+  const rowsByKey = new Map<string, MonthTx[]>()
   let oldest = currentKey
   let newest = currentKey
   for (const tx of txs) {
@@ -66,9 +67,12 @@ export function buildMonthNets(
       byKey.set(key, month)
     }
     month.count += 1
-    const currency = signedCurrency(tx, contextAccountId)
-    month.net[currency] = (month.net[currency] ?? 0) + signedAmount(tx, contextAccountId)
+    const rows = rowsByKey.get(key)
+    if (rows) rows.push(tx)
+    else rowsByKey.set(key, [tx])
   }
+  // The same net as the Sum and the day headers (LED-282).
+  for (const [key, rows] of rowsByKey) byKey.get(key)!.net = netByCurrency(rows, contextAccountId)
   const months: MonthNet[] = []
   for (let key = newest; key >= oldest; key = shiftMonthKey(key, -1)) {
     months.push(byKey.get(key) ?? { key, count: 0, net: {} })

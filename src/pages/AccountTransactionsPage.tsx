@@ -52,7 +52,7 @@ import { cardAmountDue, loanProgress } from '@/lib/accountsOverview'
 import { buildCategoryBreakdown } from '@/lib/categoryBreakdown'
 import { TONED_PROGRESS_CLASS, utilizationToneStyle } from '@/lib/utilizationTone'
 import { LoanPurchaseTracker } from '@/components/accounts/LoanPurchaseTracker'
-import type { LoanDeadline } from '@/lib/loanInstallments'
+import { payNowDate, type LoanDeadline } from '@/lib/loanInstallments'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import type { CreditCardPayment, Transaction } from '@/types'
@@ -296,11 +296,12 @@ export default function AccountTransactionsPage() {
     setRepaymentPrefill(null)
   }
 
-  // Dated on the due date so the server splits it across purchases exactly as the schedule shows.
+  // Dated on the due date so the server splits it across purchases exactly as the schedule shows; a
+  // deadline already past opens on today (payNowDate, LED-292), since the date decides the split.
   const handleRecordPayment = (deadline: LoanDeadline) => {
     setFormError(null)
     setTransactionKind('loan-repayment')
-    setRepaymentPrefill({ amount: deadline.total, date: deadline.dueDate })
+    setRepaymentPrefill({ amount: deadline.total, date: payNowDate(deadline.dueDate, new Date()) })
     setCreateOpen(true)
   }
 
@@ -762,6 +763,7 @@ export default function AccountTransactionsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search transactions..."
+              aria-label="Search transactions"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -784,7 +786,7 @@ export default function AccountTransactionsPage() {
         {(account?.type !== 'loan' || loanSection === 'activity') && (loadState === 'error' ? (
           <ErrorState title="Couldn't load your transactions" description={txError} detail={txErrorDetail} onRetry={() => void refetchTransactions()} />
         ) : loadState === 'loading' ? (
-          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 bg-skeleton-page" />)}</div>
         ) : accountTransactions.length === 0 ? (
           <EmptyState
             icon={ArrowLeftRight}

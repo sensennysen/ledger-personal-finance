@@ -30,7 +30,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { readCache } from '@/lib/dataCache'
 import { pickerGroupOrder, pickOfflineDefaultAccount } from '@/lib/accountDefault'
 import { formatCurrency, getLocalDateString } from '@/lib/utils'
-import { destinationAmountFor, needsAmountReceived } from '@/lib/transferCredit'
+import { destinationAmountFor, needsAmountReceived, paySourceAmounts } from '@/lib/transferCredit'
 import { amountInCurrency, ratesAsOfLabel } from '@/lib/exchangeRates'
 import { useOptionalExchangeRates } from '@/contexts/exchangeRatesState'
 import { getLoanAmountOwed, loansOwed } from '@/lib/loans'
@@ -204,12 +204,20 @@ export function TransactionForm({
     if (destinationTyped) return
     form.setValue('destination_amount', suggestedDestination)
   }, [destinationTyped, form, suggestedDestination])
+  // The amount a card or loan preset filled, in the target's currency, until the user types an amount of
+  // their own; a Pay from switch keeps it as what the target receives (LED-293). `sentTyped`: the amount
+  // sent is the user's figure, so a preset no longer replaces it. A new entry opened with an amount (Pay now,
+  // Make payment) starts from the bill's amount, which is in the target's currency like a preset.
+  const [presetReceived, setPresetReceived] = useState<number | null>(
+    !isEditing && Number(defaultValues?.amount) > 0 && !defaultValues?.destination_amount ? Number(defaultValues?.amount) : null,
+  )
+  const [sentTyped, setSentTyped] = useState(false)
   // A card or loan preset is in the target's currency: between two currencies it fills the amount
-  // received, and the amount sent follows from the rate feed while it is still empty (LED-269).
+  // received, and the amount sent follows from the rate feed unless the user typed it (LED-269, LED-293).
   const setReceived = (value: number) => {
     setDestinationTyped(true)
     form.setValue('destination_amount', value, { shouldValidate: true })
-    if (Number(form.getValues('amount')) > 0 || !toAccountCurrency) return
+    if ((sentTyped && Number(form.getValues('amount')) > 0) || !toAccountCurrency) return
     const sent = amountInCurrency({ amount: value, currency: toAccountCurrency, exchange_rate: null }, currencyValue, rateTable)
     if (sent !== null) form.setValue('amount', Math.round(sent * 100) / 100, { shouldValidate: true })
   }
@@ -297,6 +305,16 @@ export function TransactionForm({
     if (selectedAccountRecord) {
       // A loan or card in another currency stays chosen; the form asks for the amount received (LED-269).
       form.setValue('currency', selectedAccountRecord.currency)
+      // A preset is what the card or loan receives, so a switch of currency keeps it (LED-293).
+      if (presetReceived !== null && paymentTarget && toAccountCurrency) {
+        const next = paySourceAmounts(presetReceived, selectedAccountRecord.currency, toAccountCurrency, (amount, from, to) =>
+          amountInCurrency({ amount, currency: from, exchange_rate: null }, to, rateTable),
+        )
+        setSentTyped(false)
+        setDestinationTyped(next.destination_amount !== null)
+        form.setValue('destination_amount', next.destination_amount, { shouldValidate: true })
+        form.setValue('amount', next.amount ?? 0, { shouldValidate: true })
+      }
     }
 
     form.setValue('account_id', accountId)
@@ -420,8 +438,11 @@ export function TransactionForm({
   const cardStatementDate = getCardDateInfo(selectedCard?.statement_day)
   const cardDueDate = getCardDateInfo(selectedCard?.due_day)
   const cardCurrency = selectedCard?.currency ?? DEFAULT_CURRENCY
-  const setCardAmount = (value: number) =>
-    crossCurrency ? setReceived(value) : form.setValue('amount', value, { shouldValidate: true })
+  const setCardAmount = (value: number) => {
+    setPresetReceived(value)
+    if (crossCurrency) setReceived(value)
+    else form.setValue('amount', value, { shouldValidate: true })
+  }
 
   const hasExtraDetails =
     Boolean(notes?.trim()) ||
@@ -454,7 +475,11 @@ export function TransactionForm({
                 // A new entry starts at 0, which no save accepts (amount > 0). Show it empty, so typing
                 // 12.50 reads 12.50 rather than 012.50.
                 value={field.value === 0 ? '' : typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
-                onChange={(event) => field.onChange(event.target.value)}
+                onChange={(event) => {
+                  setSentTyped(true)
+                  setPresetReceived(null)
+                  field.onChange(event.target.value)
+                }}
               />
             </FormControl>
             <FormMessage />
@@ -506,6 +531,7 @@ export function TransactionForm({
                 value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
                 onChange={(event) => {
                   setDestinationTyped(true)
+                  setPresetReceived(null)
                   field.onChange(event.target.value === '' ? null : event.target.value)
                 }}
               />
@@ -677,6 +703,7 @@ export function TransactionForm({
             loan={selectedLoan}
             form={form}
             received={crossCurrency ? { name: 'destination_amount', set: setReceived } : undefined}
+            onPreset={setPresetReceived}
           />
         )}
 

@@ -232,3 +232,50 @@ test('an amount sort orders the whole set past 1,000 rows, not a first page', ()
 test('only largest and smallest are amount sorts', () => {
   assert.deepEqual(['newest', 'oldest', 'largest', 'smallest'].map(isAmountSort), [false, false, true, true])
 })
+
+// LED-281: the row's currency chip is amountDisplay's currency, the side of the payment being shown.
+test('a payment between two currencies names the receiving account\'s currency on its list and the source\'s on the source\'s (LED-281)', () => {
+  const rows = {
+    card: tx({ type: 'transfer', amount: 900, currency: 'EUR', account_id: 'wallet', to_account_id: 'visa', destination_amount: 1000, to_account: { currency: 'USD' } }),
+    loan: tx({ type: 'expense', amount: 405.5, currency: 'EUR', account_id: 'wallet', to_account_id: 'carLoan', destination_amount: 456, to_account: { currency: 'USD' } }),
+    transfer: tx({ type: 'transfer', amount: 100, currency: 'EUR', account_id: 'wallet', to_account_id: 'checking', destination_amount: 110, to_account: { currency: 'USD' } }),
+  }
+  assert.deepEqual(amountDisplay(rows.card, 'visa'), { sign: '+', value: 1000, currency: 'USD' })
+  assert.equal(amountDisplay(rows.card, 'wallet').currency, 'EUR')
+  assert.deepEqual(amountDisplay(rows.loan, 'carLoan'), { sign: '+', value: 456, currency: 'USD' })
+  assert.equal(amountDisplay(rows.loan, 'wallet').currency, 'EUR')
+  assert.equal(amountDisplay(rows.transfer, 'checking').currency, 'USD')
+  assert.equal(amountDisplay(rows.transfer, 'wallet').currency, 'EUR')
+})
+
+test('a same-currency payment keeps its currency on both lists (LED-281)', () => {
+  const row = tx({ type: 'transfer', amount: 50, currency: 'USD', account_id: 'checking', to_account_id: 'visa', to_account: { currency: 'USD' } })
+  assert.equal(amountDisplay(row, 'visa').currency, 'USD')
+  assert.equal(amountDisplay(row, 'checking').currency, 'USD')
+})
+
+// LED-282: outside an account a transfer nets to zero and opens no currency of its own.
+test('a transfer between two currencies opens no bucket in the Activity sum (LED-282)', () => {
+  const rows = [
+    tx({ type: 'transfer', amount: 1000, currency: 'EUR', to_account_id: 'checking', destination_amount: 1100, to_account: { currency: 'USD' } }),
+    tx({ type: 'expense', amount: 1817.4, currency: 'USD' }),
+  ]
+  assert.deepEqual(sumByCurrency(rows), { USD: -1817.4 })
+  assert.deepEqual(groupByDay(rows)[0].net, { USD: -1817.4 })
+})
+
+test('income and expenses that cancel out still show their currency at zero (LED-282)', () => {
+  const rows = [
+    tx({ type: 'income', amount: 50, currency: 'EUR' }),
+    tx({ type: 'expense', amount: 50, currency: 'EUR' }),
+    tx({ type: 'transfer', amount: 20, currency: 'USD', to_account_id: 'savings', to_account: { currency: 'USD' } }),
+  ]
+  assert.deepEqual(sumByCurrency(rows), { EUR: 0 })
+})
+
+test('rows that are only transfers still read a zero, and an account\'s own list is unchanged (LED-282)', () => {
+  const transfer = tx({ type: 'transfer', amount: 1000, currency: 'EUR', account_id: 'wallet', to_account_id: 'checking', destination_amount: 1100, to_account: { currency: 'USD' } })
+  assert.deepEqual(sumByCurrency([transfer]), { EUR: 0 })
+  assert.deepEqual(sumByCurrency([transfer], 'checking'), { USD: 1100 })
+  assert.deepEqual(sumByCurrency([transfer], 'wallet'), { EUR: -1000 })
+})

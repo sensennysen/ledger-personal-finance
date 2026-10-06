@@ -237,7 +237,8 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
     const value = Number(typed)
     return typed.trim() !== '' && Number.isFinite(value) && value > 0 ? Math.round(value * 100) / 100 : null
   }
-  const otherAmountMissing = toImport.some((row) => otherCurrency(row.line) !== null && otherAmountFor(row) === null)
+  const missingOtherAmounts = toImport.filter((row) => otherCurrency(row.line) !== null && otherAmountFor(row) === null).length
+  const otherAmountMissing = missingOtherAmounts > 0
   const causes = groupProblems(rows, duplicates)
   const cause = causes.find((item) => item.id === activeCause) ?? causes[0]
 
@@ -960,6 +961,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                       min="0"
                                       className="h-7 w-24 text-xs"
                                       aria-invalid={otherAmountFor(row) === null}
+                                      aria-describedby={otherAmountFor(row) === null ? `import-other-amount-error-${row.line}` : undefined}
                                       value={otherAmounts.get(row.line) ?? suggestedOther(row)?.toFixed(2) ?? ''}
                                       onChange={(event) => {
                                         const text = event.target.value
@@ -967,6 +969,12 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                                       }}
                                     />
                                   </label>
+                                )}
+                                {/* Named on the row, and counted beside Import (LED-283). */}
+                                {transferTo && otherCurrency(row.line) && otherAmountFor(row) === null && (
+                                  <span id={`import-other-amount-error-${row.line}`} className="mt-0.5 block text-xs text-destructive">
+                                    Enter the amount {row.type === 'expense' ? 'received' : 'sent'}
+                                  </span>
                                 )}
                               </td>
                               <td className="px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap">
@@ -1025,7 +1033,13 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
               </>
             )}
 
-            <div className="flex justify-end gap-2 pt-1">
+            <div className="flex items-center justify-end gap-2 pt-1">
+              {/* Why Import is disabled when a row between two currencies has no amount (LED-283). */}
+              {file && missingOtherAmounts > 0 && (
+                <p role="status" className="mr-auto text-xs text-destructive">
+                  {plural(missingOtherAmounts, 'row')} {missingOtherAmounts === 1 ? 'needs' : 'need'} an amount received or sent
+                </p>
+              )}
               <Button
                 variant="outline"
                 onClick={() => {

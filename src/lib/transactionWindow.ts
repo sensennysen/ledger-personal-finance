@@ -123,14 +123,26 @@ export function sortByAmount<T extends { date: string; amount: number }>(
   return keyed.map((entry) => entry.tx)
 }
 
+/**
+ * Net of the signed amounts per currency, as the rows sign them. Outside an account a transfer nets
+ * to zero, so it opens no currency of its own (LED-282): a EUR to USD transfer beside USD spending
+ * reads only USD, while EUR income and expenses that cancel out still read EUR 0. Rows that are all
+ * transfers still show a zero, in the first row's currency, so a total is never blank.
+ */
+export function netByCurrency(txs: WindowedTx[], contextAccountId?: string): Record<string, number> {
+  const net: Record<string, number> = {}
+  for (const tx of txs) {
+    if (contextAccountId === undefined && tx.type === 'transfer') continue
+    const currency = signedCurrency(tx, contextAccountId)
+    net[currency] = (net[currency] ?? 0) + signedAmount(tx, contextAccountId)
+  }
+  if (txs.length > 0 && Object.keys(net).length === 0) net[signedCurrency(txs[0], contextAccountId)] = 0
+  return net
+}
+
 /** Sum of the signed amounts per currency, as the rows and day headers sign them. */
 export function sumByCurrency(txs: WindowedTx[], contextAccountId?: string): Record<string, number> {
-  const sum: Record<string, number> = {}
-  for (const tx of txs) {
-    const currency = signedCurrency(tx, contextAccountId)
-    sum[currency] = (sum[currency] ?? 0) + signedAmount(tx, contextAccountId)
-  }
-  return sum
+  return netByCurrency(txs, contextAccountId)
 }
 
 /** Earliest and latest date in the list, or null when it is empty. */
@@ -160,10 +172,9 @@ export function groupByDay<T extends WindowedTx>(
     }
     group.items.push(tx)
     group.count += 1
-    // Keyed by the currency TransactionRow labels the amount with.
-    const currency = signedCurrency(tx, contextAccountId)
-    group.net[currency] = (group.net[currency] ?? 0) + signedAmount(tx, contextAccountId)
   }
+  // Keyed by the currency TransactionRow labels the amount with.
+  for (const group of byDate.values()) group.net = netByCurrency(group.items, contextAccountId)
   return [...byDate.values()].sort((a, b) => compareDates(a.date, b.date, sort))
 }
 

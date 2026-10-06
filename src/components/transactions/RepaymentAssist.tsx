@@ -23,6 +23,8 @@ interface RepaymentAssistProps {
    * read and fill the amount received, and `set` also suggests the amount sent.
    */
   received?: { name: 'destination_amount'; set: (value: number) => void }
+  /** Told each amount a preset fills, in the loan's currency, so a later Pay from switch keeps it (LED-293). */
+  onPreset?: (value: number) => void
 }
 
 function dueInLabel(days: number): string {
@@ -37,15 +39,18 @@ function dueInLabel(days: number): string {
  * outstanding, installment due and the balance after this payment, plus amount presets.
  * Render it with `key={loan.id}`: it reads that loan's purchases once and must not show another loan's.
  */
-export function RepaymentAssist({ loan, form, received }: RepaymentAssistProps) {
+export function RepaymentAssist({ loan, form, received, onPreset }: RepaymentAssistProps) {
   const { profile } = useAuth()
   const { purchases, allocations, loading, error, refetch } = useLoanPurchases(loan.id)
   const amountName = received?.name ?? 'amount'
   const amountValue = useWatch({ control: form.control, name: amountName })
   const date = useWatch({ control: form.control, name: 'date' })
   const defaulted = useRef(false)
-  const setAmount = (value: number) =>
-    received ? received.set(value) : form.setValue('amount', value, { shouldValidate: true })
+  const setAmount = (value: number) => {
+    onPreset?.(value)
+    if (received) received.set(value)
+    else form.setValue('amount', value, { shouldValidate: true })
+  }
 
   const startDay = profile?.month_start_day ?? 1
   const cycleEnd = monthCycleRange(getCurrentCycleMonthKey(startDay), startDay).end

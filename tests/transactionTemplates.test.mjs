@@ -7,6 +7,7 @@ import {
   parseTemplateRows,
   serializeTemplateFields,
   shouldUploadLegacy,
+  templatesErrorMessage,
   LEGACY_TEMPLATES_KEY,
 } from '../src/lib/transactionTemplates.ts'
 
@@ -77,4 +78,11 @@ test('names are collapsed, trimmed and kept to the database limit', () => {
 
 test('the old key name is unchanged, so existing browsers are found', () => {
   assert.equal(LEGACY_TEMPLATES_KEY, 'ledger_transaction_templates')
+})
+
+test('a failed upload reads as a save on its own; a failed read keeps its prefix (LED-285)', () => {
+  assert.equal(templatesErrorMessage('save', true, "Couldn't save this template. Try again."), "Couldn't save this template. Try again.")
+  assert.equal(templatesErrorMessage('save', false, "Couldn't save this template. Try again."), "Couldn't save this template. Try again.")
+  assert.equal(templatesErrorMessage('load', false, "Couldn't load this template. Try again."), "Couldn't load your templates. Couldn't load this template. Try again.")
+  assert.equal(templatesErrorMessage('load', true, 'X'), "Couldn't refresh your templates. X")
 })

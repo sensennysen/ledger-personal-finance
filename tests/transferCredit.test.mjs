@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { destinationAmountFor, isCrossCurrencyTransfer, needsAmountReceived, paymentCredit, transferCredit } from '../src/lib/transferCredit.ts'
+import { destinationAmountFor, isCrossCurrencyTransfer, needsAmountReceived, paymentCredit, paySourceAmounts, transferCredit } from '../src/lib/transferCredit.ts'
 
 test('a transfer with a destination amount credits that amount', () => {
   assert.equal(transferCredit({ amount: 100, exchange_rate: 1, destination_amount: 91.5 }), 91.5)
@@ -43,4 +43,24 @@ test('card payments and loan repayments between two currencies ask for the amoun
   assert.equal(needsAmountReceived(values({ type: 'expense', to_account_id: null }), 'PHP'), false)
   assert.equal(needsAmountReceived(values({ type: 'income' }), 'EUR'), false)
   assert.equal(destinationAmountFor(values({ type: 'expense', to_account_id: 'loan', destination_amount: 5600 }), 'PHP'), 5600)
+})
+
+// LED-293: 1 USD = 0.89 EUR, the rate the switch converts the preset with.
+const convert = (amount, from, to) => {
+  if (from === 'USD' && to === 'EUR') return amount * 0.89
+  if (from === 'EUR' && to === 'USD') return amount / 0.89
+  return null
+}
+
+test('a preset kept on a same-currency Pay from stays the amount (LED-293)', () => {
+  assert.deepEqual(paySourceAmounts(456, 'USD', 'USD', convert), { amount: 456, destination_amount: null })
+})
+
+test('a preset kept on a Pay from in another currency is the amount received, and the sent amount is converted (LED-293)', () => {
+  assert.deepEqual(paySourceAmounts(456, 'EUR', 'USD', convert), { amount: 405.84, destination_amount: 456 })
+  assert.deepEqual(paySourceAmounts(1288.69, 'EUR', 'USD', convert), { amount: 1146.93, destination_amount: 1288.69 })
+})
+
+test('with no rate the amount received is kept and the amount sent is left for the user (LED-293)', () => {
+  assert.deepEqual(paySourceAmounts(456, 'PHP', 'USD', convert), { amount: null, destination_amount: 456 })
 })

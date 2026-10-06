@@ -36,14 +36,33 @@ export function looksLikeTransfer(description: string, rules: readonly TransferR
 }
 
 /**
- * The accounts a row can transfer to or from: the user's other accounts in
- * the same currency, so the transfer needs no second rate. Loans are left out;
- * a loan repayment is an expense with a destination, not a transfer.
+ * The accounts a row can transfer to or from: the user's other accounts. One in another currency asks
+ * for the other side's figure (`importTransferAmounts`, LED-269). Loans are left out; a loan repayment
+ * is an expense with a destination, not a transfer.
  */
 export function transferCandidates<T extends TransferAccount>(accounts: readonly T[], importAccount: TransferAccount): T[] {
-  return accounts.filter(
-    (account) => account.id !== importAccount.id && account.type !== 'loan' && account.currency === importAccount.currency,
-  )
+  return accounts.filter((account) => account.id !== importAccount.id && account.type !== 'loan')
+}
+
+/**
+ * What an imported transfer saves when the other account holds another currency (LED-269). The
+ * statement gives one side; `otherAmount` is the other, in the other account's currency. Money out:
+ * the statement's amount was sent and `otherAmount` arrived. Money in: `otherAmount` was sent and the
+ * statement's amount arrived. Same currency: the statement's amount, nothing else.
+ */
+export function importTransferAmounts(
+  direction: 'income' | 'expense',
+  statementAmount: number,
+  importCurrency: string,
+  otherCurrency: string,
+  otherAmount: number | null,
+): { amount: number; currency: string; destination_amount: number | null } {
+  if (otherCurrency === importCurrency || otherAmount == null) {
+    return { amount: statementAmount, currency: importCurrency, destination_amount: null }
+  }
+  return direction === 'expense'
+    ? { amount: statementAmount, currency: importCurrency, destination_amount: otherAmount }
+    : { amount: otherAmount, currency: otherCurrency, destination_amount: statementAmount }
 }
 
 /** Money out of the imported account goes to the other one; money in comes from it. */

@@ -18,6 +18,11 @@ import type { Account } from '@/types'
 interface RepaymentAssistProps {
   loan: Account
   form: UseFormReturn<TransactionFormInput, unknown, TransactionFormValues>
+  /**
+   * Paid from another currency (LED-269): the figures and presets are in the loan's currency, so they
+   * read and fill the amount received, and `set` also suggests the amount sent.
+   */
+  received?: { name: 'destination_amount'; set: (value: number) => void }
 }
 
 function dueInLabel(days: number): string {
@@ -32,12 +37,15 @@ function dueInLabel(days: number): string {
  * outstanding, installment due and the balance after this payment, plus amount presets.
  * Render it with `key={loan.id}`: it reads that loan's purchases once and must not show another loan's.
  */
-export function RepaymentAssist({ loan, form }: RepaymentAssistProps) {
+export function RepaymentAssist({ loan, form, received }: RepaymentAssistProps) {
   const { profile } = useAuth()
   const { purchases, allocations, loading, error, refetch } = useLoanPurchases(loan.id)
-  const amountValue = useWatch({ control: form.control, name: 'amount' })
+  const amountName = received?.name ?? 'amount'
+  const amountValue = useWatch({ control: form.control, name: amountName })
   const date = useWatch({ control: form.control, name: 'date' })
   const defaulted = useRef(false)
+  const setAmount = (value: number) =>
+    received ? received.set(value) : form.setValue('amount', value, { shouldValidate: true })
 
   const startDay = profile?.month_start_day ?? 1
   const cycleEnd = monthCycleRange(getCurrentCycleMonthKey(startDay), startDay).end
@@ -73,9 +81,10 @@ export function RepaymentAssist({ loan, form }: RepaymentAssistProps) {
   useEffect(() => {
     if (defaulted.current || loading || error) return
     defaulted.current = true
-    if (presets.defaultPreset === 'installment' && presets.installment != null && !Number(form.getValues('amount'))) {
-      form.setValue('amount', presets.installment, { shouldValidate: true })
+    if (presets.defaultPreset === 'installment' && presets.installment != null && !Number(form.getValues(amountName))) {
+      setAmount(presets.installment)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the deadline is first known; `defaulted` guards it
   }, [error, form, loading, presets])
 
   const active =
@@ -84,7 +93,7 @@ export function RepaymentAssist({ loan, form }: RepaymentAssistProps) {
       : amount === presets.full && amount > 0
         ? 'full'
         : 'custom'
-  const setAmount = (value: number) => form.setValue('amount', value, { shouldValidate: true })
+
   const money = (value: number) => formatCurrency(value, loan.currency)
 
   return (
@@ -144,7 +153,7 @@ export function RepaymentAssist({ loan, form }: RepaymentAssistProps) {
           size="sm"
           variant={active === 'custom' ? 'default' : 'outline'}
           aria-pressed={active === 'custom'}
-          onClick={() => form.setFocus('amount')}
+          onClick={() => form.setFocus(amountName)}
         >
           Custom
         </Button>

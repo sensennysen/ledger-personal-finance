@@ -4,7 +4,8 @@ import { buildRunningBalanceMap } from '../src/lib/runningBalance.ts'
 
 // Replays transactions forward with the same rules as the update_account_balance trigger
 // (20260810120000_add_loan_tracker.sql; a transfer credits coalesce(destination_amount, amount * exchange_rate)
-// since 20261003120000_transfer_destination_amount.sql), recording each row's own account after the row.
+// since 20261003120000_transfer_destination_amount.sql, a loan repayment coalesce(destination_amount, amount)
+// since 20261006130000), recording each row's own account after the row.
 function replay(opening, txs) {
   const types = new Map(opening.map((a) => [a.id, a.type]))
   const balance = new Map(opening.map((a) => [a.id, a.balance]))
@@ -14,7 +15,7 @@ function replay(opening, txs) {
     if (tx.type === 'income') add(tx.account_id, tx.amount)
     else if (tx.type === 'expense') {
       add(tx.account_id, -tx.amount)
-      if (tx.to_account_id && types.get(tx.to_account_id) === 'loan') add(tx.to_account_id, tx.amount)
+      if (tx.to_account_id && types.get(tx.to_account_id) === 'loan') add(tx.to_account_id, tx.destination_amount ?? tx.amount)
     } else {
       add(tx.account_id, -(tx.amount + (tx.transfer_fee ?? 0)))
       if (tx.to_account_id) add(tx.to_account_id, tx.destination_amount ?? tx.amount * (tx.exchange_rate ?? 1))
@@ -96,4 +97,19 @@ test('a transfer between two currencies credits its destination amount, and unwi
   const map = buildRunningBalanceMap(final, rows)
   assert.equal(map.get('x2'), after.get('x2'))
   assert.equal(map.get('x1'), 898)
+})
+
+test('a loan repaid from another currency credits what the loan received, and unwinds it (LED-269)', () => {
+  const accounts = [
+    { id: 'usd', type: 'checking', balance: 1000 },
+    { id: 'loan', type: 'loan', balance: -50000 },
+  ]
+  const rows = [
+    tx('l1', '2026-10-01', 'expense', 'usd', 100, { to_account_id: 'loan', destination_amount: 5600 }),
+    tx('l2', '2026-10-02', 'expense', 'usd', 20),
+  ]
+  const { final, after } = replay(accounts, rows)
+  assert.equal(final.find((a) => a.id === 'loan').balance, -44400)
+  const map = buildRunningBalanceMap(final, rows)
+  for (const row of rows) assert.equal(map.get(row.id), after.get(row.id), row.id)
 })

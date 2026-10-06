@@ -98,20 +98,23 @@ export function resolveInitialCardId(
   return null
 }
 
-/** The first account a card can be paid from: not a liability, same currency (a card payment moves no exchange rate). */
+/**
+ * The account a card or loan is paid from by default: the first active account that is not a liability,
+ * in the target's currency when there is one. Otherwise any such account; the form then asks for the
+ * amount received (LED-269).
+ */
 export function defaultPaymentSource(
   accounts: Pick<Account, 'id' | 'type' | 'currency' | 'is_active'>[],
   card: Pick<Account, 'id' | 'currency'>,
 ): string | null {
-  const source = accounts.find(
+  const sources = accounts.filter(
     (account) =>
       account.id !== card.id &&
       account.is_active !== false &&
       account.type !== 'loan' &&
-      account.type !== 'credit_card' &&
-      account.currency === card.currency,
+      account.type !== 'credit_card',
   )
-  return source?.id ?? null
+  return (sources.find((account) => account.currency === card.currency) ?? sources[0])?.id ?? null
 }
 
 interface CardPaymentShape {
@@ -127,7 +130,8 @@ interface CardPaymentShape {
 /**
  * A card payment is saved as a transfer from the paying account to the card: the database
  * rejects an expense whose destination is not a loan, and only a transfer credits the card.
- * Same currency on both sides, so the rate is 1 and there is no category.
+ * No category, and the rate is 1: a card paid from another currency keeps its destination_amount,
+ * what the card received (LED-269), which the balance trigger credits instead.
  */
 export function cardPaymentTransfer<T extends CardPaymentShape>(values: T): T {
   return {

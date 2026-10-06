@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { importedCardPayments, looksLikeTransfer, transferCandidates, transferLegs } from '../src/lib/importTransfer.ts'
+import { importedCardPayments, importTransferAmounts, looksLikeTransfer, transferCandidates, transferLegs } from '../src/lib/importTransfer.ts'
 
 test('bank transfer wording is suggested as a transfer', () => {
   assert.equal(looksLikeTransfer('FUND TRANSFER TO 8842'), true)
@@ -21,14 +21,23 @@ test("the highest-priority matching rule's type hint decides", () => {
   assert.equal(looksLikeTransfer('INSTAPAY TRANSFER FEE', rules.slice(0, 2)), false)
 })
 
-test('candidates are the other non-loan accounts in the same currency', () => {
+test('candidates are the other non-loan accounts, in any currency (LED-269)', () => {
   const accounts = [
     { id: 'chk', type: 'checking', currency: 'PHP' },
     { id: 'sav', type: 'savings', currency: 'PHP' },
     { id: 'usd', type: 'savings', currency: 'USD' },
     { id: 'car', type: 'loan', currency: 'PHP' },
   ]
-  assert.deepEqual(transferCandidates(accounts, accounts[0]).map((account) => account.id), ['sav'])
+  assert.deepEqual(transferCandidates(accounts, accounts[0]).map((account) => account.id), ['sav', 'usd'])
+})
+
+test('a cross-currency import transfer saves both sides (LED-269)', () => {
+  // Out of the PHP account into USD: 5,600 PHP sent, 100 USD arrived.
+  assert.deepEqual(importTransferAmounts('expense', 5600, 'PHP', 'USD', 100), { amount: 5600, currency: 'PHP', destination_amount: 100 })
+  // Into the PHP account from USD: 100 USD sent, 5,600 PHP arrived.
+  assert.deepEqual(importTransferAmounts('income', 5600, 'PHP', 'USD', 100), { amount: 100, currency: 'USD', destination_amount: 5600 })
+  // Same currency: unchanged.
+  assert.deepEqual(importTransferAmounts('expense', 5600, 'PHP', 'PHP', null), { amount: 5600, currency: 'PHP', destination_amount: null })
 })
 
 test('money out goes to the other account; money in comes from it', () => {

@@ -25,7 +25,7 @@ test('transactions has a destination_amount that is null or positive', () => {
 
 test('the balance trigger credits and reverses the destination by the same coalesce', () => {
   const { name, sql } = latest(/create or replace function public\.update_account_balance\(\)/)
-  assert.equal(name, '20261003120000_transfer_destination_amount.sql')
+  assert.equal(name, '20261006130000_liability_payment_destination_amount.sql')
   assert.match(sql, /balance \+ coalesce\(new\.destination_amount, new\.amount \* new\.exchange_rate\)/)
   assert.match(sql, /balance - coalesce\(old\.destination_amount, old\.amount \* old\.exchange_rate\)/)
 })
@@ -45,4 +45,16 @@ test('the card payment and the recurring copy use the destination amount too', (
   const recurring = latest(/create or replace function public\.post_recurring_transaction\(/).sql
   assert.match(recurring, /exchange_rate, destination_amount, description/)
   assert.match(recurring, /src\.exchange_rate, src\.destination_amount, src\.description/)
+})
+
+test('a loan repayment credits, reverses and splits what the loan received (LED-269)', () => {
+  const balance = latest(/create or replace function public\.update_account_balance\(\)/).sql
+  assert.match(balance, /balance \+ coalesce\(new\.destination_amount, new\.amount\)\s+where id = new\.to_account_id and type = 'loan'/)
+  assert.match(balance, /balance - coalesce\(old\.destination_amount, old\.amount\)\s+where id = old\.to_account_id and type = 'loan'/)
+  const allocate = latest(/create or replace function public\.allocate_loan_payment\(\)/).sql
+  assert.match(allocate, /payment_remaining numeric\(18,2\) := coalesce\(new\.destination_amount, new\.amount\);/)
+  for (const trigger of ['trg_clear_loan_allocations_update', 'trg_allocate_loan_payment_update']) {
+    const sql = latest(new RegExp(`create trigger ${trigger}`)).sql
+    assert.match(sql, new RegExp(`create trigger ${trigger}\\s+(before|after) update of [^;]*\\bdestination_amount\\b`))
+  }
 })

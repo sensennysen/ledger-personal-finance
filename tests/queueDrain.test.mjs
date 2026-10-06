@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { SERVER_CHECK_FAILED, discardFlagged, drainWith, singleFlight } from '../src/lib/queueDrain.ts'
 import { MAX_ATTEMPTS, describeConflict, editQueuedInsert, hasQueuedInsert, setResolvedReceipt } from '../src/lib/queueState.ts'
 import { fakeClient } from './helpers/fakeSupabase.mjs'
-import { NOW, depsFor, fakeQueueStore, fakeReceipts, queued } from './helpers/fakeQueueStore.mjs'
+import { NOW, depsFor, fakeQueueStore, fakeReceipts, queueDeps, queued } from './helpers/fakeQueueStore.mjs'
 
 const OLD = new Date(NOW - 10_000).toISOString()
 const NEWER = new Date(NOW + 10_000).toISOString()
@@ -211,14 +211,14 @@ test('keepTheirs drops the flagged item and its pending receipt file', async () 
     queued({ id: 'y', status: 'conflict' }),
     queued({ id: 'p' }),
   ])
-  await discardFlagged({ readQueue: store.read, writeQueue: store.write, receipts }, 'x')
+  await discardFlagged({ ...queueDeps(store), receipts }, 'x')
   assert.deepEqual(store.read().map((i) => i.id), ['y', 'p'])
   assert.deepEqual(removed, ['t9'])
 })
 
 test('keepTheirs with no id drops every flagged item, failed ones included, and keeps pending', async () => {
   const store = fakeQueueStore([queued({ id: 'f', status: 'failed' }), queued({ id: 'c', status: 'conflict' }), queued({ id: 'p' })])
-  await discardFlagged({ readQueue: store.read, writeQueue: store.write, receipts: fakeReceipts() })
+  await discardFlagged({ ...queueDeps(store), receipts: fakeReceipts() })
   assert.deepEqual(store.read().map((i) => i.id), ['p'])
 })
 
@@ -551,7 +551,7 @@ test('LED-301: the local file is kept when the uploaded path cannot be stored', 
   const store = fakeQueueStore([receiptInsert()])
   const deps = { ...depsFor(fakeClient(happy), store, receipts) }
   let writes = 0
-  deps.writeQueue = (items) => { if (writes++ === 0) throw new Error('QuotaExceededError'); store.write(items) }
+  deps.mutateQueue = async (fn) => { if (writes++ === 0) throw new Error('QuotaExceededError'); return store.mutate(fn) }
   assert.equal(await drainWith(deps), 1)
   assert.deepEqual(removed, [])
 })
@@ -585,7 +585,7 @@ test('LED-301: a receipt replaced while the old one uploaded removes the unused 
 test('LED-301: discarding an item whose receipt was uploaded deletes that file', async () => {
   const client = fakeClient(happy)
   const store = fakeQueueStore([receiptInsert({ status: 'failed', uploadedReceipt: 'u/r.jpg', payload: { id: 'tx-1', receipt_url: 'u/r.jpg' } })])
-  await discardFlagged({ readQueue: store.read, writeQueue: store.write, receipts: fakeReceipts(), client }, 'q-tx-1')
+  await discardFlagged({ ...queueDeps(store), receipts: fakeReceipts(), client }, 'q-tx-1')
   assert.deepEqual(store.read(), [])
   assert.deepEqual(client.removedFiles, [{ bucket: 'receipts', path: 'u/r.jpg' }])
 })
@@ -636,6 +636,17 @@ test("LED-300: an edit's receipt that failed to upload waits; one whose file is 
 test('LED-300: discarding a flagged edit drops its pending receipt file', async () => {
   const removed = []
   const store = fakeQueueStore([queued({ id: 'e', status: 'conflict', conflictKind: 'edited', payload: { receipt_url: 'pending-receipt:t3' } })])
-  await discardFlagged({ readQueue: store.read, writeQueue: store.write, receipts: fakeReceipts({ removed }) }, 'e')
+  await discardFlagged({ ...queueDeps(store), receipts: fakeReceipts({ removed }) }, 'e')
   assert.deepEqual(removed, ['t3'])
+})
+
+test('LED-303: a change stored by another tab while the drain awaits the network survives the merge', async () => {
+  const store = fakeQueueStore([queued({ id: 'first', operation: 'insert', rowId: undefined })])
+  const client = fakeClient((call) => {
+    // Another tab's transaction lands between this drain's read and its closing write.
+    void store.mutate((q) => [...q, queued({ id: 'other-tab', timestamp: NOW })])
+    return happy(call)
+  })
+  assert.equal(await drainWith(depsFor(client, store)), 1)
+  assert.deepEqual(store.read().map((i) => i.id), ['other-tab'])
 })

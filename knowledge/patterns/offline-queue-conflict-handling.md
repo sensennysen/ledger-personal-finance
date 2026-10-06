@@ -2,7 +2,10 @@
 Three layers, so the drain can be tested without Supabase or localStorage (LED-05, LED-128):
 - `src/lib/queueState.ts` — pure state helpers (status, expiry, conflict fields, attempt counting).
 - `src/lib/queueDrain.ts` — the drain itself, with the client, storage and receipt store passed in (`drainWith`, `discardFlagged`, `singleFlight`).
-- `src/lib/offlineQueue.ts` — wires the real supabase, localStorage and receipt store. Tests use `tests/helpers/fakeSupabase.mjs` and `fakeQueueStore.mjs`.
+- `src/lib/offlineQueue.ts` — wires the real supabase, the IndexedDB queue (`queueStorage.ts`) and receipt store. Tests use `tests/helpers/fakeSupabase.mjs` and `fakeQueueStore.mjs`.
+
+**Stored before shown (LED-303).** The queue is one record in the IndexedDB database `ledger_offline_queue`. Every change is a `mutateStoredQueue(fn)`: read, change and write in one readwrite transaction, resolved only when it commits. Writers (`enqueue`, `enqueueMany`, `editQueuedInsert`, `keepMine`, `retryFailedItem`) return `{ error }`; an offline save awaits it and updates the screen and balances only after. A failure returns `QUEUE_STORAGE_FAILED` and nothing is shown. The synchronous reads (counts, `listQueue`, `revisionFor`) use a snapshot of the last commit. `loadQueue()` moves a pre-LED-303 localStorage queue in once (`mergeLegacyQueue`, by id) and removes the old key after the move commits. If IndexedDB cannot open, `queueUnavailable()` is set and the offline banner says so in red.
+- Drain deps are `readQueue()` and `mutateQueue(fn)`, both async. A read-modify-write goes inside `mutateQueue`, never as a read followed by a separate write.
 
 **Statuses.** An item with no status is pending. `conflict` (the server row was edited, or deleted, since it was queued), `expired` (older than 30 days) and `failed` (a database error five times) are flagged: the drain skips them until the user decides. Flagged items sort first after a drain and pending order is preserved.
 - Update to a deleted row: `conflict` with `conflictKind: 'deleted'`. Only Discard is offered; there is nothing left to overwrite.

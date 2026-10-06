@@ -6,8 +6,10 @@ import {
   flaggedCount as readFlaggedCount,
   keepMine,
   keepTheirs,
+  loadQueue,
   nextQueueExpiry,
   pendingCount as readPendingCount,
+  queueUnavailable,
   retryFailedItem,
   subscribeQueue,
 } from '@/lib/offlineQueue'
@@ -28,6 +30,7 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
   const [flagged, setFlagged] = useState(() => readFlaggedCount())
   const [failed, setFailed] = useState(() => readFailedCount())
   const [syncProgress, setSyncProgress] = useState<{ done: number; total: number } | null>(null)
+  const [storageError, setStorageError] = useState<string | null>(() => queueUnavailable())
   // A ref, not the isSyncing state: two triggers in one tick would both see the stale false.
   const syncing = useRef(false)
 
@@ -35,6 +38,7 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
     setCount(readPendingCount())
     setFlagged(readFlaggedCount())
     setFailed(readFailedCount())
+    setStorageError(queueUnavailable())
   }, [])
 
   const syncNow = useCallback(async () => {
@@ -60,6 +64,12 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => subscribeQueue(refreshCount), [refreshCount])
 
+  // The queue opens asynchronously (IndexedDB); the counts start at 0 and catch up once it has.
+  // A failure is kept by the queue and shown through storageError.
+  useEffect(() => {
+    loadQueue().catch((err) => console.error('Failed to open the offline queue:', err))
+  }, [])
+
   // An offline item flags as expired when the clock passes the limit, not only on the next drain.
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -68,13 +78,11 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
       const at = nextQueueExpiry()
       if (at === null) return
       timer = setTimeout(() => {
-        expireQueueNow()
-        schedule()
+        void expireQueueNow().finally(schedule)
       }, Math.min(Math.max(at - Date.now(), 0), MAX_TIMEOUT_MS))
     }
     const recheck = () => {
-      expireQueueNow()
-      schedule()
+      void expireQueueNow().finally(schedule)
     }
     schedule()
     const unsubscribe = subscribeQueue(schedule)
@@ -93,16 +101,17 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
         notifySyncListeners()
         return
       }
-      keepMine(id)
-      await syncNow()
+      // A failed write leaves the item flagged, as it was.
+      const { error } = await keepMine(id)
+      if (!error) await syncNow()
     },
     [syncNow]
   )
 
   const retry = useCallback(
     async (id: string) => {
-      retryFailedItem(id)
-      await syncNow()
+      const { error } = await retryFailedItem(id)
+      if (!error) await syncNow()
     },
     [syncNow]
   )
@@ -130,12 +139,13 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
       flaggedCount: flagged,
       failedCount: failed,
       syncProgress,
+      storageError,
       syncNow,
       refreshCount,
       resolve,
       retry,
     }),
-    [isOnline, isSyncing, count, flagged, failed, syncProgress, syncNow, refreshCount, resolve, retry]
+    [isOnline, isSyncing, count, flagged, failed, syncProgress, storageError, syncNow, refreshCount, resolve, retry]
   )
 
   return <NetworkStatusContext.Provider value={value}>{children}</NetworkStatusContext.Provider>

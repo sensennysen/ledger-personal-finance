@@ -1,11 +1,11 @@
 // The offline-queue drain, with its I/O passed in so it can run under plain node.
-// offlineQueue.ts wires the real supabase client, localStorage and receipt store.
+// offlineQueue.ts wires the real supabase client, the IndexedDB queue and receipt store.
 import {
   isCountableError,
   isDuplicateRowId,
   isFlagged,
   isPending,
-  markExpired,
+  expireNow,
   mergeDrainResult,
   rebaseRevision,
   rebaseRevisions,
@@ -41,8 +41,12 @@ export interface ReceiptDeps {
 
 export interface DrainDeps {
   client: DrainClient
-  readQueue: () => QueueItem[]
-  writeQueue: (items: QueueItem[]) => void
+  readQueue: () => Promise<QueueItem[]>
+  /**
+   * Reads the stored queue, applies `fn` and writes the result as one transaction, so a change
+   * made meanwhile (in this tab or another) is never overwritten. Returning the same array writes nothing.
+   */
+  mutateQueue: (fn: (queue: QueueItem[]) => QueueItem[]) => Promise<void>
   receipts: ReceiptDeps
   now: () => number
   /** Called after an insert reaches the database, with the item as it was sent. A throw is ignored: the row is already saved. */
@@ -110,9 +114,13 @@ async function resolveReceipt(item: QueueItem, deps: DrainDeps): Promise<QueueIt
 
   let recorded = false
   try {
-    const { queue, applied } = setResolvedReceipt(deps.readQueue(), item.id, marker, path)
-    if (applied) deps.writeQueue(queue)
-    else {
+    let applied = false
+    await deps.mutateQueue((current) => {
+      const result = setResolvedReceipt(current, item.id, marker, path)
+      applied = result.applied
+      return result.applied ? result.queue : current
+    })
+    if (!applied) {
       // The receipt was replaced (or the item resolved) while this one uploaded: nothing will use it.
       await removeUploaded(client, path)
       try { await receipts.remove(tempId) } catch { /* best-effort */ }
@@ -282,13 +290,13 @@ async function processItem(item: QueueItem, deps: DrainDeps, moves: RevisionMove
  * Returns the number of synced items.
  */
 export async function drainWith(deps: DrainDeps, onProgress?: (done: number, total: number) => void): Promise<number> {
-  const stored = deps.readQueue()
-  const queue = markExpired(stored, deps.now())
+  const stored = await deps.readQueue()
+  const queue = expireNow(stored, deps.now())
   if (queue.length === 0) return 0
 
   const fresh = queue.filter(isPending)
   if (fresh.length === 0) {
-    deps.writeQueue(queue)
+    if (queue !== stored) await deps.mutateQueue((current) => expireNow(current, deps.now()))
     return 0
   }
 
@@ -333,17 +341,21 @@ export async function drainWith(deps: DrainDeps, onProgress?: (done: number, tot
   }
 
   // Re-read: the user may have resolved or enqueued items while we awaited the network.
-  deps.writeQueue(rebaseRevisions(mergeDrainResult(remaining, deps.readQueue(), seenIds, flaggedAtStart, sent), moves))
+  await deps.mutateQueue((current) => rebaseRevisions(mergeDrainResult(remaining, current, seenIds, flaggedAtStart, sent), moves))
   return synced
 }
 
 /** "Keep theirs" / "Discard": drop the flagged item (or all of them) and any receipt file it held. */
 export async function discardFlagged(
-  deps: Pick<DrainDeps, 'readQueue' | 'writeQueue' | 'receipts'> & { client?: DrainClient },
+  deps: Pick<DrainDeps, 'mutateQueue' | 'receipts'> & { client?: DrainClient },
   id?: string,
 ): Promise<void> {
-  const { kept, removed } = removeFlagged(deps.readQueue(), id)
-  deps.writeQueue(kept)
+  let removed: QueueItem[] = []
+  await deps.mutateQueue((current) => {
+    const result = removeFlagged(current, id)
+    removed = result.removed
+    return removed.length > 0 ? result.kept : current
+  })
   for (const item of removed) {
     // A receipt the drain uploaded for a change that never reached its row.
     if (item.uploadedReceipt && deps.client) await removeUploaded(deps.client, item.uploadedReceipt)

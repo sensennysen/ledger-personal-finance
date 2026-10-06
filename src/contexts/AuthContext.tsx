@@ -373,7 +373,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     authGeneration.invalidate()
     forgetPersonalBrowserCopies()
     forgetPendingSettings()
-    clearOfflineQueue()
+    try {
+      await clearOfflineQueue()
+    } catch (queueError) {
+      console.error('Failed to clear the offline queue:', queueError)
+    }
     try {
       await clearPendingReceipts()
     } catch (receiptError) {
@@ -401,7 +405,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     authGeneration.invalidate()
     forgetPersonalBrowserCopies()
     forgetPendingSettings()
-    clearOfflineQueue()
+    try {
+      await clearOfflineQueue()
+    } catch (queueError) {
+      console.error('Failed to clear the offline queue:', queueError)
+    }
     try {
       await clearPendingReceipts()
     } catch (receiptError) {

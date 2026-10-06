@@ -54,7 +54,7 @@ export function BrowserStorageCard() {
   const clear = async (row: StorageRow) => {
     setClearing(true)
     try {
-      if (row.clear === 'queue') clearOfflineQueue()
+      if (row.clear === 'queue') await clearOfflineQueue()
       else if (row.clear === 'receipts') await clearPendingReceipts()
       else for (const key of keysInGroup(row, localStorageKeys(), user?.id ?? null)) localStorage.removeItem(key)
     } catch (err) {

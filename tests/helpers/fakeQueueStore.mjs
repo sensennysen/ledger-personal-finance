@@ -1,5 +1,5 @@
-// An in-memory stand-in for the localStorage-backed queue, so a test can change the
-// queue while a drain is awaiting the network.
+// An in-memory stand-in for the IndexedDB queue, so a test can change the queue while a
+// drain is awaiting the network. `mutate` reads and writes in one step, like a transaction.
 
 export function fakeQueueStore(initial = []) {
   let items = structuredClone(initial)
@@ -9,6 +9,11 @@ export function fakeQueueStore(initial = []) {
     write(next) {
       items = structuredClone(next)
       writes.push(structuredClone(next))
+    },
+    async mutate(fn) {
+      const current = structuredClone(items)
+      const next = fn(current)
+      if (next !== current) this.write(next)
     },
     writes,
   }
@@ -31,5 +36,10 @@ export const queued = (o) => ({
 })
 
 export function depsFor(client, store, receipts = fakeReceipts()) {
-  return { client, readQueue: store.read, writeQueue: store.write, receipts, now: () => NOW }
+  return { client, ...queueDeps(store), receipts, now: () => NOW }
+}
+
+/** The queue half of DrainDeps, backed by a fake store. */
+export function queueDeps(store) {
+  return { readQueue: async () => store.read(), mutateQueue: (fn) => store.mutate(fn) }
 }

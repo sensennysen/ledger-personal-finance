@@ -14,9 +14,23 @@ export function OfflineBanner({
   status: ReturnType<typeof useNetworkStatus>
   onReview: () => void
 }) {
-  const { isOnline, isSyncing, pendingCount, flaggedCount, failedCount, syncProgress, syncNow } = status
+  const { isOnline, isSyncing, pendingCount, flaggedCount, failedCount, syncProgress, syncNow, storageError } = status
 
   if (isOnline && pendingCount === 0 && flaggedCount === 0) return null
+
+  // Offline with nowhere to keep changes: a genuine failure, so it is red, not the pending gold.
+  if (!isOnline && storageError) {
+    return (
+      <div
+        role="alert"
+        className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 text-xs font-medium"
+        style={{ background: 'var(--expense-container)', color: 'var(--expense)' }}
+      >
+        <AlertTriangle className="size-4 shrink-0" />
+        Offline — {storageError}
+      </div>
+    )
+  }
 
   if (flaggedCount > 0) {
     return (

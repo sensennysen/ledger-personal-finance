@@ -1,0 +1,98 @@
+Skip to content
+LEDGER
+Home
+Accounts
+Activity
+Budgets
+Categories
+Reports
+Search…
+⌘K
+Q
+Accounts
+
+4 accounts · 2 currencies
+
+View options
+Add Account
+
+Assets
+
+$1,191.98
+
+Liabilities
+
+−$270.00
+
+Net Worth
+
+$921.98
+
+Coming up
+
+Nothing due
+
+ACCOUNT
+TYPE
+CURRENCY
+SHARE · USAGE
+SCHEDULED
+BALANCE
+
+Cash on Hand · 1
+
+$873.00
+
+QA Cash
+
+Cash on Hand
+USD
+73%
+−$5.00
+
+$873.00
+
+Credit Card · 1
+
+−$270.00
+
+QA Card
+
+Credit Card
+USD
+—
+—
+
+−$270.00
+
+Pay
+
+Savings Account · 2
+
+$318.98
+
+QA Euro
+
+Savings Account
+EUR
+<1%
+—
+
+€8.00
+
+≈ $8.98
+
+QA Savings
+
+Savings Account
+USD
+26%
+—
+
+$310.00
+
+Totals in USD. EUR converted at rates as of Oct 6. Exchange rates
+
+Search
+
+Search transactions, accounts, categories and actions

@@ -1,0 +1,44 @@
+Skip to content
+LEDGER
+Home
+Accounts
+Activity
+(locked until setup is done)
+Budgets
+(locked until setup is done)
+Categories
+(locked until setup is done)
+Reports
+(locked until setup is done)
+Search…
+⌘K
+Q
+Accounts
+Add Account
+
+No accounts yet
+
+Search
+
+Search transactions, accounts, categories and actions
+
+Add Account
+Type
+Cash on Hand
+Digital Wallet
+Credit Card
+Savings Account
+Checking Account
+Investment
+Loan
+Other
+Account Name
+Currency
+USD
+Current Balance
+Color
+Notes
+(optional)
+Cancel
+Save Account
+Close

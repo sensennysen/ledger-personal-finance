@@ -1,0 +1,17 @@
+{
+  "results": [
+    {
+      "id": "F-024a",
+      "title": "Save and reopen a transaction template",
+      "result": "Pass"
+    },
+    {
+      "id": "F-019c",
+      "title": "Reimporting an actual Ledger export preserves expense direction",
+      "result": "Fail",
+      "error": "Exported expense became income; new account balance is 7 instead of -7\n+ actual - expected\n\n+ 'income'\n- 'expense'\n"
+    }
+  ],
+  "browser": "154.0.8037.94",
+  "userId": "c70215a2-24ff-47bc-a6e1-2970529b8d29"
+}

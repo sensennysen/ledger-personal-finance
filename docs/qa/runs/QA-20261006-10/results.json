@@ -1,0 +1,53 @@
+{
+  "results": [
+    {
+      "id": "F-009a",
+      "title": "Scheduled expense is visibly disclosed in account scheduled column",
+      "result": "Fail",
+      "error": "locator.waitFor: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('row').filter({ hasText: 'QA Cash' }) to be visible\u001b[22m\n"
+    },
+    {
+      "id": "F-015a",
+      "title": "Create and rename expense category",
+      "result": "Pass"
+    },
+    {
+      "id": "F-023a",
+      "title": "Create savings goal with initial progress",
+      "result": "Pass"
+    },
+    {
+      "id": "F-027a",
+      "title": "Profile display name persists through reload",
+      "result": "Pass"
+    },
+    {
+      "id": "V-009a",
+      "title": "Dark theme persists across reload",
+      "result": "Pass"
+    },
+    {
+      "id": "F-021a",
+      "title": "Chart lookback changes without changing summary income",
+      "result": "Pass"
+    },
+    {
+      "id": "F-019a",
+      "title": "Import a standard one-row CSV",
+      "result": "Pass"
+    },
+    {
+      "id": "F-007a",
+      "title": "Loan repayment credits loan and creates matching allocation",
+      "result": "Fail",
+      "error": "locator.click: Timeout 8000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button').filter({ hasText: /QA Loan/ })\u001b[22m\n"
+    },
+    {
+      "id": "V-007b",
+      "title": "Escape dismisses account form and returns focus",
+      "result": "Pass"
+    }
+  ],
+  "browser": "154.0.8037.94",
+  "userId": "c70215a2-24ff-47bc-a6e1-2970529b8d29"
+}

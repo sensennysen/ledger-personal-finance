@@ -1,0 +1,334 @@
+{
+  "counts": {
+    "Pass": 44,
+    "Fail": 4
+  },
+  "results": [
+    {
+      "id": "F-001c",
+      "title": "Invalid seeded credentials show an error",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:09.830Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-001d",
+      "title": "Fresh fixture user password login and reload",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:11.531Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-001e",
+      "title": "Logout redirects and protects a deep link",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:33.818Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-002a",
+      "title": "Fresh user sees setup and locked navigation",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:13.935Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-002b",
+      "title": "Confirm a changed pay cycle persists",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:20.733Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-002c",
+      "title": "Setup completion persists in second browser context",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:55.994Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-003a",
+      "title": "Reject empty account name",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:14.052Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-003b",
+      "title": "Create cash account with opening balance",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:15.926Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-003c",
+      "title": "Create savings and card accounts",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:17.760Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-004a",
+      "title": "Reject zero expense amount",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:23.593Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-004b",
+      "title": "Expense saves once and debits balance",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:24.864Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-004c",
+      "title": "Income credits balance",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:26.902Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-004d",
+      "title": "Edit expense and recompute original balance delta",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:40.956Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-004e",
+      "title": "Delete expense and undo restores its financial effect once",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:58.318Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-005a",
+      "title": "Transfer credits destination and debits source",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:28.622Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-005b",
+      "title": "Transfer fee debits source in addition to principal",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:01.797Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-006a",
+      "title": "Transfer into credit card creates linked payment and reduces debt",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:00.348Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-007a",
+      "title": "Loan repayment credits loan and creates matching allocation",
+      "result": "Pass",
+      "run": "QA-20261006-11"
+    },
+    {
+      "id": "F-008a",
+      "title": "Cross-currency transfer credits explicit received amount",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:03.453Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-009a",
+      "title": "Scheduled expense is visibly disclosed in account scheduled column",
+      "result": "Pass",
+      "run": "QA-20261006-11"
+    },
+    {
+      "id": "F-009b",
+      "title": "Recurring occurrence posts once across two browser contexts",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:26.835Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-010a",
+      "title": "Split an expense conserves total and account balance",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:05.577Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-011a",
+      "title": "Offline expense queues and syncs once after reconnection",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:18.014Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-012a",
+      "title": "Failed accounts read shows error, not empty",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:43.629Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-012b",
+      "title": "Read retry recovers after service is restored",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:52.924Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-012c",
+      "title": "Failed transaction save preserves entered data",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:54.106Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-013a",
+      "title": "Second user cannot read or update first user account",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:55.577Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-014a",
+      "title": "Create category budget and persist amount",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:21.727Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-015a",
+      "title": "Create and rename expense category",
+      "result": "Pass",
+      "run": "QA-20261006-10"
+    },
+    {
+      "id": "F-016a",
+      "title": "Search filters to a matching transaction",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:30.538Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-016b",
+      "title": "No-match search is filtered empty, not data loss",
+      "result": "Fail",
+      "started": "2026-10-06T13:01:31.767Z",
+      "error": "locator.waitFor: Timeout 9000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText(/No .*match|No transactions found|No results/i).first() to be visible\u001b[22m\n",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-017a",
+      "title": "CSV export includes all 1105 additional records beyond API page limit",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:30.036Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-018a",
+      "title": "Global search finds account and navigates",
+      "result": "Pass",
+      "started": "2026-10-06T13:01:42.409Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-019a",
+      "title": "Import a standard one-row CSV",
+      "result": "Pass",
+      "run": "QA-20261006-10"
+    },
+    {
+      "id": "F-019b",
+      "title": "Reimport detects existing CSV row and skips it by default",
+      "result": "Pass",
+      "run": "QA-20261006-12"
+    },
+    {
+      "id": "F-019c",
+      "title": "Reimporting an actual Ledger export preserves expense direction",
+      "result": "Fail",
+      "error": "Exported expense became income; new account balance is 7 instead of -7\n+ actual - expected\n\n+ 'income'\n- 'expense'\n",
+      "run": "QA-20261006-13"
+    },
+    {
+      "id": "F-020a",
+      "title": "Report CSV download contains persisted transactions",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:24.339Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-021a",
+      "title": "Chart lookback changes without changing summary income",
+      "result": "Pass",
+      "run": "QA-20261006-10"
+    },
+    {
+      "id": "F-023a",
+      "title": "Create savings goal with initial progress",
+      "result": "Pass",
+      "run": "QA-20261006-10"
+    },
+    {
+      "id": "F-024a",
+      "title": "Save and reopen a transaction template",
+      "result": "Pass",
+      "run": "QA-20261006-13"
+    },
+    {
+      "id": "F-025a",
+      "title": "Attach receipt PNG and persist its reference",
+      "result": "Pass",
+      "run": "QA-20261006-12"
+    },
+    {
+      "id": "F-026a",
+      "title": "13th-month inclusion selection persists after reload",
+      "result": "Pass",
+      "run": "QA-20261006-12"
+    },
+    {
+      "id": "F-027a",
+      "title": "Profile display name persists through reload",
+      "result": "Pass",
+      "run": "QA-20261006-10"
+    },
+    {
+      "id": "F-029a",
+      "title": "Public legal routes render logged out",
+      "result": "Pass",
+      "started": "2026-10-06T13:02:42.914Z",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "F-029b",
+      "title": "Unknown URL has a meaningful fallback",
+      "result": "Fail",
+      "started": "2026-10-06T13:02:45.437Z",
+      "error": "The input did not match the regular expression /not found|doesn.t exist|Good day|Home|404/i. Input:\n\n''\n",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "V-007a",
+      "title": "Account form labels reference actual form controls",
+      "result": "Fail",
+      "started": "2026-10-06T13:01:15.201Z",
+      "error": "{\"for\":\"_r_e_-form-item\",\"target\":\"DIV\"}",
+      "run": "QA-20261006-09"
+    },
+    {
+      "id": "V-007b",
+      "title": "Escape dismisses account form and returns focus",
+      "result": "Pass",
+      "run": "QA-20261006-10"
+    },
+    {
+      "id": "V-009a",
+      "title": "Dark theme persists across reload",
+      "result": "Pass",
+      "run": "QA-20261006-10"
+    }
+  ]
+}

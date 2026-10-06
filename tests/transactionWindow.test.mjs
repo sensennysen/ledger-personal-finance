@@ -253,3 +253,29 @@ test('a same-currency payment keeps its currency on both lists (LED-281)', () =>
   assert.equal(amountDisplay(row, 'visa').currency, 'USD')
   assert.equal(amountDisplay(row, 'checking').currency, 'USD')
 })
+
+// LED-282: outside an account a transfer nets to zero and opens no currency of its own.
+test('a transfer between two currencies opens no bucket in the Activity sum (LED-282)', () => {
+  const rows = [
+    tx({ type: 'transfer', amount: 1000, currency: 'EUR', to_account_id: 'checking', destination_amount: 1100, to_account: { currency: 'USD' } }),
+    tx({ type: 'expense', amount: 1817.4, currency: 'USD' }),
+  ]
+  assert.deepEqual(sumByCurrency(rows), { USD: -1817.4 })
+  assert.deepEqual(groupByDay(rows)[0].net, { USD: -1817.4 })
+})
+
+test('income and expenses that cancel out still show their currency at zero (LED-282)', () => {
+  const rows = [
+    tx({ type: 'income', amount: 50, currency: 'EUR' }),
+    tx({ type: 'expense', amount: 50, currency: 'EUR' }),
+    tx({ type: 'transfer', amount: 20, currency: 'USD', to_account_id: 'savings', to_account: { currency: 'USD' } }),
+  ]
+  assert.deepEqual(sumByCurrency(rows), { EUR: 0 })
+})
+
+test('rows that are only transfers still read a zero, and an account\'s own list is unchanged (LED-282)', () => {
+  const transfer = tx({ type: 'transfer', amount: 1000, currency: 'EUR', account_id: 'wallet', to_account_id: 'checking', destination_amount: 1100, to_account: { currency: 'USD' } })
+  assert.deepEqual(sumByCurrency([transfer]), { EUR: 0 })
+  assert.deepEqual(sumByCurrency([transfer], 'checking'), { USD: 1100 })
+  assert.deepEqual(sumByCurrency([transfer], 'wallet'), { EUR: -1000 })
+})

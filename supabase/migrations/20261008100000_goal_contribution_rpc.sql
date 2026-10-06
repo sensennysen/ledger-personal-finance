@@ -20,6 +20,7 @@ create table if not exists public.goal_contribution_ops (
 
 alter table public.goal_contribution_ops enable row level security;
 
+drop policy if exists "Users can manage own goal contribution ops" on public.goal_contribution_ops;
 create policy "Users can manage own goal contribution ops"
   on public.goal_contribution_ops for all
   using (auth.uid() = user_id)

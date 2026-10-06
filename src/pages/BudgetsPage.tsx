@@ -1195,6 +1195,7 @@ export default function BudgetsPage() {
   const [editGoal, setEditGoal] = useState<GoalWithContributions | null>(null)
   const [goalFormError, setGoalFormError] = useState<FormErrorValue>(null)
   const [contributionGoal, setContributionGoal] = useState<GoalWithContributions | null>(null)
+  const [contributionError, setContributionError] = useState<FormErrorValue>(null)
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null)
 
   const defaultCurrency = profile?.default_currency ?? 'USD'
@@ -1251,9 +1252,14 @@ export default function BudgetsPage() {
 
   const handleContribution = async (amount: number) => {
     if (!contributionGoal) return
-    await addContribution(contributionGoal.id, amount, contributionGoal.current_amount)
+    const { error, errorDetail } = await addContribution(contributionGoal.id, amount, contributionGoal.current_amount)
+    // A rejected or unsent contribution keeps the dialog and its amount, so Add Contribution retries (LED-313).
+    if (error) { setContributionError({ message: error, detail: errorDetail ?? null }); return }
+    setContributionError(null)
     setContributionGoal(null)
   }
+
+  const closeContribution = () => { setContributionGoal(null); setContributionError(null) }
 
   const monthlyBudgets = budgets.filter((b) => b.period === 'monthly')
 
@@ -1705,13 +1711,14 @@ export default function BudgetsPage() {
       </Dialog>
 
       {/* Contribution dialog */}
-      <Dialog open={!!contributionGoal} onOpenChange={(o) => { if (!o) setContributionGoal(null) }}>
+      <Dialog open={!!contributionGoal} onOpenChange={(o) => { if (!o) closeContribution() }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Contribution</DialogTitle></DialogHeader>
+          <FormError error={contributionError} />
           {contributionGoal && (
             <ContributionDialog
               goal={contributionGoal}
-              onClose={() => setContributionGoal(null)}
+              onClose={closeContribution}
               onSubmit={handleContribution}
             />
           )}

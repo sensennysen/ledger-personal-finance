@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { editQueuedInsert, enqueue, pendingCount as queueSize } from '@/lib/offlineQueue'
+import { editQueuedInsert, enqueue, pendingCount as queueSize, revisionFor } from '@/lib/offlineQueue'
 import { registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
@@ -248,7 +248,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
           operation: 'update',
           payload: values as Record<string, unknown>,
           rowId: id,
-          baseRevision: existing?.updated_at,
+          baseRevision: revisionFor('transactions', existing),
           userId: user.id,
           // The edit may not touch description (e.g. a category-only change), so
           // the queue sheet title still has a name to show (LED-160).
@@ -280,7 +280,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         operation: 'delete',
         payload: {},
         rowId: id,
-        baseRevision: existing?.updated_at,
+        baseRevision: revisionFor('transactions', existing),
         userId: user.id,
         // A delete's payload carries nothing to title the queue sheet with (LED-160).
         label: existing?.description,
@@ -314,7 +314,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       updateTransactionCache(transactions.filter((t) => !ids.includes(t.id)))
       toDelete.forEach((tx) => {
         optimisticAccountDelta((accounts) => reverseTxDelta(accounts, tx))
-        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, baseRevision: tx.updated_at, userId: user.id, label: tx.description })
+        enqueue({ table: 'transactions', operation: 'delete', payload: {}, rowId: tx.id, baseRevision: revisionFor('transactions', tx), userId: user.id, label: tx.description })
       })
       return { error: null, queued: true }
     }
@@ -345,7 +345,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
           operation: 'update',
           payload: { category_id: categoryId },
           rowId: id,
-          baseRevision: existing?.updated_at,
+          baseRevision: revisionFor('transactions', existing),
           userId: user.id,
           // A category-only change doesn't touch description (LED-160).
           label: existing?.description,
@@ -373,17 +373,20 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     if (!user) return { error: 'Not authenticated', imported: 0 }
     if (!navigator.onLine) {
       const now = new Date().toISOString()
-      const optimistics = rows.map((values) => ({
-        ...buildOptimisticTransaction({ values, userId: user.id, now, id: crypto.randomUUID() }),
+      // One id per row, shared by the optimistic row and the queued insert, so an edit or delete
+      // before sync targets the row the database will hold, and a replay is recognised (LED-298).
+      const ids = rows.map(() => crypto.randomUUID())
+      const optimistics = rows.map((values, index) => ({
+        ...buildOptimisticTransaction({ values, userId: user.id, now, id: ids[index] }),
         queued: true,
       }))
       const filtered = optimistics.filter((tx) => txMatchesFilters(tx, filters))
       if (filtered.length) {
         updateTransactionCache(limitTransactions([...filtered, ...transactions], filters.limit))
       }
-      rows.forEach((values) => {
+      rows.forEach((values, index) => {
         optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
-        enqueueInsert(values)
+        enqueueInsert(values, ids[index])
       })
       return { error: null, imported: rows.length }
     }

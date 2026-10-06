@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   MAX_QUEUE_AGE_MS, MAX_ATTEMPTS, markExpired, applyKeepMine, removeFlagged, isPending, isFlagged,
   mergeDrainResult, rowKey, expireNow, nextExpiryAt, isCountableError, recordFailure, retryFailed,
-  describeConflict, canKeepMine, recordRevisionMove, rebaseRevision, rebaseRevisions,
+  describeConflict, canKeepMine, recordRevisionMove, rebaseRevision, rebaseRevisions, isDuplicateRowId,
 } from '../src/lib/queueState.ts'
 
 const NOW = 1_000_000_000_000
@@ -196,4 +196,11 @@ test('rebaseRevision follows the revisions a drain wrote, and only those', () =>
   assert.equal(rebaseRevision(insert, moves), insert)
   const queue = [item({ rowId: 'x' })]
   assert.equal(rebaseRevisions(queue, new Map()), queue, 'no moves: the same array')
+})
+
+test('isDuplicateRowId recognises only a primary-key duplicate', () => {
+  assert.equal(isDuplicateRowId({ code: '23505', message: 'duplicate key value violates unique constraint "transactions_pkey"' }), true)
+  assert.equal(isDuplicateRowId({ code: '23505', message: 'duplicate key value violates unique constraint "card_payments_transaction_id_key"' }), false)
+  assert.equal(isDuplicateRowId({ code: '23514', message: 'x_pkey"' }), false)
+  assert.equal(isDuplicateRowId(null), false)
 })

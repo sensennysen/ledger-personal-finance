@@ -9,6 +9,7 @@ import {
   isPending,
   nextExpiryAt,
   editQueuedInsert as editQueuedInsertIn,
+  hasQueuedInsert,
   retryFailed,
   type QueueItem,
 } from './queueState'
@@ -64,6 +65,15 @@ export function editQueuedInsert(rowId: string, values: Record<string, unknown>)
   const { queue, edited } = editQueuedInsertIn(readQueue(), rowId, values)
   if (edited) writeQueue(queue)
   return edited
+}
+
+/**
+ * The revision a queued change to this row is made against. A row that is still a queued create
+ * has none yet (its cached updated_at is the device's guess); the drain gives it the insert's.
+ */
+export function revisionFor(table: string, row: { id: string; updated_at?: string } | undefined): string | undefined {
+  if (!row || hasQueuedInsert(readQueue(), table, row.id)) return undefined
+  return row.updated_at
 }
 
 type SyncedListener = (item: QueueItem) => void

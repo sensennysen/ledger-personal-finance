@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { SERVER_CHECK_FAILED, discardFlagged, drainWith, singleFlight } from '../src/lib/queueDrain.ts'
-import { MAX_ATTEMPTS, describeConflict } from '../src/lib/queueState.ts'
+import { MAX_ATTEMPTS, describeConflict, editQueuedInsert, hasQueuedInsert } from '../src/lib/queueState.ts'
 import { fakeClient } from './helpers/fakeSupabase.mjs'
 import { NOW, depsFor, fakeQueueStore, fakeReceipts, queued } from './helpers/fakeQueueStore.mjs'
 
@@ -386,4 +386,79 @@ test('LED-297: keep mine is the only write without the revision condition', asyn
   assert.equal(await drainWith(depsFor(server.client, store)), 1)
   assert.equal(server.client.calls[0].filters.updated_at, undefined)
   assert.equal(server.row.amount, 5)
+})
+
+// LED-298: a table of rows owned by users. Inserts honour the primary key; updates and deletes
+// honour the revision filter. `lostResponse` commits an insert and then drops its response.
+function tableServer({ rows = [], lostResponse = new Set() } = {}) {
+  const server = { rows: new Map(rows.map((r) => [r.id, r])), clock: 0 }
+  const stamp = () => new Date(NOW + ++server.clock).toISOString()
+  server.client = fakeClient((call) => {
+    const row = server.rows.get(call.filters.id)
+    const visible = row && row.user_id === call.filters.user_id ? row : null
+    if (call.op === 'select') return { data: visible && { ...visible } }
+    if (call.op === 'insert') {
+      if (server.rows.has(call.payload.id)) return { error: { code: '23505', message: 'duplicate key value violates unique constraint "transactions_pkey"' } }
+      const saved = { ...call.payload, updated_at: stamp() }
+      server.rows.set(saved.id, saved)
+      if (lostResponse.delete(saved.id)) throw new Error('network')
+      return { data: [{ id: saved.id, updated_at: saved.updated_at }] }
+    }
+    if (!visible || (call.filters.updated_at !== undefined && call.filters.updated_at !== visible.updated_at)) return { data: [] }
+    if (call.op === 'delete') { server.rows.delete(visible.id); return { data: [{ id: visible.id }] } }
+    const saved = { ...visible, ...call.payload, updated_at: stamp() }
+    server.rows.set(saved.id, saved)
+    return { data: [{ id: saved.id, updated_at: saved.updated_at }] }
+  })
+  return server
+}
+const queuedInsert = (id, o = {}) =>
+  queued({ id: `q-${id}`, operation: 'insert', rowId: undefined, payload: { id, user_id: 'u', amount: 1 }, ...o })
+
+test('LED-298: imported rows edited and deleted before sync reach the server under their own ids', async () => {
+  const server = tableServer()
+  let queue = [queuedInsert('tx-1'), queuedInsert('tx-2')]
+  queue = editQueuedInsert(queue, 'tx-1', { amount: 9 }).queue
+  assert.ok(hasQueuedInsert(queue, 'transactions', 'tx-2'), 'a delete of tx-2 is queued without a revision')
+  queue.push(queued({ id: 'd', operation: 'delete', payload: {}, rowId: 'tx-2' }))
+  const store = fakeQueueStore(queue)
+  assert.equal(await drainWith(depsFor(server.client, store)), 3)
+  assert.deepEqual([...server.rows.keys()], ['tx-1'])
+  assert.equal(server.rows.get('tx-1').amount, 9)
+  assert.deepEqual(store.read(), [])
+  const del = server.client.calls.find((c) => c.op === 'delete')
+  // tx-1 was stamped first, tx-2 second: the delete is conditioned on tx-2's insert revision.
+  assert.equal(del.filters.updated_at, new Date(NOW + 2).toISOString())
+})
+
+test('LED-298: a committed insert whose response was lost is synced once on replay, not duplicated or failed', async () => {
+  const server = tableServer({ lostResponse: new Set(['tx-1']) })
+  const store = fakeQueueStore([queuedInsert('tx-1')])
+  const heard = []
+  const deps = { ...depsFor(server.client, store), onSynced: (item) => heard.push(item.payload.id) }
+  assert.equal(await drainWith(deps), 0, 'the response was lost')
+  assert.equal(store.read().length, 1)
+  assert.equal(await drainWith(deps), 1)
+  assert.equal(server.rows.size, 1)
+  assert.deepEqual(store.read(), [])
+  assert.deepEqual(heard, ['tx-1'], 'the follow-up runs once')
+})
+
+test("LED-298: a duplicate id on someone else's row is a genuine failure", async () => {
+  const server = tableServer({ rows: [{ id: 'tx-1', user_id: 'other', updated_at: OLD }] })
+  const store = fakeQueueStore([queuedInsert('tx-1')])
+  assert.equal(await drainWith(depsFor(server.client, store)), 0)
+  assert.equal(store.read()[0].attempts, 1)
+  assert.equal(server.rows.get('tx-1').user_id, 'other')
+})
+
+test('LED-298: a change to a row whose insert has not been sent waits for it', async () => {
+  const server = tableServer()
+  const store = fakeQueueStore([
+    queuedInsert('tx-1', { status: 'failed', attempts: MAX_ATTEMPTS }),
+    queued({ id: 'd', operation: 'delete', payload: {}, rowId: 'tx-1' }),
+  ])
+  assert.equal(await drainWith(depsFor(server.client, store)), 0)
+  assert.deepEqual(store.read().map((i) => i.id), ['q-tx-1', 'd'])
+  assert.ok(!server.client.calls.some((c) => c.op === 'delete' || c.op === 'select'))
 })

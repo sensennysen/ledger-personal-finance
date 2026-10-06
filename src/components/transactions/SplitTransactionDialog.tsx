@@ -227,6 +227,10 @@ export function SplitTransactionDialog({ tx, open, onOpenChange, onConfirm }: Pr
 
           <p className="text-xs text-muted-foreground">
             The original transaction is deleted and replaced by {lines.length} entries that keep its date, tags, receipt and goal. This can't be undone.
+            {/* LED-277: the row carrying the schedule hands it to line 1 (split_transaction). */}
+            {tx.is_recurring && tx.recurrence_interval && !tx.recurrence_next_posted && (
+              <> The first line keeps the {tx.recurrence_interval} schedule.</>
+            )}
           </p>
 
           <FormError error={error} className="mt-0 px-0" />

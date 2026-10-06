@@ -12,6 +12,7 @@ import {
   queueUnavailable,
   retryFailedItem,
   subscribeQueue,
+  subscribeRemoteSync,
 } from '@/lib/offlineQueue'
 import { notifySyncListeners } from '@/hooks/useNetworkStatus'
 import { retryDelay, shouldDrain } from '@/lib/syncReadiness'
@@ -69,6 +70,8 @@ export function NetworkStatusProvider({ children }: { children: React.ReactNode 
   }, [refreshCount])
 
   useEffect(() => subscribeQueue(refreshCount), [refreshCount])
+  // Another tab saved queued rows: this tab's lists and totals re-read, as after its own drain (LED-302).
+  useEffect(() => subscribeRemoteSync(notifySyncListeners), [])
 
   /**
    * Drains without the user asking (LED-305): when the app opens online with items waiting, when

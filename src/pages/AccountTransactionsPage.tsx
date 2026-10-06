@@ -786,7 +786,7 @@ export default function AccountTransactionsPage() {
         {(account?.type !== 'loan' || loanSection === 'activity') && (loadState === 'error' ? (
           <ErrorState title="Couldn't load your transactions" description={txError} detail={txErrorDetail} onRetry={() => void refetchTransactions()} />
         ) : loadState === 'loading' ? (
-          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+          <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 bg-skeleton-page" />)}</div>
         ) : accountTransactions.length === 0 ? (
           <EmptyState
             icon={ArrowLeftRight}

@@ -1,70 +1,49 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/contexts/notificationState'
 import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
-import { readCache, writeCache } from '@/lib/dataCache'
-import { readWithPolicy } from '@/lib/readRetry'
-import { registerAccountsListener } from '@/lib/cacheEvents'
+import { writeCache } from '@/lib/dataCache'
+import { invalidateAfterWrite, useEntityQuery } from '@/hooks/useEntityQuery'
 import { getLocalDateString } from '@/lib/utils'
 import { planAccountSave, type BalanceAdjustment } from '@/lib/accountAdjustment'
 import type { Account } from '@/types'
-import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
+import { toResult, type MutationResult } from '@/lib/dataErrors'
 
-export function useAccounts() {
+const NO_ACCOUNTS: Account[] = []
+
+/**
+ * The user's accounts. Pickers and screens see active accounts only; `includeArchived` reads every
+ * account for the data export, which must keep archived accounts and the history they carry (LED-309).
+ * The two reads cache under separate keys, so an archived account never reaches a picker.
+ */
+export function useAccounts({ includeArchived = false }: { includeArchived?: boolean } = {}) {
+  const cacheSuffix = includeArchived ? ':all' : ''
   const { user } = useAuth()
   const notify = useNotify()
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
+  const queryClient = useQueryClient()
 
-  const fetch = useCallback(async () => {
-    if (!user) {
-      setLoading(false)
-      return
-    }
-    const cacheKey = `${user.id}:accounts`
-    const cached = readCache<Account[]>(cacheKey)
-    if (cached) {
-      setAccounts(cached)
-      setLoading(false)
-    } else {
-      setLoading(true)
-    }
-    if (!navigator.onLine) return
-    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
-    const { data, error } = await readWithPolicy((retry) => supabase
-      .from('accounts')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true })
-      .retry(retry), { background: cached !== null })
-    if (error) {
-      setLoadFailure(describeDataError(error, { action: 'load' }))
-    } else {
-      setLoadFailure(null)
-      setAccounts(data as Account[])
-      writeCache(cacheKey, data)
-    }
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void fetch()
-    })
-  }, [fetch])
-
-  // Re-read cache when an offline transaction mutation updates account balances
-  const reloadFromCache = useCallback(() => {
-    if (!user) return
-    const cached = readCache<Account[]>(`${user.id}:accounts`)
-    if (cached) setAccounts(cached)
-  }, [user])
-
-  useEffect(() => registerAccountsListener(reloadFromCache), [reloadFromCache])
+  // Shared by every instance with the same key: the layout, the page and the payment hooks read once (LED-321).
+  const { data, loading, error, errorDetail, refetch: fetch, queryKey } = useEntityQuery<Account[]>({
+    entity: 'accounts',
+    offlineLabel: 'your accounts',
+    params: { includeArchived },
+    cacheKey: (userId) => `${userId}:accounts${cacheSuffix}`,
+    read: (userId, retry, signal) => {
+      let query = supabase
+        .from('accounts')
+        .select('*')
+        .eq('user_id', userId)
+      if (!includeArchived) query = query.eq('is_active', true)
+      return query
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
+        .abortSignal(signal)
+        .retry(retry)
+        .overrideTypes<Account[]>()
+    },
+  })
+  const accounts = data ?? NO_ACCOUNTS
 
   const createAccount = async (values: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
@@ -74,7 +53,7 @@ export function useAccounts() {
       ...values,
       user_id: user.id,
     })
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('accounts')
     return toResult(error, { action: 'save', entity: 'account' })
   }
 
@@ -82,7 +61,7 @@ export function useAccounts() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this account.' }
     const { error } = await supabase.from('accounts').update(values).eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('accounts')
     return toResult(error, { action: 'save', entity: 'account' })
   }
 
@@ -100,7 +79,7 @@ export function useAccounts() {
       description: BALANCE_ADJUSTMENT_DESCRIPTION,
       date: getLocalDateString(),
     })
-    await fetch()
+    await invalidateAfterWrite('transactions')
     if (!error) return
     notify({
       severity: 'partial',
@@ -126,7 +105,7 @@ export function useAccounts() {
       return { error: null }
     }
 
-    await fetch()
+    await invalidateAfterWrite('accounts')
     return { error: null }
   }
 
@@ -156,7 +135,7 @@ export function useAccounts() {
       .update({ is_active: false })
       .eq('id', id)
       .eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('accounts')
     return toResult(error, { action: 'delete', entity: 'account' })
   }
 
@@ -169,8 +148,8 @@ export function useAccounts() {
     const nextAccounts = accounts
       .map((account) => ({ ...account, sort_order: orderMap.get(account.id) ?? account.sort_order ?? accounts.length }))
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.created_at.localeCompare(b.created_at))
-    setAccounts(nextAccounts)
-    writeCache(`${user.id}:accounts`, nextAccounts)
+    queryClient.setQueryData(queryKey, nextAccounts)
+    writeCache(`${user.id}:accounts${cacheSuffix}`, nextAccounts)
 
     const updates = orderedIds.map((id, sort_order) =>
       supabase
@@ -188,7 +167,5 @@ export function useAccounts() {
     return { error: null }
   }
 
-  const error = loadFailure?.message ?? null
-  const errorDetail = loadFailure?.detail ?? null
   return { accounts, loading, error, errorDetail, refetch: fetch, createAccount, updateAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder }
 }

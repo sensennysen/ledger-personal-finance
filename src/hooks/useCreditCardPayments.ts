@@ -1,60 +1,32 @@
-import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/contexts/AuthContext'
-import { readCache, writeCache } from '@/lib/dataCache'
-import { readWithPolicy } from '@/lib/readRetry'
+import { readAllPages } from '@/lib/pagedRead'
+import { useEntityQuery } from '@/hooks/useEntityQuery'
 import type { CreditCardPayment } from '@/types'
-import { describeDataError, type DescribedError } from '@/lib/dataErrors'
+
+const NO_PAYMENTS: CreditCardPayment[] = []
 
 // Every credit card payment for the user, with no account filter. useCardPayment records and
 // updates one payment as part of a transfer; this is a plain read for the data-export card
 // (public page, LED-180) — needs only useAuth, no notification surface.
 export function useCreditCardPayments() {
-  const { user } = useAuth()
-  const [payments, setPayments] = useState<CreditCardPayment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
+  // The export reads every payment, so page past PostgREST's 1,000-row cap (LED-308).
+  const { data, loading, error, refetch } = useEntityQuery<CreditCardPayment[]>({
+    entity: 'card-payments',
+    offlineLabel: 'your card payments',
+    cacheKey: (userId) => `${userId}:credit_card_payments`,
+    read: async (userId, retry, signal) => {
+      const { rows, error } = await readAllPages<CreditCardPayment>((from, to) => supabase
+        .from('credit_card_payments')
+        .select('*')
+        .eq('user_id', userId)
+        .order('payment_date', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to)
+        .abortSignal(signal)
+        .retry(retry), 1000, () => signal.aborted)
+      return { data: rows, error }
+    },
+  })
 
-  const fetch = useCallback(async () => {
-    if (!user) {
-      setLoading(false)
-      return
-    }
-    const cacheKey = `${user.id}:credit_card_payments`
-    const cached = readCache<CreditCardPayment[]>(cacheKey)
-    if (cached) {
-      setPayments(cached)
-      setLoading(false)
-    } else {
-      setLoading(true)
-    }
-    if (!navigator.onLine) return
-
-    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
-    const { data, error } = await readWithPolicy((retry) => supabase
-      .from('credit_card_payments')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('payment_date', { ascending: false })
-      .retry(retry), { background: cached !== null })
-
-    if (error) {
-      setLoadFailure(describeDataError(error, { action: 'load' }))
-      setLoading(false)
-      return
-    }
-
-    setLoadFailure(null)
-    setPayments(data as CreditCardPayment[])
-    writeCache(cacheKey, data)
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void fetch()
-    })
-  }, [fetch])
-
-  return { payments, loading, error: loadFailure?.message ?? null, refetch: fetch }
+  return { payments: data ?? NO_PAYMENTS, loading, error, refetch }
 }

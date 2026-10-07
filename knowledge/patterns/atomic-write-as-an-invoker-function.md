@@ -17,7 +17,10 @@ select set_config('request.jwt.claims', json_build_object('sub', '<user uuid>', 
 set local role authenticated;   -- so RLS applies; use `set local role postgres` to seed rows
 ```
 - Seed with the role `postgres`, call as `authenticated`, and read balances back as `postgres`.
+- For anon, also reset the claims: `select set_config('request.jwt.claims', '{"role":"anon"}', true); set local role anon;`. `auth.uid()` reads the claims, so after `set local role anon` alone the session still acts as the last user (epic 24 phase 4).
 - Run the failing cases under `savepoint` / `rollback to savepoint` in one script with `\set ON_ERROR_STOP off`.
 - Cover: the happy path, a failure after the first child is written (an unknown category), a sum mismatch, the wrong account type, and a second user (expect "not found").
 - Then run `supabase db lint --local --level warning --fail-on error`; it flags type mismatches in a variable initialiser (`'{}'` for a `uuid[]`).
 - Put the observed figures in the unit test as literals (`patterns/mirror-a-sql-function-with-observed-fixtures.md`).
+
+**Grants (LED-294):** `revoke all … from public` does not take EXECUTE away from anon. Supabase grants anon and authenticated directly on functions in `public`, so every function above stayed callable by anon, and RLS was the real guard. Do not fix that by revoking anon. On `supabase/postgres:17.6.1.111` (local and the linked project), calling a function the role may not execute segfaults the backend (signal 11) rather than raising "permission denied". Keep the function SECURITY INVOKER so RLS answers anon with no rows, and check `has_function_privilege` in psql rather than calling a denied function. Revisit once the image is fixed (retro `2026-10-07-epic-24-phase-1`).

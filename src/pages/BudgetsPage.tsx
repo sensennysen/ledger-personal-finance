@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { amountInCurrency } from '@/lib/exchangeRates'
+import { goalContributionTotal } from '@/lib/goalContributions'
 import { useBudgets } from '@/hooks/useBudgets'
 import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { budgetAllowance, canRollover, nextCycleOpensAt } from '@/lib/budgetRollover'
@@ -1011,6 +1012,8 @@ function SavingsGoalCard({
 }) {
   const ink = useCategoryInk()
   const [expanded, setExpanded] = useState(false)
+  const { table: rateTable } = useExchangeRates()
+  const contributed = goalContributionTotal(goal.linkedTransactions ?? [], goal.currency, rateTable)
   const pace = goalPace({ target: goal.target_amount, saved: goal.current_amount, deadline: goal.deadline })
   const { pct, remaining } = pace
   const status = goalStatus({
@@ -1138,12 +1141,11 @@ function SavingsGoalCard({
             >
               {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronR className="w-3 h-3" />}
               {goal.linkedTransactions!.length} linked transaction{goal.linkedTransactions!.length !== 1 ? 's' : ''}
-              {goal.totalContributed !== undefined && (
-                <span className="ml-1 font-medium" style={{ color: goal.totalContributed >= 0 ? INCOME : EXPENSE }}>
-                  ({goal.totalContributed >= 0 ? '+' : ''}{formatCurrency(goal.totalContributed, goal.currency)})
-                </span>
-              )}
+              <span className="ml-1 font-medium" style={{ color: contributed.total >= 0 ? INCOME : EXPENSE }}>
+                ({contributed.total >= 0 ? '+' : ''}{formatCurrency(contributed.total, goal.currency)})
+              </span>
             </button>
+            <UnratedCurrencyNotice currencies={contributed.excludedCurrencies} subject="linked transactions" />
             {expanded && (
               <div className="mt-2 space-y-1">
                 <p className="text-xs text-muted-foreground">Shown for reference — they don't change Saved so far.</p>
@@ -1195,6 +1197,9 @@ export default function BudgetsPage() {
   const [editGoal, setEditGoal] = useState<GoalWithContributions | null>(null)
   const [goalFormError, setGoalFormError] = useState<FormErrorValue>(null)
   const [contributionGoal, setContributionGoal] = useState<GoalWithContributions | null>(null)
+  const [contributionError, setContributionError] = useState<FormErrorValue>(null)
+  // One id per opened dialog: a retry after a lost response reuses it and is counted once (LED-312).
+  const [contributionOpId, setContributionOpId] = useState('')
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null)
 
   const defaultCurrency = profile?.default_currency ?? 'USD'
@@ -1251,9 +1256,19 @@ export default function BudgetsPage() {
 
   const handleContribution = async (amount: number) => {
     if (!contributionGoal) return
-    await addContribution(contributionGoal.id, amount, contributionGoal.current_amount)
+    const { error, errorDetail } = await addContribution(contributionGoal.id, amount, contributionOpId)
+    // A rejected or unsent contribution keeps the dialog and its amount, so Add Contribution retries (LED-313).
+    if (error) { setContributionError({ message: error, detail: errorDetail ?? null }); return }
+    setContributionError(null)
     setContributionGoal(null)
   }
+
+  const openContribution = (goal: GoalWithContributions) => {
+    setContributionOpId(crypto.randomUUID())
+    setContributionError(null)
+    setContributionGoal(goal)
+  }
+  const closeContribution = () => { setContributionGoal(null); setContributionError(null) }
 
   const monthlyBudgets = budgets.filter((b) => b.period === 'monthly')
 
@@ -1594,7 +1609,7 @@ export default function BudgetsPage() {
                   goal={goal}
                   onEdit={() => setEditGoal(goal)}
                   onDelete={async () => { await deleteGoal(goal.id) }}
-                  onContribute={() => setContributionGoal(goal)}
+                  onContribute={() => openContribution(goal)}
                   onToggleComplete={() => updateGoal(goal.id, { is_completed: true })}
                 />
               ))}
@@ -1607,7 +1622,7 @@ export default function BudgetsPage() {
                       goal={goal}
                       onEdit={() => setEditGoal(goal)}
                       onDelete={async () => { await deleteGoal(goal.id) }}
-                      onContribute={() => setContributionGoal(goal)}
+                      onContribute={() => openContribution(goal)}
                       onToggleComplete={() => updateGoal(goal.id, { is_completed: false })}
                     />
                   ))}
@@ -1705,13 +1720,14 @@ export default function BudgetsPage() {
       </Dialog>
 
       {/* Contribution dialog */}
-      <Dialog open={!!contributionGoal} onOpenChange={(o) => { if (!o) setContributionGoal(null) }}>
+      <Dialog open={!!contributionGoal} onOpenChange={(o) => { if (!o) closeContribution() }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Contribution</DialogTitle></DialogHeader>
+          <FormError error={contributionError} />
           {contributionGoal && (
             <ContributionDialog
               goal={contributionGoal}
-              onClose={() => setContributionGoal(null)}
+              onClose={closeContribution}
               onSubmit={handleContribution}
             />
           )}

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { registerLoanPurchasesListener } from '@/lib/cacheEvents'
+import { registerEntityListener } from '@/lib/cacheEvents'
 import { readAllPages } from '@/lib/pagedRead'
+import { readInBatches } from '@/lib/idBatches'
 import { enrichLoanPurchase, getLoanDeadlines, roundMoney } from '@/lib/loanInstallments'
 import { supabase } from '@/lib/supabase'
 import type { LoanPaymentAllocation, LoanPurchase } from '@/types'
@@ -40,16 +41,21 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
     }
 
     setLoading(true)
-    let purchaseQuery = supabase
-      .from('loan_purchases')
-      .select('*, category:categories(id, name, color, icon)')
-      .eq('user_id', userId)
-
-    if (accountId) purchaseQuery = purchaseQuery.eq('account_id', accountId)
-
-    const { data: purchaseRows, error: purchaseError } = await purchaseQuery
-      .order('first_due_date', { ascending: true })
-      .order('created_at', { ascending: true })
+    // Every purchase, paged past PostgREST's 1,000-row cap: a missing one drops its allocations and
+    // understates the schedule, and the export reads this list as complete (LED-308).
+    const { rows: purchaseRows, error: purchaseError } = await readAllPages<LoanPurchase>((from, to) => {
+      let purchaseQuery = supabase
+        .from('loan_purchases')
+        .select('*, category:categories(id, name, color, icon)')
+        .eq('user_id', userId)
+      if (accountId) purchaseQuery = purchaseQuery.eq('account_id', accountId)
+      return purchaseQuery
+        .order('first_due_date', { ascending: true })
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to)
+        .overrideTypes<LoanPurchase[], { merge: false }>()
+    })
 
     if (purchaseError) {
       setLoadFailure(describeDataError(purchaseError, { action: 'load' }))
@@ -57,29 +63,32 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
       return
     }
 
-    const nextPurchases = (purchaseRows as LoanPurchase[]) ?? []
+    const nextPurchases = purchaseRows
     const purchaseIds = nextPurchases.map((purchase) => purchase.id)
     let nextAllocations: LoanPaymentAllocation[] = []
 
     if (purchaseIds.length > 0) {
-      // A read across every loan can pass PostgREST's 1,000-row cap, so page it.
-      const { rows: allocationRows, error: allocationError } = await readAllPages(
+      // A read across every loan can pass PostgREST's 1,000-row cap, so page it, and batch the ids so
+      // the filter stays short enough for a URL (LED-308).
+      const { rows: allocationRows, error: allocationError } = await readInBatches(purchaseIds, (batch) => readAllPages<LoanPaymentAllocation>(
         (from, to) => supabase
           .from('loan_payment_allocations')
           .select('*, transaction:transactions(id, date, description)')
           .eq('user_id', userId)
-          .in('loan_purchase_id', purchaseIds)
+          .in('loan_purchase_id', batch)
           .order('created_at', { ascending: true })
           .order('id', { ascending: true })
           .range(from, to),
-      )
+      ))
 
       if (allocationError) {
         setLoadFailure(describeDataError(allocationError, { action: 'load' }))
         setLoading(false)
         return
       }
-      nextAllocations = allocationRows as LoanPaymentAllocation[]
+      // Batches each come back in order; put them back in one created_at, id order.
+      nextAllocations = allocationRows.sort((a, b) =>
+        a.created_at === b.created_at ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.created_at < b.created_at ? -1 : 1)
     }
 
     setPurchases(nextPurchases)
@@ -92,7 +101,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
     queueMicrotask(() => { void fetch() })
   }, [fetch])
 
-  useEffect(() => registerLoanPurchasesListener(() => { void fetch() }), [fetch])
+  useEffect(() => registerEntityListener('loan-purchases', () => { void fetch() }), [fetch])
 
   const createPurchase = async (values: CreateLoanPurchaseValues): Promise<MutationResult> => {
     if (!userId) return { error: 'Not authenticated' }

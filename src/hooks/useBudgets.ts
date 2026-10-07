@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { readCache, writeCache } from '@/lib/dataCache'
-import type { Budget } from '@/types'
+import type { Budget, Columns } from '@/types'
 import type { BudgetSpendTx } from '@/lib/budgetSpend'
 import type { RateTable } from '@/lib/exchangeRates'
 import { getCurrentCycleMonthKey } from '@/lib/utils'
@@ -18,6 +18,7 @@ import { buildBudgetHistory, type PeriodSpend } from '@/lib/budgetHistory'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { useOptionalExchangeRates } from '@/contexts/exchangeRatesState'
 import { resolveRefresh } from '@/lib/loadState'
+import { registerEntityListener } from '@/lib/cacheEvents'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 function localDateStr(date: Date): string {
@@ -108,7 +109,8 @@ export function useBudgets(
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: true })
-      .retry(retry), { background })
+      .retry(retry)
+      .overrideTypes<Budget[], { merge: false }>(), { background })
 
     if (request !== requestId.current) return
     if (budgetError) {
@@ -116,7 +118,7 @@ export function useBudgets(
       return
     }
 
-    const budgets = budgetData as Budget[]
+    const budgets = budgetData
 
     // Fetch 13 months of expense transactions to cover history and rollover
     const now = selectedMonth
@@ -251,6 +253,9 @@ export function useBudgets(
     })
   }, [fetch])
 
+  // A transaction, category or queue drain elsewhere changes spend: re-read this cycle (LED-306).
+  useEffect(() => registerEntityListener('budgets', () => { void fetch() }), [fetch])
+
   const createBudget = async (
     values: Omit<
       Budget,
@@ -291,7 +296,7 @@ export function useBudgets(
     return toResult(error, { action: 'save', entity: 'budget' })
   }
 
-  const updateBudget = async (id: string, values: Partial<Budget>): Promise<MutationResult> => {
+  const updateBudget = async (id: string, values: Partial<Columns<'budgets', Budget>>): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this budget.' }
     const { error } = await supabase
@@ -379,13 +384,14 @@ export function useBudgetsForExport(expenseTx: BudgetSpendTx[], rateTable: RateT
       .select('*, category:categories(id, name, color, icon, type)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
+      .overrideTypes<Budget[], { merge: false }>()
     if (request !== requestId.current) return
     if (error) {
       setLoadFailure(describeDataError(error, { action: 'load' }))
       setLoading(false)
       return
     }
-    setBudgets(data as Budget[])
+    setBudgets(data)
     setLoading(false)
   }, [user])
 

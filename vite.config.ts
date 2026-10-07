@@ -19,6 +19,11 @@ function siteMeta(siteUrl: string | null): Plugin {
   }
 }
 
+// Code only the PDF export and the CSV import use (LED-317). The chunks these dynamic imports start
+// are named `deferred-*`, left out of the precache and cached on first use (runtimeCaching below), so
+// installing the app skips them. A chunk holds only what its entry alone reaches; shared code splits off.
+const DEFERRED_ENTRY = /node_modules\/.*\/(jspdf|jspdf-autotable|html2canvas|dompurify|canvg)\/|src\/components\/transactions\/ImportCSVDialog\.tsx$/
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   // The commit an error report names (LED-258). Vercel sets VERCEL_GIT_COMMIT_SHA on every build.
@@ -27,6 +32,16 @@ export default defineConfig(({ mode }) => ({
   },
   server: {
     host: '127.0.0.1',
+  },
+  build: {
+    rolldownOptions: {
+      output: {
+        chunkFileNames: (chunk) =>
+          chunk.facadeModuleId && DEFERRED_ENTRY.test(chunk.facadeModuleId)
+            ? 'assets/deferred-[name]-[hash].js'
+            : 'assets/[name]-[hash].js',
+      },
+    },
   },
   plugins: [
     siteMeta(normalizeSiteUrl(loadEnv(mode, process.cwd(), '').VITE_SITE_URL)),
@@ -38,13 +53,25 @@ export default defineConfig(({ mode }) => ({
       injectManifest: undefined,
       manifest: false,
       workbox: {
-        // Cache all app shell assets
+        // The app shell and every page are precached, so any page opens offline after install. The
+        // PDF and import code is not (LED-317).
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        globIgnores: ['**/deferred-*.js'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
         // Network-first for navigations so fresh HTML is always preferred
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
+          {
+            // A deferred chunk, cached when first used so it works offline afterwards. File names
+            // carry a content hash, so a cached copy never goes stale.
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && /^\/assets\/deferred-.*\.js$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ledger-deferred-chunks',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 90 },
+            },
+          },
           {
             // Cache Google Fonts stylesheets
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

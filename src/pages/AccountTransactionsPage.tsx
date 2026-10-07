@@ -26,12 +26,12 @@ import { ErrorState, InlineLoadError } from '@/components/ui/error-state'
 import { FormError } from '@/components/ui/form-error'
 import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { resolveLoadState } from '@/lib/loadState'
-import { notifyCardPaymentsRefresh, registerCardPaymentsListener } from '@/lib/cacheEvents'
+import { registerEntityListener } from '@/lib/cacheEvents'
 import { searchMatcher } from '@/lib/globalSearch'
 import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { useCardPayment } from '@/hooks/useCardPayment'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
-import { defaultCardPaymentDescription, isCardPaymentTransaction } from '@/lib/cardPayment'
+import { defaultCardPaymentDescription } from '@/lib/cardPayment'
 import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { entryDialogWidthClass, type TransactionKind } from '@/components/transactions/transactionKinds'
@@ -304,8 +304,8 @@ export default function AccountTransactionsPage() {
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
     refetchAccounts()
-    // The database moved, added or removed the payment's history row and statement with the transfer (LED-191, LED-230).
-    if (isCardPaymentTransaction(editingTx, accounts) || isCardPaymentTransaction(values, accounts)) notifyCardPaymentsRefresh()
+    // The database moved, added or removed the payment's history row and statement with the transfer
+    // (LED-191, LED-230); updateTransaction re-reads the payment history (LED-306).
     setEditingTx(null)
   }
 
@@ -319,9 +319,8 @@ export default function AccountTransactionsPage() {
       return
     }
     refetchAccounts()
-    if (snapshot && isCardPaymentTransaction(snapshot, accounts)) notifyCardPaymentsRefresh()
     if (snapshot) announceDeleted([snapshot], `"${snapshot.description}" deleted`)
-  }, [transactions, accounts, deleteTransaction, refetchAccounts, announceDeleteFailed, announceDeleted])
+  }, [transactions, deleteTransaction, refetchAccounts, announceDeleteFailed, announceDeleted])
 
   const isCard = account?.type === 'credit_card'
   const fetchPaymentHistory = useCallback(async () => {
@@ -339,7 +338,7 @@ export default function AccountTransactionsPage() {
       return
     }
     setPaymentsError(null)
-    setPaymentHistory({ accountId, rows: (data as CreditCardPayment[]) ?? [] })
+    setPaymentHistory({ accountId, rows: data ?? [] })
   }, [user, accountId, isCard])
 
   useEffect(() => {
@@ -347,8 +346,8 @@ export default function AccountTransactionsPage() {
   }, [fetchPaymentHistory])
 
   // A payment made from the global modal, or a card payment edited or deleted, signals here instead of
-  // this page running a second listener of its own (LED-192).
-  useEffect(() => registerCardPaymentsListener(() => void fetchPaymentHistory()), [fetchPaymentHistory])
+  // this page running a second listener of its own (LED-192, LED-306).
+  useEffect(() => registerEntityListener('card-payments', () => void fetchPaymentHistory()), [fetchPaymentHistory])
 
   const historyLoaded = paymentHistory !== null && paymentHistory.accountId === accountId
   const historyRows = historyLoaded ? paymentHistory.rows : []

@@ -29,8 +29,6 @@ import { FormError } from '@/components/ui/form-error'
 import type { FormErrorValue } from '@/lib/dataErrors'
 import { InteractiveRow } from '@/components/ui/interactive-row'
 import { resolveLoadState } from '@/lib/loadState'
-import { notifyAccountsRefresh, notifyCardPaymentsRefresh } from '@/lib/cacheEvents'
-import { isCardPaymentTransaction } from '@/lib/cardPayment'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { TransactionForm, type TransactionFormValues } from '@/components/transactions/TransactionForm'
 import { TransactionEditHeader, TransactionEntryHeader } from '@/components/transactions/TransactionEntryHeader'
@@ -53,7 +51,7 @@ import { filterFromParams, isFilterActive, type ActivityFilter, type FilterType 
 import { filteredEmptyMessage } from '@/lib/filteredEmpty'
 import { SavedFiltersDialog } from '@/components/transactions/SavedFiltersDialog'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
-import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
+import type { ImportCSVDialog as ImportCSVDialogComponent, ImportTx } from '@/components/transactions/ImportCSVDialog'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import type { Transaction } from '@/types'
@@ -162,10 +160,34 @@ export default function TransactionsPage() {
     bulkUpdateCategory,
     bulkCreateTransactions,
   } = useTransactions()
-  const { createWithStatement, recordGenerated } = useCardPayment(createTransaction)
+  const { createWithStatement } = useCardPayment(createTransaction)
 
   const notify = useNotify()
   const { categories } = useCategories()
+
+  // The import editor downloads the first time it opens (LED-317), then stays mounted.
+  const [ImportCSVDialog, setImportCSVDialog] = useState<typeof ImportCSVDialogComponent | null>(null)
+  useEffect(() => {
+    if (!importOpen || ImportCSVDialog) return
+    let cancelled = false
+    import('@/components/transactions/ImportCSVDialog').then(
+      (module) => { if (!cancelled) setImportCSVDialog(() => module.ImportCSVDialog) },
+      () => {
+        if (cancelled) return
+        setImportOpen(false)
+        notify({
+          severity: 'failure',
+          title: "Couldn't open the import",
+          // The browser keeps a failed import until the page reloads, so Retry reloads.
+          body: navigator.onLine
+            ? 'Reload the page and try again.'
+            : "The CSV import downloads the first time it's used. Connect to the internet, then reload the page.",
+          action: { label: 'Reload', run: () => window.location.reload() },
+        })
+      },
+    )
+    return () => { cancelled = true }
+  }, [importOpen, ImportCSVDialog, notify])
   const loadState = resolveLoadState({ loading, error, hasData: transactions.length > 0 })
 
   // ── Helpers ────────────────────────────────────────────────
@@ -351,11 +373,8 @@ export default function TransactionsPage() {
     const { error, errorDetail } = await updateTransaction(editingTx.id, values as Parameters<typeof updateTransaction>[1])
     if (error) { setFormError({ message: error, detail: errorDetail ?? null }); return }
     setFormError(null)
-    // The database moved, added or removed the card's payment row and statement with the edit (LED-191, LED-230).
-    if (isCardPaymentTransaction(editingTx, accounts) || isCardPaymentTransaction(values, accounts)) {
-      notifyAccountsRefresh()
-      notifyCardPaymentsRefresh()
-    }
+    // The database moved, added or removed the card's payment row and statement with the edit
+    // (LED-191, LED-230); updateTransaction re-reads balances and the card views (LED-306).
     setEditingTx(null)
   }
 
@@ -463,7 +482,7 @@ export default function TransactionsPage() {
       // A converted row keeps the statement's own amount and currency, so a re-import at another rate is still caught.
       ...(t.original ? { original_amount: t.original.amount, original_currency: t.original.currency } : {}),
     }))
-    const result = await bulkCreateTransactions(rows, recordGenerated)
+    const result = await bulkCreateTransactions(rows)
     return { imported: result.imported ?? 0, error: result.error ?? null }
   }
 
@@ -1005,11 +1024,13 @@ export default function TransactionsPage() {
         )}
 
         {/* Import CSV dialog */}
-        <ImportCSVDialog
-          open={importOpen}
-          onOpenChange={setImportOpen}
-          onImport={handleImport}
-        />
+        {ImportCSVDialog && (
+          <ImportCSVDialog
+            open={importOpen}
+            onOpenChange={setImportOpen}
+            onImport={handleImport}
+          />
+        )}
 
 
       </div>

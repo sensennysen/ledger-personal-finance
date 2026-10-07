@@ -24,8 +24,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import { useNotify } from '@/contexts/notificationState'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useCategories } from '@/hooks/useCategories'
@@ -102,7 +101,7 @@ function pdfCategoryRows(categoryBreakdown: CategorySlice[]) {
   return other ? [...top, { name: `Other - ${other.count} categories`, amount: other.amount }] : top
 }
 
-function exportToPdf(
+async function exportToPdf(
   transactions: Transaction[],
   totalIncome: number,
   totalExpenses: number,
@@ -121,6 +120,8 @@ function exportToPdf(
   const pdfFmt = (amount: number, code: string) =>
     formatCurrency(amount, code, { currencyDisplay: 'code' })
 
+  // jsPDF and its table plugin (with html2canvas behind them) download on the first export (LED-317).
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 14
@@ -416,6 +417,7 @@ const SKELETON_WIDTH: Record<ReportColumn, string> = {
 
 export default function ReportsPage() {
   const ink = useCategoryInk()
+  const notify = useNotify()
   const { profile } = useAuth()
   const deficitBehaviour = useDeficitBehaviour()
   const currency = profile?.default_currency ?? 'USD'
@@ -530,7 +532,7 @@ export default function ReportsPage() {
   }
 
   const handleExportPdf = () => {
-    exportToPdf(
+    void exportToPdf(
       sortedTransactions,
       totalIncome,
       totalExpenses,
@@ -542,7 +544,15 @@ export default function ReportsPage() {
       filenameLabel,
       exportColumns(visibleColumns),
       txBalanceMap,
-    )
+    ).catch(() => notify({
+      severity: 'failure',
+      title: "Couldn't create the PDF",
+      // The browser keeps a failed import until the page reloads, so the action reloads.
+      body: navigator.onLine
+        ? 'Reload the page and try again.'
+        : "The PDF export downloads the first time it's used. Connect to the internet, then reload the page.",
+      action: { label: 'Reload', run: () => window.location.reload() },
+    }))
   }
 
   // ── Net Worth Over Time (last 13 months) ──

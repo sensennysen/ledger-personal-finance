@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { registerSyncedListener } from '@/lib/offlineQueue'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { hiddenByScroll, isNearScrollEnd } from '@/lib/scrollEnd'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import {
@@ -18,6 +17,7 @@ import { QueueReviewSheet } from './QueueReviewSheet'
 import { PWAInstallBanner } from './PWAInstallBanner'
 import { resolveHeaderMeta } from '@/lib/pageChrome'
 import { CycleProvider } from '@/contexts/CycleContext'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useCycle } from '@/contexts/cycleState'
 import { buildMonthNets } from '@/lib/monthJump'
 import { cn, getCurrentCycleMonthKey } from '@/lib/utils'
@@ -101,7 +101,7 @@ function LayoutShell() {
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
   const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
-  const { createWithStatement, recordGenerated, recordSynced } = useCardPayment(createTransaction)
+  const { createWithStatement } = useCardPayment(createTransaction)
   const notify = useNotify()
   const { accounts, loading: accountsLoading } = useAccounts()
   // ⌘F in search scopes to the account page it opened over.
@@ -231,20 +231,18 @@ function LayoutShell() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
   useCreditCardNotifications()
-  // A card payment made offline records its statement when the queue drains (LED-193). One owner: here.
-  useEffect(() => registerSyncedListener((item) => void recordSynced(item)), [recordSynced])
   useEffect(() => {
     if (hasGenerated.current) return
     hasGenerated.current = true
     // A recurring row that could not be posted, or a failed read of them, is reported with Retry,
     // not skipped silently (LED-232).
     const run = async () => {
-      const notice = recurringRunNotice(await generateDueRecurring(recordGenerated))
+      const notice = recurringRunNotice(await generateDueRecurring())
       if (!notice) return
       notify({ severity: 'failure', ...notice, action: { label: 'Retry', run: () => void run() } })
     }
     void run()
-  }, [generateDueRecurring, recordGenerated, notify])
+  }, [generateDueRecurring, notify])
   const handleCreate = async (values: TransactionFormValues) => {
     const { error, errorDetail } = await createWithStatement(
       values as Parameters<typeof createTransaction>[0],
@@ -396,7 +394,10 @@ function LayoutShell() {
               className="animate-page-in min-h-full min-w-0 w-full max-w-full"
             >
               <ErrorBoundary>
-                <Outlet context={{ openAddTransactionModal, setupComplete } satisfies AppLayoutContext} />
+                {/* A page's code arrives on first open (LED-317); the shell stays and the page area waits. */}
+                <Suspense fallback={<PageSkeleton />}>
+                  <Outlet context={{ openAddTransactionModal, setupComplete } satisfies AppLayoutContext} />
+                </Suspense>
               </ErrorBoundary>
             </div>
           </main>
@@ -616,5 +617,16 @@ function LayoutShell() {
         </Dialog>
       </div>
     </EntryContext.Provider>
+  )
+}
+
+/** The page area while a page's code downloads: the page's own layout is not known yet, so plain cards. */
+function PageSkeleton() {
+  return (
+    <div className="p-4 md:p-6 lg:px-8 space-y-6 max-w-[1600px] mx-auto" aria-busy="true" aria-label="Loading page">
+      <Skeleton className="h-32 rounded-[20px]" />
+      <Skeleton className="h-64 rounded-[20px]" />
+      <Skeleton className="h-48 rounded-[20px]" />
+    </div>
   )
 }

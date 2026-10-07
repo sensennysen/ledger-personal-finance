@@ -1,5 +1,6 @@
 import { useContext } from 'react'
 import { NetworkStatusContext, type NetworkStatus } from '@/contexts/networkStatusState'
+import { invalidateAfterWrite } from '@/hooks/useEntityQuery'
 
 /**
  * Online/offline state and the offline-queue drain. The state lives in one
@@ -13,18 +14,11 @@ export function useNetworkStatus(): NetworkStatus {
 }
 
 // ---------------------------------------------------------------------------
-// Sync listeners: data hooks register a refetch to run after a drain or a resolve.
+// After a drain or a resolve, every read a transaction touches refetches wherever it is mounted:
+// lists, balances, budgets, goals and card views (LED-306).
 // ---------------------------------------------------------------------------
-type SyncListener = () => void
-const syncListeners = new Set<SyncListener>()
 
-/** Called by data hooks to register a refetch callback after sync. */
-export function registerSyncListener(cb: SyncListener) {
-  syncListeners.add(cb)
-  return () => syncListeners.delete(cb)
-}
-
-/** Called after a sync or a resolve to notify data hooks. */
+/** Called after a sync or a resolve (this tab's or another's) to refresh what the queue changed. */
 export function notifySyncListeners() {
-  syncListeners.forEach((cb) => cb())
+  void invalidateAfterWrite('sync')
 }

@@ -9,8 +9,10 @@ Ledger: a self-hostable personal finance app. React 19 + TypeScript + Vite + Sup
 - `pnpm build` — `tsc -b` then `vite build`.
 - `pnpm test` — all `tests/*.test.mjs` via `node --test`, then `tests/redesign.mjs`.
 - `pnpm db:start|stop|status|reset|migrate|new|diff` — local Supabase (see README). `pnpm db:push:remote` touches the linked remote; never run it without being asked.
+- `pnpm db:test` — pgTAP files in `supabase/tests/database/` plus `supabase/tests/concurrency.sh`, against local Supabase.
+- `pnpm db:types` — regenerate `src/types/database.ts` from the local schema. Run it after every migration and commit the result; CI fails on drift.
 
-CI (`.github/workflows/ci.yml`) runs on every PR and on push to `main`: a `verify` job (lint, build, test) and a `db` job that starts a fresh local Supabase, applies every migration and `seed.sql`, lints database functions and replays the migrations from scratch. Keep both green; a new migration must apply cleanly to an empty database.
+CI (`.github/workflows/ci.yml`) runs on every PR and on push to `main`: a `verify` job (lint, build, test) and a `db` job that starts a fresh local Supabase, applies every migration and `seed.sql`, lints database functions, replays the migrations from scratch, runs the database tests and checks `src/types/database.ts` for drift. Keep both green; a new migration must apply cleanly to an empty database.
 
 ## Layout
 - `src/lib/` — pure logic and helpers. New logic that needs tests goes here.

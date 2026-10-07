@@ -10,6 +10,8 @@ export interface NetworkStatus {
   failedCount: number
   /** How many of this drain's items have been attempted so far, and the drain's total. Null when not syncing. */
   syncProgress: { done: number; total: number } | null
+  /** Why this browser cannot store offline changes, or null when it can (LED-303). */
+  storageError: string | null
   /** Manually trigger a sync attempt */
   syncNow: () => Promise<void>
   /** Re-read the counts from storage */

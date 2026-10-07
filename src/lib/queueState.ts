@@ -12,10 +12,22 @@ export interface QueueItem {
   payload: Record<string, unknown>
   /** For update/delete: the row id to target */
   rowId?: string
+  /**
+   * For update/delete: the server's updated_at the change was made against. The write only
+   * applies while the row still has it (LED-297). Absent on items queued before that.
+   */
+  baseRevision?: string
   /** Display name captured at enqueue time, for the queue sheet. Never sent to the database. */
   label?: string
   userId: string
   timestamp: number
+  /**
+   * A receipt the drain uploaded for this item, already in payload.receipt_url. Deleted from storage
+   * if the item is discarded, since no row points at it (LED-301).
+   */
+  uploadedReceipt?: string
+  /** Bumped by each edit of a queued create, so a drain confirms only the version it sent (LED-299). Absent = 0. */
+  version?: number
   /** Absent = pending. Flagged items are retained until the user resolves them. */
   status?: QueueStatus
   /** Set by "keep mine": skip the conflict check on the next drain. */
@@ -44,6 +56,13 @@ export function isCountableError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false
   const code = (error as { code?: unknown }).code
   return typeof code === 'string' && code !== ''
+}
+
+/** True for the database's duplicate-key error on a table's primary key (`<table>_pkey`). */
+export function isDuplicateRowId(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const { code, message } = error as { code?: unknown; message?: unknown }
+  return code === '23505' && typeof message === 'string' && /_pkey"?\s*$/.test(message)
 }
 
 /**
@@ -97,6 +116,7 @@ export function editQueuedInsert(
     const fixed: QueueItem = {
       ...item,
       payload: { ...item.payload, ...values, id: rowId, user_id: item.payload.user_id },
+      version: (item.version ?? 0) + 1,
     }
     if (typeof values.description === 'string') fixed.label = values.description
     delete fixed.status
@@ -105,6 +125,31 @@ export function editQueuedInsert(
     return fixed
   })
   return { queue: edited ? next : queue, edited }
+}
+
+/** True when the row is still only a queued create (pending, failed or flagged), so it has no server revision yet. */
+export const hasQueuedInsert = (queue: QueueItem[], table: string, rowId: string) =>
+  queue.some((item) => item.table === table && item.operation === 'insert' && item.payload.id === rowId)
+
+/**
+ * Records a receipt the drain uploaded on the stored item, before the row is saved (LED-301).
+ * Applies only while the item still points at the same pending file; the version is not bumped,
+ * since this is the drain's own step, not an edit. `applied` is false when the receipt was
+ * replaced or the item is gone.
+ */
+export function setResolvedReceipt(
+  queue: QueueItem[],
+  itemId: string,
+  marker: string,
+  path: string,
+): { queue: QueueItem[]; applied: boolean } {
+  let applied = false
+  const next = queue.map((item) => {
+    if (item.id !== itemId || item.payload.receipt_url !== marker) return item
+    applied = true
+    return { ...item, uploadedReceipt: path, payload: { ...item.payload, receipt_url: path } }
+  })
+  return { queue: applied ? next : queue, applied }
 }
 
 /** When the earliest pending item passes the max age, or null when nothing is pending. */
@@ -168,12 +213,79 @@ export function applyKeepMine(queue: QueueItem[], id: string, now: number): Queu
 export const rowKey = (item: QueueItem) => `${item.table}:${item.rowId}`
 
 /**
+ * The revisions a drain wrote, per row: which revision each write replaced, and the latest one.
+ * A later queued change made against a revision we replaced is moved onto ours, so our own
+ * write is never mistaken for someone else's edit (LED-297).
+ */
+export type RevisionMoves = Map<string, { replaced: Map<string, string>; latest: string }>
+
+export function recordRevisionMove(moves: RevisionMoves, key: string, from: string | undefined, to: string): void {
+  const entry = moves.get(key) ?? { replaced: new Map<string, string>(), latest: to }
+  if (from !== undefined && from !== to) entry.replaced.set(from, to)
+  entry.latest = to
+  moves.set(key, entry)
+}
+
+/**
+ * Moves an update/delete onto the revision this drain left the row at. An item with no
+ * revision (queued before LED-297) takes the latest one: the row holds what we wrote.
+ * A revision we did not replace is someone else's, and is left alone.
+ */
+export function rebaseRevision(item: QueueItem, moves: RevisionMoves): QueueItem {
+  if (item.operation === 'insert' || !item.rowId) return item
+  const entry = moves.get(rowKey(item))
+  if (!entry) return item
+  if (item.baseRevision === undefined) return { ...item, baseRevision: entry.latest }
+  let revision = item.baseRevision
+  const seen = new Set<string>()
+  while (entry.replaced.has(revision) && !seen.has(revision)) {
+    seen.add(revision)
+    revision = entry.replaced.get(revision)!
+  }
+  return revision === item.baseRevision ? item : { ...item, baseRevision: revision }
+}
+
+export const rebaseRevisions = (items: QueueItem[], moves: RevisionMoves) =>
+  moves.size === 0 ? items : items.map((item) => rebaseRevision(item, moves))
+
+/** A queued create the drain saved: the version it sent, and its payload as the drain read it. */
+export interface SentInsert {
+  version: number
+  payload: Record<string, unknown>
+}
+
+/**
+ * A queued create that was edited while the drain was sending an older version. The row now
+ * exists, so the edit becomes an update of the fields that changed (LED-299). It takes the
+ * insert's revision from the drain's revision moves. Null when nothing changed.
+ */
+export function followUpUpdate(current: QueueItem, sent: SentInsert): QueueItem | null {
+  const changed: Record<string, unknown> = {}
+  for (const [field, value] of Object.entries(current.payload)) {
+    if (field === 'id' || field === 'user_id') continue
+    if (JSON.stringify(value) !== JSON.stringify(sent.payload[field])) changed[field] = value
+  }
+  if (Object.keys(changed).length === 0) return null
+  const next: QueueItem = { ...current, operation: 'update', rowId: String(current.payload.id), payload: changed }
+  delete next.status
+  delete next.attempts
+  delete next.lastError
+  delete next.baseRevision
+  // The insert saved that file: discarding this follow-up must not delete it.
+  delete next.uploadedReceipt
+  return next
+}
+
+/**
  * Combines a drain's result with the queue as it is now, so changes made while
  * the drain was awaiting the network are not overwritten.
  *
  * - `remaining`: items the drain wants to keep (unsynced, failed, flagged).
  * - `flaggedAtStart`: ids that were already flagged in storage when the drain began;
  *   the user may have resolved these mid-drain, so the current copy wins.
+ * - A kept item edited mid-drain (a newer `version`) keeps the current copy.
+ * - `sent`: creates the drain saved. One edited while it was sent leaves its newer
+ *   version behind as an update (LED-299).
  * - Items no longer in `current` (resolved via keep-theirs or cleared) are dropped.
  * - Items in `current` that the drain never saw (enqueued mid-drain) are appended.
  */
@@ -181,14 +293,22 @@ export function mergeDrainResult(
   remaining: QueueItem[],
   current: QueueItem[],
   seenIds: Set<string>,
-  flaggedAtStart: Set<string>
+  flaggedAtStart: Set<string>,
+  sent: Map<string, SentInsert> = new Map(),
 ): QueueItem[] {
   const currentById = new Map(current.map((i) => [i.id, i]))
   const merged: QueueItem[] = []
   for (const item of remaining) {
     const cur = currentById.get(item.id)
     if (!cur) continue
-    merged.push(flaggedAtStart.has(item.id) ? cur : item)
+    const editedMidDrain = (cur.version ?? 0) > (item.version ?? 0)
+    merged.push(flaggedAtStart.has(item.id) || editedMidDrain ? cur : item)
+  }
+  for (const [id, saved] of sent) {
+    const cur = currentById.get(id)
+    if (!cur || (cur.version ?? 0) <= saved.version) continue
+    const update = followUpUpdate(cur, saved)
+    if (update) merged.push(update)
   }
   for (const item of current) if (!seenIds.has(item.id)) merged.push(item)
   return merged
@@ -199,4 +319,27 @@ export function removeFlagged(queue: QueueItem[], id?: string) {
   const removed = queue.filter((i) => i.status && (id === undefined || i.id === id))
   const kept = queue.filter((i) => !removed.includes(i))
   return { kept, removed }
+}
+
+/** Shown when a change could not be stored in this browser: nothing was saved or shown (LED-303). */
+export const QUEUE_STORAGE_FAILED =
+  "This browser couldn't store the change, so it wasn't saved. Free up some space or reconnect, then try again."
+
+/** A new item as a caller gives it: the queue assigns its id and timestamp. */
+export type NewQueueItem = Omit<QueueItem, 'id' | 'timestamp'>
+
+/** Appends new items in order, each with its own id and the same timestamp (LED-318: one write for a batch). */
+export function appendItems(queue: QueueItem[], items: NewQueueItem[], now: number, newId: () => string): QueueItem[] {
+  if (items.length === 0) return queue
+  return [...queue, ...items.map((item) => ({ ...item, id: newId(), timestamp: now }))]
+}
+
+/**
+ * Moves a queue stored before LED-303 (localStorage) into the stored queue. An item already there
+ * (by id) is kept as stored, so a second tab running the same move adds nothing.
+ */
+export function mergeLegacyQueue(stored: QueueItem[], legacy: QueueItem[]): QueueItem[] {
+  const ids = new Set(stored.map((item) => item.id))
+  const added = legacy.filter((item) => item && typeof item.id === 'string' && !ids.has(item.id))
+  return added.length === 0 ? stored : [...stored, ...added]
 }

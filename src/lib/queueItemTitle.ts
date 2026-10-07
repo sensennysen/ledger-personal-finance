@@ -40,5 +40,7 @@ export function itemNote(item: QueueItem): string {
   }
   if (item.status === 'failed') return `Couldn't save after ${MAX_ATTEMPTS} tries${item.lastError ? `: ${item.lastError}` : ''}`
   if (item.status === 'expired') return 'Waited more than 30 days to sync'
+  // Still pending, but the last drain could not check the saved copy, so it wrote nothing (LED-297).
+  if (item.lastError && !item.attempts) return item.lastError
   return `${OPERATION_LABEL[item.operation]} · ${humanizeTable(item.table)}`
 }

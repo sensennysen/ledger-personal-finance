@@ -54,7 +54,7 @@ export const STORAGE_ROWS: StorageRow[] = [
     id: 'queue',
     what: 'Changes waiting to sync',
     keys: ['ledger_offline_queue'],
-    where: 'local storage',
+    where: 'IndexedDB',
     why: 'Changes made offline, sent when you reconnect',
     removed: 'When they sync, or when you sign out',
     clear: 'queue',

@@ -225,13 +225,12 @@ begin
   end loop;
 
   -- ── Credit card payment log ──
-  -- One row per transfer into the card, linked by transaction_id the way the
-  -- app records a card payment, so editing or deleting the transfer keeps the
-  -- payment history in step.
-  insert into public.credit_card_payments (user_id, account_id, amount, payment_date, notes, transaction_id)
-  select t.user_id, t.to_account_id, t.amount, t.date, 'Autopay', t.id
-  from public.transactions t
-  where t.user_id = demo_user and t.type = 'transfer' and t.to_account_id = visa;
+  -- One row per transfer into the card, linked by transaction_id. The transfer insert
+  -- already recorded it (LED-296 trigger), so the seed only labels them.
+  update public.credit_card_payments p
+     set notes = 'Autopay'
+    from public.transactions t
+   where t.id = p.transaction_id and t.user_id = demo_user and t.type = 'transfer' and t.to_account_id = visa;
 
   update public.accounts a
      set last_payment_amount = p.amount, last_payment_date = p.payment_date

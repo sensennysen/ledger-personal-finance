@@ -1,96 +1,66 @@
-import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { readCache, writeCache } from '@/lib/dataCache'
+import { invalidateAfterWrite, useEntityQuery } from '@/hooks/useEntityQuery'
 import { readAllPages } from '@/lib/pagedRead'
-import { readWithPolicy } from '@/lib/readRetry'
+import { readInBatches } from '@/lib/idBatches'
 import type { SavingsGoal, Transaction } from '@/types'
-import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
+import { toResult, type MutationResult } from '@/lib/dataErrors'
 
 export interface GoalWithContributions extends SavingsGoal {
   linkedTransactions?: Transaction[]
-  totalContributed?: number
 }
+
+const NO_GOALS: GoalWithContributions[] = []
 
 export function useSavingsGoals() {
   const { user } = useAuth()
-  const [goals, setGoals] = useState<GoalWithContributions[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
 
-  const fetch = useCallback(async () => {
-    if (!user) {
-      setLoading(false)
-      return
-    }
-    const cacheKey = `${user.id}:savings_goals`
-    const cached = readCache<GoalWithContributions[]>(cacheKey)
-    if (cached) {
-      setGoals(cached)
-      setLoading(false)
-    } else {
-      setLoading(true)
-    }
-    if (!navigator.onLine) return
+  // Shared by every instance (LED-321): a goal and its linked transactions are one read.
+  const { data, loading, error, errorDetail, refetch } = useEntityQuery<GoalWithContributions[]>({
+    entity: 'savings-goals',
+    offlineLabel: 'your savings goals',
+    cacheKey: (userId) => `${userId}:savings_goals`,
+    read: async (userId, retry, signal) => {
+      const { data, error } = await supabase
+        .from('savings_goals')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+        .abortSignal(signal)
+        .retry(retry)
+      if (error) return { data: null, error }
 
-    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
-    const background = cached !== null
-    const { data, error } = await readWithPolicy((retry) => supabase
-      .from('savings_goals')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-      .retry(retry), { background })
-
-    if (error) {
-      setLoadFailure(describeDataError(error, { action: 'load' }))
-      setLoading(false)
-      return
-    }
-
-    // Fetch linked transactions for each goal
-    const goalIds = (data as SavingsGoal[]).map((g) => g.id)
-    let linkedTxs: Transaction[] = []
-    if (goalIds.length > 0) {
-      const { rows, error: txError } = await readWithPolicy((retry) => readAllPages<Transaction>((from, to) =>
-        supabase
-          .from('transactions')
-          .select('*, category:categories(id,name,color,icon), account:accounts!transactions_account_id_fkey(id,name,color,currency)')
-          .eq('user_id', user.id)
-          .in('goal_id', goalIds)
-          .order('date', { ascending: false })
-          .order('id', { ascending: false })
-          .range(from, to)
-          .retry(retry),
-      ), { background })
-      if (txError) {
-        setLoadFailure(describeDataError(txError, { action: 'load' }))
-        setLoading(false)
-        return
+      // Fetch linked transactions for each goal
+      const goalIds = data.map((g) => g.id)
+      let linkedTxs: Transaction[] = []
+      if (goalIds.length > 0) {
+        // Batched so the goal id filter stays short enough for a URL (LED-308).
+        const { rows, error: txError } = await readInBatches(goalIds, (batch) => readAllPages<Transaction>((from, to) =>
+          supabase
+            .from('transactions')
+            .select('*, category:categories(id,name,color,icon), account:accounts!transactions_account_id_fkey(id,name,color,currency)')
+            .eq('user_id', userId)
+            .in('goal_id', batch)
+            .order('date', { ascending: false })
+            .order('id', { ascending: false })
+            .range(from, to)
+            .abortSignal(signal)
+            .retry(retry)
+            .overrideTypes<Transaction[], { merge: false }>(),
+        ))
+        if (txError) return { data: null, error: txError }
+        linkedTxs = rows
       }
-      linkedTxs = rows
-    }
 
-    const enriched: GoalWithContributions[] = (data as SavingsGoal[]).map((g) => {
-      const txs = linkedTxs.filter((t) => t.goal_id === g.id)
-      return {
-        ...g,
-        linkedTransactions: txs,
-        totalContributed: txs.reduce((sum, t) => sum + (t.type === 'expense' ? -t.amount : t.amount), 0),
-      }
-    })
-
-    setLoadFailure(null)
-    setGoals(enriched)
-    writeCache(cacheKey, enriched)
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void fetch()
-    })
-  }, [fetch])
+      const enriched: GoalWithContributions[] = data.map((g) => {
+        const txs = linkedTxs.filter((t) => t.goal_id === g.id)
+        // The total is converted to the goal's currency where it is shown, with the rates (LED-311).
+        return { ...g, linkedTransactions: txs }
+      })
+      return { data: enriched, error: null }
+    },
+  })
+  const goals = data ?? NO_GOALS
 
   const createGoal = async (
     values: Omit<SavingsGoal, 'id' | 'user_id' | 'created_at' | 'updated_at'>
@@ -98,7 +68,7 @@ export function useSavingsGoals() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add a savings goal.' }
     const { error } = await supabase.from('savings_goals').insert({ ...values, user_id: user.id })
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('savings-goals')
     return toResult(error, { action: 'save', entity: 'goal' })
   }
 
@@ -106,7 +76,7 @@ export function useSavingsGoals() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this savings goal.' }
     const { error } = await supabase.from('savings_goals').update(values).eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('savings-goals')
     return toResult(error, { action: 'save', entity: 'goal' })
   }
 
@@ -114,15 +84,22 @@ export function useSavingsGoals() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to remove this savings goal.' }
     const { error } = await supabase.from('savings_goals').delete().eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('savings-goals')
     return toResult(error, { action: 'delete', entity: 'goal' })
   }
 
-  const addContribution = async (id: string, amount: number, currentAmount: number) => {
-    return updateGoal(id, { current_amount: currentAmount + amount })
+  /**
+   * Adds to a goal in one database call that locks the goal and increments in SQL, so concurrent
+   * contributions all count (LED-312). `opId` is one per contribution: a retry with the same id after
+   * a lost response is counted once.
+   */
+  const addContribution = async (id: string, amount: number, opId: string): Promise<MutationResult> => {
+    if (!user) return { error: 'Not authenticated' }
+    if (!navigator.onLine) return { error: 'Connect to the internet to add to this savings goal.' }
+    const { error } = await supabase.rpc('add_goal_contribution', { p_goal_id: id, p_amount: amount, p_op_id: opId })
+    if (!error) await invalidateAfterWrite('savings-goals')
+    return toResult(error, { action: 'save', entity: 'goal' })
   }
 
-  const error = loadFailure?.message ?? null
-  const errorDetail = loadFailure?.detail ?? null
-  return { goals, loading, error, errorDetail, refetch: fetch, createGoal, updateGoal, deleteGoal, addContribution }
+  return { goals, loading, error, errorDetail, refetch, createGoal, updateGoal, deleteGoal, addContribution }
 }

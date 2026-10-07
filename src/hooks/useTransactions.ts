@@ -1,25 +1,17 @@
-import { useEffect, useCallback } from 'react'
+import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { drainQueue, editQueuedInsert, enqueue, enqueueMany, pendingCount as queueSize, revisionFor } from '@/lib/offlineQueue'
 import { splitPendingReceipt } from '@/lib/receiptJob'
-import { notifySyncListeners, registerSyncListener } from '@/hooks/useNetworkStatus'
+import { notifySyncListeners } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
-import { useEntityQuery } from '@/hooks/useEntityQuery'
-import {
-  notifyAccountsRefresh,
-  notifyCardPaymentsRefresh,
-  notifyLoanPurchasesRefresh,
-  notifyTransactionsRefresh,
-  registerTransactionsListener,
-} from '@/lib/cacheEvents'
+import { invalidateAfterWrite, useEntityQuery } from '@/hooks/useEntityQuery'
+import { entityKey } from '@/lib/entityQuery'
 import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/lib/splitState'
 import { dueRecurringPosts, type RecurringRun } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
-import { generatedCardPayment } from '@/lib/cardPayment'
-import { importedCardPayments, type SavedImportRow } from '@/lib/importTransfer'
 import type { Transaction, Account, Category } from '@/types'
 import {
   applyTxDelta,
@@ -122,40 +114,27 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
   // Disabled, the key would be the unfiltered list's: never show it here.
   const transactions = enabled ? data ?? NO_TRANSACTIONS : NO_TRANSACTIONS
 
+  // Every mounted instance with these filters shares this entry, so the queued row shows on Home
+  // beside the layout's add form too (LED-145). The device copy keeps it across a reload.
   const updateTransactionCache = useCallback((next: Transaction[]) => {
     queryClient.setQueryData(queryKey, next)
-    // Another mounted instance (Home beside the layout's add form) has its own copy of this list.
-    // It reloads from the cache, so when the copy could not be written, asking it to would reload
-    // the old list over this one too (LED-303).
-    if (writeCache(buildCacheKey(), next)) notifyTransactionsRefresh()
+    writeCache(buildCacheKey(), next)
   }, [buildCacheKey, queryClient, queryKey])
-
-  const reloadFromCache = useCallback(() => {
-    // Disabled, the key would be the unfiltered list's: never load it here.
-    if (!user || !enabled) return
-    const cached = readCache<Transaction[]>(buildCacheKey())
-    if (cached) queryClient.setQueryData(queryKey, cached)
-  }, [user, enabled, buildCacheKey, queryClient, queryKey])
-
-  useEffect(() => registerTransactionsListener(reloadFromCache), [reloadFromCache])
-
-  // Refetch when the offline queue is drained (connection restored)
-  useEffect(() => {
-    const unregister = registerSyncListener(() => { if (enabled) void fetch() })
-    return () => { unregister() }
-  }, [fetch, enabled])
 
   // ---------- helpers for optimistic account updates ----------
 
   const optimisticAccountDelta = useCallback((applyFn: (accounts: Account[]) => Account[]) => {
     if (!user) return
-    const accountCacheKey = `${user.id}:accounts`
-    const cached = readCache<Account[]>(accountCacheKey)
-    if (!cached) return
-    const updated = applyFn(cached)
-    writeCache(accountCacheKey, updated)
-    notifyAccountsRefresh()
-  }, [user])
+    // Both account reads (pickers, and the export's archived ones) move with the balance.
+    for (const suffix of ['', ':all']) {
+      const accountCacheKey = `${user.id}:accounts${suffix}`
+      const cached = readCache<Account[]>(accountCacheKey)
+      if (!cached) continue
+      const updated = applyFn(cached)
+      writeCache(accountCacheKey, updated)
+      queryClient.setQueryData(entityKey(user.id, 'accounts', { includeArchived: suffix === ':all' }), updated)
+    }
+  }, [user, queryClient])
 
   // `id` is chosen here, not by the database, so a queued create keeps one identity: a later edit of
   // it finds the queued insert (LED-193) and a card payment's statement can name the row it came from.
@@ -227,8 +206,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       .single()
     if (!error && data && marker) await queueReceipt(data, marker, values.description)
     if (!error) {
-      await fetch()
-      notifyLoanPurchasesRefresh()
+      await invalidateAfterWrite('transactions')
     }
     return { ...toResult(error, { action: 'save', entity: 'transaction' }), id: data?.id }
   }
@@ -277,8 +255,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       .maybeSingle()
     if (!error && data && marker) await queueReceipt(data, marker, values.description ?? transactions.find((t) => t.id === id)?.description)
     if (!error) {
-      await fetch()
-      notifyLoanPurchasesRefresh()
+      await invalidateAfterWrite('transactions')
     }
     return toResult(error, { action: 'save', entity: 'transaction' })
   }
@@ -308,11 +285,10 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     }
     const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
     if (!error) {
-      await fetch()
-      notifyLoanPurchasesRefresh()
+      await invalidateAfterWrite('transactions')
     }
     return toResult(error, { action: 'delete', entity: 'transaction' })
-  }, [user, transactions, updateTransactionCache, optimisticAccountDelta, fetch])
+  }, [user, transactions, updateTransactionCache, optimisticAccountDelta])
 
   /** Splits one transaction into lines in a single database call: every line is written and the original removed, or nothing changes. */
   const splitTransaction = async (id: string, splits: SplitRpcLine[]): Promise<MutationResult> => {
@@ -320,8 +296,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     if (!navigator.onLine) return { error: SPLIT_OFFLINE_MESSAGE }
     const { error } = await supabase.rpc('split_transaction', { original_id: id, lines: buildSplitRpcLines(splits) })
     if (!error) {
-      await fetch()
-      notifyLoanPurchasesRefresh()
+      await invalidateAfterWrite('transactions')
     }
     return toResult(error, { action: 'save', entity: 'transaction' })
   }
@@ -347,8 +322,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       .in('id', ids)
       .eq('user_id', user.id)
     if (!error) {
-      await fetch()
-      notifyLoanPurchasesRefresh()
+      await invalidateAfterWrite('transactions')
     }
     return toResult(error, { action: 'delete' })
   }
@@ -383,7 +357,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       .update({ category_id: categoryId, subcategory_id: null })
       .in('id', ids)
       .eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('transactions')
     return toResult(error, { action: 'save' })
   }
 
@@ -417,22 +391,12 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       optimisticAccountDelta((accounts) => rows.reduce((next, values) => applyTxDelta(next, values), accounts))
       return { error: null, imported: rows.length }
     }
-    const { data: saved, error } = await supabase
+    const { error } = await supabase
       .from('transactions')
       .insert(rows.map((row) => ({ ...withTransactionDefaults(row), user_id: user.id })))
-      .select('id, type, to_account_id, amount, exchange_rate, destination_amount, date')
-    if (!error) await fetch()
-    if (!error && saved) {
-      const savedRows = saved as SavedImportRow[]
-      const cardIds = [...new Set(savedRows.filter((row) => row.type === 'transfer' && row.to_account_id).map((row) => row.to_account_id!))]
-      if (cardIds.length) {
-        const { data: destinations } = await supabase.from('accounts').select('*').in('id', cardIds)
-        if (importedCardPayments(savedRows, (destinations ?? []) as Account[]).length > 0) {
-          notifyAccountsRefresh()
-          notifyCardPaymentsRefresh()
-        }
-      }
-    }
+    // An imported transfer into a card is a payment the database recorded with it; invalidating
+    // transactions re-reads balances and the card views as well (LED-306).
+    if (!error) await invalidateAfterWrite('transactions')
     return { ...toResult(error, { action: 'save' }), imported: error ? 0 : rows.length }
   }
 
@@ -440,7 +404,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
    * Posts every recurring row that has come due. The database decides whether a row's next
    * occurrence is already posted (LED-232), so another browser or device never posts it twice.
    * A posted transfer into a credit card is recorded as a payment by the database in the same
-   * insert (LED-190, LED-296); the card views are asked to re-read.
+   * insert (LED-190, LED-296); invalidating transactions re-reads the card views (LED-306).
    */
   const generateDueRecurring = useCallback(async (): Promise<RecurringRun> => {
     if (!user || !navigator.onLine) return { posted: 0, failed: 0 }
@@ -463,7 +427,6 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
 
     let posted = 0
     let failed = 0
-    let cardPaid = false
     for (const { source: tx, date: nextDate } of dueRecurringPosts(allRecurring, today)) {
       const { data: insertedId, error } = await supabase.rpc('post_recurring_transaction', {
         p_source: tx.id,
@@ -476,18 +439,10 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       // null: already posted, by this or another device.
       if (typeof insertedId !== 'string') continue
       posted++
-      if (!cardPaid && tx.type === 'transfer' && tx.to_account_id) {
-        const { data: destination } = await supabase.from('accounts').select('id, type').eq('id', tx.to_account_id).maybeSingle()
-        cardPaid = destination !== null && generatedCardPayment(tx, [destination as Account]) !== null
-      }
     }
-    if (posted > 0) await fetch()
-    if (cardPaid) {
-      notifyAccountsRefresh()
-      notifyCardPaymentsRefresh()
-    }
+    if (posted > 0) await invalidateAfterWrite('transactions')
     return { posted, failed }
-  }, [user, fetch])
+  }, [user])
 
   return {
     transactions,

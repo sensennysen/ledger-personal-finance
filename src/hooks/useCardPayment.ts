@@ -1,6 +1,5 @@
 import { useNotify } from '@/contexts/notificationState'
 import { useAccounts } from '@/hooks/useAccounts'
-import { notifyAccountsRefresh, notifyCardPaymentsRefresh } from '@/lib/cacheEvents'
 import { transferCard } from '@/lib/cardPayment'
 import type { MutationResult } from '@/lib/dataErrors'
 import type { TransactionUpsertValues } from '@/hooks/useTransactions.helpers'
@@ -14,7 +13,7 @@ type CreateTransaction = (values: TransactionUpsertValues) => Promise<MutationRe
  *
  * The database records the payment and moves the statement's paid amount in the same insert as the
  * transfer (LED-296), so a payment is counted once and never half-recorded. This hook only says so
- * when the payment is queued offline, and asks the card views to re-read once it is saved.
+ * when the payment is queued offline; once saved, createTransaction re-reads the card views (LED-306).
  */
 export function useCardPayment(createTransaction: CreateTransaction) {
   const notify = useNotify()
@@ -33,10 +32,7 @@ export function useCardPayment(createTransaction: CreateTransaction) {
         title: 'Payment saved offline',
         body: `The payment for ${card.name} syncs when you are back online, and its statement updates then.`,
       })
-      return result
     }
-    notifyAccountsRefresh()
-    notifyCardPaymentsRefresh()
     return result
   }
 

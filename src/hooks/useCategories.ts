@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { writeCache } from '@/lib/dataCache'
-import { useEntityQuery } from '@/hooks/useEntityQuery'
+import { invalidateAfterWrite, useEntityQuery } from '@/hooks/useEntityQuery'
 import type { Category, Subcategory } from '@/types'
 import { parseMergeResult, planSubcategoryMerge, type MergePreview } from '@/lib/categoryMerge'
 import { toResult, type MutationResult } from '@/lib/dataErrors'
@@ -39,7 +39,7 @@ export function useCategories() {
     const { error } = await supabase
       .from('categories')
       .insert({ ...values, user_id: user.id, is_default: false, sort_order: categories.length })
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('categories')
     return toResult(error, { action: 'save', entity: 'category' })
   }
 
@@ -47,7 +47,7 @@ export function useCategories() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this category.' }
     const { error } = await supabase.from('categories').update(values).eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('categories')
     return toResult(error, { action: 'save', entity: 'category' })
   }
 
@@ -55,7 +55,7 @@ export function useCategories() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to remove this category.' }
     const { error } = await supabase.from('categories').delete().eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('categories')
     return toResult(error, { action: 'delete', entity: 'category' })
   }
 
@@ -153,7 +153,7 @@ export function useCategories() {
     if (!navigator.onLine) return { error: 'Connect to the internet to merge categories.' }
     const { data, error } = await supabase.rpc('merge_category', { p_source: sourceId, p_target: targetId })
     if (error) return toResult(error, { action: 'save', entity: 'category' })
-    await fetch()
+    await invalidateAfterWrite('categories')
     return { error: null, result: parseMergeResult(data as Record<string, unknown> | null) }
   }
 

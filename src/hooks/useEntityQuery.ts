@@ -3,6 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
 import { describeQueryError, entityKey, entityQueryOptions, type Entity, type ReadResult } from '@/lib/entityQuery'
 import { offlineNoCopyMessage, offlineUnavailable } from '@/lib/readState'
+import { invalidateEntities, type WriteSource } from '@/lib/invalidation'
+import { notifyEntityChanged } from '@/lib/cacheEvents'
+import { queryClient } from '@/lib/queryClient'
 import type { DataErrorContext } from '@/lib/dataErrors'
 
 interface UseEntityQueryInput<T> {
@@ -63,4 +66,12 @@ export function useEntityQuery<T>({ entity, params, cacheKey, read, offlineLabel
     queryKey,
     cacheKey: storageKey,
   }
+}
+
+/**
+ * After a write or a queue drain: every read the write affects, in the store and outside it,
+ * refetches wherever it is mounted (LED-306). Resolves once the reads on screen have refetched.
+ */
+export function invalidateAfterWrite(source: WriteSource): Promise<void> {
+  return invalidateEntities(queryClient, source, notifyEntityChanged)
 }

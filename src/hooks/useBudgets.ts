@@ -18,6 +18,7 @@ import { buildBudgetHistory, type PeriodSpend } from '@/lib/budgetHistory'
 import { useDeficitBehaviour } from '@/hooks/useDeficitBehaviour'
 import { useOptionalExchangeRates } from '@/contexts/exchangeRatesState'
 import { resolveRefresh } from '@/lib/loadState'
+import { registerEntityListener } from '@/lib/cacheEvents'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 
 function localDateStr(date: Date): string {
@@ -250,6 +251,9 @@ export function useBudgets(
       void fetch()
     })
   }, [fetch])
+
+  // A transaction, category or queue drain elsewhere changes spend: re-read this cycle (LED-306).
+  useEffect(() => registerEntityListener('budgets', () => { void fetch() }), [fetch])
 
   const createBudget = async (
     values: Omit<

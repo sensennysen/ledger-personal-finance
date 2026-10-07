@@ -1,12 +1,10 @@
-import { useEffect, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/contexts/notificationState'
 import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
-import { readCache, writeCache } from '@/lib/dataCache'
-import { useEntityQuery } from '@/hooks/useEntityQuery'
-import { registerAccountsListener } from '@/lib/cacheEvents'
+import { writeCache } from '@/lib/dataCache'
+import { invalidateAfterWrite, useEntityQuery } from '@/hooks/useEntityQuery'
 import { getLocalDateString } from '@/lib/utils'
 import { planAccountSave, type BalanceAdjustment } from '@/lib/accountAdjustment'
 import type { Account } from '@/types'
@@ -46,15 +44,6 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
   })
   const accounts = data ?? NO_ACCOUNTS
 
-  // Re-read cache when an offline transaction mutation updates account balances
-  const reloadFromCache = useCallback(() => {
-    if (!user) return
-    const cached = readCache<Account[]>(`${user.id}:accounts${cacheSuffix}`)
-    if (cached) queryClient.setQueryData(queryKey, cached)
-  }, [user, cacheSuffix, queryClient, queryKey])
-
-  useEffect(() => registerAccountsListener(reloadFromCache), [reloadFromCache])
-
   const createAccount = async (values: Omit<Account, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add an account.' }
@@ -63,7 +52,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
       ...values,
       user_id: user.id,
     })
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('accounts')
     return toResult(error, { action: 'save', entity: 'account' })
   }
 
@@ -71,7 +60,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this account.' }
     const { error } = await supabase.from('accounts').update(values).eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('accounts')
     return toResult(error, { action: 'save', entity: 'account' })
   }
 
@@ -89,7 +78,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
       description: BALANCE_ADJUSTMENT_DESCRIPTION,
       date: getLocalDateString(),
     })
-    await fetch()
+    await invalidateAfterWrite('transactions')
     if (!error) return
     notify({
       severity: 'partial',
@@ -115,7 +104,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
       return { error: null }
     }
 
-    await fetch()
+    await invalidateAfterWrite('accounts')
     return { error: null }
   }
 
@@ -145,7 +134,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
       .update({ is_active: false })
       .eq('id', id)
       .eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('accounts')
     return toResult(error, { action: 'delete', entity: 'account' })
   }
 

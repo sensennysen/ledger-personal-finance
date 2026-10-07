@@ -16,6 +16,7 @@ export function useCategories() {
   // Shared by every instance: the form, the palette and the page read once (LED-321).
   const { data, loading, error, errorDetail, refetch: fetch, queryKey } = useEntityQuery<Category[]>({
     entity: 'categories',
+    offlineLabel: 'your categories',
     cacheKey: (userId) => `${userId}:categories`,
     read: (userId, retry, signal) => supabase
       .from('categories')

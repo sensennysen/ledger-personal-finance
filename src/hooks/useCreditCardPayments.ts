@@ -12,6 +12,7 @@ export function useCreditCardPayments() {
   // The export reads every payment, so page past PostgREST's 1,000-row cap (LED-308).
   const { data, loading, error, refetch } = useEntityQuery<CreditCardPayment[]>({
     entity: 'card-payments',
+    offlineLabel: 'your card payments',
     cacheKey: (userId) => `${userId}:credit_card_payments`,
     read: async (userId, retry, signal) => {
       const { rows, error } = await readAllPages<CreditCardPayment>((from, to) => supabase

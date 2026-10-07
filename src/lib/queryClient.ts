@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient, onlineManager } from '@tanstack/react-query'
 
 /**
  * The one store entity reads share (LED-321): hooks mounting the same key in the same tick read
@@ -23,6 +23,10 @@ export function createQueryClient(): QueryClient {
 }
 
 export const queryClient = createQueryClient()
+
+// The store only hears online/offline events after load; an app opened offline must start offline,
+// or its first reads fail as connection errors instead of waiting (LED-307).
+if (typeof navigator !== 'undefined') onlineManager.setOnline(navigator.onLine)
 
 /**
  * Sign-out or a switch to another account: reads still in flight are cancelled, so none writes

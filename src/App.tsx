@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { queryClient } from '@/lib/queryClient'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import AppLayout from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/LoginPage'
@@ -239,19 +241,21 @@ export default function App() {
   useVisualViewportVars()
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <OrientationLock />
-        <RouteMeta />
-        <Routes>
-          <Route path="/login" element={<LoginPageWrapper />} />
-          <Route path="/privacy" element={<PrivacyPolicyPage />} />
-          <Route path="/terms" element={<TermsOfServicePage />} />
-          <Route path="/data-deletion" element={<DataDeletionPage />} />
-          <Route path="/cookies" element={<CookiesStoragePage />} />
-          <Route path="/notices" element={<LegalNoticesPage />} />
-          <Route path="/*" element={<ProtectedRoutes />} />
-        </Routes>
-      </AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <OrientationLock />
+          <RouteMeta />
+          <Routes>
+            <Route path="/login" element={<LoginPageWrapper />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
+            <Route path="/data-deletion" element={<DataDeletionPage />} />
+            <Route path="/cookies" element={<CookiesStoragePage />} />
+            <Route path="/notices" element={<LegalNoticesPage />} />
+            <Route path="/*" element={<ProtectedRoutes />} />
+          </Routes>
+        </AuthProvider>
+      </QueryClientProvider>
     </BrowserRouter>
   )
 }

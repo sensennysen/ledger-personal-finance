@@ -1,57 +1,34 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { readCache, writeCache } from '@/lib/dataCache'
-import { readWithPolicy } from '@/lib/readRetry'
+import { writeCache } from '@/lib/dataCache'
+import { useEntityQuery } from '@/hooks/useEntityQuery'
 import type { Category, Subcategory } from '@/types'
 import { parseMergeResult, planSubcategoryMerge, type MergePreview } from '@/lib/categoryMerge'
-import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
+import { toResult, type MutationResult } from '@/lib/dataErrors'
+
+const NO_CATEGORIES: Category[] = []
 
 export function useCategories() {
   const { user } = useAuth()
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
+  const queryClient = useQueryClient()
 
-  const fetch = useCallback(async () => {
-    if (!user) {
-      setLoading(false)
-      return
-    }
-    const cacheKey = `${user.id}:categories`
-    const cached = readCache<Category[]>(cacheKey)
-    if (cached) {
-      setCategories(cached)
-      setLoading(false)
-    } else {
-      setLoading(true)
-    }
-    if (!navigator.onLine) return
-    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
-    const { data, error } = await readWithPolicy((retry) => supabase
+  // Shared by every instance: the form, the palette and the page read once (LED-321).
+  const { data, loading, error, errorDetail, refetch: fetch, queryKey } = useEntityQuery<Category[]>({
+    entity: 'categories',
+    cacheKey: (userId) => `${userId}:categories`,
+    read: (userId, retry, signal) => supabase
       .from('categories')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('sort_order', { ascending: true })
       .order('is_default', { ascending: false })
       .order('name', { ascending: true })
       .order('created_at', { ascending: true })
-      .retry(retry), { background: cached !== null })
-    if (error) {
-      setLoadFailure(describeDataError(error, { action: 'load' }))
-    } else {
-      setLoadFailure(null)
-      setCategories(data as Category[])
-      writeCache(cacheKey, data)
-    }
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void fetch()
-    })
-  }, [fetch])
+      .abortSignal(signal)
+      .retry(retry),
+  })
+  const categories = data ?? NO_CATEGORIES
 
   const createCategory = async (
     values: Omit<Category, 'id' | 'user_id' | 'is_default' | 'created_at' | 'updated_at'>
@@ -99,7 +76,7 @@ export function useCategories() {
           a.created_at.localeCompare(b.created_at)
       )
 
-    setCategories(nextCategories)
+    queryClient.setQueryData(queryKey, nextCategories)
     writeCache(`${user.id}:categories`, nextCategories)
 
     const results = await Promise.all(
@@ -179,7 +156,5 @@ export function useCategories() {
     return { error: null, result: parseMergeResult(data as Record<string, unknown> | null) }
   }
 
-  const error = loadFailure?.message ?? null
-  const errorDetail = loadFailure?.detail ?? null
   return { categories, loading, error, errorDetail, refetch: fetch, createCategory, updateCategory, deleteCategory, updateCategoryOrder, previewMerge, mergeCategory }
 }

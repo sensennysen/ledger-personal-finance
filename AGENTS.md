@@ -19,7 +19,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on push to `main`: a `verif
 - `src/components/`, `src/pages/`, `src/hooks/`, `src/contexts/`, `src/types/`.
 - `supabase/migrations/` — the only way schema changes ship. `schema.sql` is the baseline snapshot (the first migration); a new database applies every migration.
 - `docs/dev-tasks/` — ticket CSVs (LED-NN). `knowledge/` — rules, patterns, prompts, retros.
-- `design_handoff_ledger_ui_audit/` — design source of truth.
+- `design_handoff_ledger_ui_audit/` — design source of truth. Local only (git-ignored), not in the repo.
 
 ## Standards
 - Testable logic must import only relative/pure modules: `node --test` cannot resolve the `@/` alias or load Supabase. Keep logic in `src/lib` files such as `queueState.ts`, `accountSchema.ts`, `loadState.ts`.
@@ -31,7 +31,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on push to `main`: a `verif
 - `--ease-out` in `src/index.css` shadows Tailwind's built-in `--ease-out`. Use `var(--ease-out)` (or the `animate-*` utilities); a bare `ease-out` class would also pick up the branded curve.
 
 ## Workflow (E→P→A→V)
-1. `/evaluate` — orient, check graphify (`graphify-out/`), and grep the design handoff for the ticket's screen.
+1. `/evaluate` — orient, check graphify (`graphify-out/`), and grep the design handoff (if you have a local copy) for the ticket's screen.
 2. `/plan` — blueprint, no code.
 3. `/apply` — implement exactly the plan; one commit per LED-NN ticket.
 4. `/validate` — lint, build and test must pass; write a retro in `knowledge/retros/` with a Backlog of anything not verified.

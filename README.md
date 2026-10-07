@@ -158,7 +158,7 @@ GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every 
 None of this is needed to deploy your own copy; the build only uses `src/`, `public/` and `supabase/`.
 
 - `knowledge/` holds the project's rules, patterns, checklists and retros written while building Ledger. Retro screenshots are kept locally and are not committed, so image links in older retros will not resolve.
-- `docs/dev-tasks/` holds the ticket CSVs (LED-NN) and `design_handoff_ledger_ui_audit/` the design source.
+- `docs/dev-tasks/` holds the ticket CSVs (LED-NN). The design source and QA runs are internal and not in the repo, so references to them in retros and tickets will not resolve.
 - `.claude/` holds the Claude Code slash commands (`/evaluate`, `/plan`, `/apply`, `/validate`) behind the workflow in `AGENTS.md`.
 - graphify builds an optional code graph in `graphify-out/` (git-ignored). The commands use it when it exists and skip it otherwise; the edit hook in `.claude/settings.json` does nothing when graphify is not installed.
 

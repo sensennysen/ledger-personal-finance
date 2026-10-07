@@ -39,3 +39,7 @@ sweep-out/
 
 # Retro screenshots (kept local, not committed)
 knowledge/retros/shots/
+
+# Internal: design source and QA runs (kept local, not committed)
+design_handoff_ledger_ui_audit/
+docs/qa/

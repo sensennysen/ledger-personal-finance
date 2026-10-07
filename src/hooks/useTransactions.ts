@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { drainQueue, editQueuedInsert, enqueue, enqueueMany, pendingCount as queueSize, revisionFor } from '@/lib/offlineQueue'
@@ -6,8 +7,7 @@ import { splitPendingReceipt } from '@/lib/receiptJob'
 import { notifySyncListeners, registerSyncListener } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
 import { readAllPages } from '@/lib/pagedRead'
-import { readWithPolicy } from '@/lib/readRetry'
-import { dedupeAsync } from '@/lib/inFlightRequest'
+import { useEntityQuery } from '@/hooks/useEntityQuery'
 import {
   notifyAccountsRefresh,
   notifyCardPaymentsRefresh,
@@ -33,9 +33,11 @@ import {
   type TransactionUpsertValues,
   withTransactionDefaults,
 } from '@/hooks/useTransactions.helpers'
-import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
+import { toResult, type MutationResult } from '@/lib/dataErrors'
 
 // ---------- hook ----------
+
+const NO_TRANSACTIONS: Transaction[] = []
 
 export type { RecurringRun }
 
@@ -52,9 +54,7 @@ export interface UseTransactionsOptions {
 
 export function useTransactions(filters: TransactionFilters = {}, { enabled = true }: UseTransactionsOptions = {}) {
   const { user } = useAuth()
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
+  const queryClient = useQueryClient()
 
   const buildCacheKey = useCallback(
     () =>
@@ -69,98 +69,80 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     [user, filters.accountId, filters.categoryId, filters.type, filters.startDate, filters.endDate, filters.limit]
   )
 
+  // Keyed by every filter, so rows, loading and errors always belong to the filters on screen: a slow
+  // read for filters already left lands under its own key and never here (LED-304). AppLayout, the
+  // page, palette hooks and dashboard cards mounting with the same filters share one read (LED-166).
+  const { data, loading, error, errorDetail, refetch: fetch, queryKey } = useEntityQuery<Transaction[]>({
+    entity: 'transactions',
+    params: {
+      accountId: filters.accountId,
+      categoryId: filters.categoryId,
+      type: filters.type,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      limit: filters.limit,
+    },
+    cacheKey: (userId) => buildTransactionsCacheKey(userId, filters),
+    enabled,
+    read: async (userId, retry, signal) => {
+      const buildQuery = () => {
+        let query = supabase
+          .from('transactions')
+          .select(`
+            *,
+            account:accounts!transactions_account_id_fkey(id, name, color, currency),
+            to_account:accounts!transactions_to_account_id_fkey(id, name, color, currency, type),
+            category:categories(id, name, color, icon),
+            subcategory:subcategories(id, name)
+          `)
+          .eq('user_id', userId)
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+
+        if (filters.accountId) query = query.or(`account_id.eq.${filters.accountId},to_account_id.eq.${filters.accountId}`)
+        if (filters.categoryId) query = query.eq('category_id', filters.categoryId)
+        if (filters.type) query = query.eq('type', filters.type)
+        if (filters.startDate) query = query.gte('date', filters.startDate)
+        if (filters.endDate) query = query.lte('date', filters.endDate)
+        return query.abortSignal(signal)
+      }
+
+      // An explicit limit is one request; otherwise page past PostgREST's 1,000-row cap. Leaving
+      // these filters cancels the read, and paging stops at the next page.
+      if (filters.limit) {
+        const { data, error } = await buildQuery().limit(filters.limit).retry(retry)
+        return { data: (data ?? []) as Transaction[], error }
+      }
+      const { rows, error } = await readAllPages<Transaction>((from, to) => buildQuery().range(from, to).retry(retry), 1000, () => signal.aborted)
+      return { data: rows, error }
+    },
+  })
+  // Disabled, the key would be the unfiltered list's: never show it here.
+  const transactions = enabled ? data ?? NO_TRANSACTIONS : NO_TRANSACTIONS
+
   const updateTransactionCache = useCallback((next: Transaction[]) => {
-    setTransactions(next)
+    queryClient.setQueryData(queryKey, next)
     // Another mounted instance (Home beside the layout's add form) has its own copy of this list.
     // It reloads from the cache, so when the copy could not be written, asking it to would reload
     // the old list over this one too (LED-303).
     if (writeCache(buildCacheKey(), next)) notifyTransactionsRefresh()
-  }, [buildCacheKey])
+  }, [buildCacheKey, queryClient, queryKey])
 
   const reloadFromCache = useCallback(() => {
     // Disabled, the key would be the unfiltered list's: never load it here.
     if (!user || !enabled) return
     const cached = readCache<Transaction[]>(buildCacheKey())
-    if (cached) setTransactions(cached)
-  }, [user, enabled, buildCacheKey])
+    if (cached) queryClient.setQueryData(queryKey, cached)
+  }, [user, enabled, buildCacheKey, queryClient, queryKey])
 
   useEffect(() => registerTransactionsListener(reloadFromCache), [reloadFromCache])
 
-  const fetch = useCallback(async () => {
-    if (!user) {
-      setLoading(false)
-      return
-    }
-    if (!enabled) {
-      setTransactions([])
-      setLoadFailure(null)
-      setLoading(false)
-      return
-    }
-    const cacheKey = buildCacheKey()
-    const cached = readCache<Transaction[]>(cacheKey)
-    if (cached) {
-      setTransactions(cached)
-      setLoading(false)
-    } else {
-      setLoading(true)
-    }
-    if (!navigator.onLine) return
-    const buildQuery = () => {
-      let query = supabase
-        .from('transactions')
-        .select(`
-          *,
-          account:accounts!transactions_account_id_fkey(id, name, color, currency),
-          to_account:accounts!transactions_to_account_id_fkey(id, name, color, currency, type),
-          category:categories(id, name, color, icon),
-          subcategory:subcategories(id, name)
-        `)
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-
-      if (filters.accountId) query = query.or(`account_id.eq.${filters.accountId},to_account_id.eq.${filters.accountId}`)
-      if (filters.categoryId) query = query.eq('category_id', filters.categoryId)
-      if (filters.type) query = query.eq('type', filters.type)
-      if (filters.startDate) query = query.gte('date', filters.startDate)
-      if (filters.endDate) query = query.lte('date', filters.endDate)
-      return query
-    }
-
-    // An explicit limit is one request; otherwise page past PostgREST's 1,000-row cap. A first load
-    // fails fast; with the cache on screen the library retries as before (LED-242).
-    // Shared per cache key: AppLayout, the page, palette hooks and dashboard
-    // cards mounting with the same filters in the same tick read the table once (LED-166).
-    const { rows, error } = await dedupeAsync(cacheKey, () => readWithPolicy(async (retry) => {
-      if (filters.limit) {
-        const { data, error } = await buildQuery().limit(filters.limit).retry(retry)
-        return { rows: (data ?? []) as Transaction[], error: error?.message ?? null }
-      }
-      return readAllPages<Transaction>((from, to) => buildQuery().range(from, to).retry(retry))
-    }, { background: cached !== null }))
-    if (error) {
-      setLoadFailure(describeDataError(error, { action: 'load' }))
-    } else {
-      setLoadFailure(null)
-      setTransactions(rows)
-      writeCache(cacheKey, rows)
-    }
-    setLoading(false)
-  }, [user, enabled, buildCacheKey, filters.accountId, filters.categoryId, filters.type, filters.startDate, filters.endDate, filters.limit])
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void fetch()
-    })
-  }, [fetch])
-
   // Refetch when the offline queue is drained (connection restored)
   useEffect(() => {
-    const unregister = registerSyncListener(fetch)
+    const unregister = registerSyncListener(() => { if (enabled) void fetch() })
     return () => { unregister() }
-  }, [fetch])
+  }, [fetch, enabled])
 
   // ---------- helpers for optimistic account updates ----------
 
@@ -506,8 +488,6 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     return { posted, failed }
   }, [user, fetch])
 
-  const error = loadFailure?.message ?? null
-  const errorDetail = loadFailure?.detail ?? null
   return {
     transactions,
     loading,

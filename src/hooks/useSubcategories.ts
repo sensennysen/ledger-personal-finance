@@ -31,7 +31,7 @@ export function useSubcategories(categoryId: string | null) {
       .order('name', { ascending: true })
       .order('created_at', { ascending: true })
     if (!error && data) {
-      setSubcategories(data as Subcategory[])
+      setSubcategories(data)
       writeCache(cacheKey, data)
     }
     setLoading(false)

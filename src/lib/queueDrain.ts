@@ -19,10 +19,25 @@ import {
   type SentInsert,
 } from './queueState.ts'
 
-/** The slice of the supabase client the drain uses. Left loose: the query builder is a long chain. */
+/** A queued row: the table is chosen at run time, so its columns are only known as names. */
+type DrainRow = Record<string, unknown>
+type DrainResponse<T> = PromiseLike<{ data: T; error: unknown }>
+
+/** The filter chain the drain builds after select, update or delete (LED-320). */
+export interface DrainFilter {
+  eq: (column: string, value: unknown) => DrainFilter
+  maybeSingle: () => DrainResponse<DrainRow | null>
+  select: (columns: string) => DrainResponse<DrainRow[] | null>
+}
+
+/** The slice of the supabase client the drain uses, typed to just the calls it makes (LED-320). */
 export interface DrainClient {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  from: (table: string) => any
+  from: (table: string) => {
+    select: (columns: string) => DrainFilter
+    insert: (row: DrainRow) => { select: (columns: string) => DrainResponse<DrainRow[] | null> }
+    update: (row: DrainRow) => DrainFilter
+    delete: () => DrainFilter
+  }
   storage: {
     from: (bucket: string) => {
       upload: (path: string, file: File) => Promise<{ error: unknown }>
@@ -147,7 +162,7 @@ async function readServerRow(item: QueueItem, client: DrainClient) {
       .eq('user_id', item.userId)
       .maybeSingle()
     if (error) return 'unknown' as const
-    return (data as Record<string, unknown> | null) ?? null
+    return data ?? null
   } catch {
     return 'unknown' as const
   }
@@ -200,7 +215,7 @@ async function processWrite(item: QueueItem, deps: DrainDeps, moves: RevisionMov
   const { data, error } = await query.select('id, updated_at')
   if (error) return { kind: 'keep', item: recordFailure(item, messageOf(error), isCountableError(error)) }
 
-  const written = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined
+  const written = Array.isArray(data) ? data[0] : undefined
   if (written) {
     if (item.operation === 'update' && typeof written.updated_at === 'string') {
       recordRevisionMove(moves, rowKey(item), base, written.updated_at)

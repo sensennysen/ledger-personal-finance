@@ -32,6 +32,7 @@ import {
   type PendingSettings,
 } from '@/lib/pendingSettings'
 import type { Profile } from '@/types'
+import type { Json, TablesUpdate } from '@/types/database'
 
 interface AuthContextValue {
   session: Session | null
@@ -126,13 +127,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const columns = pendingValues(sending, 'columns')
     if (Object.keys(columns).length > 0) {
-      const { error } = await supabase.from('profiles').update(columns).eq('id', userId)
+      const { error } = await supabase.from('profiles').update(columns as TablesUpdate<'profiles'>).eq('id', userId)
       if (error) failure = error.message
       else settle('columns')
     }
     const preferences = pendingValues(sending, 'preferences')
     if (Object.keys(preferences).length > 0) {
-      const { data, error } = await supabase.rpc('merge_profile_preferences', { p_patch: preferences })
+      const { data, error } = await supabase.rpc('merge_profile_preferences', { p_patch: preferences as Json })
       if (error) {
         failure = error.message
       } else {
@@ -210,6 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq('id', data.id)
           .is('dashboard_hidden_widgets', null)
           .select('dashboard_hidden_widgets')
+          .overrideTypes<Pick<Profile, 'dashboard_hidden_widgets'>[]>()
         if (!isCurrent(token)) return moved
         if (error) {
           console.error('Failed to move the Home layout to the account:', error.message)
@@ -231,7 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       for (const [column, value] of Object.entries(upload)) {
         const { data: stored, error } = await supabase
           .from('profiles')
-          .update({ [column]: value })
+          .update({ [column]: value } as TablesUpdate<'profiles'>)
           .eq('id', data.id)
           .is(column, null)
           .select(column)
@@ -262,7 +264,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .select('*')
       .eq('id', userId)
       .single()
-      .retry(retry), { background: cached !== null })
+      .retry(retry)
+      .overrideTypes<Profile>(), { background: cached !== null })
     // Signed out, switched account or a newer read started: this response is not for the screen.
     if (!isCurrent(token)) return
     if (error) {
@@ -276,9 +279,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Waiting changes the account already holds, or that another device has since replaced, go (LED-278).
       pending.current = dropStale(pending.current, data as Profile & Record<string, unknown>)
       savePending(userId)
-      setProfile(withPending(data as Profile))
-      writeCache(cacheKey, withPending(data as Profile))
-      const moved = await moveBrowserSettings(data as Profile, token)
+      setProfile(withPending(data))
+      writeCache(cacheKey, withPending(data))
+      const moved = await moveBrowserSettings(data, token)
       if (!isCurrent(token)) return
       if (moved !== data) {
         setProfile(withPending(moved))

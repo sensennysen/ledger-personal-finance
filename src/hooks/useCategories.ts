@@ -27,7 +27,8 @@ export function useCategories() {
       .order('name', { ascending: true })
       .order('created_at', { ascending: true })
       .abortSignal(signal)
-      .retry(retry),
+      .retry(retry)
+      .overrideTypes<Category[]>(),
   })
   const categories = data ?? NO_CATEGORIES
 

@@ -21,6 +21,7 @@ import {
   type RefreshFrequency,
 } from '@/lib/exchangeRates'
 import { supabase } from '@/lib/supabase'
+import type { TablesInsert } from '@/types/database'
 import { ExchangeRatesContext, type ExchangeRatesState } from './exchangeRatesState'
 
 const FEED_TIMEOUT_MS = 10_000
@@ -81,7 +82,7 @@ export function ExchangeRatesProvider({ children }: { children: ReactNode }) {
       return
     }
     setReadFailure(null)
-    setTable(parseRateRow(data as RateRow | null))
+    setTable(parseRateRow(data))
     if (data) writeCache(cacheKey, data)
     setLoading(false)
   }, [cacheKey, user])
@@ -95,7 +96,7 @@ export function ExchangeRatesProvider({ children }: { children: ReactNode }) {
   /** Writes the row and, when it took, keeps state and cache in step with it. */
   const store = useCallback(
     async (userId: string, stored: RateRow): Promise<MutationResult> => {
-      const { error } = await supabase.from('exchange_rates').upsert({ user_id: userId, ...stored }, { onConflict: 'user_id' })
+      const { error } = await supabase.from('exchange_rates').upsert({ user_id: userId, ...stored } as TablesInsert<'exchange_rates'>, { onConflict: 'user_id' })
       if (error) return toResult(error, { action: 'save', entity: 'exchange rate' })
       setTable(parseRateRow(stored))
       if (cacheKey) writeCache(cacheKey, stored)

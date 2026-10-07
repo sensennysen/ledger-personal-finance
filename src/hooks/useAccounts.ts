@@ -40,6 +40,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
         .order('created_at', { ascending: true })
         .abortSignal(signal)
         .retry(retry)
+        .overrideTypes<Account[]>()
     },
   })
   const accounts = data ?? NO_ACCOUNTS

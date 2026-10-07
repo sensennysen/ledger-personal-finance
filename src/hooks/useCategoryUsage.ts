@@ -39,7 +39,8 @@ export function useCategoryUsage() {
           .not('category_id', 'is', null)
           .order('date', { ascending: true })
           .order('id', { ascending: true })
-          .range(from, to),
+          .range(from, to)
+          .overrideTypes<UsageTx[]>(),
       undefined,
       () => request !== requestId.current,
     )

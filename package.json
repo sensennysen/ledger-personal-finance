@@ -28,6 +28,7 @@
     "db:new": "supabase migration new",
     "db:diff": "supabase db diff --local",
     "db:test": "supabase test db && bash supabase/tests/concurrency.sh",
+    "db:types": "supabase gen types typescript --local --schema public > src/types/database.ts",
     "db:push:remote": "supabase db push --linked"
   },
   "dependencies": {

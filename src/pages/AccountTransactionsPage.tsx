@@ -338,7 +338,7 @@ export default function AccountTransactionsPage() {
       return
     }
     setPaymentsError(null)
-    setPaymentHistory({ accountId, rows: (data as CreditCardPayment[]) ?? [] })
+    setPaymentHistory({ accountId, rows: data ?? [] })
   }, [user, accountId, isCard])
 
   useEffect(() => {

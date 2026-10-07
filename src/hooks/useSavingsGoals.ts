@@ -31,7 +31,7 @@ export function useSavingsGoals() {
       if (error) return { data: null, error }
 
       // Fetch linked transactions for each goal
-      const goalIds = (data as SavingsGoal[]).map((g) => g.id)
+      const goalIds = data.map((g) => g.id)
       let linkedTxs: Transaction[] = []
       if (goalIds.length > 0) {
         // Batched so the goal id filter stays short enough for a URL (LED-308).
@@ -45,13 +45,14 @@ export function useSavingsGoals() {
             .order('id', { ascending: false })
             .range(from, to)
             .abortSignal(signal)
-            .retry(retry),
+            .retry(retry)
+            .overrideTypes<Transaction[], { merge: false }>(),
         ))
         if (txError) return { data: null, error: txError }
         linkedTxs = rows
       }
 
-      const enriched: GoalWithContributions[] = (data as SavingsGoal[]).map((g) => {
+      const enriched: GoalWithContributions[] = data.map((g) => {
         const txs = linkedTxs.filter((t) => t.goal_id === g.id)
         // The total is converted to the goal's currency where it is shown, with the rates (LED-311).
         return { ...g, linkedTransactions: txs }

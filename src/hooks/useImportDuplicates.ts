@@ -41,7 +41,8 @@ export function useImportDuplicates(accountId: string, span: { start: string; en
             .lte('date', span.end)
             .order('date', { ascending: true })
             .order('id', { ascending: true })
-            .range(from, to),
+            .range(from, to)
+            .overrideTypes<ExistingTx[]>(),
         undefined,
         () => cancelled,
       )

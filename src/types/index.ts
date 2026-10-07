@@ -1,4 +1,5 @@
 import { SWATCHES } from '../lib/swatches.ts'
+import type { Database, Tables } from './database.ts'
 
 export type AccountType =
   | 'cash'
@@ -29,124 +30,74 @@ export type RecurrenceInterval =
   | 'quarterly'
   | 'yearly'
 
-export interface Profile {
-  id: string
-  email: string
-  full_name: string | null
-  avatar_url: string | null
-  default_currency: string
-  month_start_day: number
-  budget_deficit_behaviour?: 'carry' | 'reset' | null
-  exchange_rate_refresh?: 'open' | 'daily' | 'weekly' | 'manual' | null
-  dashboard_widget_order?: string[] | null
-  /** The Home widgets turned off; null until the account stores one (LED-264). */
-  dashboard_hidden_widgets?: string[] | null
-  /** When the setup checklist was dismissed and the pay cycle confirmed; null until then (LED-265). */
-  setup_checklist_dismissed_at?: string | null
-  pay_cycle_confirmed_at?: string | null
-  account_group_order?: AccountType[] | null
-  account_view_mode?: 'all' | AccountType | null
-  /** Only the preferences the user changed; read through parsePreferences (LED-263). */
-  preferences?: Record<string, unknown> | null
-  created_at: string
-  updated_at: string
-}
+/**
+ * An entity is its generated row (src/types/database.ts, LED-320) with text and JSON columns
+ * narrowed to the values the app writes. `Loose` columns stay optional: older code builds rows
+ * (optimistic inserts, previews) without them. Joined and computed fields are added per entity.
+ * A read narrows its rows with `.overrideTypes<Entity[]>()`; a select with joined rows passes
+ * `{ merge: false }`, since the joins carry only the columns a view shows.
+ */
+type Entity<T extends keyof Database['public']['Tables'], Loose extends keyof Tables<T> = never, Narrowed = unknown> =
+  Omit<Tables<T>, Loose | keyof Narrowed> & Partial<Pick<Tables<T>, Exclude<Loose, keyof Narrowed>>> & Narrowed
 
-export interface Account {
-  id: string
-  user_id: string
-  name: string
-  type: AccountType
-  currency: string
-  balance: number
-  color: string
-  icon: string | null
-  is_active: boolean
-  credit_limit: number | null
-  statement_day?: number | null
-  due_day?: number | null
-  utilization_target_pct?: number | null
-  payment_reminder_days?: number | null
-  statement_balance?: number | null
-  statement_balance_locked_at?: string | null
-  statement_paid_amount?: number | null
-  last_payment_amount?: number | null
-  last_payment_date?: string | null
-  loan_pay_period?: LoanPayPeriod | null
-  loan_due_days?: number[] | null
-  loan_due_weekday?: number | null
-  sort_order?: number
-  notes: string | null
-  created_at: string
-  updated_at: string
-}
+export type Profile = Entity<
+  'profiles',
+  'setup_checklist_dismissed_at' | 'pay_cycle_confirmed_at',
+  {
+    budget_deficit_behaviour?: 'carry' | 'reset' | null
+    exchange_rate_refresh?: 'open' | 'daily' | 'weekly' | 'manual' | null
+    dashboard_widget_order?: string[] | null
+    /** The Home widgets turned off; null until the account stores one (LED-264). */
+    dashboard_hidden_widgets?: string[] | null
+    account_group_order?: AccountType[] | null
+    account_view_mode?: 'all' | AccountType | null
+    /** Only the preferences the user changed; read through parsePreferences (LED-263). */
+    preferences?: Record<string, unknown> | null
+  }
+>
 
-export interface Category {
-  id: string
-  user_id: string
-  name: string
-  type: TransactionType | 'both'
-  color: string
-  icon: string
-  is_default: boolean
-  /** Counts as basic salary on the 13th Month page (LED-236). */
-  counts_as_salary: boolean
-  sort_order?: number
-  created_at: string
-  updated_at: string
-}
+export type Account = Entity<
+  'accounts',
+  | 'statement_day' | 'due_day' | 'utilization_target_pct' | 'payment_reminder_days' | 'statement_balance'
+  | 'statement_balance_locked_at' | 'statement_paid_amount' | 'last_payment_amount' | 'last_payment_date'
+  | 'loan_due_days' | 'loan_due_weekday' | 'sort_order' | 'loan_original_amount' | 'loan_due_day'
+  | 'loan_due_day_secondary',
+  {
+    type: AccountType
+    loan_pay_period?: LoanPayPeriod | null
+  }
+>
 
-export interface Subcategory {
-  id: string
-  user_id: string
-  category_id: string
-  name: string
-  sort_order?: number
-  created_at: string
-  updated_at: string
-}
+/** counts_as_salary: counts as basic salary on the 13th Month page (LED-236). */
+export type Category = Entity<
+  'categories',
+  'sort_order',
+  { type: TransactionType | 'both' }
+>
 
-export interface Transaction {
-  id: string
-  user_id: string
-  account_id: string
-  to_account_id: string | null
-  category_id: string | null
-  subcategory_id: string | null
-  type: TransactionType
-  amount: number
-  currency: string
-  exchange_rate: number
-  /**
-   * What a transfer between two currencies credits its destination, in the destination's currency
-   * (LED-185). Null for every other row; the destination then receives the amount itself.
-   */
-  destination_amount?: number | null
-  description: string
-  notes: string | null
-  date: string
-  transfer_fee: number | null
-  is_recurring: boolean
-  recurrence_interval: RecurrenceInterval | null
-  recurrence_end_date: string | null
-  /** Set by the database once this row's next occurrence is posted, on any device (LED-232). */
-  recurrence_next_posted?: boolean
-  receipt_url: string | null
-  tags?: string[]
-  goal_id?: string | null
-  /** The statement amount and currency of a converted CSV import row (LED-136). */
-  original_amount?: number | null
-  original_currency?: string | null
-  created_at: string
-  updated_at: string
-  // joined
-  account?: Account
-  to_account?: Account
-  category?: Category
-  subcategory?: Subcategory
-  /** Client-only: set on optimistic rows queued while offline, cleared on the next successful fetch. */
-  queued?: boolean
-}
+export type Subcategory = Entity<'subcategories', 'sort_order'>
+
+/**
+ * destination_amount: what a transfer between two currencies credits its destination, in the
+ * destination's currency (LED-185); null for every other row. recurrence_next_posted: set by the
+ * database once the next occurrence is posted, on any device (LED-232). original_amount and
+ * original_currency: the statement amount of a converted CSV import row (LED-136).
+ */
+export type Transaction = Entity<
+  'transactions',
+  | 'destination_amount' | 'recurrence_next_posted' | 'tags' | 'goal_id' | 'original_amount' | 'original_currency',
+  {
+    type: TransactionType
+    recurrence_interval: RecurrenceInterval | null
+    // joined
+    account?: Account
+    to_account?: Account
+    category?: Category
+    subcategory?: Subcategory
+    /** Client-only: set on optimistic rows queued while offline, cleared on the next successful fetch. */
+    queued?: boolean
+  }
+>
 
 export interface BudgetHistoryEntry {
   period_start: string
@@ -157,92 +108,51 @@ export interface BudgetHistoryEntry {
   currency: string
 }
 
-export interface Budget {
-  id: string
-  user_id: string
-  category_id: string
-  name: string
-  amount: number
-  currency: string
-  period: 'weekly' | 'monthly' | 'quarterly' | 'yearly'
-  start_date: string
-  end_date: string | null
-  is_active: boolean
-  rollover_enabled: boolean
-  created_at: string
-  updated_at: string
-  // joined / computed
-  category?: Category
-  spent?: number
-  /** Spend dated later in the open period: scheduled, not in `spent` yet (LED-238). */
-  scheduled?: number
-  unrated_currencies?: string[]
-  rollover_amount?: number
-  effective_amount?: number
-  history?: BudgetHistoryEntry[]
-  /** Spend in every closed monthly period, oldest first; lets the form replay Carried in. */
-  period_spends?: number[]
-}
+export type Budget = Entity<
+  'budgets',
+  never,
+  {
+    period: 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+    // joined / computed
+    category?: Category
+    spent?: number
+    /** Spend dated later in the open period: scheduled, not in `spent` yet (LED-238). */
+    scheduled?: number
+    unrated_currencies?: string[]
+    rollover_amount?: number
+    effective_amount?: number
+    history?: BudgetHistoryEntry[]
+    /** Spend in every closed monthly period, oldest first; lets the form replay Carried in. */
+    period_spends?: number[]
+  }
+>
 
-export interface SavingsGoal {
-  id: string
-  user_id: string
-  name: string
-  target_amount: number
-  current_amount: number
-  currency: string
-  deadline: string | null
-  color: string
-  icon: string
-  notes: string | null
-  is_completed: boolean
-  created_at: string
-  updated_at: string
-}
+export type SavingsGoal = Entity<'savings_goals'>
 
-export interface CreditCardPayment {
-  id: string
-  user_id: string
-  account_id: string
-  amount: number
-  payment_date: string
-  notes: string | null
-  /** The transfer this payment came from. Null on payments made before LED-191 that could not be matched. */
-  transaction_id: string | null
-  created_at: string
-}
+/** transaction_id: the transfer this payment came from; null on payments before LED-191 that could not be matched. */
+export type CreditCardPayment = Entity<'credit_card_payments'>
 
-export interface LoanPurchase {
-  id: string
-  user_id: string
-  account_id: string
-  category_id: string | null
-  name: string
-  principal_amount: number
-  term_months: number
-  monthly_interest_rate: number
-  monthly_installment: number
-  total_payable: number
-  opening_installments_paid: number
-  opening_paid_amount: number
-  first_due_date: string
-  notes: string | null
-  created_at: string
-  updated_at: string
-  paid_amount?: number
-  remaining_balance?: number
-  category?: Category
-}
+export type LoanPurchase = Entity<
+  'loan_purchases',
+  never,
+  {
+    paid_amount?: number
+    remaining_balance?: number
+    category?: Category
+  }
+>
 
-export interface LoanPaymentAllocation {
-  id: string
-  user_id: string
-  transaction_id: string
-  loan_purchase_id: string
-  amount: number
-  created_at: string
-  transaction?: Pick<Transaction, 'id' | 'date' | 'description'>
-}
+export type LoanPaymentAllocation = Entity<
+  'loan_payment_allocations',
+  never,
+  { transaction?: Pick<Transaction, 'id' | 'date' | 'description'> }
+>
+
+/** An entity's database columns, without joined or computed fields: what an insert or update may send. */
+export type Columns<T extends keyof Database['public']['Tables'], E> = Pick<E, Extract<keyof E, keyof Tables<T>>>
+
+/** Arguments of a database function, as the generated schema declares them. */
+export type RpcArgs<F extends keyof Database['public']['Functions']> = Database['public']['Functions'][F]['Args']
 
 export interface DashboardStats {
   totalBalance: number

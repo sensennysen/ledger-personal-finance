@@ -39,7 +39,8 @@ export function resolveSplit(total: number, lines: SplitLineInput[]): SplitState
 
 export const SPLIT_OFFLINE_MESSAGE = 'Connect to the internet to split a transaction.'
 
-export interface SplitRpcLine {
+// A type, not an interface, so it is assignable to the function's Json argument (LED-320).
+export type SplitRpcLine = {
   description: string
   category_id: string | null
   amount: number

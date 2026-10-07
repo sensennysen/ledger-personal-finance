@@ -69,6 +69,13 @@ jobs:
       - name: Concurrent money writes
         run: bash supabase/tests/concurrency.sh
 
+      # src/types/database.ts must match the schema the migrations build (LED-320). After a
+      # migration, run `pnpm db:types` and commit the result.
+      - name: Database types match the migrations
+        run: |
+          supabase gen types typescript --local --schema public > "$RUNNER_TEMP/database.ts"
+          diff -u src/types/database.ts "$RUNNER_TEMP/database.ts"
+
       - name: Stop
         if: always()
         run: supabase stop --no-backup

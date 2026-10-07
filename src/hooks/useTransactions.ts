@@ -12,7 +12,7 @@ import { entityKey } from '@/lib/entityQuery'
 import { buildSplitRpcLines, SPLIT_OFFLINE_MESSAGE, type SplitRpcLine } from '@/lib/splitState'
 import { dueRecurringPosts, type RecurringRun } from '@/lib/recurringTransactions'
 import { getLocalDateString } from '@/lib/utils'
-import type { Transaction, Account, Category } from '@/types'
+import type { Transaction, Account, Category, Columns } from '@/types'
 import {
   applyTxDelta,
   buildOptimisticTransaction,
@@ -104,10 +104,10 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       // An explicit limit is one request; otherwise page past PostgREST's 1,000-row cap. Leaving
       // these filters cancels the read, and paging stops at the next page.
       if (filters.limit) {
-        const { data, error } = await buildQuery().limit(filters.limit).retry(retry)
-        return { data: (data ?? []) as Transaction[], error }
+        const { data, error } = await buildQuery().limit(filters.limit).retry(retry).overrideTypes<Transaction[], { merge: false }>()
+        return { data: data ?? [], error }
       }
-      const { rows, error } = await readAllPages<Transaction>((from, to) => buildQuery().range(from, to).retry(retry), 1000, () => signal.aborted)
+      const { rows, error } = await readAllPages<Transaction>((from, to) => buildQuery().range(from, to).retry(retry).overrideTypes<Transaction[], { merge: false }>(), 1000, () => signal.aborted)
       return { data: rows, error }
     },
   })
@@ -211,7 +211,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     return { ...toResult(error, { action: 'save', entity: 'transaction' }), id: data?.id }
   }
 
-  const updateTransaction = async (id: string, values: Partial<Transaction>): Promise<MutationResult & { queued?: boolean }> => {
+  const updateTransaction = async (id: string, values: Partial<Columns<'transactions', Transaction>>): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) {
       const existing = transactions.find((t) => t.id === id)
@@ -419,7 +419,8 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         .eq('recurrence_next_posted', false)
         .order('date', { ascending: false })
         .order('id', { ascending: false })
-        .range(from, to),
+        .range(from, to)
+        .overrideTypes<Transaction[]>(),
     )
     // A failed read means nothing is known to be due, and a partial list would skip series.
     // Say so: the caller reports it rather than treating it as "nothing due".

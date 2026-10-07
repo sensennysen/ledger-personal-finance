@@ -4,6 +4,7 @@ import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { reportError } from '@/lib/reportError'
+import { isChunkLoadError } from '@/lib/chunkLoad'
 
 interface Props {
   children: ReactNode
@@ -80,6 +81,28 @@ export class ErrorBoundary extends Component<Props, State> {
       )
     }
     const app = this.props.variant === 'app'
+    if (isChunkLoadError(this.state.error)) {
+      // A page's code could not be fetched (LED-317). Offline, it was never opened online, so it
+      // was never cached. Online, a deploy replaced it. The browser keeps a failed import for the
+      // life of the page, so only a reload fetches it again; the app shell is cached, so a reload
+      // works offline too.
+      const offline = typeof navigator !== 'undefined' && !navigator.onLine
+      return (
+        <div role="alert" className="flex flex-col items-center justify-center gap-3 p-8 text-center min-h-[40vh]">
+          <AlertTriangle className="w-10 h-10 text-destructive" />
+          <p className="font-medium">This page couldn't be downloaded</p>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            {offline
+              ? "You're offline and this page hasn't been saved on this device yet. Connect to the internet, then reload. Pages you've opened before still work."
+              : 'Ledger may have just been updated. Reload to get the latest version. Nothing you entered has been lost.'}
+          </p>
+          <Button variant="outline" onClick={() => window.location.reload()}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Reload
+          </Button>
+        </div>
+      )
+    }
     return (
       <div role="alert" className="flex flex-col items-center justify-center gap-3 p-8 text-center min-h-[40vh]">
         <AlertTriangle className="w-10 h-10 text-destructive" />

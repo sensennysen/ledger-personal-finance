@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { registerLoanPurchasesListener } from '@/lib/cacheEvents'
+import { registerEntityListener } from '@/lib/cacheEvents'
 import { readAllPages } from '@/lib/pagedRead'
 import { readInBatches } from '@/lib/idBatches'
 import { enrichLoanPurchase, getLoanDeadlines, roundMoney } from '@/lib/loanInstallments'
@@ -100,7 +100,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
     queueMicrotask(() => { void fetch() })
   }, [fetch])
 
-  useEffect(() => registerLoanPurchasesListener(() => { void fetch() }), [fetch])
+  useEffect(() => registerEntityListener('loan-purchases', () => { void fetch() }), [fetch])
 
   const createPurchase = async (values: CreateLoanPurchaseValues): Promise<MutationResult> => {
     if (!userId) return { error: 'Not authenticated' }

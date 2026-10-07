@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { useEntityQuery } from '@/hooks/useEntityQuery'
+import { invalidateAfterWrite, useEntityQuery } from '@/hooks/useEntityQuery'
 import { readAllPages } from '@/lib/pagedRead'
 import { readInBatches } from '@/lib/idBatches'
 import type { SavingsGoal, Transaction } from '@/types'
@@ -16,7 +16,7 @@ export function useSavingsGoals() {
   const { user } = useAuth()
 
   // Shared by every instance (LED-321): a goal and its linked transactions are one read.
-  const { data, loading, error, errorDetail, refetch: fetch } = useEntityQuery<GoalWithContributions[]>({
+  const { data, loading, error, errorDetail, refetch } = useEntityQuery<GoalWithContributions[]>({
     entity: 'savings-goals',
     offlineLabel: 'your savings goals',
     cacheKey: (userId) => `${userId}:savings_goals`,
@@ -67,7 +67,7 @@ export function useSavingsGoals() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add a savings goal.' }
     const { error } = await supabase.from('savings_goals').insert({ ...values, user_id: user.id })
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('savings-goals')
     return toResult(error, { action: 'save', entity: 'goal' })
   }
 
@@ -75,7 +75,7 @@ export function useSavingsGoals() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this savings goal.' }
     const { error } = await supabase.from('savings_goals').update(values).eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('savings-goals')
     return toResult(error, { action: 'save', entity: 'goal' })
   }
 
@@ -83,7 +83,7 @@ export function useSavingsGoals() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to remove this savings goal.' }
     const { error } = await supabase.from('savings_goals').delete().eq('id', id).eq('user_id', user.id)
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('savings-goals')
     return toResult(error, { action: 'delete', entity: 'goal' })
   }
 
@@ -96,9 +96,9 @@ export function useSavingsGoals() {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add to this savings goal.' }
     const { error } = await supabase.rpc('add_goal_contribution', { p_goal_id: id, p_amount: amount, p_op_id: opId })
-    if (!error) await fetch()
+    if (!error) await invalidateAfterWrite('savings-goals')
     return toResult(error, { action: 'save', entity: 'goal' })
   }
 
-  return { goals, loading, error, errorDetail, refetch: fetch, createGoal, updateGoal, deleteGoal, addContribution }
+  return { goals, loading, error, errorDetail, refetch, createGoal, updateGoal, deleteGoal, addContribution }
 }

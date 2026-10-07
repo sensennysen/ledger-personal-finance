@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { registerSyncedListener } from '@/lib/offlineQueue'
-import { notifyAccountsRefresh, notifyCardPaymentsRefresh } from '@/lib/cacheEvents'
 import { hiddenByScroll, isNearScrollEnd } from '@/lib/scrollEnd'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import {
@@ -232,13 +230,6 @@ function LayoutShell() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
   useCreditCardNotifications()
-  // A queued transfer into a card is recorded as a payment by the database when it drains (LED-193,
-  // LED-296); the card views re-read then. One owner: here.
-  useEffect(() => registerSyncedListener((item) => {
-    if (item.table !== 'transactions' || item.payload.type !== 'transfer' || typeof item.payload.to_account_id !== 'string') return
-    notifyAccountsRefresh()
-    notifyCardPaymentsRefresh()
-  }), [])
   useEffect(() => {
     if (hasGenerated.current) return
     hasGenerated.current = true

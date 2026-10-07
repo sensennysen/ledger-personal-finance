@@ -17,6 +17,7 @@ select set_config('request.jwt.claims', json_build_object('sub', '<user uuid>', 
 set local role authenticated;   -- so RLS applies; use `set local role postgres` to seed rows
 ```
 - Seed with the role `postgres`, call as `authenticated`, and read balances back as `postgres`.
+- For anon, also reset the claims: `select set_config('request.jwt.claims', '{"role":"anon"}', true); set local role anon;`. `auth.uid()` reads the claims, so after `set local role anon` alone the session still acts as the last user (epic 24 phase 4).
 - Run the failing cases under `savepoint` / `rollback to savepoint` in one script with `\set ON_ERROR_STOP off`.
 - Cover: the happy path, a failure after the first child is written (an unknown category), a sum mismatch, the wrong account type, and a second user (expect "not found").
 - Then run `supabase db lint --local --level warning --fail-on error`; it flags type mismatches in a variable initialiser (`'{}'` for a `uuid[]`).

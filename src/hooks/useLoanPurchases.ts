@@ -54,6 +54,7 @@ export function useLoanPurchases(accountId?: string, enabled = true) {
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
         .range(from, to)
+        .overrideTypes<LoanPurchase[], { merge: false }>()
     })
 
     if (purchaseError) {

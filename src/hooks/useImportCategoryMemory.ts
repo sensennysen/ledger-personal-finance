@@ -46,7 +46,8 @@ export function useImportCategoryMemory(fileKey: number | null) {
             .not('category_id', 'is', null)
             .order('date', { ascending: true })
             .order('id', { ascending: true })
-            .range(from, to),
+            .range(from, to)
+            .overrideTypes<HistoryTx[]>(),
         ),
         supabase.from('transaction_rules').select('keyword, category_id, type_hint, priority').eq('user_id', user.id),
       ])

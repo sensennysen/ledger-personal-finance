@@ -41,6 +41,7 @@ export function useTransactionRules(enabled = false) {
       .eq('user_id', user.id)
       .order('priority', { ascending: false })
       .order('created_at', { ascending: true })
+      .overrideTypes<TransactionRule[], { merge: false }>()
     if (error) {
       // A failed read keeps whatever was loaded and says so; it is not an empty rule list.
       setFailure(describeDataError(error, { action: 'load', entity: 'rule' }))
@@ -48,7 +49,7 @@ export function useTransactionRules(enabled = false) {
       return
     }
     setFailure(null)
-    setRules((data as TransactionRule[]) ?? [])
+    setRules(data ?? [])
     setLoading(false)
   }, [enabled, user])
 

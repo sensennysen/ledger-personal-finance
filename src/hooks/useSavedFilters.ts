@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/contexts/notificationState'
 import { supabase } from '@/lib/supabase'
+import type { Json } from '@/types/database'
 import { readAllPages } from '@/lib/pagedRead'
 import { readWithPolicy } from '@/lib/readRetry'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
@@ -70,7 +71,7 @@ export function useSavedFilters(enabled = true) {
       if (!user) return { error: 'Not authenticated' }
       const { error } = await supabase
         .from('saved_filters')
-        .insert({ user_id: user.id, name: normalizeFilterName(name), filter: serializeFilter(filter) })
+        .insert({ user_id: user.id, name: normalizeFilterName(name), filter: serializeFilter(filter) as Json })
       if (!error) await refetch()
       return toResult(error, { action: 'save', entity: 'saved filter' })
     },
@@ -95,7 +96,8 @@ export function useSavedFilters(enabled = true) {
   const restore = useCallback(
     async function attempt(saved: SavedFilter): Promise<void> {
       if (!user) return
-      const { error } = await supabase.from('saved_filters').insert({ ...restoreSavedFilterRow(saved), user_id: user.id })
+      const row = restoreSavedFilterRow(saved)
+      const { error } = await supabase.from('saved_filters').insert({ ...row, filter: row.filter as Json, user_id: user.id })
       if (!error) {
         await refetch()
         return

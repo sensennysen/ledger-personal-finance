@@ -245,6 +245,7 @@ export function nextQueueExpiry(): number | null {
 }
 
 const deps: DrainDeps = {
+  // The typed client takes table names from the schema; a queued item's table is a stored string.
   client: supabase as unknown as DrainClient,
   readQueue,
   mutateQueue,

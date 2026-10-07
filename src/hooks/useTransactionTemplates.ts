@@ -5,6 +5,7 @@ import { readAllPages } from '@/lib/pagedRead'
 import { readWithPolicy } from '@/lib/readRetry'
 import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
 import type { TransactionFormValues } from '@/components/transactions/TransactionForm'
+import type { Json } from '@/types/database'
 import {
   LEGACY_TEMPLATES_KEY,
   forgetLegacyTemplates,
@@ -74,7 +75,7 @@ export function useTransactionTemplates() {
         const { error: uploadError } = await supabase
           .from('transaction_templates')
           // An old entry without a usable id or date gets the column default, not null.
-          .upsert(upload, { onConflict: 'id', ignoreDuplicates: true, defaultToNull: false })
+          .upsert(upload.map((row) => ({ ...row, fields: row.fields as Json })), { onConflict: 'id', ignoreDuplicates: true, defaultToNull: false })
         if (uploadError) {
           // The key stays, so the next load tries again; the list shows what the account holds.
           uploadFailure = describeDataError(uploadError, { action: 'save', entity: 'template' })
@@ -112,7 +113,7 @@ export function useTransactionTemplates() {
       if (!user) return { error: 'Not authenticated' }
       const { error } = await supabase
         .from('transaction_templates')
-        .insert({ user_id: user.id, name: normalizeTemplateName(name), fields: serializeTemplateFields({ ...values }) })
+        .insert({ user_id: user.id, name: normalizeTemplateName(name), fields: serializeTemplateFields({ ...values }) as Json })
       if (!error) await refetch()
       return toResult(error, { action: 'save', entity: 'template' })
     },

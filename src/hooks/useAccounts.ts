@@ -28,6 +28,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
   // Shared by every instance with the same key: the layout, the page and the payment hooks read once (LED-321).
   const { data, loading, error, errorDetail, refetch: fetch, queryKey } = useEntityQuery<Account[]>({
     entity: 'accounts',
+    offlineLabel: 'your accounts',
     params: { includeArchived },
     cacheKey: (userId) => `${userId}:accounts${cacheSuffix}`,
     read: (userId, retry, signal) => {

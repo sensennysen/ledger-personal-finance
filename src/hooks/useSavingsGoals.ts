@@ -18,6 +18,7 @@ export function useSavingsGoals() {
   // Shared by every instance (LED-321): a goal and its linked transactions are one read.
   const { data, loading, error, errorDetail, refetch: fetch } = useEntityQuery<GoalWithContributions[]>({
     entity: 'savings-goals',
+    offlineLabel: 'your savings goals',
     cacheKey: (userId) => `${userId}:savings_goals`,
     read: async (userId, retry, signal) => {
       const { data, error } = await supabase

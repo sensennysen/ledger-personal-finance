@@ -1,9 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/contexts/AuthContext'
-import { readCache, writeCache } from '@/lib/dataCache'
-import { parseRateRow, type RateRow, type RateTable } from '@/lib/exchangeRates'
-import { describeDataError, type DescribedError } from '@/lib/dataErrors'
+import { useEntityQuery } from '@/hooks/useEntityQuery'
+import { parseRateRow, type RateRow } from '@/lib/exchangeRates'
 
 const COLUMNS = 'base, rates, overrides, as_of, fetched_at'
 
@@ -12,49 +9,19 @@ const COLUMNS = 'base, rates, overrides, as_of, fetched_at'
 // trap on the public data-deletion page (knowledge/patterns/hooks-on-public-pages.md). Export
 // card only (LED-180).
 export function useExchangeRateRow() {
-  const { user } = useAuth()
-  const [table, setTable] = useState<RateTable | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
-
-  const fetch = useCallback(async () => {
-    if (!user) {
-      setLoading(false)
-      return
-    }
-    const cacheKey = `${user.id}:exchange_rates`
-    const cached = readCache<RateRow>(cacheKey)
-    if (cached) {
-      setTable(parseRateRow(cached))
-      setLoading(false)
-    } else {
-      setLoading(true)
-    }
-    if (!navigator.onLine) return
-
-    const { data, error } = await supabase
+  const { data, loading, error, refetch } = useEntityQuery<RateRow | null>({
+    entity: 'exchange-rates',
+    offlineLabel: 'your exchange rates',
+    cacheKey: (userId) => `${userId}:exchange_rates`,
+    context: { action: 'load', entity: 'exchange rate' },
+    read: (userId, retry, signal) => supabase
       .from('exchange_rates')
       .select(COLUMNS)
-      .eq('user_id', user.id)
-      .maybeSingle()
+      .eq('user_id', userId)
+      .abortSignal(signal)
+      .retry(retry)
+      .maybeSingle(),
+  })
 
-    if (error) {
-      setLoadFailure(describeDataError(error, { action: 'load', entity: 'exchange rate' }))
-      setLoading(false)
-      return
-    }
-
-    setLoadFailure(null)
-    setTable(parseRateRow(data as RateRow | null))
-    if (data) writeCache(cacheKey, data)
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void fetch()
-    })
-  }, [fetch])
-
-  return { table, loading, error: loadFailure?.message ?? null, refetch: fetch }
+  return { table: data === undefined ? null : parseRateRow(data), loading, error, refetch }
 }

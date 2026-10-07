@@ -74,6 +74,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
   // page, palette hooks and dashboard cards mounting with the same filters share one read (LED-166).
   const { data, loading, error, errorDetail, refetch: fetch, queryKey } = useEntityQuery<Transaction[]>({
     entity: 'transactions',
+    offlineLabel: 'these transactions',
     params: {
       accountId: filters.accountId,
       categoryId: filters.categoryId,

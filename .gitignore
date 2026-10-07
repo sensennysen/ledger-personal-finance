@@ -36,3 +36,6 @@ supabase/prod_dump_*.sql
 # Graphify output
 graphify-out/
 sweep-out/
+
+# Retro screenshots (kept local, not committed)
+knowledge/retros/shots/

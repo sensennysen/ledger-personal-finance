@@ -153,6 +153,15 @@ Other flags: `--base-url` (default `http://127.0.0.1:5173`), `--out` (default `s
 
 GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and on pushes to `main`. A separate `db` job starts a fresh local Supabase, applies all migrations and the seed, lints database functions and replays the migrations from scratch, so a migration that fails on an empty database fails CI. CI cannot see the hosted database or the headers Vercel serves; `knowledge/checklists/release.md` covers those before a release. Contributor conventions are in `AGENTS.md`.
 
+## Dev tooling (optional)
+
+None of this is needed to deploy your own copy; the build only uses `src/`, `public/` and `supabase/`.
+
+- `knowledge/` holds the project's rules, patterns, checklists and retros written while building Ledger. Retro screenshots are kept locally and are not committed, so image links in older retros will not resolve.
+- `docs/dev-tasks/` holds the ticket CSVs (LED-NN) and `design_handoff_ledger_ui_audit/` the design source.
+- `.claude/` holds the Claude Code slash commands (`/evaluate`, `/plan`, `/apply`, `/validate`) behind the workflow in `AGENTS.md`.
+- graphify builds an optional code graph in `graphify-out/` (git-ignored). The commands use it when it exists and skip it otherwise; the edit hook in `.claude/settings.json` does nothing when graphify is not installed.
+
 ## Philosophy
 
 This is not trying to be a bank, a brokerage, or a glossy budget coach that sends you emails with a stock photo of a latte. It is a ledger: your accounts, your rules, your data, your ability to leave.

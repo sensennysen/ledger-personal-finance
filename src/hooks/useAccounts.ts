@@ -1,15 +1,18 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/contexts/notificationState'
 import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
 import { readCache, writeCache } from '@/lib/dataCache'
-import { readWithPolicy } from '@/lib/readRetry'
+import { useEntityQuery } from '@/hooks/useEntityQuery'
 import { registerAccountsListener } from '@/lib/cacheEvents'
 import { getLocalDateString } from '@/lib/utils'
 import { planAccountSave, type BalanceAdjustment } from '@/lib/accountAdjustment'
 import type { Account } from '@/types'
-import { describeDataError, toResult, type DescribedError, type MutationResult } from '@/lib/dataErrors'
+import { toResult, type MutationResult } from '@/lib/dataErrors'
+
+const NO_ACCOUNTS: Account[] = []
 
 /**
  * The user's accounts. Pickers and screens see active accounts only; `includeArchived` reads every
@@ -20,58 +23,34 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
   const cacheSuffix = includeArchived ? ':all' : ''
   const { user } = useAuth()
   const notify = useNotify()
-  const [accounts, setAccounts] = useState<Account[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadFailure, setLoadFailure] = useState<DescribedError | null>(null)
+  const queryClient = useQueryClient()
 
-  const fetch = useCallback(async () => {
-    if (!user) {
-      setLoading(false)
-      return
-    }
-    const cacheKey = `${user.id}:accounts${cacheSuffix}`
-    const cached = readCache<Account[]>(cacheKey)
-    if (cached) {
-      setAccounts(cached)
-      setLoading(false)
-    } else {
-      setLoading(true)
-    }
-    if (!navigator.onLine) return
-    // Fails fast on a first load, keeps the library retries when the cache is on screen (LED-242).
-    const { data, error } = await readWithPolicy((retry) => {
+  // Shared by every instance with the same key: the layout, the page and the payment hooks read once (LED-321).
+  const { data, loading, error, errorDetail, refetch: fetch, queryKey } = useEntityQuery<Account[]>({
+    entity: 'accounts',
+    params: { includeArchived },
+    cacheKey: (userId) => `${userId}:accounts${cacheSuffix}`,
+    read: (userId, retry, signal) => {
       let query = supabase
         .from('accounts')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
       if (!includeArchived) query = query.eq('is_active', true)
       return query
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true })
+        .abortSignal(signal)
         .retry(retry)
-    }, { background: cached !== null })
-    if (error) {
-      setLoadFailure(describeDataError(error, { action: 'load' }))
-    } else {
-      setLoadFailure(null)
-      setAccounts(data as Account[])
-      writeCache(cacheKey, data)
-    }
-    setLoading(false)
-  }, [user, includeArchived, cacheSuffix])
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      void fetch()
-    })
-  }, [fetch])
+    },
+  })
+  const accounts = data ?? NO_ACCOUNTS
 
   // Re-read cache when an offline transaction mutation updates account balances
   const reloadFromCache = useCallback(() => {
     if (!user) return
     const cached = readCache<Account[]>(`${user.id}:accounts${cacheSuffix}`)
-    if (cached) setAccounts(cached)
-  }, [user, cacheSuffix])
+    if (cached) queryClient.setQueryData(queryKey, cached)
+  }, [user, cacheSuffix, queryClient, queryKey])
 
   useEffect(() => registerAccountsListener(reloadFromCache), [reloadFromCache])
 
@@ -178,7 +157,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
     const nextAccounts = accounts
       .map((account) => ({ ...account, sort_order: orderMap.get(account.id) ?? account.sort_order ?? accounts.length }))
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.created_at.localeCompare(b.created_at))
-    setAccounts(nextAccounts)
+    queryClient.setQueryData(queryKey, nextAccounts)
     writeCache(`${user.id}:accounts${cacheSuffix}`, nextAccounts)
 
     const updates = orderedIds.map((id, sort_order) =>
@@ -197,7 +176,5 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
     return { error: null }
   }
 
-  const error = loadFailure?.message ?? null
-  const errorDetail = loadFailure?.detail ?? null
   return { accounts, loading, error, errorDetail, refetch: fetch, createAccount, updateAccount, updateAccountWithAdjustment, deleteAccount, updateAccountOrder }
 }

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { clearCacheByPrefix, readCache, writeCache } from '@/lib/dataCache'
+import { forgetQueries } from '@/lib/queryClient'
 import { forgetPersonalBrowserCopies } from '@/lib/browserStorage'
 import { readWithPolicy } from '@/lib/readRetry'
 import { clearOfflineQueue } from '@/lib/offlineQueue'
@@ -319,6 +320,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userChanged) {
           // The previous account's profile leaves the screen now, and any read of it still in flight is dropped.
           authGeneration.invalidate()
+          forgetQueries()
           setProfile(null)
           loadPendingSettings(userIdRef.current)
         }
@@ -371,6 +373,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Every personal copy goes, older copies of moved settings included (LED-268). A profile read
     // still in flight is dropped first, so it cannot write its copy back (LED-295).
     authGeneration.invalidate()
+    forgetQueries()
     forgetPersonalBrowserCopies()
     forgetPendingSettings()
     try {
@@ -403,6 +406,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Every personal copy goes, older copies of moved settings included (LED-268). A profile read
     // still in flight is dropped first, so it cannot write its copy back (LED-295).
     authGeneration.invalidate()
+    forgetQueries()
     forgetPersonalBrowserCopies()
     forgetPendingSettings()
     try {

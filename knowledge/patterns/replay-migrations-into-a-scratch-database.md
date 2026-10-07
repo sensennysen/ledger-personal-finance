@@ -17,3 +17,5 @@ psql $B -c "drop database p4_replay"
 ```
 - The baseline needs both `auth` and `storage` (it creates a bucket). A host `pg_dump` may not exist or may not match the server's version, so run it inside the container.
 - Run the seed once. A `||` retry re-runs it and reports a duplicate key that is not the real error.
+- To run role-based tests on the scratch database (`patterns/database-tests-with-pgtap.md`), add Supabase's default grants first. They come from the platform, not the migrations, so without them every `authenticated` statement fails with "permission denied for table": `grant usage on schema public, extensions to anon, authenticated, service_role; grant all on all tables in schema public to anon, authenticated, service_role; grant all on all sequences in schema public to anon, authenticated, service_role; grant execute on all functions in schema public to anon, authenticated, service_role;`
+- To replay only the migrations before a fix (proving a test fails without it), apply only the files whose name sorts before the fix's timestamp: `[[ "$(basename $f)" < "20261007100000" ]] || continue`.

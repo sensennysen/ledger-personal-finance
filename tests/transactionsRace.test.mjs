@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { QueryClient, QueryObserver, onlineManager } from '@tanstack/react-query'
 import { entityKey, entityQueryOptions } from '../src/lib/entityQuery.ts'
+import { forgetQueries, queryClient } from '../src/lib/queryClient.ts'
 import { readAllPages } from '../src/lib/pagedRead.ts'
 
 // LED-304: changing filters quickly shows only the latest filter's rows, loading and errors.
@@ -101,5 +102,29 @@ test('leaving a filter stops its paged read at the next page', async () => {
   await tick()
   await tick()
   assert.deepEqual(pages, [0], 'no page after the first once A was left')
+  off()
+})
+
+// LED-319: an auth change (sign-out or another account) while a transactions read is in flight.
+test('a read still in flight at sign-out stores nothing and shows nothing', async () => {
+  onlineManager.setOnline(true)
+  const cache = memoryCache()
+  const gate = deferred()
+  const read = async () => { await gate.promise; return { data: [{ id: 'late-row' }], error: null } }
+
+  const observer = new QueryObserver(queryClient, options('A', read, cache))
+  const seen = []
+  const off = observer.subscribe((r) => seen.push(r))
+  await tick()
+  assert.equal(observer.getCurrentResult().isPending, true)
+
+  // AuthContext signs out (LED-295): the store forgets every query.
+  forgetQueries()
+  gate.resolve()
+  await tick()
+  await tick()
+  assert.equal(queryClient.getQueryCache().getAll().length, 0, 'no query survives sign-out')
+  assert.ok(!seen.some((r) => r.data?.[0]?.id === 'late-row'), 'the late rows never reach an observer')
+  assert.equal(cache.store.get('u1:transactions:A'), undefined, 'the late rows are not written to the device copy')
   off()
 })

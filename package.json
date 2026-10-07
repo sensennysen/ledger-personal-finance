@@ -27,6 +27,7 @@
     "db:migrate": "supabase migration up --local",
     "db:new": "supabase migration new",
     "db:diff": "supabase db diff --local",
+    "db:test": "supabase test db && bash supabase/tests/concurrency.sh",
     "db:push:remote": "supabase db push --linked"
   },
   "dependencies": {

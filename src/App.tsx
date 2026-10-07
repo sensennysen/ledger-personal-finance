@@ -1,28 +1,32 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { queryClient } from '@/lib/queryClient'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
-import AppLayout from '@/components/layout/AppLayout'
 import LoginPage from '@/pages/LoginPage'
-import DashboardPage from '@/pages/DashboardPage'
-import AccountsPage from '@/pages/AccountsPage'
-import TransactionsPage from '@/pages/TransactionsPage'
-import CategoriesPage from '@/pages/CategoriesPage'
-import BudgetsPage from '@/pages/BudgetsPage'
-import SettingsPage from '@/pages/SettingsPage'
-import AccountTransactionsPage from '@/pages/AccountTransactionsPage'
-import PrivacyPolicyPage from '@/pages/PrivacyPolicyPage'
-import TermsOfServicePage from '@/pages/TermsOfServicePage'
-import DataDeletionPage from '@/pages/DataDeletionPage'
-import CookiesStoragePage from '@/pages/CookiesStoragePage'
-import LegalNoticesPage from '@/pages/LegalNoticesPage'
-import ReportsPage from '@/pages/ReportsPage'
-import ThirteenthMonthPage from '@/pages/ThirteenthMonthPage'
-import MorePage from '@/pages/MorePage'
-import NotFoundPage from '@/pages/NotFoundPage'
 import { useVisualViewportVars } from '@/hooks/useVisualViewportVars'
+
+// Every page but sign-in is its own chunk, fetched when first opened (LED-317). Sign-in stays in
+// the entry so a signed-out visitor downloads nothing else first; the signed-in shell (layout,
+// add-transaction form, search) is a chunk of its own too.
+const AppLayout = lazy(() => import('@/components/layout/AppLayout'))
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
+const AccountsPage = lazy(() => import('@/pages/AccountsPage'))
+const TransactionsPage = lazy(() => import('@/pages/TransactionsPage'))
+const CategoriesPage = lazy(() => import('@/pages/CategoriesPage'))
+const BudgetsPage = lazy(() => import('@/pages/BudgetsPage'))
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const AccountTransactionsPage = lazy(() => import('@/pages/AccountTransactionsPage'))
+const PrivacyPolicyPage = lazy(() => import('@/pages/PrivacyPolicyPage'))
+const TermsOfServicePage = lazy(() => import('@/pages/TermsOfServicePage'))
+const DataDeletionPage = lazy(() => import('@/pages/DataDeletionPage'))
+const CookiesStoragePage = lazy(() => import('@/pages/CookiesStoragePage'))
+const LegalNoticesPage = lazy(() => import('@/pages/LegalNoticesPage'))
+const ReportsPage = lazy(() => import('@/pages/ReportsPage'))
+const ThirteenthMonthPage = lazy(() => import('@/pages/ThirteenthMonthPage'))
+const MorePage = lazy(() => import('@/pages/MorePage'))
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 
 type RouteMetaEntry = {
   test: (pathname: string) => boolean
@@ -187,21 +191,24 @@ function OrientationLock() {
   return null
 }
 
+/** The session check, and a public page's code arriving: there is no shell to keep on screen yet. */
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
+      <div
+        className="w-9 h-9 rounded-full border-2 border-t-transparent animate-spin"
+        style={{ borderColor: 'color-mix(in srgb, var(--primary) 25%, transparent)', borderTopColor: 'var(--primary)' }}
+      />
+      <p className="text-xs text-muted-foreground tracking-[0.12em] uppercase">Loading</p>
+    </div>
+  )
+}
+
 function ProtectedRoutes() {
   const { session, loading } = useAuth()
   const location = useLocation()
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background">
-        <div
-          className="w-9 h-9 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: 'color-mix(in srgb, var(--primary) 25%, transparent)', borderTopColor: 'var(--primary)' }}
-        />
-        <p className="text-xs text-muted-foreground tracking-[0.12em] uppercase">Loading</p>
-      </div>
-    )
-  }
+  if (loading) return <LoadingScreen />
 
   // Redirect to /login, preserving any auth error params so LoginPage can show them
   if (!session) {
@@ -245,15 +252,20 @@ export default function App() {
         <AuthProvider>
           <OrientationLock />
           <RouteMeta />
-          <Routes>
-            <Route path="/login" element={<LoginPageWrapper />} />
-            <Route path="/privacy" element={<PrivacyPolicyPage />} />
-            <Route path="/terms" element={<TermsOfServicePage />} />
-            <Route path="/data-deletion" element={<DataDeletionPage />} />
-            <Route path="/cookies" element={<CookiesStoragePage />} />
-            <Route path="/notices" element={<LegalNoticesPage />} />
-            <Route path="/*" element={<ProtectedRoutes />} />
-          </Routes>
+          {/* The legal pages load on their own; the app's pages load inside the layout (AppLayout). */}
+          <ErrorBoundary variant="app">
+            <Suspense fallback={<LoadingScreen />}>
+              <Routes>
+                <Route path="/login" element={<LoginPageWrapper />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms" element={<TermsOfServicePage />} />
+                <Route path="/data-deletion" element={<DataDeletionPage />} />
+                <Route path="/cookies" element={<CookiesStoragePage />} />
+                <Route path="/notices" element={<LegalNoticesPage />} />
+                <Route path="/*" element={<ProtectedRoutes />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </AuthProvider>
       </QueryClientProvider>
     </BrowserRouter>

@@ -51,7 +51,7 @@ import { filterFromParams, isFilterActive, type ActivityFilter, type FilterType 
 import { filteredEmptyMessage } from '@/lib/filteredEmpty'
 import { SavedFiltersDialog } from '@/components/transactions/SavedFiltersDialog'
 import { SplitTransactionDialog, type SplitInput } from '@/components/transactions/SplitTransactionDialog'
-import { ImportCSVDialog, type ImportTx } from '@/components/transactions/ImportCSVDialog'
+import type { ImportCSVDialog as ImportCSVDialogComponent, ImportTx } from '@/components/transactions/ImportCSVDialog'
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import type { Transaction } from '@/types'
@@ -164,6 +164,30 @@ export default function TransactionsPage() {
 
   const notify = useNotify()
   const { categories } = useCategories()
+
+  // The import editor downloads the first time it opens (LED-317), then stays mounted.
+  const [ImportCSVDialog, setImportCSVDialog] = useState<typeof ImportCSVDialogComponent | null>(null)
+  useEffect(() => {
+    if (!importOpen || ImportCSVDialog) return
+    let cancelled = false
+    import('@/components/transactions/ImportCSVDialog').then(
+      (module) => { if (!cancelled) setImportCSVDialog(() => module.ImportCSVDialog) },
+      () => {
+        if (cancelled) return
+        setImportOpen(false)
+        notify({
+          severity: 'failure',
+          title: "Couldn't open the import",
+          // The browser keeps a failed import until the page reloads, so Retry reloads.
+          body: navigator.onLine
+            ? 'Reload the page and try again.'
+            : "The CSV import downloads the first time it's used. Connect to the internet, then reload the page.",
+          action: { label: 'Reload', run: () => window.location.reload() },
+        })
+      },
+    )
+    return () => { cancelled = true }
+  }, [importOpen, ImportCSVDialog, notify])
   const loadState = resolveLoadState({ loading, error, hasData: transactions.length > 0 })
 
   // ── Helpers ────────────────────────────────────────────────
@@ -1000,11 +1024,13 @@ export default function TransactionsPage() {
         )}
 
         {/* Import CSV dialog */}
-        <ImportCSVDialog
-          open={importOpen}
-          onOpenChange={setImportOpen}
-          onImport={handleImport}
-        />
+        {ImportCSVDialog && (
+          <ImportCSVDialog
+            open={importOpen}
+            onOpenChange={setImportOpen}
+            onImport={handleImport}
+          />
+        )}
 
 
       </div>

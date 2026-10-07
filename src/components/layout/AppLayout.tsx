@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { hiddenByScroll, isNearScrollEnd } from '@/lib/scrollEnd'
 import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import {
@@ -17,6 +17,7 @@ import { QueueReviewSheet } from './QueueReviewSheet'
 import { PWAInstallBanner } from './PWAInstallBanner'
 import { resolveHeaderMeta } from '@/lib/pageChrome'
 import { CycleProvider } from '@/contexts/CycleContext'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useCycle } from '@/contexts/cycleState'
 import { buildMonthNets } from '@/lib/monthJump'
 import { cn, getCurrentCycleMonthKey } from '@/lib/utils'
@@ -393,7 +394,10 @@ function LayoutShell() {
               className="animate-page-in min-h-full min-w-0 w-full max-w-full"
             >
               <ErrorBoundary>
-                <Outlet context={{ openAddTransactionModal, setupComplete } satisfies AppLayoutContext} />
+                {/* A page's code arrives on first open (LED-317); the shell stays and the page area waits. */}
+                <Suspense fallback={<PageSkeleton />}>
+                  <Outlet context={{ openAddTransactionModal, setupComplete } satisfies AppLayoutContext} />
+                </Suspense>
               </ErrorBoundary>
             </div>
           </main>
@@ -613,5 +617,16 @@ function LayoutShell() {
         </Dialog>
       </div>
     </EntryContext.Provider>
+  )
+}
+
+/** The page area while a page's code downloads: the page's own layout is not known yet, so plain cards. */
+function PageSkeleton() {
+  return (
+    <div className="p-4 md:p-6 lg:px-8 space-y-6 max-w-[1600px] mx-auto" aria-busy="true" aria-label="Loading page">
+      <Skeleton className="h-32 rounded-[20px]" />
+      <Skeleton className="h-64 rounded-[20px]" />
+      <Skeleton className="h-48 rounded-[20px]" />
+    </div>
   )
 }

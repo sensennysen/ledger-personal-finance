@@ -29,6 +29,11 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # What ships to the browser has no high or critical advisory (LED-333). Build-only tools
+      # (devDependencies) are left out: they never reach a user.
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
+
       - name: Lint
         run: pnpm lint
 

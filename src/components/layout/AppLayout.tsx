@@ -43,6 +43,8 @@ import { NetworkStatusProvider } from '@/contexts/NetworkStatusContext'
 import { useSignOut } from '@/hooks/useSignOut'
 import { useReceiptSweep } from '@/hooks/useReceiptSweep'
 import { SignOutConfirm } from '@/components/layout/SignOutConfirm'
+import { ExitConfirm } from '@/components/layout/ExitConfirm'
+import { useExitGuard } from '@/hooks/useExitGuard'
 import { ExchangeRatesProvider } from '@/contexts/ExchangeRatesContext'
 import {
   Dialog,
@@ -104,6 +106,7 @@ function LayoutShell() {
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
   useReceiptSweep()
+  const exitGuard = useExitGuard()
   const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
   const { createWithStatement } = useCardPayment(createTransaction)
   const notify = useNotify()
@@ -621,6 +624,7 @@ function LayoutShell() {
           </DialogContent>
         </Dialog>
         <SignOutConfirm {...sheetSignOut.confirm} />
+        <ExitConfirm {...exitGuard} />
       </div>
     </EntryContext.Provider>
   )

@@ -59,6 +59,7 @@ Epic 22 (branch `epic-22`) adds the files below. They reach the hosted database 
 | `20261006120200_setup_checklist` | LED-265 | The setup checklist shows again and the pay cycle reads as unconfirmed; dismissing shows "Couldn't save your settings" (the two `profiles` columns do not exist). The old browser copy stays. |
 | `20261006120300_card_reminders_sent` | LED-266 | No card reminder shows (the check fails and is logged and reported; `card_reminders_sent` does not exist). The old browser copy stays. |
 | `20261006120400_thirteenth_month_picks` | LED-267 | 13th Month Pay shows "Couldn't load your saved picks" and no estimate (the two tables and `set_thirteenth_month_picks` do not exist). The old browser copy stays. |
+| `20261008140000_transfer_credit_rounded` | LED-326 | Nothing fails; a transfer with an exchange rate other than 1 and no amount received can leave its destination a cent off after an edit or delete, as before. |
 
 When this list grows: add the row in the same commit as the migration, with the client query or call that needs it.
 

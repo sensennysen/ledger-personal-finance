@@ -9,7 +9,7 @@ test('a transfer with a destination amount credits that amount', () => {
 test('without one it credits amount x exchange_rate, as every row before LED-185 did', () => {
   assert.equal(transferCredit({ amount: 100, exchange_rate: 1, destination_amount: null }), 100)
   assert.equal(transferCredit({ amount: 100 }), 100)
-  assert.equal(transferCredit({ amount: 5625, exchange_rate: 0.0178 }), 5625 * 0.0178)
+  assert.equal(transferCredit({ amount: 5625, exchange_rate: 0.0178 }), 100.13)
 })
 
 const values = (o = {}) => ({ type: 'transfer', currency: 'USD', to_account_id: 'eur', destination_amount: 91.5, ...o })
@@ -63,4 +63,9 @@ test('a preset kept on a Pay from in another currency is the amount received, an
 
 test('with no rate the amount received is kept and the amount sent is left for the user (LED-293)', () => {
   assert.deepEqual(paySourceAmounts(456, 'PHP', 'USD', convert), { amount: null, destination_amount: 456 })
+})
+
+test('a fallback credit is rounded to cents, as the balance trigger does (LED-326)', () => {
+  assert.equal(transferCredit({ amount: 10, exchange_rate: 1.0005 }), 10.01)
+  assert.equal(transferCredit({ amount: 3, exchange_rate: 0.333333 }), 1)
 })

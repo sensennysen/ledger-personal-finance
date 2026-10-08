@@ -25,9 +25,10 @@ test('transactions has a destination_amount that is null or positive', () => {
 
 test('the balance trigger credits and reverses the destination by the same coalesce', () => {
   const { name, sql } = latest(/create or replace function public\.update_account_balance\(\)/)
-  assert.equal(name, '20261006130000_liability_payment_destination_amount.sql')
-  assert.match(sql, /balance \+ coalesce\(new\.destination_amount, new\.amount \* new\.exchange_rate\)/)
-  assert.match(sql, /balance - coalesce\(old\.destination_amount, old\.amount \* old\.exchange_rate\)/)
+  assert.equal(name, '20261008140000_transfer_credit_rounded.sql')
+  // Rounded to cents both ways, so a reversal removes exactly what the credit added (LED-326).
+  assert.match(sql, /balance \+ coalesce\(new\.destination_amount, round\(new\.amount \* new\.exchange_rate, 2\)\)/)
+  assert.match(sql, /balance - coalesce\(old\.destination_amount, round\(old\.amount \* old\.exchange_rate, 2\)\)/)
 })
 
 test('an edit to the destination amount alone fires the balance and card-payment triggers', () => {

@@ -11,8 +11,20 @@ export interface TransferCreditInput {
   destination_amount?: number | null
 }
 
+/**
+ * round(amount * rate, 2) as Postgres computes it on numeric(18,2) x numeric(18,6): exactly, half
+ * away from zero. Float multiplication would round 5625 x 0.0178 = 100.125 down to 100.12.
+ */
+function roundedProduct(amount: number, rate: number): number {
+  const product = BigInt(Math.round(amount * 100)) * BigInt(Math.round(rate * 1e6)) // units of 1e-8
+  const half = 500000n
+  const cents = product >= 0n ? (product + half) / 1000000n : (product - half) / 1000000n
+  return Number(cents) / 100
+}
+
 export function transferCredit(tx: TransferCreditInput): number {
-  return tx.destination_amount ?? tx.amount * (tx.exchange_rate ?? 1)
+  // Rounded to cents, as the trigger does since LED-326 (20261008140000_transfer_credit_rounded.sql).
+  return tx.destination_amount ?? roundedProduct(tx.amount, tx.exchange_rate ?? 1)
 }
 
 /**

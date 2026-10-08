@@ -32,7 +32,7 @@ This retro covers fixes for the 12 findings of the full-codebase review on 2026-
 ## Backlog
 
 - No `supabase db reset` replay from scratch was run, so the local data was kept. CI's `db` job covers it.
-- Apply the three new migrations (`20261008140000`, `20261008150000`, `20261008160000`) to the hosted database before the client deploys. Until `set_account_balance` exists there, a balance edit shows "balance adjustment not recorded".
+- ~~Apply the three new migrations (`20261008140000`, `20261008150000`, `20261008160000`) to the hosted database before the client deploys.~~ Done 2026-10-08 by the owner with `pnpm db:push:remote`. `supabase migration list --linked` shows all three on the remote.
 - The receipt sweep was tested with a fake bucket, and the local storage list was checked to return `created_at`. It was not run end to end against storage with real orphans.
 - The sign-out confirmation was checked only on Settings, not on More, the mobile account sheet or Browser storage, which share the hook.
 - Balances that drifted before LED-326 are not corrected; only new credits and reversals are exact.

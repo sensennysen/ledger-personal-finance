@@ -50,3 +50,12 @@ test('rpc lines are trimmed and rounded to cents, and keep their order and categ
     { description: 'Rest', category_id: null, amount: 40 },
   ])
 })
+
+test('lines balance as the cents they are sent as, so the server never rejects a balanced split (LED-330)', () => {
+  const s = resolveSplit(100, [line('A', 33.333), line('B', 33.333), line('C', 33.333)])
+  assert.equal(s.balanced, false)
+  assert.equal(s.unassigned, 0.01)
+  assert.equal(resolveSplit(100, [line('A', 33.33), line('B', 33.33), line('C', 33.34)]).balanced, true)
+  // A sub-cent line is sent as 0.00, so it is a zero line.
+  assert.deepEqual(resolveSplit(10, [line('A', 10), line('B', 0.004)]).blockers, [{ kind: 'zero-amount', lines: [1] }])
+})

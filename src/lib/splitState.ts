@@ -18,12 +18,16 @@ export interface SplitState {
   blockers: SplitBlocker[]
 }
 
+const toCents = (amount: unknown) => Math.round((Number(amount) || 0) * 100)
+
 export function resolveSplit(total: number, lines: SplitLineInput[]): SplitState {
-  const sum = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
-  const diff = Math.round((total - sum) * 100) / 100
-  const balanced = Math.abs(diff) < 0.01
+  // Each line counts as the cents it is sent as (buildSplitRpcLines), so the dialog balances exactly
+  // when the server will: three lines of 33.333 are 99.99, not 100 (LED-330).
+  const sum = lines.reduce((s, l) => s + toCents(l.amount), 0)
+  const diff = (toCents(total) - sum) / 100
+  const balanced = diff === 0
   const blank = lines.flatMap((l, i) => (l.description.trim() ? [] : [i]))
-  const zero = lines.flatMap((l, i) => (Number(l.amount) > 0 ? [] : [i]))
+  const zero = lines.flatMap((l, i) => (toCents(l.amount) > 0 ? [] : [i]))
   const blockers: SplitBlocker[] = []
   if (!balanced) blockers.push({ kind: 'unbalanced' })
   if (blank.length) blockers.push({ kind: 'blank-description', lines: blank })
@@ -51,6 +55,6 @@ export function buildSplitRpcLines(lines: SplitRpcLine[]): SplitRpcLine[] {
   return lines.map((line) => ({
     description: line.description.trim(),
     category_id: line.category_id,
-    amount: Math.round(Number(line.amount) * 100) / 100,
+    amount: toCents(line.amount) / 100,
   }))
 }

@@ -9,6 +9,7 @@ import { getLocalDateString } from '@/lib/utils'
 import { planAccountSave, type BalanceAdjustment } from '@/lib/accountAdjustment'
 import type { Account } from '@/types'
 import { toResult, type MutationResult } from '@/lib/dataErrors'
+import { eitherAccountFilter } from '@/lib/accountFilter'
 
 const NO_ACCOUNTS: Account[] = []
 
@@ -120,7 +121,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
       const { count, error: countError } = await supabase
         .from('transactions')
         .select('id', { count: 'exact', head: true })
-        .or(`account_id.eq.${id},to_account_id.eq.${id}`)
+        .or(eitherAccountFilter(id))
         .eq('user_id', user.id)
       if (countError) return toResult(countError, { action: 'delete', entity: 'account' })
       if (count && count > 0) {

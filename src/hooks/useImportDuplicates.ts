@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import type { ExistingTx } from '@/lib/importDuplicates'
 import { readAllPages } from '@/lib/pagedRead'
 import { describeDataError, type DescribedError } from '@/lib/dataErrors'
+import { eitherAccountFilter } from '@/lib/accountFilter'
 
 interface CheckResult {
   key: string
@@ -36,7 +37,7 @@ export function useImportDuplicates(accountId: string, span: { start: string; en
             .from('transactions')
             .select('id, date, amount, type, description, account_id, to_account_id, exchange_rate, destination_amount, original_amount, original_currency')
             .eq('user_id', user.id)
-            .or(`account_id.eq.${accountId},to_account_id.eq.${accountId}`)
+            .or(eitherAccountFilter(accountId))
             .gte('date', span.start)
             .lte('date', span.end)
             .order('date', { ascending: true })

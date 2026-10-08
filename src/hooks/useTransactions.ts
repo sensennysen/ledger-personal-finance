@@ -26,6 +26,7 @@ import {
   withTransactionDefaults,
 } from '@/hooks/useTransactions.helpers'
 import { toResult, type MutationResult } from '@/lib/dataErrors'
+import { eitherAccountFilter } from '@/lib/accountFilter'
 
 // ---------- hook ----------
 
@@ -93,7 +94,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
           .order('created_at', { ascending: false })
           .order('id', { ascending: false })
 
-        if (filters.accountId) query = query.or(`account_id.eq.${filters.accountId},to_account_id.eq.${filters.accountId}`)
+        if (filters.accountId) query = query.or(eitherAccountFilter(filters.accountId))
         if (filters.categoryId) query = query.eq('category_id', filters.categoryId)
         if (filters.type) query = query.eq('type', filters.type)
         if (filters.startDate) query = query.gte('date', filters.startDate)

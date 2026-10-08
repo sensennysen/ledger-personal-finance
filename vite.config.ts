@@ -3,7 +3,9 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { readFileSync } from 'fs'
 import { absoluteImageTags, headTags, normalizeSiteUrl, robotsTxt, sitemapXml } from './src/lib/siteMeta.ts'
+import { blockedSupabaseDirectives } from './src/lib/cspCheck.ts'
 
 // Canonical link, og:url, absolute og:image/twitter:image, sitemap.xml and robots.txt from VITE_SITE_URL. Unset, the build ships no
 // canonical link and no sitemap rather than a placeholder domain (src/lib/siteMeta.ts).
@@ -15,6 +17,37 @@ function siteMeta(siteUrl: string | null): Plugin {
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'robots.txt', source: robotsTxt(siteUrl) })
       if (siteUrl) this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: sitemapXml(siteUrl) })
+    },
+  }
+}
+
+// The CSP in vercel.json must let the app reach VITE_SUPABASE_URL, or a self-hosted Supabase on its
+// own domain loads a blank app (LED-325, src/lib/cspCheck.ts). A Vercel build fails; elsewhere,
+// where vercel.json is not served, it only warns.
+function cspCheck(supabaseUrl: string | undefined): Plugin {
+  return {
+    name: 'ledger-csp-check',
+    apply: 'build',
+    buildStart() {
+      // A build against local Supabase is for local use; vercel.json is not what serves it.
+      if (!supabaseUrl || /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(supabaseUrl)) return
+      let csp: string | undefined
+      try {
+        const config = JSON.parse(readFileSync(path.resolve(process.cwd(), 'vercel.json'), 'utf8'))
+        csp = config.headers
+          ?.flatMap((rule: { headers: { key: string; value: string }[] }) => rule.headers)
+          .find((header: { key: string }) => header.key === 'Content-Security-Policy')?.value
+      } catch {
+        return
+      }
+      if (!csp) return
+      const blocked = blockedSupabaseDirectives(csp, supabaseUrl)
+      if (blocked.length === 0) return
+      const message =
+        `vercel.json's Content-Security-Policy does not allow VITE_SUPABASE_URL (${new URL(supabaseUrl).origin}) in ${blocked.join(' and ')}. ` +
+        'Add its origin (and its wss:// origin to connect-src) or every request to Supabase is blocked. See README "Self-hosting on your own Supabase domain".'
+      if (process.env.VERCEL) this.error(message)
+      else this.warn(message)
     },
   }
 }
@@ -45,6 +78,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     siteMeta(normalizeSiteUrl(loadEnv(mode, process.cwd(), '').VITE_SITE_URL)),
+    cspCheck(loadEnv(mode, process.cwd(), '').VITE_SUPABASE_URL),
     react(),
     tailwindcss(),
     VitePWA({

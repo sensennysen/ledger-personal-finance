@@ -54,6 +54,8 @@ VITE_SITE_URL=https://ledger.example.com
 
 On a hosting provider, set the same variables there (on Vercel: Project → Settings → Environment Variables). Without `VITE_SITE_URL` the build ships no canonical link and no sitemap.
 
+**Self-hosting on your own Supabase domain.** `vercel.json` sends a Content-Security-Policy that allows only `*.supabase.co` and `*.supabase.in`. If `VITE_SUPABASE_URL` points anywhere else (a self-hosted Supabase or a custom domain), add its origin to `img-src` and `connect-src`, and its `wss://` origin to `connect-src`, or the browser blocks every request and the app loads blank. The build checks this: on Vercel it fails, and elsewhere it prints a warning. On another host, send the same headers with your origin added. The policy in `index.html` adds `VITE_SUPABASE_URL` itself.
+
 **New database.** Apply every file in `supabase/migrations/` in filename order, for example with `supabase link` then `supabase db push`, or by running each file in the SQL editor. The first file is the baseline schema; `supabase/schema.sql` is the same baseline and has none of the later migrations, so running it alone leaves a database every save fails against.
 
 **Upgrading a self-hosted database.** Apply every file in `supabase/migrations/` that your database does not have yet, in filename order, *before* you deploy the new client. Each file is idempotent. A database missing a column the client writes rejects every transaction save, not only the new feature's. `knowledge/checklists/release.md` lists each migration and what fails without it.

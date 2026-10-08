@@ -8,8 +8,8 @@ const historyIndex = () => (window.history.state as { idx?: number } | null)?.id
 /**
  * Back on Home in the installed app asks before leaving (instead of closing at once). Home, as the
  * app's first history entry, gets a guard entry pushed on top; back pops it, and landing on the
- * first entry again opens the confirm. Stay re-pushes the guard; Exit closes the window, and where
- * the browser refuses that, the next back press leaves since nothing sits above the first entry.
+ * first entry again opens the confirm. Stay re-pushes the guard; a second back press leaves, since
+ * nothing sits below the first entry.
  */
 export function useExitGuard() {
   const location = useLocation()
@@ -35,11 +35,5 @@ export function useExitGuard() {
     arm()
   }
 
-  const exit = () => {
-    setOpen(false)
-    armed.current = false
-    window.close()
-  }
-
-  return { open, stay, exit }
+  return { open, stay }
 }

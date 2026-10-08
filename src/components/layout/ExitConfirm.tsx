@@ -1,6 +1,5 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -9,18 +8,20 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
-/** Asks before back on Home closes the installed app (see useExitGuard). */
-export function ExitConfirm({ open, stay, exit }: { open: boolean; stay: () => void; exit: () => void }) {
+/**
+ * Asks before back on Home closes the installed app (see useExitGuard). A page cannot close the
+ * app itself (window.close is ignored there), so exiting is the second back press, not a button.
+ */
+export function ExitConfirm({ open, stay }: { open: boolean; stay: () => void }) {
   return (
     <AlertDialog open={open} onOpenChange={(next) => { if (!next) stay() }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Exit Ledger?</AlertDialogTitle>
-          <AlertDialogDescription>Anything waiting to sync stays on this device until you're back online.</AlertDialogDescription>
+          <AlertDialogDescription>Press back again to exit. Anything waiting to sync stays on this device until you're back online.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Stay</AlertDialogCancel>
-          <AlertDialogAction onClick={exit}>Exit</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

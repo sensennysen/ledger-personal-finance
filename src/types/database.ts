@@ -1087,6 +1087,15 @@ export type Database = {
         Args: { p_date: string; p_source: string }
         Returns: string
       }
+      set_account_balance: {
+        Args: {
+          p_account_id: string
+          p_balance: number
+          p_date: string
+          p_description: string
+        }
+        Returns: number
+      }
       set_thirteenth_month_picks: {
         Args: { p_ids: string[]; p_only_if_absent?: boolean; p_year: number }
         Returns: boolean

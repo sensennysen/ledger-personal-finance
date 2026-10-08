@@ -2,11 +2,11 @@ import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/contexts/notificationState'
-import { BALANCE_ADJUSTMENT_DESCRIPTION, DEFAULT_CURRENCY } from '@/constants/accounts'
+import { BALANCE_ADJUSTMENT_DESCRIPTION } from '@/constants/accounts'
 import { writeCache } from '@/lib/dataCache'
 import { invalidateAfterWrite, useEntityQuery } from '@/hooks/useEntityQuery'
 import { getLocalDateString } from '@/lib/utils'
-import { planAccountSave, type BalanceAdjustment } from '@/lib/accountAdjustment'
+import { planAccountSave } from '@/lib/accountAdjustment'
 import type { Account } from '@/types'
 import { toResult, type MutationResult } from '@/lib/dataErrors'
 import { eitherAccountFilter } from '@/lib/accountFilter'
@@ -67,18 +67,16 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
   }
 
   // The account has already saved by the time this runs, so a failure is partial: Fix
-  // reruns only this insert and never saves the account a second time.
-  const recordBalanceAdjustment = async (accountId: string, adjustment: BalanceAdjustment, currency: string): Promise<void> => {
+  // reruns only the balance and never saves the account a second time. set_account_balance
+  // locks the account and inserts the difference from the balance the server holds, so a change
+  // from another device in between is not overwritten, and a rerun adds nothing twice (LED-327).
+  const setBalance = async (accountId: string, balance: number): Promise<void> => {
     if (!user) return
-    const { error } = await supabase.from('transactions').insert({
-      user_id: user.id,
-      account_id: accountId,
-      type: adjustment.type,
-      amount: adjustment.amount,
-      currency,
-      exchange_rate: 1,
-      description: BALANCE_ADJUSTMENT_DESCRIPTION,
-      date: getLocalDateString(),
+    const { error } = await supabase.rpc('set_account_balance', {
+      p_account_id: accountId,
+      p_balance: balance,
+      p_description: BALANCE_ADJUSTMENT_DESCRIPTION,
+      p_date: getLocalDateString(),
     })
     await invalidateAfterWrite('transactions')
     if (!error) return
@@ -86,7 +84,7 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
       severity: 'partial',
       title: 'Account saved, balance adjustment not recorded',
       body: 'Your changes saved, but the balance still shows the old amount.',
-      action: { label: 'Fix', run: () => void recordBalanceAdjustment(accountId, adjustment, currency) },
+      action: { label: 'Fix', run: () => void setBalance(accountId, balance) },
     })
   }
 
@@ -94,15 +92,14 @@ export function useAccounts({ includeArchived = false }: { includeArchived?: boo
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to edit this account.' }
 
-    // If the balance changed, omit it from the update: the transaction trigger handles it.
+    // If the balance changed, omit it from the update: the adjustment transaction moves it.
     const { updatePayload, adjustment } = planAccountSave(oldBalance, values)
 
     const { error: updateError } = await supabase.from('accounts').update(updatePayload).eq('id', id).eq('user_id', user.id)
     if (updateError) return toResult(updateError, { action: 'save', entity: 'account' })
 
-    if (adjustment) {
-      const account = accounts.find((a) => a.id === id)
-      await recordBalanceAdjustment(id, adjustment, account?.currency ?? values.currency ?? DEFAULT_CURRENCY)
+    if (adjustment && values.balance !== undefined) {
+      await setBalance(id, values.balance)
       return { error: null }
     }
 

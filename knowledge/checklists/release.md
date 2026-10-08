@@ -60,6 +60,7 @@ Epic 22 (branch `epic-22`) adds the files below. They reach the hosted database 
 | `20261006120300_card_reminders_sent` | LED-266 | No card reminder shows (the check fails and is logged and reported; `card_reminders_sent` does not exist). The old browser copy stays. |
 | `20261006120400_thirteenth_month_picks` | LED-267 | 13th Month Pay shows "Couldn't load your saved picks" and no estimate (the two tables and `set_thirteenth_month_picks` do not exist). The old browser copy stays. |
 | `20261008140000_transfer_credit_rounded` | LED-326 | Nothing fails; a transfer with an exchange rate other than 1 and no amount received can leave its destination a cent off after an edit or delete, as before. |
+| `20261008150000_set_account_balance_rpc` | LED-327 | Editing an account's balance saves the other fields, then shows "Account saved, balance adjustment not recorded" (`set_account_balance` does not exist); Fix fails the same way until the migration is applied. |
 
 When this list grows: add the row in the same commit as the migration, with the client query or call that needs it.
 

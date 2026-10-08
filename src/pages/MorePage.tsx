@@ -12,6 +12,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSignOut } from '@/hooks/useSignOut'
+import { SignOutConfirm } from '@/components/layout/SignOutConfirm'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -36,7 +38,8 @@ const divider = <div aria-hidden className="ml-[52px] h-px bg-border" />
 // reaches these from the top bar, so /more sends it home.
 export default function MorePage() {
   const mobile = useMediaQuery('(max-width: 767px)')
-  const { user, profile, signOut } = useAuth()
+  const { user, profile } = useAuth()
+  const signOut = useSignOut()
   const { theme, toggleTheme } = useTheme()
   const { isOnline, pendingCount } = useNetworkStatus()
   const { setupComplete } = useOutletContext<AppLayoutContext>()
@@ -102,13 +105,14 @@ export default function MorePage() {
         {divider}
         <button
           type="button"
-          onClick={() => void signOut()}
+          onClick={signOut.request}
           className={`${row} font-medium text-expense`}
         >
           <LogOut className="size-5 shrink-0" />
           Sign out
         </button>
       </div>
+      <SignOutConfirm {...signOut.confirm} />
     </div>
   )
 }

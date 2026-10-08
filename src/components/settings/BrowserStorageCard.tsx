@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AlertTriangle, HardDrive } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSignOut } from '@/hooks/useSignOut'
+import { SignOutConfirm } from '@/components/layout/SignOutConfirm'
 import { useNotify } from '@/contexts/notificationState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,7 +35,8 @@ function localStorageKeys(): string[] {
  * queue and pending receipts say what would be lost before they go.
  */
 export function BrowserStorageCard() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
+  const signOut = useSignOut()
   const notify = useNotify()
   const [confirming, setConfirming] = useState<StorageRow | null>(null)
   const [clearing, setClearing] = useState(false)
@@ -96,7 +99,7 @@ export function BrowserStorageCard() {
                 <p className="text-xs text-muted-foreground">{row.why}.</p>
               </div>
               {row.clear === 'signOut' ? (
-                <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-auto" onClick={() => void signOut()}>
+                <Button variant="outline" size="sm" className="shrink-0 self-start sm:self-auto" onClick={signOut.request}>
                   Sign out
                 </Button>
               ) : row.clear === 'none' ? (
@@ -146,6 +149,7 @@ export function BrowserStorageCard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <SignOutConfirm {...signOut.confirm} />
     </Card>
   )
 }

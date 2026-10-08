@@ -101,3 +101,16 @@ test('every group cleared at sign-out says so in the notice', () => {
   }
   for (const id of ['appearance', 'install-banner']) assert.doesNotMatch(row(id).removed, /sign out/, id)
 })
+
+test('signOutWarnings lists what would be lost, and nothing when all is synced (LED-323)', async () => {
+  const { signOutWarnings } = await import('../src/lib/browserStorage.ts')
+  assert.deepEqual(signOutWarnings({ pending: 0, flagged: 0, withReceipt: 0, pendingSettings: false }), [])
+  assert.deepEqual(signOutWarnings({ pending: 4, flagged: 1, withReceipt: 1, pendingSettings: true }), [
+    '5 changes not yet synced will be lost.',
+    '1 receipt photo not yet uploaded will be lost.',
+    'Settings changed on this device have not been saved to your account.',
+  ])
+  assert.deepEqual(signOutWarnings({ pending: 1, flagged: 0, withReceipt: 0, pendingSettings: false }), [
+    '1 change not yet synced will be lost.',
+  ])
+})

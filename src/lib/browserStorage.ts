@@ -214,3 +214,32 @@ export function unsyncedWarning(row: StorageRow, queued: number, queuedWithRecei
   }
   return null
 }
+
+/** What is still on this device only, counted for the sign-out confirmation (LED-323). */
+export interface UnsyncedOnDevice {
+  /** Queued changes waiting to sync. */
+  pending: number
+  /** Queued changes waiting on the user's decision (conflicted, expired or failed). */
+  flagged: number
+  /** Queued changes that carry a receipt photo not yet uploaded. */
+  withReceipt: number
+  /** Settings changed here that the account has not stored yet. */
+  pendingSettings: boolean
+}
+
+/**
+ * What signing out would destroy, one line per kind, or an empty list when nothing would be lost.
+ * Sign-out clears this device's copy, so anything not yet synced never reaches the account.
+ */
+export function signOutWarnings(unsynced: UnsyncedOnDevice): string[] {
+  const lines: string[] = []
+  const queued = unsynced.pending + unsynced.flagged
+  if (queued > 0) {
+    lines.push(`${queued} change${queued === 1 ? '' : 's'} not yet synced will be lost.`)
+  }
+  if (unsynced.withReceipt > 0) {
+    lines.push(`${unsynced.withReceipt} receipt photo${unsynced.withReceipt === 1 ? '' : 's'} not yet uploaded will be lost.`)
+  }
+  if (unsynced.pendingSettings) lines.push('Settings changed on this device have not been saved to your account.')
+  return lines
+}

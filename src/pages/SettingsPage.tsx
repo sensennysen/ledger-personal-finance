@@ -5,6 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { ChevronRight, Sun, Moon, Monitor, ShieldCheck, Trash2, CalendarDays, ALargeSmall, AlertTriangle, Palette, Settings2, BellRing, FileText, Cookie, Info } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useSignOut } from '@/hooks/useSignOut'
+import { SignOutConfirm } from '@/components/layout/SignOutConfirm'
 import { useTheme, type FontSize } from '@/contexts/ThemeContext'
 import { useMonthCycle } from '@/hooks/useMonthCycle'
 import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
@@ -80,7 +82,8 @@ const THEME_CHOICES = [
 ] as const
 
 export default function SettingsPage() {
-  const { user, profile, signOut, deleteAccount, refreshProfile } = useAuth()
+  const { user, profile, deleteAccount, refreshProfile } = useAuth()
+  const signOut = useSignOut()
   const { themePreference, setTheme, fontSize, setFontSize, accentColor, setAccentColor } = useTheme()
   const { startDay, setStartDay } = useMonthCycle()
   const { confirmCycle } = useFirstRunChecklist()
@@ -643,7 +646,8 @@ export default function SettingsPage() {
           <CardTitle className="text-destructive">Account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button variant="outline" onClick={() => void signOut()}>Sign Out</Button>
+          <Button variant="outline" onClick={signOut.request}>Sign Out</Button>
+          <SignOutConfirm {...signOut.confirm} />
           <Separator />
           <div>
             <p className="text-sm font-medium text-destructive mb-1">Delete Account</p>

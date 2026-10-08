@@ -44,6 +44,8 @@ interface AuthContextValue {
   /** `started` is false when the OAuth start failed; the page then shows why (LED-196). */
   signInWithGoogle: () => Promise<{ started: boolean }>
   signOut: () => Promise<boolean>
+  /** True while settings changed on this device wait to reach the account; sign-out warns (LED-323). */
+  hasPendingSettings: () => boolean
   deleteAccount: () => Promise<void>
   refreshProfile: () => Promise<void>
   /**
@@ -362,6 +364,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const hasPendingSettings = () => !isPendingEmpty(pending.current)
+
   const signOut = async (): Promise<boolean> => {
     // supabase-js clears the local session even when the server call fails (2.116.0), so
     // local data is cleared either way; the return value says whether the server confirmed it.
@@ -438,7 +442,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user, profile, loading, authError, clearAuthError, signInWithGoogle, signOut, deleteAccount, refreshProfile, patchProfile, setPreferences, syncSettings }}
+      value={{ session, user, profile, loading, authError, clearAuthError, signInWithGoogle, signOut, hasPendingSettings, deleteAccount, refreshProfile, patchProfile, setPreferences, syncSettings }}
     >
       {children}
     </AuthContext.Provider>

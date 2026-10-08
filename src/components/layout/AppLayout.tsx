@@ -40,6 +40,8 @@ import { isNavUnlocked } from '@/lib/firstRunChecklist'
 import { recurringRunNotice } from '@/lib/recurringTransactions'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { NetworkStatusProvider } from '@/contexts/NetworkStatusContext'
+import { useSignOut } from '@/hooks/useSignOut'
+import { SignOutConfirm } from '@/components/layout/SignOutConfirm'
 import { ExchangeRatesProvider } from '@/contexts/ExchangeRatesContext'
 import {
   Dialog,
@@ -121,6 +123,7 @@ function LayoutShell() {
   )
   const hasGenerated = useRef(false)
   const [sheet, setSheet] = useState<'add' | 'account' | 'detail' | null>(null)
+  const sheetSignOut = useSignOut((ok) => { if (!ok) setSheet(null) })
   const [transactionKind, setTransactionKind] =
     useState<TransactionKind>('expense')
   const [targetAccountId, setTargetAccountId] = useState<string | undefined>()
@@ -605,7 +608,7 @@ function LayoutShell() {
                 )}
                 <Button
                   variant="outline"
-                  onClick={() => void signOut().then((ok) => { if (!ok) setSheet(null) })}
+                  onClick={sheetSignOut.request}
                   className="w-full text-expense"
                 >
                   <LogOut />
@@ -615,6 +618,7 @@ function LayoutShell() {
             )}
           </DialogContent>
         </Dialog>
+        <SignOutConfirm {...sheetSignOut.confirm} />
       </div>
     </EntryContext.Provider>
   )

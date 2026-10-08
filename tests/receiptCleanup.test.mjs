@@ -69,3 +69,46 @@ test('deleteAccountWithReceipts retries delete_user and says when receipts are a
   )
   assert.equal(calls, 0)
 })
+
+// A bucket whose files carry an age; `ages` maps a name to how many hours ago it was stored.
+function agedBucket(ages) {
+  const now = Date.parse('2026-10-08T12:00:00Z')
+  const removed = []
+  return {
+    now,
+    removed,
+    async list(path, { limit, offset }) {
+      const files = Object.entries(ages).map(([name, hours]) => ({
+        name,
+        created_at: hours === null ? null : new Date(now - hours * 3600_000).toISOString(),
+      }))
+      return { data: files.slice(offset, offset + limit), error: null }
+    },
+    async remove(paths) {
+      removed.push(...paths)
+      return { error: null }
+    },
+  }
+}
+
+test('the sweep removes only old files no transaction points at (LED-324)', async () => {
+  const { sweepOrphanReceipts } = await import('../src/lib/receiptCleanup.ts')
+  const bucket = agedBucket({ 'kept.jpg': 100, 'shared.jpg': 100, 'orphan.jpg': 100, 'fresh.jpg': 1, 'folder': null })
+  const refs = ['u1/kept.jpg', 'u1/shared.jpg', 'u1/shared.jpg', null, 'pending-receipt:abc']
+  assert.equal(await sweepOrphanReceipts(bucket, 'u1', refs, bucket.now), 1)
+  assert.deepEqual(bucket.removed, ['u1/orphan.jpg'])
+})
+
+test('an old https receipt URL keeps its file, and an unreadable one stops the sweep (LED-324)', async () => {
+  const { sweepOrphanReceipts, receiptObjectPath } = await import('../src/lib/receiptCleanup.ts')
+  assert.equal(receiptObjectPath('https://x.supabase.co/storage/v1/object/public/receipts/u1/a%20b.jpg?t=1'), 'u1/a b.jpg')
+  assert.equal(receiptObjectPath('https://elsewhere.example/img.jpg'), undefined)
+
+  const bucket = agedBucket({ 'legacy.jpg': 100, 'orphan.jpg': 100 })
+  await sweepOrphanReceipts(bucket, 'u1', ['https://x.supabase.co/storage/v1/object/public/receipts/u1/legacy.jpg'], bucket.now)
+  assert.deepEqual(bucket.removed, ['u1/orphan.jpg'])
+
+  const stopped = agedBucket({ 'orphan.jpg': 100 })
+  assert.equal(await sweepOrphanReceipts(stopped, 'u1', ['https://elsewhere.example/img.jpg'], stopped.now), 0)
+  assert.deepEqual(stopped.removed, [])
+})

@@ -4,11 +4,13 @@
 // buildReceiptObjectPath) and are removed through the Storage API, which applies the bucket's own policies.
 // Pure: the bucket is passed in, so `node --test` can drive it with a fake.
 
+import { PENDING_RECEIPT_PREFIX } from './receiptStore.ts'
+
 export interface ReceiptBucket {
   list(
     path: string,
     options: { limit: number; offset: number },
-  ): Promise<{ data: { name: string }[] | null; error: unknown }>
+  ): Promise<{ data: { name: string; created_at?: string | null }[] | null; error: unknown }>
   remove(paths: string[]): Promise<{ error: unknown }>
 }
 
@@ -78,4 +80,67 @@ export async function deleteAccountWithReceipts(
     }
   }
   throw new AccountDeletionIncompleteError(lastError)
+}
+
+/**
+ * The object path a transaction's receipt_url points at in the `receipts` bucket, or null for no
+ * receipt or one still waiting on this device. A stored path is the path itself; an old https URL
+ * is read for the path after `/receipts/`. `undefined` means a URL that cannot be read, so a sweep
+ * cannot know what it keeps and must not run.
+ */
+export function receiptObjectPath(value: string | null | undefined): string | null | undefined {
+  if (!value || value.startsWith(PENDING_RECEIPT_PREFIX)) return null
+  if (!/^https?:\/\//i.test(value)) return value
+  try {
+    const match = new URL(value).pathname.match(/\/receipts\/(.+)$/)
+    return match ? decodeURIComponent(match[1]) : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** How long an unreferenced receipt is kept: room for Undo, an edit in flight and the offline queue. */
+export const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Removes the user's receipt images no transaction points at any more (LED-324). Deleting a
+ * transaction, removing its receipt or replacing it leaves the file behind, and a split's lines
+ * share one file, so a file is only safe to remove once no row refers to it. Files younger than
+ * `graceMs` stay, so Undo and a save still in flight find theirs. `references` is every
+ * receipt_url of the user's transactions; one that cannot be read stops the sweep. Returns how
+ * many files were removed.
+ */
+export async function sweepOrphanReceipts(
+  bucket: ReceiptBucket,
+  userId: string,
+  references: (string | null)[],
+  now: number,
+  graceMs = ORPHAN_GRACE_MS,
+): Promise<number> {
+  const kept = new Set<string>()
+  for (const reference of references) {
+    const path = receiptObjectPath(reference)
+    if (path === undefined) return 0
+    if (path) kept.add(path)
+  }
+
+  const orphans: string[] = []
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await bucket.list(userId, { limit: PAGE, offset })
+    if (error) throw new ReceiptCleanupError(error)
+    const page = data ?? []
+    for (const file of page) {
+      const path = `${userId}/${file.name}`
+      const created = file.created_at ? Date.parse(file.created_at) : NaN
+      // A folder, or a file whose age is unknown, is left alone.
+      if (kept.has(path) || !Number.isFinite(created) || now - created < graceMs) continue
+      orphans.push(path)
+    }
+    if (page.length < PAGE) break
+  }
+  for (let start = 0; start < orphans.length; start += PAGE) {
+    const { error } = await bucket.remove(orphans.slice(start, start + PAGE))
+    if (error) throw new ReceiptCleanupError(error)
+  }
+  return orphans.length
 }

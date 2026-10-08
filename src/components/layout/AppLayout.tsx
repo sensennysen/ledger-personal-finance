@@ -41,6 +41,7 @@ import { recurringRunNotice } from '@/lib/recurringTransactions'
 import { useNetworkStatus } from '@/hooks/useNetworkStatus'
 import { NetworkStatusProvider } from '@/contexts/NetworkStatusContext'
 import { useSignOut } from '@/hooks/useSignOut'
+import { useReceiptSweep } from '@/hooks/useReceiptSweep'
 import { SignOutConfirm } from '@/components/layout/SignOutConfirm'
 import { ExchangeRatesProvider } from '@/contexts/ExchangeRatesContext'
 import {
@@ -102,6 +103,7 @@ function LayoutShell() {
   const wide = useMediaQuery('(min-width: 1920px)')
   const networkStatus = useNetworkStatus()
   const { isOnline, pendingCount } = networkStatus
+  useReceiptSweep()
   const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
   const { createWithStatement } = useCardPayment(createTransaction)
   const notify = useNotify()

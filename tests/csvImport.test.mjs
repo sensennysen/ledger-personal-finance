@@ -122,6 +122,25 @@ test('parseAmount flags non-numbers instead of treating them as zero', () => {
   assert.equal(parseAmount('n/a'), null)
 })
 
+test('parseAmount flags decimal commas, exponents and hex instead of guessing (LED-322)', () => {
+  assert.equal(parseAmount('12,50'), null)
+  assert.equal(parseAmount('1.234,56'), null)
+  assert.equal(parseAmount('1e3'), null)
+  assert.equal(parseAmount('0x10'), null)
+  assert.equal(parseAmount('1,234,567.89'), 1234567.89)
+  assert.equal(parseAmount('1234'), 1234)
+  assert.equal(parseAmount('.5'), 0.5)
+})
+
+test('parseAmount rounds to cents, so a sub-cent amount is a zero line (LED-322)', () => {
+  assert.equal(parseAmount('0.004'), 0)
+  assert.equal(parseAmount('12.345'), 12.35)
+  const { rows, ignored } = rowsOf('Date,Description,Amount\n2026-01-02,Tiny,0.004\n2026-01-03,Coffee,"12,50"\n')
+  assert.equal(ignored, 1)
+  assert.equal(rows.length, 1)
+  assert.ok(rows[0].issues.includes('bad-amount'))
+})
+
 const MESSY = [
   'Date,Description,Amount',
   '17/09/2026,SM SUPERMARKET PODIUM 4471,-86.40', // bad date under M/D/Y

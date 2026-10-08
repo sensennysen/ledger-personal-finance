@@ -754,7 +754,7 @@ export function ImportCSVDialog({ open, onOpenChange, onImport }: Props) {
                       {cause.id === 'bad-amount' && (
                         <p className="text-muted-foreground">
                           Amounts in these rows read <code className="text-foreground">{cause.sample || '(empty)'}</code>.
-                          Correct them in the file, or skip these rows.
+                          Amounts need a dot for decimals (12.50, not 12,50). Correct them in the file, or skip these rows.
                         </p>
                       )}
 

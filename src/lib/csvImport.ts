@@ -241,12 +241,23 @@ export function dateOrderIsAmbiguous(values: string[]): boolean {
   return ambiguous
 }
 
-/** An amount cell as a number: empty or "-" is 0, anything non-numeric is null. */
+// A plain decimal: commas only as thousands separators in groups of three, a dot for the decimals.
+const PLAIN_AMOUNT = /^[+-]?(\d{1,3}(,\d{3})+|\d+)?(\.\d+)?$/
+
+/**
+ * An amount cell as a number, rounded to cents: empty or "-" is 0, anything else that is not a
+ * plain decimal is null. A decimal comma ("12,50", "1.234,56"), an exponent or hex is flagged
+ * rather than guessed at, so it cannot import 100 times too large (LED-322).
+ */
 export function parseAmount(value: string): number | null {
-  const cleaned = value.replace(/[,₱$\s]/g, '').replace(/^\((.+)\)$/, '-$1')
+  const cleaned = value.replace(/[₱$\s]/g, '').replace(/^\((.+)\)$/, '-$1')
   if (cleaned === '' || cleaned === '-') return 0
-  const amount = Number(cleaned)
-  return Number.isFinite(amount) ? amount : null
+  if (!PLAIN_AMOUNT.test(cleaned) || !/\d/.test(cleaned)) return null
+  const amount = Number(cleaned.replace(/,/g, ''))
+  if (!Number.isFinite(amount)) return null
+  // The column holds cents; a sub-cent amount is a zero line, not a row the insert will reject.
+  const cents = Math.round(amount * 100) / 100
+  return cents === 0 ? 0 : cents
 }
 
 function isBalanceLine(description: string): boolean {

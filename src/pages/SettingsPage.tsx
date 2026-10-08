@@ -24,7 +24,7 @@ import { ExchangeRatesCard } from '@/components/settings/ExchangeRatesCard'
 import { BrowserStorageCard } from '@/components/settings/BrowserStorageCard'
 import { FormError } from '@/components/ui/form-error'
 import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
-import { ReceiptCleanupError } from '@/lib/receiptCleanup'
+import { AccountDeletionIncompleteError, ReceiptCleanupError } from '@/lib/receiptCleanup'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -132,7 +132,7 @@ export default function SettingsPage() {
       setDeleteOpen(false)
     } catch (err) {
       setDeleteError(
-        err instanceof ReceiptCleanupError
+        err instanceof ReceiptCleanupError || err instanceof AccountDeletionIncompleteError
           ? { message: err.message, detail: describeDataError(err.cause as Error, { action: 'delete', entity: 'account' })?.detail ?? null }
           : err instanceof Error
             ? describeDataError(err, { action: 'delete', entity: 'account' })

@@ -47,3 +47,25 @@ test('a failed list or remove throws, so the account is not deleted', async () =
     return true
   })
 })
+
+test('deleteAccountWithReceipts retries delete_user and says when receipts are already gone (LED-332)', async () => {
+  const { deleteAccountWithReceipts, AccountDeletionIncompleteError } = await import('../src/lib/receiptCleanup.ts')
+  let calls = 0
+  await deleteAccountWithReceipts(fakeBucket(['a.png']), 'u1', async () => (++calls < 2 ? { error: { message: 'network' } } : { error: null }))
+  assert.equal(calls, 2)
+
+  calls = 0
+  await assert.rejects(
+    deleteAccountWithReceipts(fakeBucket(['a.png']), 'u1', async () => { calls++; throw new Error('offline') }),
+    AccountDeletionIncompleteError,
+  )
+  assert.equal(calls, 3)
+
+  // A storage failure stops before the account is touched.
+  calls = 0
+  await assert.rejects(
+    deleteAccountWithReceipts(fakeBucket(['a.png'], { listError: { message: 'denied' } }), 'u1', async () => { calls++; return { error: null } }),
+    ReceiptCleanupError,
+  )
+  assert.equal(calls, 0)
+})

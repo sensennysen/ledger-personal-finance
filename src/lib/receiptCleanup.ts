@@ -40,3 +40,42 @@ export async function removeUserReceipts(bucket: ReceiptBucket, userId: string):
   }
   return paths.length
 }
+
+/**
+ * Thrown when the receipts were removed but delete_user() then failed (LED-332). The images are
+ * already gone, so the account is not "as it was": the message says so and asks the user to
+ * finish the deletion rather than walk away from an account whose receipts no longer open.
+ */
+export class AccountDeletionIncompleteError extends Error {
+  readonly cause: unknown
+  constructor(cause: unknown) {
+    super('Your receipt images were removed, but your account could not be deleted. Try again to finish deleting it.')
+    this.name = 'AccountDeletionIncompleteError'
+    this.cause = cause
+  }
+}
+
+/**
+ * Receipts first, then the account (LED-189, LED-332). Storage can only be cleared while the
+ * user still exists, so the order stays; delete_user() is retried so a dropped request does not
+ * leave the account behind with its receipts removed.
+ */
+export async function deleteAccountWithReceipts(
+  bucket: ReceiptBucket,
+  userId: string,
+  deleteUser: () => PromiseLike<{ error: unknown }>,
+  attempts = 3,
+): Promise<void> {
+  await removeUserReceipts(bucket, userId)
+  let lastError: unknown = null
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const { error } = await deleteUser()
+      if (!error) return
+      lastError = error
+    } catch (err) {
+      lastError = err
+    }
+  }
+  throw new AccountDeletionIncompleteError(lastError)
+}

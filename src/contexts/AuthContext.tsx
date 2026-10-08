@@ -16,7 +16,7 @@ import {
 import { forgetLegacyFirstRun, legacyFirstRunUpload, readLegacyFirstRun } from '@/lib/firstRun'
 import { forgetLegacyDashboardKeys, hasLegacyDashboardKeys, legacyHiddenUpload, readLegacyWidgets } from '@/lib/dashboardLayout'
 import { clearPendingReceipts } from '@/lib/receiptStore'
-import { removeUserReceipts } from '@/lib/receiptCleanup'
+import { deleteAccountWithReceipts } from '@/lib/receiptCleanup'
 import { makeAuthError, type AuthError } from '@/lib/authErrors'
 import { createAuthGeneration, type AuthToken } from '@/lib/authGeneration'
 import {
@@ -406,9 +406,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const deleteAccount = async () => {
     // Receipt images are files, not rows, so the cascade does not reach them (LED-189). They go
     // first; if they cannot, this throws a ReceiptCleanupError and the account is left as it was.
-    if (user) await removeUserReceipts(supabase.storage.from('receipts'), user.id)
-    const { error } = await supabase.rpc('delete_user')
-    if (error) throw error
+    // If they went but delete_user() still fails after retries, it throws an
+    // AccountDeletionIncompleteError that asks the user to finish (LED-332).
+    if (!user) throw new Error('Not signed in.')
+    await deleteAccountWithReceipts(supabase.storage.from('receipts'), user.id, () => supabase.rpc('delete_user'))
     // Clear all local data before signing out
     // Every personal copy goes, older copies of moved settings included (LED-268). A profile read
     // still in flight is dropped first, so it cannot write its copy back (LED-295).

@@ -71,6 +71,12 @@ test('formula-looking cells are neutralised', () => {
   assert.equal(escapeCsvCell('=HYPERLINK("x","y")'), `"'=HYPERLINK(""x"",""y"")"`)
 })
 
+test('a leading tab or carriage return is neutralised, and a lone CR is quoted (LED-329)', () => {
+  assert.equal(escapeCsvCell('\t=cmd|x'), "'\t=cmd|x")
+  assert.equal(escapeCsvCell('\r=cmd'), `"'\r=cmd"`)
+  assert.equal(escapeCsvCell('a\rb'), '"a\rb"')
+})
+
 test('buildReportCsv carries only the chosen columns, amount always with its currency', () => {
   const csv = buildReportCsv([tx()], ['date', 'description', 'amount'])
   assert.equal(csv, 'Date,Description,Amount,Currency\n2026-09-08,Salary — first half,3200,PHP')

@@ -8,10 +8,11 @@ export function escapeCsvCell(value: string | number | null | undefined): string
   let str = String(value ?? '')
   // Neutralize spreadsheet formulas when the CSV is opened in Excel/Sheets. A number is not text a
   // formula can hide in, and a negative balance (a card, a loan) must stay a number (LED-143).
-  if (typeof value === 'string' && /^[=+\-@]/.test(str)) {
+  // A leading tab or carriage return is on OWASP's list too (LED-329).
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(str)) {
     str = `'${str}`
   }
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replace(/"/g, '""')}"`
   }
   return str

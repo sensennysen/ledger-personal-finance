@@ -48,3 +48,8 @@ test('the Budgets goals view hides the stepper; the budgets view keeps it', () =
   assert.equal(resolveHeaderMeta('/budgets', '').showStepper, true)
   assert.equal(resolveHeaderMeta('/transactions', '?view=goals').showStepper, true)
 })
+
+test('Reports on a custom range hides the stepper', () => {
+  assert.equal(resolveHeaderMeta('/reports', '?from=2026-01-01&to=2026-03-31').showStepper, false)
+  assert.equal(resolveHeaderMeta('/reports', '?from=2026-03-31&to=2026-01-01').showStepper, true)
+})

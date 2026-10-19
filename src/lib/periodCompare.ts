@@ -65,8 +65,13 @@ export function likeForLikeWindows(current: Window, previous: Window, today: str
 /** What the comparison is against: "Aug" for a whole cycle, "Aug 25 – Aug 28" for part of one (LED-237). */
 export function comparisonLabel(previousKey: string, windows: { previous: Window; partial: boolean }): string {
   if (!windows.partial) return cycleMonthLabel(previousKey)
+  return windowLabel(windows.previous)
+}
+
+/** A window by its days, "Aug 25 – Aug 28": what a custom report range is compared against. */
+export function windowLabel(window: Window): string {
   const short = (date: string) => parseDay(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return `${short(windows.previous.start)} – ${short(windows.previous.end)}`
+  return `${short(window.start)} – ${short(window.end)}`
 }
 
 /**

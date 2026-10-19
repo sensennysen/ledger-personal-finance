@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   Download,
   TrendingUp,
@@ -32,7 +32,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useExchangeRates } from '@/contexts/exchangeRatesState'
 import { converterTo } from '@/lib/exchangeRates'
 import { useCycle } from '@/contexts/cycleState'
-import { getReportRange } from '@/lib/reportCycle'
+import { getCustomReportRange, getReportRange, parseCustomRange, previousRangeOf } from '@/lib/reportCycle'
 import {
   compareToPrevious,
   comparisonLabel,
@@ -41,6 +41,7 @@ import {
   likeForLikeWindows,
   previousCycleKey,
   summarizeRange,
+  windowLabel,
 } from '@/lib/periodCompare'
 import {
   DEFAULT_LOOKBACK,
@@ -82,6 +83,7 @@ import { summarizeBalances } from '@/lib/accountsOverview'
 import { UnratedCurrencyNotice } from '@/components/UnratedCurrencyNotice'
 import { buildCategoryBreakdown, rollupBreakdown, type CategorySlice } from '@/lib/categoryBreakdown'
 import { CategoryBreakdownCard } from '@/components/reports/CategoryBreakdownCard'
+import { ReportRangeControl } from '@/components/reports/ReportRangeControl'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
@@ -438,9 +440,29 @@ export default function ReportsPage() {
   const { startDay, selectedMonth, setSelectedMonth } = useCycle()
   const overspending = useOverspendingReport({ startDay, month: selectedMonth, deficitBehaviour })
   const [activeTab, setActiveTab] = useState('overview')
+  // A custom range lives in the URL (?from=&to=), so the header can hide the cycle stepper.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const customRange = parseCustomRange(searchParams.toString())
+  const customStart = customRange?.start
+  const customEnd = customRange?.end
+  const isCustomRange = !!customRange
+  const setCustomRange = (range: { start: string; end: string } | null) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (range) {
+        next.set('from', range.start)
+        next.set('to', range.end)
+      } else {
+        next.delete('from')
+        next.delete('to')
+      }
+      return next
+    }, { replace: true })
+  }
+  const cycleRange = useMemo(() => getReportRange(selectedMonth, startDay), [selectedMonth, startDay])
   const { start, end, label: rangeLabel, filenameLabel } = useMemo(
-    () => getReportRange(selectedMonth, startDay),
-    [selectedMonth, startDay],
+    () => (customStart && customEnd ? getCustomReportRange(customStart, customEnd) : cycleRange),
+    [customStart, customEnd, cycleRange],
   )
 
   // Filtered transactions
@@ -458,7 +480,8 @@ export default function ReportsPage() {
   const counted = useMemo(() => filtered.filter((t) => countsYet(t.date, today)), [filtered, today])
 
   const goToPreviousPeriod = () => {
-    setSelectedMonth(previousCycleKey(selectedMonth))
+    if (isCustomRange) setCustomRange(previousRangeOf({ start, end }))
+    else setSelectedMonth(previousCycleKey(selectedMonth))
   }
 
   const categoryById = useMemo(
@@ -484,11 +507,14 @@ export default function ReportsPage() {
 
   // Same figures for the previous cycle, so each stat card has a reference point. While this
   // cycle is open, only its first N days are set against the first N of the last one (LED-237).
+  // A custom range is set against the same number of days just before it.
   const previousWindows = useMemo(() => {
-    const previous = getReportRange(previousCycleKey(selectedMonth), startDay)
+    const previous = isCustomRange ? previousRangeOf({ start, end }) : getReportRange(previousCycleKey(selectedMonth), startDay)
     return likeForLikeWindows({ start, end }, { start: previous.start, end: previous.end }, today)
-  }, [selectedMonth, startDay, start, end, today])
-  const previousLabel = comparisonLabel(previousCycleKey(selectedMonth), previousWindows)
+  }, [isCustomRange, selectedMonth, startDay, start, end, today])
+  const previousLabel = isCustomRange
+    ? windowLabel(previousWindows.previous)
+    : comparisonLabel(previousCycleKey(selectedMonth), previousWindows)
   const previousTotals = useMemo(
     () => summarizeRange(transactions, previousWindows.previous.start, previousWindows.previous.end, currency, rateTable),
     [transactions, previousWindows, currency, rateTable]
@@ -712,10 +738,13 @@ export default function ReportsPage() {
           </div>
         </PageActions>
 
+        <ReportRangeControl custom={customRange} cycleRange={cycleRange} label={rangeLabel} onChange={setCustomRange} />
+
         <TabsContent value="overview" className="mt-6 flex flex-col gap-6">
-          <OverspendingCard categories={categories} month={selectedMonth} report={overspending} />
+          {/* Budgets run by cycle, so overspending has no meaning for an arbitrary range. */}
+          {!isCustomRange && <OverspendingCard categories={categories} month={selectedMonth} report={overspending} />}
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div className={cn('grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3', isCustomRange ? 'xl:grid-cols-4' : 'xl:grid-cols-5')}>
         <StatCard
           title="Total Income"
           value={formatCurrency(totalIncome, currency)}
@@ -756,22 +785,24 @@ export default function ReportsPage() {
           note={<UnratedCurrencyNotice currencies={balanceSummary.excludedCurrencies} subject="balances" />}
           comparison={loadFailed ? undefined : {
             text: netWorthChange === 0
-              ? 'No change this cycle'
-              : `${netWorthChange > 0 ? '↑' : '↓'} ${formatCurrency(Math.abs(netWorthChange), currency)} this cycle`,
+              ? `No change this ${isCustomRange ? 'period' : 'cycle'}`
+              : `${netWorthChange > 0 ? '↑' : '↓'} ${formatCurrency(Math.abs(netWorthChange), currency)} this ${isCustomRange ? 'period' : 'cycle'}`,
             color: netWorthChange > 0 ? INCOME : netWorthChange < 0 ? EXPENSE : 'var(--muted-foreground)',
           }}
           loading={loading}
         />
-        <StatCard
-          title="Over budget"
-          value={overspendingReady ? formatCurrency(overNow, currency) : '—'}
-          sub={overspendingSub}
-          icon={TriangleAlert}
-          color={overNow > 0 ? 'var(--warning)' : 'var(--foreground)'}
-          comparison={overspendingReady ? compare(overNow, overPrevious, 'down') : undefined}
-          loading={overspending.state === 'loading'}
-          note={<UnratedCurrencyNotice currencies={overspending.converted.excludedCurrencies} subject="overspending" />}
-        />
+        {!isCustomRange && (
+          <StatCard
+            title="Over budget"
+            value={overspendingReady ? formatCurrency(overNow, currency) : '—'}
+            sub={overspendingSub}
+            icon={TriangleAlert}
+            color={overNow > 0 ? 'var(--warning)' : 'var(--foreground)'}
+            comparison={overspendingReady ? compare(overNow, overPrevious, 'down') : undefined}
+            loading={overspending.state === 'loading'}
+            note={<UnratedCurrencyNotice currencies={overspending.converted.excludedCurrencies} subject="overspending" />}
+          />
+        )}
       </div>
 
       <div className="grid lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-4">

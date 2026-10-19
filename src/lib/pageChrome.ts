@@ -1,3 +1,5 @@
+import { parseCustomRange } from './reportCycle.ts'
+
 export const PAGE_ACTIONS_ID = 'page-actions'
 
 export interface HeaderMeta {
@@ -21,9 +23,11 @@ const TITLES: Record<string, string> = {
   '/more': 'More',
 }
 
-// Budgets' Goals view is not per-cycle, so the stepper would move nothing on screen.
+// Budgets' Goals view is not per-cycle, and Reports on a custom range is not either, so the
+// stepper would move nothing on screen.
 function followsCycle(pathname: string, search: string): boolean {
   if (!STEPPER_PATHS.includes(pathname)) return false
+  if (pathname === '/reports' && parseCustomRange(search)) return false
   return !(pathname === '/budgets' && new URLSearchParams(search).get('view') === 'goals')
 }
 

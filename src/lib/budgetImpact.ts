@@ -3,6 +3,7 @@ import { amountInCurrency, type RateTable } from './exchangeRates.ts'
 export interface ImpactTx {
   type: string
   category_id: string | null
+  subcategory_id?: string | null
   amount: number
   date: string
   currency: string
@@ -11,6 +12,7 @@ export interface ImpactTx {
 
 export interface ImpactBudget {
   category_id: string
+  subcategory_id?: string | null
   currency: string
   amount: number
   spent?: number
@@ -41,6 +43,7 @@ export function entryBudgetImpact(
 ): BudgetImpact | null {
   if (tx.type !== 'expense' || !tx.category_id || !budget) return null
   if (budget.category_id !== tx.category_id) return null
+  if (budget.subcategory_id && budget.subcategory_id !== tx.subcategory_id) return null
   if (tx.date < range.start || tx.date > range.end) return null
   const entry = amountInCurrency(tx, budget.currency, rates)
   if (entry === null) return null

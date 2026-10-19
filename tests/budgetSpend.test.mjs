@@ -64,3 +64,16 @@ test('last-cycle suggestions convert with the table too', () => {
   assert.ok(Math.abs(rows[0].spent - 560) < 1e-9)
   assert.deepEqual(rows[0].unrated, ['EUR'])
 })
+
+test('a budget on one subcategory counts only expenses tagged with it', () => {
+  const sub = { category_id: 'c1', subcategory_id: 's1', currency: 'PHP' }
+  const result = sumBudgetSpend(
+    [tx({ subcategory_id: 's1' }), tx({ subcategory_id: 's2', amount: 40 }), tx({ amount: 25 }), tx({ category_id: 'c2', subcategory_id: 's1' })],
+    sub, '2026-09-01', '2026-09-30',
+  )
+  assert.deepEqual(result, { spent: 100, unrated: [] })
+})
+
+test('a budget with no subcategory still counts the whole category', () => {
+  assert.deepEqual(sum([tx({ subcategory_id: 's1' }), tx({ subcategory_id: null, amount: 25 })]), { spent: 125, unrated: [] })
+})

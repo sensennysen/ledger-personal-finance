@@ -37,7 +37,7 @@ export function useOverspending(until: string) {
     const background = loadedOnce.current
     const { data: budgetData, error: budgetError } = await readWithPolicy((retry) => supabase
       .from('budgets')
-      .select('id, category_id, amount, currency, period, start_date, rollover_enabled')
+      .select('id, category_id, subcategory_id, amount, currency, period, start_date, rollover_enabled, subcategory:subcategories(name)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .retry(retry), { background })
@@ -56,7 +56,7 @@ export function useOverspending(until: string) {
         (from, to) =>
           supabase
             .from('transactions')
-            .select('category_id, amount, date, currency, exchange_rate')
+            .select('category_id, subcategory_id, amount, date, currency, exchange_rate')
             .eq('user_id', user.id)
             .eq('type', 'expense')
             .gte('date', earliest)

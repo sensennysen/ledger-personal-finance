@@ -10,6 +10,9 @@ const pad = (n: number) => String(n).padStart(2, '0')
 export interface OverspendingBudget {
   id: string
   category_id: string
+  /** The one subcategory the budget tracks, or null for its whole category. */
+  subcategory_id?: string | null
+  subcategory?: { name: string } | null
   amount: number
   currency: string
   period: 'weekly' | 'monthly' | 'quarterly' | 'yearly'
@@ -20,6 +23,9 @@ export interface OverspendingBudget {
 export interface OverspendingRow {
   budgetId: string
   categoryId: string
+  subcategoryId: string | null
+  /** The tracked subcategory's name, for the row label; null for a whole-category budget. */
+  subcategoryName: string | null
   currency: string
   /** A yearly row's spend is the year so far, not the selected cycle (LED-244). */
   period: OverspendingBudget['period']
@@ -107,7 +113,7 @@ export function computeOverspending(input: Input): OverspendingResult {
       u.forEach((c) => unrated.add(c))
       if (spent > b.amount) {
         // No streak: only monthly budgets are walked cycle by cycle (LED-271).
-        rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, period: b.period, spent, limit: b.amount, over: spent - b.amount, streak: 0, uncarried: 0, window })
+        rows.push({ budgetId: b.id, categoryId: b.category_id, subcategoryId: b.subcategory_id ?? null, subcategoryName: b.subcategory?.name ?? null, currency: b.currency, period: b.period, spent, limit: b.amount, over: spent - b.amount, streak: 0, uncarried: 0, window })
       }
       continue
     }
@@ -131,7 +137,7 @@ export function computeOverspending(input: Input): OverspendingResult {
         if (over > 0) {
           const uncarried =
             rolloverActive && behaviour === 'carry' ? Math.max(0, -unclamped - b.amount) : 0
-          rows.push({ budgetId: b.id, categoryId: b.category_id, currency: b.currency, period: b.period, spent, limit, over, streak, uncarried })
+          rows.push({ budgetId: b.id, categoryId: b.category_id, subcategoryId: b.subcategory_id ?? null, subcategoryName: b.subcategory?.name ?? null, currency: b.currency, period: b.period, spent, limit, over, streak, uncarried })
         }
         break
       }

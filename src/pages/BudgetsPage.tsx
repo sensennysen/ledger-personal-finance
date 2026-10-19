@@ -34,6 +34,7 @@ import { useNotify } from '@/contexts/notificationState'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useSavingsGoals, type GoalWithContributions } from '@/hooks/useSavingsGoals'
 import { useCategories } from '@/hooks/useCategories'
+import { useSubcategories } from '@/hooks/useSubcategories'
 import { CURRENCIES, ACCOUNT_COLORS } from '@/types'
 import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
 import { INCOME, EXPENSE } from '@/constants/colors'
@@ -73,6 +74,8 @@ import { useCategoryInk } from '@/hooks/useCategoryInk'
 const budgetSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   category_id: z.string().min(1, 'Category is required'),
+  /** One subcategory to track; null tracks every expense in the category. */
+  subcategory_id: z.string().nullable(),
   amount: z.coerce.number().positive('Amount must be positive'),
   currency: z.string().min(1),
   period: z.enum(['weekly', 'monthly', 'quarterly', 'yearly']),
@@ -92,6 +95,7 @@ const BUDGET_PERIOD_LABELS: Record<BudgetFormValues['period'], string> = {
 }
 
 const getCurrencyLabel = (value: string | null | undefined) => value ?? 'Select currency'
+const WHOLE_CATEGORY_VALUE = '__whole_category__'
 const formatCycleDay = (date: string) =>
   new Date(date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
@@ -118,6 +122,7 @@ function BudgetForm({
     defaultValues: {
       name: '',
       category_id: '',
+      subcategory_id: null,
       amount: 0,
       currency: DEFAULT_CURRENCY,
       period: 'monthly',
@@ -129,6 +134,8 @@ function BudgetForm({
   })
 
   const period = useWatch({ control: form.control, name: 'period' })
+  const [categoryId, subcategoryId] = useWatch({ control: form.control, name: ['category_id', 'subcategory_id'] })
+  const { subcategories } = useSubcategories(categoryId || null)
   const rolloverAllowed = canRollover(period)
   const { selectedMonth, startDay } = useCycle()
   const cycle = getBudgetCycleRange(period, selectedMonth, startDay)
@@ -196,7 +203,14 @@ function BudgetForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select
+                onValueChange={(value) => {
+                  field.onChange(value)
+                  // A subcategory belongs to one category, so a new category starts on the whole of it.
+                  form.setValue('subcategory_id', null)
+                }}
+                defaultValue={field.value}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select category">
@@ -219,6 +233,47 @@ function BudgetForm({
             </FormItem>
           )}
         />
+        {/* Shown once the category has subcategories, or while an edited budget's own is loading. */}
+        {(subcategories.length > 0 || !!subcategoryId) && (
+          <FormField
+            control={form.control}
+            name="subcategory_id"
+            render={({ field }) => {
+              const selectedSubcategory = subcategories.find((subcategory) => subcategory.id === field.value)
+              const selectedName = selectedSubcategory?.name ?? (field.value && current?.subcategory_id === field.value ? current.subcategory?.name : undefined)
+              return (
+                <FormItem>
+                  <FormLabel>
+                    Subcategory <span className="font-normal text-muted-foreground">(optional)</span>
+                  </FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === WHOLE_CATEGORY_VALUE ? null : value)}
+                    value={field.value ?? WHOLE_CATEGORY_VALUE}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Whole category">
+                          {field.value ? selectedName ?? 'Loading…' : 'Whole category'}
+                        </SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={WHOLE_CATEGORY_VALUE}>Whole category</SelectItem>
+                      {subcategories.map((subcategory) => (
+                        <SelectItem key={subcategory.id} value={subcategory.id}>{subcategory.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {field.value
+                      ? 'Only expenses tagged with this subcategory count toward the budget.'
+                      : 'Every expense in the category counts toward the budget.'}
+                  </p>
+                </FormItem>
+              )
+            }}
+          />
+        )}
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -889,6 +944,7 @@ function BudgetTransactionsDialog({
           <div className="min-w-0">
             <p className="text-sm font-medium">
               {budget.category?.icon} {budget.category?.name ?? 'Budget category'}
+              {budget.subcategory && <span className="text-muted-foreground"> · {budget.subcategory.name}</span>}
             </p>
             <p className="text-xs text-muted-foreground">
               {formatDate(periodRange.start)} - {formatDate(periodRange.end)}
@@ -927,7 +983,9 @@ function BudgetTransactionsDialog({
         <div className="rounded-lg border border-dashed px-4 py-8 text-center">
           <p className="text-sm font-medium">No matching transactions</p>
           <p className="text-xs text-muted-foreground">
-            Expenses in this category and period will appear here.
+            {budget.subcategory_id
+              ? 'Expenses in this subcategory and period will appear here.'
+              : 'Expenses in this category and period will appear here.'}
           </p>
         </div>
       ) : (
@@ -1209,7 +1267,7 @@ export default function BudgetsPage() {
     [selectedBudget, selectedMonth, startDay]
   )
   const {
-    transactions: selectedBudgetTransactions,
+    transactions: selectedBudgetCategoryTransactions,
     loading: selectedBudgetTransactionsLoading,
     error: selectedBudgetTransactionsError,
     errorDetail: selectedBudgetTransactionsErrorDetail,
@@ -1222,6 +1280,14 @@ export default function BudgetsPage() {
       endDate: selectedBudgetRange?.end,
     },
     { enabled: selectedBudget != null },
+  )
+  // A budget on one subcategory lists only the category's rows tagged with it, as its spend counts.
+  const selectedSubcategoryId = selectedBudget?.subcategory_id
+  const selectedBudgetTransactions = React.useMemo(
+    () => selectedSubcategoryId
+      ? selectedBudgetCategoryTransactions.filter((tx) => tx.subcategory_id === selectedSubcategoryId)
+      : selectedBudgetCategoryTransactions,
+    [selectedBudgetCategoryTransactions, selectedSubcategoryId],
   )
 
   const handleCreateBudget = async (values: BudgetFormValues) => {
@@ -1310,6 +1376,7 @@ export default function BudgetsPage() {
       suggestions.map((suggestion) => ({
         name: suggestion.name,
         category_id: suggestion.category_id,
+        subcategory_id: null,
         amount: suggestion.amount,
         currency: defaultCurrency,
         period: 'monthly' as const,
@@ -1441,7 +1508,9 @@ export default function BudgetsPage() {
                           <div className="flex gap-1 mt-0.5 flex-wrap">
                             <Badge variant="outline" className="text-xs">{BUDGET_PERIOD_LABELS[budget.period]}</Badge>
                             {budget.category && (
-                              <Badge variant="secondary" className="text-xs">{budget.category.name}</Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                {budget.category.name}{budget.subcategory ? ` · ${budget.subcategory.name}` : ''}
+                              </Badge>
                             )}
                             {rolloverActive && (
                               <Badge variant="outline" className="text-xs gap-0.5 text-transfer border-transfer/40">

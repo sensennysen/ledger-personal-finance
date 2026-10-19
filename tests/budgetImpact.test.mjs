@@ -52,3 +52,10 @@ test('a foreign entry converts with the exchange-rate table (LED-136)', async ()
   assert.equal(entryBudgetImpact(foreign, budget, range), null)
   assert.ok(Math.abs(entryBudgetImpact(foreign, budget, range, rates).entry - 560) < 1e-9)
 })
+
+test('a subcategory budget shows only entries tagged with its subcategory', () => {
+  const subBudget = { ...budget, subcategory_id: 'produce' }
+  assert.equal(entryBudgetImpact({ ...tx, subcategory_id: 'produce' }, subBudget, range).entry, 86.4)
+  assert.equal(entryBudgetImpact({ ...tx, subcategory_id: 'snacks' }, subBudget, range), null)
+  assert.equal(entryBudgetImpact(tx, subBudget, range), null)
+})

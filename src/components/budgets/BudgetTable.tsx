@@ -73,6 +73,7 @@ export function BudgetTable({
                       </button>
                       <div className="mt-0.5 flex flex-wrap gap-1">
                         <Badge variant="outline" className="text-xs">{periodLabel(budget.period)}</Badge>
+                        {budget.subcategory && <Badge variant="secondary" className="text-xs">{budget.subcategory.name}</Badge>}
                         {rolloverActive && (
                           <Badge variant="outline" className="gap-0.5 border-transfer/40 text-xs text-transfer">
                             <RefreshCw className="h-2.5 w-2.5" />Rollover

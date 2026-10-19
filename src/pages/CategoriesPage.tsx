@@ -490,7 +490,7 @@ function SubcategoryPanel({
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete subcategory?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This will delete "{sub.name}". Transactions using it will lose this subcategory.
+                          This will delete "{sub.name}". Transactions using it will lose this subcategory, and a budget on it will track all of {category.name}.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>

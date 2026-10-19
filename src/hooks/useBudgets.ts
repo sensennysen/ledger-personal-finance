@@ -105,7 +105,7 @@ export function useBudgets(
     const background = cached !== null
     const { data: budgetData, error: budgetError } = await readWithPolicy((retry) => supabase
       .from('budgets')
-      .select('*, category:categories(id, name, color, icon, type)')
+      .select('*, category:categories(id, name, color, icon, type), subcategory:subcategories(id, name)')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: true })
@@ -137,7 +137,7 @@ export function useBudgets(
       (from, to) =>
         supabase
           .from('transactions')
-          .select('category_id, amount, date, currency, exchange_rate')
+          .select('category_id, subcategory_id, amount, date, currency, exchange_rate')
           .eq('user_id', user.id)
           .eq('type', 'expense')
           .gte('date', fetchStart)
@@ -264,6 +264,7 @@ export function useBudgets(
       | 'created_at'
       | 'updated_at'
       | 'category'
+      | 'subcategory'
       | 'spent'
       | 'scheduled'
       | 'unrated_currencies'
@@ -284,7 +285,7 @@ export function useBudgets(
 
   /** Inserts every budget in one call: all of them are created or none. */
   const createBudgets = async (
-    rows: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'spent' | 'scheduled' | 'unrated_currencies' | 'rollover_amount' | 'effective_amount' | 'history' | 'period_spends'>[],
+    rows: Omit<Budget, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'category' | 'subcategory' | 'spent' | 'scheduled' | 'unrated_currencies' | 'rollover_amount' | 'effective_amount' | 'history' | 'period_spends'>[],
   ): Promise<MutationResult> => {
     if (!user) return { error: 'Not authenticated' }
     if (!navigator.onLine) return { error: 'Connect to the internet to add budgets.' }
@@ -381,7 +382,7 @@ export function useBudgetsForExport(expenseTx: BudgetSpendTx[], rateTable: RateT
     }
     const { data, error } = await supabase
       .from('budgets')
-      .select('*, category:categories(id, name, color, icon, type)')
+      .select('*, category:categories(id, name, color, icon, type), subcategory:subcategories(id, name)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
       .overrideTypes<Budget[], { merge: false }>()

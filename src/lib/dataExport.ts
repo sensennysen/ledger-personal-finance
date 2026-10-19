@@ -34,6 +34,8 @@ interface ExportCategory {
 interface ExportBudget {
   name: string
   category?: { name: string } | null
+  /** The one subcategory the budget tracks; none means the whole category. */
+  subcategory?: { name: string } | null
   amount: number
   currency: string
   period: string
@@ -81,14 +83,14 @@ export function buildCategoriesCsv(categories: readonly ExportCategory[]): strin
 }
 
 export const BUDGET_CSV_HEADERS = [
-  'Name', 'Category', 'Amount', 'Currency', 'Period', 'Start Date', 'End Date', 'Active', 'Rollover', 'Spent', 'Unrated Currencies',
+  'Name', 'Category', 'Subcategory', 'Amount', 'Currency', 'Period', 'Start Date', 'End Date', 'Active', 'Rollover', 'Spent', 'Unrated Currencies',
 ]
 
 export function buildBudgetsCsv(budgets: readonly ExportBudget[]): string {
   return toCsv(
     BUDGET_CSV_HEADERS,
     budgets.map((b) => [
-      b.name, b.category?.name, b.amount, b.currency, b.period, b.start_date, b.end_date, b.is_active, b.rollover_enabled,
+      b.name, b.category?.name, b.subcategory?.name, b.amount, b.currency, b.period, b.start_date, b.end_date, b.is_active, b.rollover_enabled,
       b.spent, b.unrated_currencies.join(';'),
     ]),
   )

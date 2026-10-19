@@ -92,7 +92,10 @@ export function OverspendingCard({ categories, month, report }: OverspendingCard
                     {category?.icon}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium truncate">{category?.name ?? 'Uncategorised'}</span>
+                    <span className="block text-sm font-medium truncate">
+                      {category?.name ?? 'Uncategorised'}
+                      {row.subcategoryName && <span className="text-muted-foreground"> · {row.subcategoryName}</span>}
+                    </span>
                     <span className="block text-xs text-muted-foreground tabular-nums">
                       {formatCurrency(row.spent, row.currency)} of {formatCurrency(row.limit, row.currency)}
                       {spendWindow ? <span className="whitespace-nowrap"> · {spendWindow.inline}</span> : <span className="sm:hidden"> · {streakLabel(row.streak)}</span>}

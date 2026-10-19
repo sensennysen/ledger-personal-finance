@@ -189,7 +189,10 @@ function BudgetImpactBar({ transaction }: { transaction: Transaction }) {
   const month = monthKeyOf(transaction.date, startDay)
   const { budgets } = useBudgets({ selectedMonth: month, startDay })
   const { table: rates } = useExchangeRates()
-  const budget = budgets.find((b) => b.category_id === transaction.category_id)
+  // The budget on this entry's subcategory when there is one, else the one on its whole category.
+  const budget =
+    budgets.find((b) => b.category_id === transaction.category_id && !!b.subcategory_id && b.subcategory_id === transaction.subcategory_id) ??
+    budgets.find((b) => b.category_id === transaction.category_id && !b.subcategory_id)
   const impact = budget
     ? entryBudgetImpact(transaction, budget, getBudgetCycleRange(budget.period, month, startDay), rates)
     : null

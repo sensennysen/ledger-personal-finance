@@ -115,6 +115,8 @@ export type Budget = Entity<
     period: 'weekly' | 'monthly' | 'quarterly' | 'yearly'
     // joined / computed
     category?: Category
+    /** The one subcategory the budget tracks; absent or null means the whole category. */
+    subcategory?: Pick<Subcategory, 'id' | 'name'> | null
     spent?: number
     /** Spend dated later in the open period: scheduled, not in `spent` yet (LED-238). */
     scheduled?: number

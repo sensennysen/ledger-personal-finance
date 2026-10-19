@@ -2,6 +2,8 @@ import { amountInCurrency, type RateTable } from './exchangeRates.ts'
 
 export interface BudgetSpendTx {
   category_id: string | null
+  /** Read when a budget tracks one subcategory; rows read without it never match such a budget. */
+  subcategory_id?: string | null
   amount: number
   date: string
   currency: string
@@ -13,10 +15,11 @@ export interface BudgetSpendTx {
  * A transaction in another currency is converted at the rate recorded on it, else at
  * the exchange-rate table's rate (LED-136). With neither it cannot be converted:
  * it is excluded from the total and its currency is reported in `unrated`.
+ * A budget with a subcategory counts only the category's expenses tagged with it.
  */
 export function sumBudgetSpend(
   txs: BudgetSpendTx[],
-  budget: { category_id: string; currency: string },
+  budget: { category_id: string; subcategory_id?: string | null; currency: string },
   rangeStart: string,
   rangeEnd: string,
   rates: RateTable | null = null,
@@ -25,6 +28,7 @@ export function sumBudgetSpend(
   const unrated = new Set<string>()
   for (const tx of txs) {
     if (tx.category_id !== budget.category_id) continue
+    if (budget.subcategory_id && tx.subcategory_id !== budget.subcategory_id) continue
     if (tx.date < rangeStart || tx.date > rangeEnd) continue
     const converted = amountInCurrency(tx, budget.currency, rates)
     if (converted === null) unrated.add(tx.currency)

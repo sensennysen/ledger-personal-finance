@@ -88,7 +88,7 @@ function TransactionListDialog({
           </div>
         </ScrollArea>
         {transactions.length > 0 && (
-          <div className="flex items-center justify-between pt-2 border-t border-border/50">
+          <div className="pt-2 border-t border-border/50">
             <DashboardSummaryValueRow
               label={totalLabel}
               value={

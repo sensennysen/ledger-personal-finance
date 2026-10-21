@@ -23,7 +23,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # 22.23.4 is the October 21, 2026 security release (Brotli RCE, TLS hostname bypasses).
+          node-version: 22.23.4
           cache: pnpm
 
       - name: Install

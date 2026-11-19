@@ -20,9 +20,11 @@ Quick Log now saves the original phrase and recognized fields as a draft wheneve
 - The expanded suite passed lint, the production build, 1,244 Node tests, the redesign checks, 85 pgTAP assertions, database lint, and the existing concurrency checks. The new database tests cover isolation, failed completion, late retry, and balance changes.
 - Replayed the migrations and seed from an empty Supabase database. Generated types matched the output from the CI version of the CLI.
 - Verified the Vite development override on port 5173. Both Supabase endpoints accepted preflight, but the running app had been using the hosted endpoint. With `.env.development.local` pointing to the local stack, a signed-in browser submission saved the extracted phrase and amount in local Supabase.
+- Reproduced the production CORS failure using the full browser preflight. The hosted response omitted Ledger's `X-Client-ID` from its allowed headers. The local gateway echoed the requested headers, which hid the omission during browser testing. The function source now explicitly allows `X-Client-ID`.
 
 ## Backlog
 
 - Verify on installed iOS and Android PWAs, including a real offline-to-online handoff.
 - Apply the Quick Log migrations and deploy the extraction function to hosted Supabase when deploying the frontend. The OpenAI key is configured as a hosted Edge Function secret.
+- Deploy the CORS fix to the hosted extraction function and repeat the production-origin preflight with all browser headers.
 - Implement receipt capture and daily review reminders in their follow-on milestones.

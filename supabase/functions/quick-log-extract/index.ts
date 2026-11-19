@@ -6,7 +6,8 @@ import {
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, content-type',
+  // Ledger sets X-Client-ID on every request through its Supabase client.
+  'Access-Control-Allow-Headers': 'authorization, apikey, x-client-id, x-client-info, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const supportedLocales = ['en-US', 'de-DE', 'fr-FR', 'ja-JP', 'zh-CN']

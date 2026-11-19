@@ -10,6 +10,9 @@ export interface Preferences {
   dateFormat: DateFormat
   largeTransactionThreshold: number
   creditCardNotificationsEnabled: boolean
+  quickLogAccountId: string | null
+  quickLogIncomeAccountId: string | null
+  quickLogIntroSeen: boolean
   txView: 'grouped' | 'flat'
   txDensity: 'comfortable' | 'compact'
   accView: 'grouped' | 'flat'
@@ -20,6 +23,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   dateFormat: 'MDY',
   largeTransactionThreshold: 0,
   creditCardNotificationsEnabled: false,
+  quickLogAccountId: null,
+  quickLogIncomeAccountId: null,
+  quickLogIntroSeen: false,
   txView: 'grouped',
   txDensity: 'comfortable',
   accView: 'grouped',
@@ -36,6 +42,9 @@ const CHECKS: { [K in keyof Preferences]: (value: unknown) => boolean } = {
   dateFormat: (v) => ['MDY', 'DMY', 'YMD'].includes(v as string),
   largeTransactionThreshold: (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0,
   creditCardNotificationsEnabled: (v) => typeof v === 'boolean',
+  quickLogAccountId: (v) => v === null || (typeof v === 'string' && v.length > 0),
+  quickLogIncomeAccountId: (v) => v === null || (typeof v === 'string' && v.length > 0),
+  quickLogIntroSeen: (v) => typeof v === 'boolean',
   txView: (v) => v === 'grouped' || v === 'flat',
   txDensity: (v) => v === 'comfortable' || v === 'compact',
   accView: (v) => v === 'grouped' || v === 'flat',

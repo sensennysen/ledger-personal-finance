@@ -85,7 +85,8 @@ export type Subcategory = Entity<'subcategories', 'sort_order'>
  */
 export type Transaction = Entity<
   'transactions',
-  | 'destination_amount' | 'recurrence_next_posted' | 'tags' | 'goal_id' | 'original_amount' | 'original_currency',
+  | 'destination_amount' | 'recurrence_next_posted' | 'tags' | 'goal_id' | 'original_amount' | 'original_currency'
+  | 'destination_currency' | 'entry_source' | 'reviewed_at',
   {
     type: TransactionType
     recurrence_interval: RecurrenceInterval | null

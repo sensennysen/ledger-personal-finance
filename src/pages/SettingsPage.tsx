@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { ExchangeRatesCard } from '@/components/settings/ExchangeRatesCard'
 import { BrowserStorageCard } from '@/components/settings/BrowserStorageCard'
+import { QuickLogSettingsCard } from '@/components/settings/QuickLogSettingsCard'
 import { FormError } from '@/components/ui/form-error'
 import { describeDataError, type FormErrorValue } from '@/lib/dataErrors'
 import { AccountDeletionIncompleteError, ReceiptCleanupError } from '@/lib/receiptCleanup'
@@ -427,6 +428,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <QuickLogSettingsCard />
 
       {/* Notifications */}
       <Card>

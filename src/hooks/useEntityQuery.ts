@@ -14,6 +14,7 @@ interface UseEntityQueryInput<T> {
   params?: Record<string, unknown>
   /** The dataCache key for this user. */
   cacheKey: (userId: string) => string
+  cachedFallback?: (userId: string) => T | undefined
   read: (userId: string, retry: boolean, signal: AbortSignal) => PromiseLike<ReadResult<T>>
   /** Names the list in the offline message, e.g. "your accounts" (LED-307). */
   offlineLabel: string
@@ -30,7 +31,7 @@ interface UseEntityQueryInput<T> {
  * Offline with no copy on this device is reported as an error naming what is missing, never as
  * endless loading, so list views resolve it through resolveLoadState; the read resumes on reconnect.
  */
-export function useEntityQuery<T>({ entity, params, cacheKey, read, offlineLabel, enabled = true, context }: UseEntityQueryInput<T>) {
+export function useEntityQuery<T>({ entity, params, cacheKey, cachedFallback, read, offlineLabel, enabled = true, context }: UseEntityQueryInput<T>) {
   const { user } = useAuth()
   const userId = user?.id ?? null
   const paramsKey = JSON.stringify(params ?? null)
@@ -39,13 +40,15 @@ export function useEntityQuery<T>({ entity, params, cacheKey, read, offlineLabel
   const queryKey = useMemo(() => entityKey(userId ?? '', entity, params), [userId, entity, paramsKey])
   const storageKey = userId ? cacheKey(userId) : ''
 
+  const options = entityQueryOptions<T>({
+    queryKey,
+    cacheKey: storageKey,
+    read: (retry, signal) => read(userId!, retry, signal),
+    context,
+  })
   const query = useQuery({
-    ...entityQueryOptions<T>({
-      queryKey,
-      cacheKey: storageKey,
-      read: (retry, signal) => read(userId!, retry, signal),
-      context,
-    }),
+    ...options,
+    initialData: () => options.initialData() ?? (userId ? cachedFallback?.(userId) : undefined),
     enabled: enabled && userId !== null,
   })
 

@@ -12,6 +12,11 @@ export function restoreTransactionInput(tx: Transaction) {
     currency: tx.currency,
     exchange_rate: tx.exchange_rate,
     destination_amount: tx.destination_amount ?? null,
+    ...(tx.entry_source === 'ai_phrase' ? {
+      entry_source: tx.entry_source,
+      reviewed_at: tx.reviewed_at ?? null,
+      destination_currency: tx.type === 'transfer' ? tx.to_account?.currency ?? tx.destination_currency ?? null : null,
+    } : {}),
     description: tx.description,
     notes: tx.notes,
     date: tx.date,

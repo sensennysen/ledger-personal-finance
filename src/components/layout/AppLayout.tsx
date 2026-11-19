@@ -8,6 +8,7 @@ import {
   Plus,
   LogOut,
   CalendarDays,
+  Zap,
 } from 'lucide-react'
 import { TopBar } from './TopBar'
 import { PageHeader } from './PageHeader'
@@ -66,6 +67,12 @@ import { SearchPalette } from '@/components/search/SearchPalette'
 import { EntryDetail } from '@/components/transactions/EntryDetail'
 import { X } from 'lucide-react'
 import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
+import { QuickLogForm } from '@/components/transactions/QuickLogForm'
+import { QuickLogIntro } from '@/components/transactions/QuickLogIntro'
+import { transactionSchema } from '@/components/transactions/transactionFormSchema'
+import { usePreferences } from '@/hooks/usePreferences'
+import { saveQuickLogDraft, type QuickLogDraft } from '@/hooks/useQuickLogDrafts'
+import type { QuickLogResolution } from '@/lib/quickLog'
 import type { Transaction } from '@/types'
 
 export type AddTransactionOptions = {
@@ -79,6 +86,8 @@ export type AppLayoutContext = {
   /** `categoryId` opens the form with that category chosen (search: "New expense in Groceries"). */
   /** `prefill` opens it with an amount and date (Home: Pay now on a loan bill). */
   openAddTransactionModal: (kind: TransactionKind, options?: AddTransactionOptions) => void
+  openQuickLog: () => void
+  openQuickLogDraft: (draft: QuickLogDraft) => void
   /** Advisory locks (More's destinations follow the nav's). */
   setupComplete: boolean
 }
@@ -107,9 +116,10 @@ function LayoutShell() {
   const { isOnline, pendingCount } = networkStatus
   useReceiptSweep()
   const exitGuard = useExitGuard()
-  const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction } = useTransactions()
+  const { transactions, loading: transactionsLoading, generateDueRecurring, createTransaction, deleteTransaction } = useTransactions()
   const { createWithStatement } = useCardPayment(createTransaction)
   const notify = useNotify()
+  const { formatAmount, prefs, set: setPreference } = usePreferences()
   const { accounts, loading: accountsLoading } = useAccounts()
   // ⌘F in search scopes to the account page it opened over.
   const accountRouteId = useMatch('/accounts/:accountId')?.params.accountId
@@ -134,6 +144,9 @@ function LayoutShell() {
   const [targetAccountId, setTargetAccountId] = useState<string | undefined>()
   const [prefillCategoryId, setPrefillCategoryId] = useState<string | undefined>()
   const [prefill, setPrefill] = useState<AddTransactionOptions['prefill']>()
+  const [quickLogStep, setQuickLogStep] = useState<'intro' | 'form' | null>(null)
+  const [manualPhrase, setManualPhrase] = useState<string | null>(null)
+  const [quickLogDraft, setQuickLogDraft] = useState<QuickLogDraft | null>(null)
   const [entry, setEntry] = useState<{
     transaction: Transaction
     actions?: EntryActions
@@ -226,7 +239,31 @@ function LayoutShell() {
     setTargetAccountId(options?.targetAccountId)
     setPrefillCategoryId(options?.categoryId)
     setPrefill(options?.prefill)
+    setQuickLogStep(null)
+    setQuickLogDraft(null)
+    setManualPhrase(null)
     setSheet('add')
+  }
+  const openQuickLog = () => {
+    openAddTransactionModal('expense')
+    setQuickLogStep(prefs.quickLogIntroSeen ? 'form' : 'intro')
+  }
+  const openQuickLogDraft = (draft: QuickLogDraft) => {
+    const kind = draft.kind === 'income' || draft.kind === 'transfer'
+      || draft.kind === 'card-payment' || draft.kind === 'loan-repayment' ? draft.kind : 'expense'
+    openAddTransactionModal(kind)
+    setQuickLogDraft(draft)
+  }
+  const finishQuickLogIntro = () => {
+    setPreference('quickLogIntroSeen', true)
+    setQuickLogStep('form')
+    requestAnimationFrame(() => document.getElementById('quick-log-phrase')?.focus())
+  }
+  const openQuickLogSettings = () => {
+    setPreference('quickLogIntroSeen', true)
+    setQuickLogStep(null)
+    setSheet(null)
+    navigate('/settings#quick-log')
   }
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -252,15 +289,53 @@ function LayoutShell() {
     void run()
   }, [generateDueRecurring, notify])
   const handleCreate = async (values: TransactionFormValues) => {
-    const { error, errorDetail } = await createWithStatement(
-      values as Parameters<typeof createTransaction>[0],
-    )
+    const result = quickLogDraft
+      ? await createWithStatement({ ...values, entry_source: 'ai_phrase', reviewed_at: new Date().toISOString() }, quickLogDraft.id)
+      : await createWithStatement(values)
+    const { error, errorDetail } = result
     if (error) {
       setFormError({ message: error, detail: errorDetail ?? null })
       return
     }
+    if (quickLogDraft && result.id) announceQuickLog(values, result.id, result.queued)
     setFormError(null)
     setSheet(null)
+  }
+  const announceQuickLog = (values: TransactionFormValues, id: string, queued?: boolean) => {
+    const source = accounts.find((account) => account.id === values.account_id)
+    const destination = accounts.find((account) => account.id === values.to_account_id)
+    const amount = formatAmount(values.amount, values.currency)
+    const body = values.type === 'transfer' && destination
+      ? `${source?.name ?? 'From account'} · ${amount} → ${destination.name} · ${formatAmount(values.destination_amount ?? values.amount, destination.currency)}`
+      : `${amount} · ${source?.name ?? values.description}`
+    notify({
+      severity: 'success', title: queued ? 'Transaction queued' : 'Transaction saved', body,
+      action: { label: 'Undo', run: () => {
+        void deleteTransaction(id).then((result) => notify(result.error
+          ? { severity: 'failure', title: 'Could not undo transaction', body: result.error }
+          : { severity: 'success', title: result.queued ? 'Undo queued' : 'Transaction undone' }))
+      } },
+    })
+  }
+  const saveQuickLog = async (draft: QuickLogResolution, phrase: string, id: string) => {
+    if (!draft.ready) {
+      const error = await saveQuickLogDraft(draft, phrase, id)
+      if (error) return error
+      notify({
+        severity: 'success', title: 'Saved for review', body: 'Finish the entry in Activity when you’re ready.',
+        action: { label: 'Needs review', run: () => navigate('/transactions?review=needed') },
+      })
+      return null
+    }
+    const validated = transactionSchema.safeParse(draft.values)
+    if (!validated.success) return 'Ledger could not save this transaction.'
+    const result = await createTransaction({
+      ...validated.data, entry_source: 'ai_phrase', reviewed_at: null, destination_currency: draft.destinationCurrency,
+    }, id)
+    if (result.error) return result.error
+    if (!result.id) return 'Ledger could not confirm that the transaction was saved.'
+    announceQuickLog(validated.data, result.id, result.queued)
+    return null
   }
   const name = profile?.full_name ?? user?.email ?? 'Your account'
   const initials = name
@@ -302,6 +377,7 @@ function LayoutShell() {
         onDelete={closeThen(entry.actions?.onDelete)}
         onSplit={closeThen(entry.actions?.onSplit)}
         onSaveTemplate={closeThen(entry.actions?.onSaveTemplate)}
+        onMarkReviewed={closeThen(entry.actions?.onMarkReviewed)}
       />
     </ErrorBoundary>
   )
@@ -404,7 +480,7 @@ function LayoutShell() {
               <ErrorBoundary>
                 {/* A page's code arrives on first open (LED-317); the shell stays and the page area waits. */}
                 <Suspense fallback={<PageSkeleton />}>
-                  <Outlet context={{ openAddTransactionModal, setupComplete } satisfies AppLayoutContext} />
+                  <Outlet context={{ openAddTransactionModal, openQuickLog, openQuickLogDraft, setupComplete } satisfies AppLayoutContext} />
                 </Suspense>
               </ErrorBoundary>
             </div>
@@ -444,6 +520,7 @@ function LayoutShell() {
         {mobile && !sheet && location.pathname !== '/settings' && location.pathname !== '/more' && (
           // Same action as the page's Add button: pick a kind, then the entry dialog.
           <TransactionKindMenu
+            onQuickLog={() => { openQuickLog(); trigger.current = 'fab' }}
             onSelect={(kind) => {
               openAddTransactionModal(kind)
               trigger.current = 'fab'
@@ -541,7 +618,14 @@ function LayoutShell() {
                 <span className="h-1 w-8 rounded-full bg-muted-foreground/50" />
               </div>
             )}
-            {sheet === 'add' ? (
+            {sheet === 'add' && quickLogStep === 'intro' ? (
+              <QuickLogIntro onContinue={finishQuickLogIntro} onSettings={openQuickLogSettings} />
+            ) : sheet === 'add' && quickLogStep === 'form' ? (
+              <DialogHeader className="flex-row items-center gap-3 pr-8">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Zap className="size-5" aria-hidden /></span>
+                <DialogTitle>Quick Log</DialogTitle>
+              </DialogHeader>
+            ) : sheet === 'add' ? (
               <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
             ) : (
               <DialogHeader>
@@ -549,12 +633,42 @@ function LayoutShell() {
               </DialogHeader>
             )}
             <FormError error={formError} className="px-0 mt-0" />
-            {sheet === 'add' && (
+            {sheet === 'add' && quickLogStep === 'form' && (
+              <QuickLogForm
+                online={isOnline}
+                onManual={(phrase) => {
+                  setManualPhrase(phrase.trim())
+                  setQuickLogStep(null)
+                }}
+                onSave={saveQuickLog}
+                onSaved={() => setSheet(null)}
+              />
+            )}
+            {sheet === 'add' && quickLogDraft && (
+              <p className="break-words rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                <span className="font-medium">Quick Log phrase</span>{' · '}{quickLogDraft.phrase}
+              </p>
+            )}
+            {sheet === 'add' && quickLogStep === null && (
               <TransactionForm
                 entryKind={transactionKind}
                 lockedCardAccountId={transactionKind === 'card-payment' ? targetAccountId : undefined}
                 lockedLoanAccountId={transactionKind === 'loan-repayment' ? targetAccountId : undefined}
-                defaultValues={prefillCategoryId || prefill ? { ...(prefillCategoryId ? { category_id: prefillCategoryId } : {}), ...prefill } : undefined}
+                defaultValues={quickLogDraft ? {
+                  description: quickLogDraft.description ?? quickLogDraft.phrase,
+                  account_id: quickLogDraft.account_id ?? '',
+                  to_account_id: quickLogDraft.to_account_id,
+                  category_id: quickLogDraft.category_id,
+                  subcategory_id: quickLogDraft.subcategory_id,
+                  amount: quickLogDraft.amount ?? 0,
+                  currency: quickLogDraft.currency ?? profile?.default_currency,
+                  date: quickLogDraft.transaction_date ?? '',
+                  destination_amount: quickLogDraft.destination_amount,
+                  transfer_fee: quickLogDraft.transfer_fee,
+                } : (manualPhrase !== null
+                  ? { description: manualPhrase }
+                  : prefillCategoryId || prefill ? { ...(prefillCategoryId ? { category_id: prefillCategoryId } : {}), ...prefill } : undefined)}
+                quickLogReview={quickLogDraft ? { destinationCurrency: quickLogDraft.destination_currency } : undefined}
                 onSubmit={handleCreate}
                 onClose={() => setSheet(null)}
               />

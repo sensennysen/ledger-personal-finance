@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import { Check, ChevronRight } from 'lucide-react'
+import { Check, ChevronRight, Zap } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 interface TransactionKindMenuProps {
   trigger: ReactElement
   onSelect: (kind: TransactionKind) => void
+  onQuickLog?: () => void
   align?: 'start' | 'center' | 'end'
   side?: 'top' | 'bottom' | 'left' | 'right' | 'inline-start' | 'inline-end'
   showLoanRepayment?: boolean
@@ -32,6 +33,7 @@ interface TransactionKindMenuProps {
 export function TransactionKindMenu({
   trigger,
   onSelect,
+  onQuickLog,
   align = 'end',
   side = 'bottom',
   showLoanRepayment = true,
@@ -117,6 +119,17 @@ export function TransactionKindMenu({
         >
           <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-border" aria-hidden />
           <SheetTitle className="px-4 pt-3 pb-2 text-[17px]">What would you like to record?</SheetTitle>
+          {onQuickLog && (
+            <button
+              type="button"
+              className="flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left outline-none focus-visible:bg-muted active:bg-muted"
+              onClick={() => { setSheetOpen(false); onQuickLog() }}
+            >
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"><Zap className="size-5" aria-hidden /></span>
+              <span className="min-w-0 flex-1 font-medium">Quick Log</span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            </button>
+          )}
           <div>{primary.map(renderRow)}</div>
           {liabilities.length > 0 && (
             <>
@@ -152,6 +165,12 @@ export function TransactionKindMenu({
       >
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2 py-1.5">What would you like to record?</DropdownMenuLabel>
+          {onQuickLog && (
+            <DropdownMenuItem onClick={onQuickLog} className="items-center gap-3 px-2 py-2">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-foreground"><Zap aria-hidden /></span>
+              <span className="font-medium">Quick Log</span>
+            </DropdownMenuItem>
+          )}
           {primary.map(renderItem)}
         </DropdownMenuGroup>
         {liabilities.length > 0 && (

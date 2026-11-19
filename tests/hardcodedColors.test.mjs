@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // Colors must come from the index.css tokens so they follow the theme (LED-100).
@@ -37,7 +37,7 @@ test('components use theme tokens, not hardcoded colors', () => {
     readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
       for (const re of [PALETTE, LITERAL]) {
         for (const m of line.matchAll(re)) {
-          const path = relative(root, file)
+          const path = relative(root, file).split(sep).join('/')
           if (!ALLOWED.some(([f, re]) => f === path && re.test(line))) hits.push(`${path}:${i + 1} ${m[0]}`)
         }
       }

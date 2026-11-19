@@ -15,6 +15,7 @@
     "test:card": "node --test tests/cardPayment.test.mjs",
     "test:rollover": "node --test tests/budgetRollover.test.mjs",
     "test:auth": "node --test tests/authErrors.test.mjs",
+    "test:openai": "node --env-file-if-exists=.env --test scripts/openai-smoke.test.mjs",
     "test:redesign": "node tests/redesign.mjs",
     "preview": "vite preview",
     "sweep": "node scripts/sweep.mjs",

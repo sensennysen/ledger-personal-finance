@@ -4,6 +4,10 @@
 # working directory name when running `supabase init`.
 project_id = "ledger-personal-finance"
 
+[functions.quick-log-extract]
+# The function verifies the bearer token with Supabase Auth before reading user data or calling OpenAI.
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.

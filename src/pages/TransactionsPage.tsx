@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { Plus, Search, ArrowLeftRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCardPayment } from '@/hooks/useCardPayment'
@@ -14,6 +14,7 @@ import { useSavedFilters } from '@/hooks/useSavedFilters'
 import { useKeyboardShortcut } from '@/hooks/useKeyboardShortcut'
 import { useUndoDelete } from '@/hooks/useUndoDelete'
 import { usePreferences } from '@/hooks/usePreferences'
+import { useQuickLogDrafts } from '@/hooks/useQuickLogDrafts'
 import { formatCurrency, getCustomMonthRange, getCurrentCycleMonthKey, getLocalDateString } from '@/lib/utils'
 import { MINUS } from '@/lib/netSign'
 import { Button } from '@/components/ui/button'
@@ -35,6 +36,7 @@ import { TransactionEditHeader, TransactionEntryHeader } from '@/components/tran
 import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { entryDialogWidthClass, inferTransactionKind, type TransactionKind } from '@/components/transactions/transactionKinds'
 import { TransactionRow } from '@/components/transactions/TransactionRow'
+import { QuickLogDraftList } from '@/components/transactions/QuickLogDraftList'
 import { DayCard, TableSurface, TransactionDayList, WindowFooter } from '@/components/transactions/TransactionDayList'
 import { ResultBar, ResultBarLayout } from '@/components/transactions/ResultBar'
 import { MonthRail } from '@/components/transactions/MonthJump'
@@ -55,8 +57,11 @@ import type { ImportCSVDialog as ImportCSVDialogComponent, ImportTx } from '@/co
 import { UNCATEGORIZED_VALUE } from '@/constants/accounts'
 import { TRANSACTION_TYPE_COLOR } from '@/constants/accounts'
 import type { Transaction } from '@/types'
+import type { AppLayoutContext } from '@/components/layout/AppLayout'
+import { transactionNeedsReview } from '@/hooks/useTransactions.helpers'
 
 export default function TransactionsPage() {
+  const layout = useOutletContext<AppLayoutContext | null>()
   const { profile } = useAuth()
   const baseCurrency = profile?.default_currency ?? 'USD'
   const { table: rateTable } = useExchangeRates()
@@ -84,6 +89,31 @@ export default function TransactionsPage() {
 
   // ── Import CSV ────────────────────────────────────────────
   const [searchParams, setSearchParams] = useSearchParams()
+  const needsReview = searchParams.get('review') === 'needed'
+  const draftQuery = useQuickLogDrafts(needsReview)
+  const draftLoadState = resolveLoadState({
+    loading: draftQuery.loading, error: draftQuery.error, hasData: draftQuery.drafts.length > 0,
+  })
+  const draftSearch = search.trim().toLowerCase()
+  const reviewDrafts = draftQuery.drafts.filter((draft) => !activeTagFilter
+    && (filterType === 'all' || draft.kind === filterType
+      || (filterType === 'expense' && (draft.kind === 'card-payment' || draft.kind === 'loan-repayment')))
+    && (!draftSearch || draft.phrase.toLowerCase().includes(draftSearch)
+      || draft.description?.toLowerCase().includes(draftSearch)))
+  const [previousReviewMode, setPreviousReviewMode] = useState(needsReview)
+  if (needsReview !== previousReviewMode) {
+    setPreviousReviewMode(needsReview)
+    if (needsReview) {
+      setFilterType('all')
+      setSearch('')
+      setActiveTagFilter(null)
+    }
+  }
+  const setReviewMode = (enabled: boolean) => setSearchParams((params) => {
+    if (enabled) params.set('review', 'needed')
+    else params.delete('review')
+    return params
+  })
   const [importOpen, setImportOpen] = useState(() => searchParams.get('import') === '1')
   useEffect(() => {
     if (searchParams.has('import')) {
@@ -159,7 +189,7 @@ export default function TransactionsPage() {
     bulkDeleteTransactions,
     bulkUpdateCategory,
     bulkCreateTransactions,
-  } = useTransactions()
+  } = useTransactions({ needsReview })
   const { createWithStatement } = useCardPayment(createTransaction)
 
   const notify = useNotify()
@@ -273,8 +303,8 @@ export default function TransactionsPage() {
   )
 
   const cycleOnly = useMemo(
-    () => transactions.filter((t) => t.date >= cycleRange.start && t.date <= cycleRange.end),
-    [transactions, cycleRange]
+    () => needsReview ? transactions : transactions.filter((t) => t.date >= cycleRange.start && t.date <= cycleRange.end),
+    [transactions, cycleRange, needsReview]
   )
 
   const filtered = useMemo(() => {
@@ -356,7 +386,7 @@ export default function TransactionsPage() {
   const tableList = !compactList && density === 'compact'
   const { rendered, sentinelRef } = useRenderWindow(filtered.length, {
     step: compactList ? WINDOW_STEP.mobile : WINDOW_STEP.desktop,
-    resetKey: JSON.stringify([filterType, search, activeTagFilter, prefs.txView, sort]),
+    resetKey: JSON.stringify([filterType, search, activeTagFilter, prefs.txView, sort, needsReview]),
   })
 
   // ── Handlers ───────────────────────────────────────────────
@@ -499,6 +529,13 @@ export default function TransactionsPage() {
     setTemplateSourceTx(t)
     setTemplateName(t.description)
   }, [])
+  const markReviewed = (tx: Transaction) => {
+    void updateTransaction(tx.id, { reviewed_at: new Date().toISOString() }).then((result) => {
+      notify(result.error
+        ? { severity: 'failure', title: 'Could not mark entry reviewed', body: result.error }
+        : { severity: 'success', title: result.queued ? 'Review queued' : 'Entry marked reviewed' })
+    })
+  }
 
   const renderRow = (tx: Transaction) => (
     <TransactionRow
@@ -508,6 +545,7 @@ export default function TransactionsPage() {
       onDelete={handleDelete}
       onSplit={setSplittingTx}
       onSaveTemplate={handleSaveTemplate}
+      onMarkReviewed={transactionNeedsReview(tx) ? markReviewed : undefined}
       selectable={selectMode}
       selected={selectedIds.has(tx.id)}
       onSelect={toggleSelect}
@@ -529,7 +567,7 @@ export default function TransactionsPage() {
     <ResultBar
       matchCount={filtered.length}
       total={cycleOnly.length}
-      totalLabel="this cycle"
+      totalLabel={needsReview ? 'pending review' : 'this cycle'}
       sum={matchSum}
       sort={sort}
       onSortChange={changeSort}
@@ -601,8 +639,8 @@ export default function TransactionsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder={compactList ? 'Search this cycle' : 'Search transactions...'}
-                aria-label={compactList ? 'Search this cycle' : 'Search transactions'}
+                placeholder={needsReview ? 'Search review entries' : compactList ? 'Search this cycle' : 'Search transactions...'}
+                aria-label={needsReview ? 'Search review entries' : compactList ? 'Search this cycle' : 'Search transactions'}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 max-md:h-11 max-md:rounded-full max-md:bg-card"
@@ -727,6 +765,7 @@ export default function TransactionsPage() {
               <span>Import</span>
             </Button>
             <TransactionKindMenu
+              onQuickLog={layout?.openQuickLog}
               onSelect={(kind) => {
                 setTemplateDefaults(undefined)
                 setFormError(null)
@@ -740,6 +779,13 @@ export default function TransactionsPage() {
               }
             />
           </div>
+        </div>
+
+        <div>
+          <Button type="button" variant={needsReview ? 'secondary' : 'outline'} size="sm"
+            aria-pressed={needsReview} onClick={() => setReviewMode(!needsReview)}>
+            Needs review
+          </Button>
         </div>
 
         {/* Tag filter chips */}
@@ -823,6 +869,15 @@ export default function TransactionsPage() {
         </Sheet>
 
         {/* Transaction list */}
+        {needsReview && (
+          <>
+            {draftLoadState === 'loading' && <Skeleton aria-label="Loading Quick Log drafts" className="h-20 bg-skeleton-page" />}
+            {draftQuery.error && <InlineLoadError message={draftQuery.error} onRetry={() => void draftQuery.refetch()} />}
+            {reviewDrafts.length > 0 && layout && (
+              <QuickLogDraftList drafts={reviewDrafts} canDiscard={draftQuery.isOnline} onEdit={layout.openQuickLogDraft} />
+            )}
+          </>
+        )}
         {loadState === 'stale-error' && (
           <InlineLoadError message="Couldn't refresh your transactions. Showing what was last loaded." onRetry={() => void refetch()} />
         )}
@@ -830,6 +885,14 @@ export default function TransactionsPage() {
           <ErrorState title="Couldn't load your transactions" description={error} detail={errorDetail} onRetry={() => void refetch()} />
         ) : loadState === 'loading' ? (
           <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 bg-skeleton-page" />)}</div>
+        ) : transactions.length === 0 && needsReview ? (
+          draftLoadState === 'empty' ? (
+            <EmptyState icon={CheckSquare} title="No transactions need review"
+              action={<Button variant="outline" size="sm" onClick={() => setReviewMode(false)}>Show all activity</Button>} />
+          ) : draftLoadState === 'ready' && reviewDrafts.length === 0 ? (
+            <EmptyState icon={CheckSquare} title="No drafts match your filters"
+              action={<Button variant="outline" size="sm" onClick={clearActivityFilters}>Clear filters</Button>} />
+          ) : null
         ) : transactions.length === 0 ? (
           <EmptyState
             icon={ArrowLeftRight}
@@ -840,6 +903,7 @@ export default function TransactionsPage() {
                   <Upload className="w-3.5 h-3.5" />Import CSV
                 </Button>
                 <TransactionKindMenu
+                  onQuickLog={layout?.openQuickLog}
                   onSelect={(kind) => {
                     setTemplateDefaults(undefined)
                     setFormError(null)
@@ -870,7 +934,7 @@ export default function TransactionsPage() {
             icon={ArrowLeftRight}
             {...filteredEmptyMessage(
               { type: filterType, search, tag: activeTagFilter },
-              `${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`,
+              needsReview ? 'all review dates' : `${cycleDateLabel(cycleRange.start)} – ${cycleDateLabel(cycleRange.end)}`,
             )}
             action={
               <Button variant="outline" size="sm" onClick={clearActivityFilters}>
@@ -1034,7 +1098,7 @@ export default function TransactionsPage() {
 
 
       </div>
-      {showMonthJump && !amountSorted && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} baseCurrency={baseCurrency} rateTable={rateTable} />} />}
+      {showMonthJump && !amountSorted && !needsReview && <MonthRail months={months} activeKey={selectedMonth} onPick={jumpToMonth} footer={<FilterTopCategories transactions={filtered} baseCurrency={baseCurrency} rateTable={rateTable} />} />}
     </div>
   )
 }

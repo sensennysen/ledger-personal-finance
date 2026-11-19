@@ -23,6 +23,17 @@ test('stored values replace only their own default', () => {
   assert.equal(prefs.numberLocale, 'en-US')
 })
 
+test('Quick Log defaults and walkthrough acknowledgement are independent profile preferences', () => {
+  const accounts = { quickLogAccountId: 'wallet', quickLogIncomeAccountId: 'savings' }
+  const existing = parsePreferences(accounts)
+  assert.equal(existing.quickLogIntroSeen, false)
+  const seen = parsePreferences({ ...accounts, quickLogIntroSeen: true })
+  assert.equal(seen.quickLogIntroSeen, true)
+  assert.equal(seen.quickLogAccountId, 'wallet')
+  assert.equal(seen.quickLogIncomeAccountId, 'savings')
+  assert.equal(parsePreferences({ quickLogIntroSeen: 'true' }).quickLogIntroSeen, false)
+})
+
 test('an unknown or broken value falls back to its default, never reaching the formatters', () => {
   const prefs = parsePreferences({
     numberLocale: 'xx-XX',

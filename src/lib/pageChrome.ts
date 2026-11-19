@@ -23,12 +23,13 @@ const TITLES: Record<string, string> = {
   '/more': 'More',
 }
 
-// Budgets' Goals view is not per-cycle, and Reports on a custom range is not either, so the
-// stepper would move nothing on screen.
+// Goals, custom report ranges and the pending review list are independent of the selected cycle.
 function followsCycle(pathname: string, search: string): boolean {
   if (!STEPPER_PATHS.includes(pathname)) return false
   if (pathname === '/reports' && parseCustomRange(search)) return false
-  return !(pathname === '/budgets' && new URLSearchParams(search).get('view') === 'goals')
+  const params = new URLSearchParams(search)
+  if (pathname === '/transactions' && params.get('review') === 'needed') return false
+  return !(pathname === '/budgets' && params.get('view') === 'goals')
 }
 
 export function resolveHeaderMeta(pathname: string, search = ''): HeaderMeta {

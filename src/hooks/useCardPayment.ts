@@ -4,7 +4,7 @@ import { transferCard } from '@/lib/cardPayment'
 import type { MutationResult } from '@/lib/dataErrors'
 import type { TransactionUpsertValues } from '@/hooks/useTransactions.helpers'
 
-type CreateTransaction = (values: TransactionUpsertValues) => Promise<MutationResult & { queued?: boolean; id?: string }>
+type CreateTransaction = (values: TransactionUpsertValues, id?: string) => Promise<MutationResult & { queued?: boolean; id?: string }>
 
 /**
  * One way to pay a card (LED-146). Wrap a form's `createTransaction`: a transfer into a credit card
@@ -19,9 +19,9 @@ export function useCardPayment(createTransaction: CreateTransaction) {
   const notify = useNotify()
   const { accounts } = useAccounts()
 
-  const createWithStatement = async (values: TransactionUpsertValues) => {
+  const createWithStatement = async (values: TransactionUpsertValues, id?: string) => {
     const card = transferCard(values, accounts)
-    const result = await createTransaction(values)
+    const result = await createTransaction(values, id)
     if (!card || result.error) return result
 
     if (result.queued) {

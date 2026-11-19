@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bookmark, Pencil, Scissors, Trash2 } from 'lucide-react'
+import { Bookmark, Check, Pencil, Scissors, Trash2 } from 'lucide-react'
 import { formatCurrency, formatDate, getLocalDateString } from '@/lib/utils'
 import { countsYet } from '@/lib/countsYet'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { getBudgetCycleRange } from '@/lib/budgetCycle'
 import { entryBudgetImpact } from '@/lib/budgetImpact'
 import { isPendingReceiptReference, resolveReceiptUrl } from '@/lib/receiptUrls'
 import type { Transaction } from '@/types'
+import { transactionNeedsReview } from '@/hooks/useTransactions.helpers'
 
 export function EntryDetail({
   transaction,
@@ -18,22 +19,26 @@ export function EntryDetail({
   onDelete,
   onSplit,
   onSaveTemplate,
+  onMarkReviewed,
 }: {
   transaction: Transaction
   onEdit?: () => void
   onDelete?: () => void
   onSplit?: () => void
   onSaveTemplate?: () => void
+  onMarkReviewed?: () => void
 }) {
   const accountName = transaction.account?.name ?? 'Account'
   const tags = transaction.tags ?? []
   const interval = transaction.recurrence_interval
   // Everything the phone row no longer shows lives here (M-07).
   const scheduled = !countsYet(transaction.date, getLocalDateString())
-  const status = scheduled || transaction.queued ? (
+  const needsReview = transactionNeedsReview(transaction)
+  const status = scheduled || transaction.queued || needsReview ? (
     <span className="inline-flex flex-col items-end">
       {scheduled && <span>Scheduled · counts from {formatDate(transaction.date)}</span>}
       {transaction.queued && <span className="text-warning">Not synced yet</span>}
+      {needsReview && <span>Needs review</span>}
     </span>
   ) : null
   const fee = transaction.transfer_fee ?? 0
@@ -110,8 +115,9 @@ export function EntryDetail({
       {transaction.type === 'expense' && transaction.category_id && (
         <BudgetImpactBar transaction={transaction} />
       )}
-      {(onEdit || onSplit || onDelete || onSaveTemplate) && (
+      {(onEdit || onSplit || onDelete || onSaveTemplate || onMarkReviewed) && (
         <div className="space-y-2">
+          {onMarkReviewed && <Button variant="secondary" className="w-full" onClick={onMarkReviewed}><Check />Mark reviewed</Button>}
           {onEdit && (
             <Button className="w-full" onClick={onEdit}>
               <Pencil />

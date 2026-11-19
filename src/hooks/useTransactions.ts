@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { drainQueue, editQueuedInsert, enqueue, enqueueMany, pendingCount as queueSize, revisionFor } from '@/lib/offlineQueue'
+import { drainQueue, editQueuedInsert, enqueue, enqueueMany, enqueueTransactionOnce, listQueue, pendingCount as queueSize, revisionFor } from '@/lib/offlineQueue'
 import { splitPendingReceipt } from '@/lib/receiptJob'
 import { notifySyncListeners } from '@/hooks/useNetworkStatus'
 import { readCache, writeCache } from '@/lib/dataCache'
@@ -20,6 +20,7 @@ import {
   forgetLegacyRecurringMap,
   limitTransactions,
   reverseTxDelta,
+  transactionNeedsReview,
   txMatchesFilters,
   type TransactionFilters,
   type TransactionUpsertValues,
@@ -58,8 +59,9 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         startDate: filters.startDate,
         endDate: filters.endDate,
         limit: filters.limit,
+        needsReview: filters.needsReview,
       }),
-    [user, filters.accountId, filters.categoryId, filters.type, filters.startDate, filters.endDate, filters.limit]
+    [user, filters.accountId, filters.categoryId, filters.type, filters.startDate, filters.endDate, filters.limit, filters.needsReview]
   )
 
   // Keyed by every filter, so rows, loading and errors always belong to the filters on screen: a slow
@@ -75,8 +77,13 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       startDate: filters.startDate,
       endDate: filters.endDate,
       limit: filters.limit,
+      needsReview: filters.needsReview || undefined,
     },
     cacheKey: (userId) => buildTransactionsCacheKey(userId, filters),
+    cachedFallback: filters.needsReview ? (userId) => {
+      const rows = readCache<Transaction[]>(buildTransactionsCacheKey(userId, {}))
+      return rows ? limitTransactions(rows.filter((row) => txMatchesFilters(row, filters)), filters.limit) : undefined
+    } : undefined,
     enabled,
     read: async (userId, retry, signal) => {
       const buildQuery = () => {
@@ -99,6 +106,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         if (filters.type) query = query.eq('type', filters.type)
         if (filters.startDate) query = query.gte('date', filters.startDate)
         if (filters.endDate) query = query.lte('date', filters.endDate)
+        if (filters.needsReview) query = query.eq('entry_source', 'ai_phrase').is('reviewed_at', null)
         return query.abortSignal(signal)
       }
 
@@ -121,6 +129,30 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
     queryClient.setQueryData(queryKey, next)
     writeCache(buildCacheKey(), next)
   }, [buildCacheKey, queryClient, queryKey])
+
+  const updateQuickLogCaches = useCallback((id: string, transaction?: Transaction) => {
+    if (!user) return
+    const allKey = buildTransactionsCacheKey(user.id, {})
+    const reviewKey = buildTransactionsCacheKey(user.id, { needsReview: true })
+    const all = readCache<Transaction[]>(allKey)
+    const review = readCache<Transaction[]>(reviewKey) ?? all?.filter(transactionNeedsReview)
+    const reconcile = (rows: Transaction[], row: Transaction | undefined) => {
+      if (!row) return rows.filter((existing) => existing.id !== id)
+      return rows.some((existing) => existing.id === id)
+        ? rows.map((existing) => existing.id === id ? row : existing)
+        : [row, ...rows]
+    }
+    if (all) {
+      const updated = reconcile(all, transaction)
+      writeCache(allKey, updated)
+      queryClient.setQueryData(entityKey(user.id, 'transactions', {}), updated)
+    }
+    if (review) {
+      const updated = reconcile(review, transaction && transactionNeedsReview(transaction) ? transaction : undefined)
+      writeCache(reviewKey, updated)
+      queryClient.setQueryData(entityKey(user.id, 'transactions', { needsReview: true }), updated)
+    }
+  }, [queryClient, user])
 
   // ---------- helpers for optimistic account updates ----------
 
@@ -169,17 +201,25 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
 
   // ---------- mutations ----------
 
-  const createTransaction = async (values: TransactionUpsertValues): Promise<MutationResult & { queued?: boolean; id?: string }> => {
+  const createTransaction = async (values: TransactionUpsertValues, submissionId?: string): Promise<MutationResult & { queued?: boolean; id?: string }> => {
     if (!user) return { error: 'Not authenticated' }
-    if (!navigator.onLine) {
+    const userId = user.id
+    const queueCreate = async (optimisticBalance: boolean) => {
       const now = new Date().toISOString()
-      const queuedId = crypto.randomUUID()
-      const cachedAccounts = readCache<Account[]>(`${user.id}:accounts`) ?? []
-      const cachedCategories = readCache<Category[]>(`${user.id}:categories`) ?? []
+      const queuedId = submissionId ?? crypto.randomUUID()
+      const item = insertItem(values, userId, queuedId)
+      const result = submissionId ? await enqueueTransactionOnce(item, queuedId) : { ...await enqueue(item), added: true }
+      if (result.error) return { error: result.error }
+      if (!result.added || !optimisticBalance) {
+        if (result.added && navigator.onLine) void drainQueue().then(() => notifySyncListeners(), () => {})
+        return { error: null, queued: true, id: queuedId }
+      }
+      const cachedAccounts = readCache<Account[]>(`${userId}:accounts`) ?? []
+      const cachedCategories = readCache<Category[]>(`${userId}:categories`) ?? []
       const optimistic: Transaction = {
         ...buildOptimisticTransaction({
           values,
-          userId: user.id,
+          userId,
           now,
           id: queuedId,
           accounts: cachedAccounts,
@@ -188,23 +228,31 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         queued: true,
       }
 
-      // Stored first: nothing is shown as saved until the queue holds it (LED-303).
-      const { error } = await enqueue(insertItem(values, user.id, queuedId))
-      if (error) return { error }
-
       if (txMatchesFilters(optimistic, filters)) {
-        updateTransactionCache(limitTransactions([optimistic, ...transactions], filters.limit))
+        const current = queryClient.getQueryData<Transaction[]>(queryKey) ?? transactions
+        updateTransactionCache(limitTransactions([optimistic, ...current], filters.limit))
       }
-
+      if (optimistic.entry_source === 'ai_phrase') updateQuickLogCaches(queuedId, optimistic)
       optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
       return { error: null, queued: true, id: queuedId }
     }
+    if (!navigator.onLine) return queueCreate(true)
     const { values: saved, marker } = splitPendingReceipt(values)
-    const { data, error } = await supabase
+    const { data, error, status } = await supabase
       .from('transactions')
-      .insert({ ...withTransactionDefaults(saved), user_id: user.id })
+      .insert({ ...withTransactionDefaults(saved), user_id: userId, ...(submissionId ? { id: submissionId } : {}) })
       .select('id, updated_at')
       .single()
+    if (submissionId && error?.code === '23505') {
+      const existing = await supabase.from('transactions').select('id')
+        .eq('id', submissionId).eq('user_id', userId).eq('entry_source', 'ai_phrase').maybeSingle()
+      if (existing.data) {
+        await invalidateAfterWrite('transactions')
+        return { error: null, id: submissionId }
+      }
+      if (existing.error && existing.status === 0) return queueCreate(false)
+    }
+    if (submissionId && error && [0, 502, 503, 504].includes(status)) return queueCreate(false)
     if (!error && data && marker) await queueReceipt(data, marker, values.description)
     if (!error) {
       await invalidateAfterWrite('transactions')
@@ -214,7 +262,9 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
 
   const updateTransaction = async (id: string, values: Partial<Columns<'transactions', Transaction>>): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
-    if (!navigator.onLine) {
+    const queuedCreate = listQueue().some((item) => item.userId === user.id && item.table === 'transactions'
+      && item.operation === 'insert' && item.payload.id === id)
+    if (!navigator.onLine || queuedCreate) {
       const existing = transactions.find((t) => t.id === id)
       // A row that is still only a queued create is fixed in the queue; an update would target a
       // row the database has not seen (LED-193). Stored before it is shown (LED-303).
@@ -237,7 +287,8 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       if (existing) {
         // updated_at stays the server's: it is the revision the queued change is made against (LED-297).
         const merged: Transaction = { ...existing, ...values, queued: true }
-        updateTransactionCache(transactions.map((t) => (t.id === id ? merged : t)))
+        updateTransactionCache(transactions.map((t) => (t.id === id ? merged : t)).filter((row) => txMatchesFilters(row, filters)))
+        if (existing.entry_source === 'ai_phrase') updateQuickLogCaches(id, merged)
 
         // Reverse old effect, apply new effect
         optimisticAccountDelta((accounts) =>
@@ -255,6 +306,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       .select('id, updated_at')
       .maybeSingle()
     if (!error && data && marker) await queueReceipt(data, marker, values.description ?? transactions.find((t) => t.id === id)?.description)
+    if (!error && !data && values.reviewed_at) return { error: 'This transaction is no longer available.' }
     if (!error) {
       await invalidateAfterWrite('transactions')
     }
@@ -265,8 +317,11 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
   // TransactionRow's onDelete prop doesn't change identity every render.
   const deleteTransaction = useCallback(async (id: string): Promise<MutationResult & { queued?: boolean }> => {
     if (!user) return { error: 'Not authenticated' }
-    if (!navigator.onLine) {
-      const existing = transactions.find((t) => t.id === id)
+    const queuedCreate = listQueue().some((item) => item.userId === user.id && item.table === 'transactions'
+      && item.operation === 'insert' && item.payload.id === id)
+    if (!navigator.onLine || queuedCreate) {
+      const current = queryClient.getQueryData<Transaction[]>(queryKey) ?? transactions
+      const existing = current.find((t) => t.id === id)
       const { error } = await enqueue({
         table: 'transactions',
         operation: 'delete',
@@ -279,9 +334,11 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       })
       if (error) return { error }
       if (existing) {
-        updateTransactionCache(transactions.filter((t) => t.id !== id))
+        updateTransactionCache(current.filter((t) => t.id !== id))
+        if (existing.entry_source === 'ai_phrase') updateQuickLogCaches(id)
         optimisticAccountDelta((accounts) => reverseTxDelta(accounts, existing))
       }
+      if (navigator.onLine) void drainQueue().then(() => notifySyncListeners(), () => {})
       return { error: null, queued: true }
     }
     const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
@@ -289,7 +346,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       await invalidateAfterWrite('transactions')
     }
     return toResult(error, { action: 'delete', entity: 'transaction' })
-  }, [user, transactions, updateTransactionCache, optimisticAccountDelta])
+  }, [user, queryClient, queryKey, transactions, updateTransactionCache, updateQuickLogCaches, optimisticAccountDelta])
 
   /** Splits one transaction into lines in a single database call: every line is written and the original removed, or nothing changes. */
   const splitTransaction = async (id: string, splits: SplitRpcLine[]): Promise<MutationResult> => {

@@ -156,6 +156,16 @@ export function enqueue(item: NewQueueItem): Promise<{ error: string | null }> {
   return store((queue) => appendItems(queue, [item], Date.now(), () => crypto.randomUUID()))
 }
 
+/** A lost acknowledgement can enqueue the same transaction more than once. */
+export async function enqueueTransactionOnce(item: NewQueueItem, id: string): Promise<{ error: string | null; added: boolean }> {
+  let added = false
+  const { error } = await store((queue) => {
+    added = !hasQueuedInsert(queue, 'transactions', id)
+    return added ? appendItems(queue, [item], Date.now(), () => crypto.randomUUID()) : queue
+  })
+  return { error, added: !error && added }
+}
+
 /** Stores several changes in one write: all of them are kept, or none is (LED-303). */
 export function enqueueMany(items: NewQueueItem[]): Promise<{ error: string | null }> {
   if (items.length === 0) return Promise.resolve({ error: null })

@@ -43,6 +43,8 @@ Create a local environment file:
 cp .env.example .env.local
 ```
 
+Vite also loads `.env` from the repo root. Values in `.env.local` override the same values in `.env`.
+
 Fill in your Supabase project values:
 
 ```env
@@ -88,7 +90,7 @@ Start the local database and the app together:
 pnpm dev:all
 ```
 
-Run `pnpm db:status` for the local API URL and anon key, then put them in `.env.local` (see the commented block in `.env.example`). The local stack uses the ports set in `supabase/config.toml` (API 54321, DB 54322, Studio 54323).
+Run `pnpm db:status` for the local API URL and anon key, then put them in the Git-ignored `.env.development.local` file (see the commented block in `.env.example`). Restart Vite if it was running. The local stack uses the ports set in `supabase/config.toml` (API 54321, DB 54322, Studio 54323).
 
 | Command | What it does |
 | --- | --- |
@@ -132,9 +134,33 @@ supabase/
 - `pnpm build` type-checks and builds the app.
 - `pnpm lint` runs ESLint.
 - `pnpm test` runs the node test suite.
+- `pnpm test:openai` runs the opt-in [OpenAI smoke test](#openai-smoke-test).
 - `pnpm preview` serves the built app locally.
 - `pnpm db:*` manage the local database (see [Local development](#local-development)).
 - `pnpm sweep` runs the dev-only live sweep (see [Sweep script](#sweep-script)). CI does not run it.
+
+### OpenAI smoke test
+
+Set `OPENAI_API_KEY` in your environment or add `OPENAI_API_KEY=<your Ledger Dev project key>` to the git-ignored `.env` at the repo root. Use the name `OPENAI_API_KEY` without a `VITE_` prefix so Vite keeps it out of the browser build. Then run `pnpm test:openai`.
+
+You can also run `node --env-file-if-exists=.env --test scripts/openai-smoke.test.mjs` from the repo root.
+
+The command makes two billable Responses API requests to `gpt-6-luna` with `store: false`. It checks that `Jollibee 189` extracts as PHP 189.00 and that the bundled synthetic receipt extracts PHP 249.50 and the printed date. The receipt is sent inline. This test runs separately from `pnpm test` and CI and requires no Ledger app or Supabase instance.
+
+### Run Quick Log locally
+
+Add `OPENAI_API_KEY` to the Git-ignored root `.env`. Start Docker and run `pnpm db:start`. Set `VITE_SUPABASE_URL=http://127.0.0.1:54321` and `VITE_SUPABASE_ANON_KEY` from `pnpm db:status` in `.env.development.local`. Vite uses these development settings ahead of the hosted settings in `.env`. Then apply the local migrations and start the function.
+
+```sh
+pnpm db:migrate
+supabase functions serve quick-log-extract --env-file .env
+```
+
+With `pnpm dev` running in a second terminal, sign in and open **Add → Quick Log**. The first-use walkthrough gives examples and links to **Settings → Quick Log**, where you can choose default expense and income accounts. Try `Jollibee 189`, `Salary 45000`, or a transfer using two of your account names. At the end of the day, open **Activity → Needs review** to check auto-saved transactions or finish drafts with missing or unclear details. Drafts retain the original phrase and affect balances only after you finish them.
+
+If the browser reports CORS, check the Quick Log request in the Network tab. In local development its URL is `http://127.0.0.1:54321/functions/v1/quick-log-extract`. If it points at hosted Supabase, check the Vite overrides and restart the dev server.
+
+For a hosted Ledger instance, set `OPENAI_API_KEY` as a Supabase Edge Function secret and deploy the migrations and the `quick-log-extract` function. The function accepts `QUICK_LOG_REQUESTS_PER_MINUTE` and `QUICK_LOG_TIMEOUT_MS` overrides. Keep the OpenAI key in the function environment.
 
 ### Sweep script
 

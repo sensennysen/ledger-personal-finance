@@ -8,6 +8,7 @@ export interface TransactionFilters {
   startDate?: string
   endDate?: string
   limit?: number
+  needsReview?: boolean
 }
 
 export type TransactionUpsertValues = Omit<
@@ -65,12 +66,17 @@ export function reverseTxDelta(accounts: Account[], tx: TxShape): Account[] {
 }
 
 export function txMatchesFilters(tx: Transaction, filters: TransactionFilters): boolean {
+  if (filters.needsReview && !transactionNeedsReview(tx)) return false
   if (filters.accountId && tx.account_id !== filters.accountId && tx.to_account_id !== filters.accountId) return false
   if (filters.categoryId && tx.category_id !== filters.categoryId) return false
   if (filters.type && tx.type !== filters.type) return false
   if (filters.startDate && tx.date < filters.startDate) return false
   if (filters.endDate && tx.date > filters.endDate) return false
   return true
+}
+
+export function transactionNeedsReview(tx: Pick<Transaction, 'entry_source' | 'reviewed_at'>): boolean {
+  return tx.entry_source === 'ai_phrase' && !tx.reviewed_at
 }
 
 export function buildTransactionsCacheKey(userId: string, filters: TransactionFilters): string {
@@ -81,6 +87,7 @@ export function buildTransactionsCacheKey(userId: string, filters: TransactionFi
     startDate: filters.startDate,
     endDate: filters.endDate,
     limit: filters.limit,
+    needsReview: filters.needsReview || undefined,
   })}`
 }
 

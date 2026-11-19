@@ -626,6 +626,95 @@ export type Database = {
         }
         Relationships: []
       }
+      quick_log_drafts: {
+        Row: {
+          account_id: string | null
+          amount: number | null
+          category_id: string | null
+          created_at: string
+          currency: string | null
+          description: string | null
+          destination_amount: number | null
+          destination_currency: string | null
+          id: string
+          kind: string | null
+          phrase: string
+          reason: string
+          subcategory_id: string | null
+          to_account_id: string | null
+          transaction_date: string | null
+          transfer_fee: number | null
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount?: number | null
+          category_id?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          destination_amount?: number | null
+          destination_currency?: string | null
+          id: string
+          kind?: string | null
+          phrase: string
+          reason: string
+          subcategory_id?: string | null
+          to_account_id?: string | null
+          transaction_date?: string | null
+          transfer_fee?: number | null
+          user_id?: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number | null
+          category_id?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          destination_amount?: number | null
+          destination_currency?: string | null
+          id?: string
+          kind?: string | null
+          phrase?: string
+          reason?: string
+          subcategory_id?: string | null
+          to_account_id?: string | null
+          transaction_date?: string | null
+          transfer_fee?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_log_drafts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_log_drafts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_log_drafts_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_log_drafts_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_filters: {
         Row: {
           created_at: string
@@ -908,6 +997,8 @@ export type Database = {
           date: string
           description: string
           destination_amount: number | null
+          destination_currency: string | null
+          entry_source: string
           exchange_rate: number
           goal_id: string | null
           id: string
@@ -919,6 +1010,7 @@ export type Database = {
           recurrence_end_date: string | null
           recurrence_interval: string | null
           recurrence_next_posted: boolean
+          reviewed_at: string | null
           subcategory_id: string | null
           tags: string[]
           to_account_id: string | null
@@ -936,6 +1028,8 @@ export type Database = {
           date?: string
           description: string
           destination_amount?: number | null
+          destination_currency?: string | null
+          entry_source?: string
           exchange_rate?: number
           goal_id?: string | null
           id?: string
@@ -947,6 +1041,7 @@ export type Database = {
           recurrence_end_date?: string | null
           recurrence_interval?: string | null
           recurrence_next_posted?: boolean
+          reviewed_at?: string | null
           subcategory_id?: string | null
           tags?: string[]
           to_account_id?: string | null
@@ -964,6 +1059,8 @@ export type Database = {
           date?: string
           description?: string
           destination_amount?: number | null
+          destination_currency?: string | null
+          entry_source?: string
           exchange_rate?: number
           goal_id?: string | null
           id?: string
@@ -975,6 +1072,7 @@ export type Database = {
           recurrence_end_date?: string | null
           recurrence_interval?: string | null
           recurrence_next_posted?: boolean
+          reviewed_at?: string | null
           subcategory_id?: string | null
           tags?: string[]
           to_account_id?: string | null
@@ -1075,6 +1173,10 @@ export type Database = {
       card_statement_shift: {
         Args: { p_card_id: string; p_delta: number }
         Returns: undefined
+      }
+      consume_quick_log_quota: {
+        Args: { p_limit: number; p_user_id: string }
+        Returns: boolean
       }
       delete_user: { Args: never; Returns: undefined }
       loan_purchase_due_amount: {

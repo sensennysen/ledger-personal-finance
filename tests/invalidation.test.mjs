@@ -6,7 +6,7 @@ import { entityKey, entityQueryOptions } from '../src/lib/entityQuery.ts'
 
 // LED-306: every mounted list and total refreshes after a change.
 
-const READS = ['accounts', 'categories', 'transactions', 'savings-goals', 'card-payments', 'exchange-rates', 'budgets', 'loan-purchases']
+const READS = ['accounts', 'categories', 'transactions', 'savings-goals', 'card-payments', 'exchange-rates', 'budgets', 'loan-purchases', 'quick-log-drafts']
 
 test('every write names only known reads, and always its own', () => {
   for (const [source, targets] of Object.entries(INVALIDATES)) {
@@ -16,10 +16,10 @@ test('every write names only known reads, and always its own', () => {
   for (const read of READS) assert.ok(read in INVALIDATES, `${read} has an entry`)
 })
 
-test('a transaction write reaches balances, budgets, goals, card payments and loans', () => {
+test('a transaction write reaches balances, budgets, goals, card payments, loans and Quick Log drafts', () => {
   assert.deepEqual(
     [...invalidatedBy('transactions')].sort(),
-    ['accounts', 'budgets', 'card-payments', 'loan-purchases', 'savings-goals', 'transactions'],
+    ['accounts', 'budgets', 'card-payments', 'loan-purchases', 'quick-log-drafts', 'savings-goals', 'transactions'],
   )
 })
 

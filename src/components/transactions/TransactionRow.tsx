@@ -24,6 +24,7 @@ import {
 import { amountDisplay } from '@/lib/transactionWindow'
 import { inferTransactionKind } from '@/components/transactions/transactionKinds'
 import type { Transaction } from '@/types'
+import { transactionNeedsReview } from '@/hooks/useTransactions.helpers'
 
 interface TransactionRowProps {
   tx: Transaction
@@ -33,6 +34,7 @@ interface TransactionRowProps {
   onSplit?: (tx: Transaction) => void
   /** Called when the user wants to save this transaction as a template. */
   onSaveTemplate?: (tx: Transaction) => void
+  onMarkReviewed?: (tx: Transaction) => void
   /** When true, a checkbox is shown for bulk selection. */
   selectable?: boolean
   /** Controlled checked state of the checkbox. */
@@ -66,6 +68,7 @@ function TransactionRowImpl({
   onDelete,
   onSplit,
   onSaveTemplate,
+  onMarkReviewed,
   selectable,
   selected,
   onSelect,
@@ -118,6 +121,7 @@ function TransactionRowImpl({
 
   // Split only where the inline button offers it: never on transfers or repayments (M-07).
   const canSplit = !!onSplit && tx.type !== 'transfer' && !isLoanRepayment
+  const needsReview = transactionNeedsReview(tx)
   const open = () =>
     openDetail
       ? openDetail(tx, {
@@ -125,6 +129,7 @@ function TransactionRowImpl({
           onDelete: () => void onDelete(tx.id),
           onSplit: canSplit ? () => onSplit(tx) : undefined,
           onSaveTemplate: onSaveTemplate ? () => onSaveTemplate(tx) : undefined,
+          onMarkReviewed: needsReview && onMarkReviewed ? () => onMarkReviewed(tx) : undefined,
         })
       : onEdit(tx)
 
@@ -184,6 +189,7 @@ function TransactionRowImpl({
             {tx.category ? tx.category.icon : <Icon className={`size-[13px] ${TRANSACTION_TYPE_COLOR[tx.type]}`} />}
           </span>
           <span className="truncate font-medium">{tx.description}</span>
+          {needsReview && <span className="shrink-0 text-xs text-muted-foreground">Needs review</span>}
           {tx.is_recurring && (
             <Repeat role="img" aria-label={`Repeats ${tx.recurrence_interval ?? ''}`.trim()} className={flag} />
           )}
@@ -210,6 +216,7 @@ function TransactionRowImpl({
     const scheduled = !countsYet(tx.date, today)
     const isPayment = tx.type === 'transfer' || isLoanRepayment
     const meta = [
+      needsReview ? 'Needs review' : '',
       showDate ? formatDateShort(tx.date) : '',
       contextAccountId !== undefined
         ? isPayment
@@ -351,6 +358,7 @@ function TransactionRowImpl({
                 )}
               </>
             )}
+            {needsReview && <Badge variant="outline" className="text-xs py-0 px-1.5">Needs review</Badge>}
             {tx.category && (
               <Badge variant="secondary" className="text-xs py-0 px-1.5">{tx.category.name}</Badge>
             )}

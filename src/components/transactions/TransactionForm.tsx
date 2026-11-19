@@ -66,6 +66,7 @@ interface TransactionFormProps {
   lockedCardAccountId?: string
   submitLabel?: string
   entryKind?: TransactionKind
+  quickLogReview?: { destinationCurrency: string | null }
   /** True when editing a saved transaction rather than creating one. */
   isEditing?: boolean
 }
@@ -79,6 +80,7 @@ export function TransactionForm({
   lockedCardAccountId,
   submitLabel = 'Save Transaction',
   entryKind,
+  quickLogReview,
   isEditing = false,
 }: TransactionFormProps) {
   const { user, profile } = useAuth()
@@ -156,6 +158,19 @@ export function TransactionForm({
     },
   })
 
+  const reviewForm = useRef<HTMLFormElement>(null)
+  const reviewingQuickLog = Boolean(quickLogReview)
+  useEffect(() => {
+    if (!reviewingQuickLog) return
+    const values = form.getValues()
+    const field = !values.account_id ? '[data-quick-log-account] button'
+      : values.type === 'transfer' && !values.to_account_id ? '[data-quick-log-destination] button'
+      : !values.amount ? 'input[name="amount"]'
+      : !values.date ? 'input[name="date"]'
+      : 'input[name="amount"]'
+    reviewForm.current?.querySelector<HTMLElement>(field)?.focus()
+  }, [reviewingQuickLog, form])
+
   // Change kind swaps entryKind while the dialog stays open (LED-111). The step
   // state below belongs to the old kind, so it resets during render; the values
   // keep what every kind shares and lose what no longer applies.
@@ -192,12 +207,12 @@ export function TransactionForm({
   const toAccountCurrency = accounts.find((account) => account.id === selectedLoanId)?.currency
   const crossCurrency = needsAmountReceived({ type, currency: currencyValue, to_account_id: selectedLoanId }, toAccountCurrency)
   const suggestedDestination = useMemo(() => {
-    if (!crossCurrency || !toAccountCurrency) return null
+    if (quickLogReview || !crossCurrency || !toAccountCurrency) return null
     const amount = Number(amountValue)
     if (!Number.isFinite(amount) || amount <= 0) return null
     const converted = amountInCurrency({ amount, currency: currencyValue, exchange_rate: null }, toAccountCurrency, rateTable)
     return converted === null ? null : Math.round(converted * 100) / 100
-  }, [amountValue, crossCurrency, currencyValue, rateTable, toAccountCurrency])
+  }, [amountValue, crossCurrency, currencyValue, quickLogReview, rateTable, toAccountCurrency])
   // The suggestion follows the amount until the user types their own figure; a saved one is theirs already.
   const [destinationTyped, setDestinationTyped] = useState(Boolean(defaultValues?.destination_amount))
   useEffect(() => {
@@ -209,12 +224,14 @@ export function TransactionForm({
   // sent is the user's figure, so a preset no longer replaces it. A new entry opened with an amount (Pay now,
   // Make payment) starts from the bill's amount, which is in the target's currency like a preset.
   const [presetReceived, setPresetReceived] = useState<number | null>(
-    !isEditing && Number(defaultValues?.amount) > 0 && !defaultValues?.destination_amount ? Number(defaultValues?.amount) : null,
+    !isEditing && !quickLogReview && Number(defaultValues?.amount) > 0 && !defaultValues?.destination_amount ? Number(defaultValues?.amount) : null,
   )
-  const [sentTyped, setSentTyped] = useState(false)
+  const [sentTyped, setSentTyped] = useState(!!quickLogReview && Number(defaultValues?.amount) > 0)
+  const [receivedCurrencyEdited, setReceivedCurrencyEdited] = useState<string>()
   // A card or loan preset is in the target's currency: between two currencies it fills the amount
   // received, and the amount sent follows from the rate feed unless the user typed it (LED-269, LED-293).
   const setReceived = (value: number) => {
+    setReceivedCurrencyEdited(toAccountCurrency)
     setDestinationTyped(true)
     form.setValue('destination_amount', value, { shouldValidate: true })
     if ((sentTyped && Number(form.getValues('amount')) > 0) || !toAccountCurrency) return
@@ -304,7 +321,7 @@ export function TransactionForm({
     const selectedAccountRecord = accounts.find((account) => account.id === accountId)
     if (selectedAccountRecord) {
       // A loan or card in another currency stays chosen; the form asks for the amount received (LED-269).
-      form.setValue('currency', selectedAccountRecord.currency)
+      if (!quickLogReview) form.setValue('currency', selectedAccountRecord.currency)
       // A preset is what the card or loan receives, so a switch of currency keeps it (LED-293).
       if (presetReceived !== null && paymentTarget && toAccountCurrency) {
         const next = paySourceAmounts(presetReceived, selectedAccountRecord.currency, toAccountCurrency, (amount, from, to) =>
@@ -396,6 +413,27 @@ export function TransactionForm({
     hasLoanPickerStep({ loanCount: loanAccountsOwed.length, lockedLoanAccountId, isEditing })
 
   const handleSubmitWithUpload = async (values: TransactionFormValues) => {
+    if (quickLogReview) {
+      const source = accounts.find((account) => account.id === values.account_id)
+      if (!source?.is_active || source.currency !== values.currency) {
+        form.setError('currency', { message: 'Choose an account that uses ' + values.currency + ', or correct the currency.' })
+        return
+      }
+      const target = accounts.find((account) => account.id === values.to_account_id)
+      if (values.to_account_id && (!target?.is_active || target.id === source.id)) {
+        form.setError('to_account_id', { message: 'Choose a different active destination account.' })
+        return
+      }
+      if (target && values.destination_amount !== null && quickLogReview.destinationCurrency
+        && target.currency !== quickLogReview.destinationCurrency && target.currency !== receivedCurrencyEdited) {
+        form.setError('destination_amount', { message: 'Check the amount received in ' + target.currency + '.' })
+        return
+      }
+      if (values.to_account_id === values.account_id) {
+        form.setError('to_account_id', { message: 'Choose a different destination account.' })
+        return
+      }
+    }
     const repaymentLoan = loanAccounts.find((account) => account.id === values.to_account_id)
     if (isLoanRepayment && !repaymentLoan) {
       form.setError('to_account_id', { message: 'Choose the loan you are repaying' })
@@ -493,7 +531,7 @@ export function TransactionForm({
         render={({ field }) => (
           <FormItem>
             <FormLabel>Currency</FormLabel>
-            <Select modal={false} onValueChange={field.onChange} value={field.value} disabled={isLiabilityPayment}>
+            <Select modal={false} onValueChange={field.onChange} value={field.value} disabled={isLiabilityPayment && !quickLogReview}>
               <FormControl>
                 <SelectTrigger>
                   <SelectValue />
@@ -507,6 +545,7 @@ export function TransactionForm({
                 ))}
               </SelectContent>
             </Select>
+            <FormMessage />
           </FormItem>
         )}
       />
@@ -530,6 +569,7 @@ export function TransactionForm({
                 onBlur={field.onBlur}
                 value={typeof field.value === 'number' || typeof field.value === 'string' ? field.value : ''}
                 onChange={(event) => {
+                  setReceivedCurrencyEdited(toAccountCurrency)
                   setDestinationTyped(true)
                   setPresetReceived(null)
                   field.onChange(event.target.value === '' ? null : event.target.value)
@@ -542,7 +582,8 @@ export function TransactionForm({
               )
             ) : (
               <p className="text-xs text-muted-foreground">
-                No exchange rate for {currencyValue} to {toAccountCurrency}. Enter what the account received.
+                {quickLogReview ? 'Enter the actual amount received.'
+                  : `No exchange rate for ${currencyValue} to ${toAccountCurrency}. Enter what the account received.`}
               </p>
             )}
             <FormMessage />
@@ -628,7 +669,7 @@ export function TransactionForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmitWithUpload)} className="space-y-3 sm:space-y-4">
+      <form ref={reviewForm} onSubmit={form.handleSubmit(handleSubmitWithUpload)} className="space-y-3 sm:space-y-4">
         {canEditKind && (
           <FormField
             control={form.control}
@@ -792,7 +833,7 @@ export function TransactionForm({
             name="account_id"
             render={({ field }) => {
               return (
-                <FormItem>
+                  <FormItem data-quick-log-account>
                   <FormLabel>{type === 'transfer' ? 'From account' : isLiabilityPayment ? 'Pay from' : 'Account'}</FormLabel>
                   <FormControl>
                     <AccountCombobox
@@ -819,13 +860,23 @@ export function TransactionForm({
                 const selectedToAccount = accounts.find((account) => account.id === field.value)
 
                 return (
-                  <FormItem>
+                  <FormItem data-quick-log-destination>
                     <FormLabel>To account</FormLabel>
                     <FormControl>
                       <AccountCombobox
                         accounts={accounts.filter((account) => account.id !== selectedAccount)}
                         value={selectedToAccount?.id ?? field.value}
-                        onValueChange={field.onChange}
+                        onValueChange={(id) => {
+                          if (quickLogReview && id !== field.value) {
+                            const currency = accounts.find((account) => account.id === id)?.currency
+                            if (currency !== (receivedCurrencyEdited ?? quickLogReview.destinationCurrency)) {
+                              form.setValue('destination_amount', null)
+                              setDestinationTyped(false)
+                            }
+                            setReceivedCurrencyEdited(undefined)
+                          }
+                          field.onChange(id)
+                        }}
                         placeholder="Select account"
                         searchPlaceholder="Search destination accounts…"
                       />

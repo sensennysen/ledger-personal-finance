@@ -10,14 +10,15 @@ export type ReadEntity = Entity | 'budgets' | 'loan-purchases'
 export type WriteSource = ReadEntity | 'sync'
 
 // A transaction moves balances (database trigger), budget spend, goal contributions, card payments
-// and statements (LED-296) and loan installments.
+// and statements (LED-296), loan installments, and completed Quick Log drafts.
 const TRANSACTION_EFFECTS: readonly ReadEntity[] = [
-  'transactions', 'accounts', 'budgets', 'savings-goals', 'card-payments', 'loan-purchases',
+  'transactions', 'accounts', 'budgets', 'savings-goals', 'card-payments', 'loan-purchases', 'quick-log-drafts',
 ]
 
 export const INVALIDATES: Readonly<Record<WriteSource, readonly ReadEntity[]>> = {
   transactions: TRANSACTION_EFFECTS,
   sync: TRANSACTION_EFFECTS,
+  'quick-log-drafts': ['quick-log-drafts'],
   // Transactions carry the account's name, colour and currency.
   accounts: ['accounts', 'transactions'],
   // Transactions and budgets carry the category's name, colour and icon.

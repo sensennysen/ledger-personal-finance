@@ -10,6 +10,7 @@ export type Entity =
   | 'accounts'
   | 'categories'
   | 'transactions'
+  | 'quick-log-drafts'
   | 'savings-goals'
   | 'card-payments'
   | 'exchange-rates'

@@ -77,6 +77,8 @@ import { saveQuickLogDraft, type QuickLogDraft } from '@/hooks/useQuickLogDrafts
 import type { QuickLogResolution, QuickLogSource } from '@/lib/quickLog'
 import type { Transaction } from '@/types'
 
+const ACTIVITY_REVIEW_PATH = '/transactions?review=needed'
+
 export type AddTransactionOptions = {
   targetAccountId?: string
   categoryId?: string
@@ -295,6 +297,22 @@ function LayoutShell() {
     }
     void run()
   }, [generateDueRecurring, notify])
+  const openActivityAfterSave = ({ date, review = false }: { date?: string; review?: boolean }) => {
+    setSheet(null)
+    if (date && !review) {
+      const entryCycle = getCurrentCycleMonthKey(startDay, new Date(`${date}T00:00:00`))
+      if (entryCycle !== selectedMonth) setSelectedMonth(entryCycle)
+    }
+    const destination = review ? ACTIVITY_REVIEW_PATH : '/transactions'
+    if (destination !== location.pathname + location.search) {
+      if (mainRef.current) mainRef.current.scrollTop = 0
+      navigate(destination)
+    }
+  }
+  const handleQuickLogSaved = (draft: QuickLogResolution) => {
+    if (draft.ready) openActivityAfterSave({ date: draft.values.date })
+    else openActivityAfterSave({ review: true })
+  }
   const handleCreate = async (values: TransactionFormValues) => {
     const result = quickLogDraft
       ? await createWithStatement({ ...values, entry_source: quickLogDraft.entry_source ?? 'ai_phrase', reviewed_at: new Date().toISOString() }, quickLogDraft.id)
@@ -306,7 +324,7 @@ function LayoutShell() {
     }
     if (quickLogDraft && result.id) announceQuickLog(values, result.id, result.queued)
     setFormError(null)
-    setSheet(null)
+    openActivityAfterSave({ date: values.date, review: !!quickLogDraft })
   }
   const announceQuickLog = (values: TransactionFormValues, id: string, queued?: boolean) => {
     const source = accounts.find((account) => account.id === values.account_id)
@@ -330,7 +348,7 @@ function LayoutShell() {
       if (error) return error
       notify({
         severity: 'success', title: 'Saved for review', body: draft.reason,
-        action: { label: 'Needs review', run: () => navigate('/transactions?review=needed') },
+        action: { label: 'Needs review', run: () => navigate(ACTIVITY_REVIEW_PATH) },
       })
       return null
     }
@@ -654,7 +672,7 @@ function LayoutShell() {
                   setQuickLogStep(null)
                 }}
                 onSave={saveQuickLog}
-                onSaved={() => setSheet(null)}
+                onSaved={handleQuickLogSaved}
               />
             )}
             {sheet === 'add' && quickLogStep === 'receipt' && (
@@ -662,7 +680,7 @@ function LayoutShell() {
                 online={isOnline}
                 initialAccountId={targetAccountId}
                 onSave={(draft, label, id) => saveQuickLog(draft, label, id, 'ai_receipt')}
-                onSaved={() => setSheet(null)}
+                onSaved={handleQuickLogSaved}
               />
             )}
             {sheet === 'add' && quickLogDraft && (

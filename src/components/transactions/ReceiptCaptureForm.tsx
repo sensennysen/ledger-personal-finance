@@ -30,7 +30,7 @@ export function ReceiptCaptureForm({ online, initialAccountId, onSave, onSaved }
   online: boolean
   initialAccountId?: string
   onSave: (draft: QuickLogResolution, label: string, id: string) => Promise<string | null>
-  onSaved: () => void
+  onSaved: (draft: QuickLogResolution) => void
 }) {
   const { user } = useAuth()
   const { accounts, loading: accountsLoading, error: accountsError, refetch: refetchAccounts } = useAccounts()
@@ -127,7 +127,7 @@ export function ReceiptCaptureForm({ online, initialAccountId, onSave, onSaved }
       const failure = await onSave(save.draft, save.draft.values.description || 'Captured receipt', save.id)
       if (controller.signal.aborted) return
       if (failure) setError(failure)
-      else onSaved()
+      else onSaved(save.draft)
     } catch (failure) {
       if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : 'The receipt could not be saved.')
     } finally {

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeftRight, Check, Target, Upload, Wallet, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton, SkeletonText } from '@/components/ui/skeleton'
+import { TransactionKindMenu } from '@/components/transactions/TransactionKindMenu'
 import { cn } from '@/lib/utils'
 import { useFirstRunChecklist } from '@/hooks/useFirstRunChecklist'
 import {
@@ -23,6 +24,8 @@ interface DashboardFirstRunChecklistProps {
   accounts: Account[]
   transactions: Transaction[]
   onAddTransaction: (kind: TransactionKind) => void
+  onQuickLog: () => void
+  onCaptureReceipt: () => void
   /**
    * Accounts and transactions are still being read. The card then keeps its rows, titles and
    * descriptions (they do not depend on data) and greys out the counts and buttons, so Home does
@@ -35,6 +38,8 @@ export function DashboardFirstRunChecklist({
   accounts,
   transactions,
   onAddTransaction,
+  onQuickLog,
+  onCaptureReceipt,
   loading = false,
 }: DashboardFirstRunChecklistProps) {
   const navigate = useNavigate()
@@ -132,9 +137,12 @@ export function DashboardFirstRunChecklist({
                     <Upload className="size-3.5" />
                     Import
                   </Button>
-                  <Button size="sm" onClick={() => onAddTransaction('expense')}>
-                    Add entry
-                  </Button>
+                  <TransactionKindMenu
+                    onSelect={onAddTransaction}
+                    onQuickLog={onQuickLog}
+                    onCaptureReceipt={onCaptureReceipt}
+                    trigger={<Button size="sm">Add entry</Button>}
+                  />
                 </span>
               )}
               {!loading && !step.done && step.id === 'cycle' && (

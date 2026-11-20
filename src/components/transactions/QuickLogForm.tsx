@@ -38,7 +38,7 @@ export function QuickLogForm({
   online: boolean
   onManual: (phrase: string) => void
   onSave: (draft: QuickLogResolution, phrase: string, id: string) => Promise<string | null>
-  onSaved: () => void
+  onSaved: (draft: QuickLogResolution) => void
 }) {
   const { profile } = useAuth()
   const { accounts, loading: accountsLoading, error: accountsError, refetch: refetchAccounts } = useAccounts()
@@ -88,7 +88,7 @@ export function QuickLogForm({
       const error = await onSave(draft, phrase.trim(), id)
       if (controller.signal.aborted) return
       if (error) setFailure(error)
-      else onSaved()
+      else onSaved(draft)
     } catch {
       if (!controller.signal.aborted) setFailure(errorMessages.unavailable)
     } finally {

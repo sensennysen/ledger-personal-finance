@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { ArrowLeftRight, ChevronDown, ChevronRight, Search, Plus, Upload, CreditCard, Wallet, Pencil } from 'lucide-react'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -56,6 +56,7 @@ import { payNowDate, type LoanDeadline } from '@/lib/loanInstallments'
 import { ACCOUNT_ICONS } from '@/constants/accounts'
 import { AccountForm, type AccountFormValues } from '@/components/accounts/AccountForm'
 import type { CreditCardPayment, Transaction } from '@/types'
+import type { AppLayoutContext } from '@/components/layout/AppLayout'
 import { useCategoryInk } from '@/hooks/useCategoryInk'
 
 function bandCell(label: string, value: string, sub?: string, money = true, wrapValue = false, muted = false) {
@@ -88,6 +89,7 @@ function dayInDaysLabel(days: number | null) {
 const SETTLE_DEBOUNCE_MS = 500
 
 export default function AccountTransactionsPage() {
+  const layout = useOutletContext<AppLayoutContext | null>()
   const ink = useCategoryInk()
   const { accountId } = useParams<{ accountId: string }>()
   const navigate = useNavigate()
@@ -471,6 +473,7 @@ export default function AccountTransactionsPage() {
               </Button>
             )}
             <TransactionKindMenu
+              onCaptureReceipt={layout ? () => layout.openReceiptCapture(account?.is_active && account.type !== 'loan' ? account.id : undefined) : undefined}
               showCardPayment={account?.type !== 'credit_card'}
               showLoanRepayment={Boolean(
                 account &&

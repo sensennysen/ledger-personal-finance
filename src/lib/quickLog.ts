@@ -19,13 +19,13 @@ interface QuickLogValues {
   exchange_rate: number
   destination_amount: number | null
   description: string
-  notes: null
+  notes: string | null
   date: string
   transfer_fee: number | null
   is_recurring: false
   recurrence_interval: null
   recurrence_end_date: null
-  receipt_url: null
+  receipt_url: string | null
   tags: string[]
   goal_id: null
 }
@@ -33,6 +33,11 @@ interface QuickLogValues {
 export type QuickLogResolution =
   | { ready: true; values: QuickLogValues; destinationCurrency: string | null }
   | { ready: false; kind: Kind | null; values: Partial<QuickLogValues>; destinationCurrency: string | null; reason: string }
+
+export const QUICK_LOG_SOURCES = ['ai_phrase', 'ai_receipt'] as const
+export type QuickLogSource = (typeof QUICK_LOG_SOURCES)[number]
+export const isQuickLogSource = (source: string | null | undefined): source is QuickLogSource =>
+  QUICK_LOG_SOURCES.some((value) => value === source)
 
 const normalize = (text: string) => text.trim().replace(/\s+/g, ' ').toLowerCase()
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -104,7 +109,7 @@ function hasAmountRole(phrase: string, amount: QuickLogAmount | null, currency: 
   return new RegExp(role === 'fee' ? afterLabel + '|' + money + '\\s+' + label : afterLabel, 'i').test(phrase)
 }
 
-function mentionsLiteral(phrase: string, mention: string | null) {
+export function mentionsLiteral(phrase: string, mention: string | null) {
   if (!mention || !normalize(mention)) return false
   return new RegExp('(?<![\\p{L}\\p{N}])' + escape(normalize(mention)) + '(?![\\p{L}\\p{N}])', 'u').test(phrase)
 }

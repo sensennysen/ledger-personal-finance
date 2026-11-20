@@ -636,10 +636,13 @@ export type Database = {
           description: string | null
           destination_amount: number | null
           destination_currency: string | null
+          entry_source: string
           id: string
           kind: string | null
+          notes: string | null
           phrase: string
           reason: string
+          receipt_url: string | null
           subcategory_id: string | null
           to_account_id: string | null
           transaction_date: string | null
@@ -655,10 +658,13 @@ export type Database = {
           description?: string | null
           destination_amount?: number | null
           destination_currency?: string | null
+          entry_source?: string
           id: string
           kind?: string | null
+          notes?: string | null
           phrase: string
           reason: string
+          receipt_url?: string | null
           subcategory_id?: string | null
           to_account_id?: string | null
           transaction_date?: string | null
@@ -674,10 +680,13 @@ export type Database = {
           description?: string | null
           destination_amount?: number | null
           destination_currency?: string | null
+          entry_source?: string
           id?: string
           kind?: string | null
+          notes?: string | null
           phrase?: string
           reason?: string
+          receipt_url?: string | null
           subcategory_id?: string | null
           to_account_id?: string | null
           transaction_date?: string | null

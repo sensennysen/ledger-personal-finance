@@ -71,7 +71,7 @@ export default function LegalNoticesPage() {
           <p className={body}>
             Ledger is built with open-source libraries, including React, Supabase’s JavaScript client, Tailwind CSS and
             Recharts, each under its own licence. Exchange rates come from Frankfurter. Fonts are from Google Fonts.
-            Quick Log uses the OpenAI API to extract transaction details when you submit an entry.
+            Quick Log and Capture Receipt use the OpenAI API to extract transaction details when you submit text or a photo.
           </p>
         </section>
 

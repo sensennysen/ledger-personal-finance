@@ -14,7 +14,7 @@ const sections: LegalSection[] = [
     content: [
       'Your name, email address and profile picture link, received from Google when you sign in.',
       'The records you enter: accounts and their balances; transactions, with their notes, tags and receipt images; categories and subcategories; budgets; savings goals; loans and financed purchases; credit card payments; auto-categorisation rules; saved filters; saved transaction templates; and the exchange rates Ledger fetched or you typed.',
-      'Quick Log drafts contain the phrase you entered, the details Ledger extracted and the reason the entry needs review. Posted Quick Log transactions include their source and review status. Ledger also stores your Quick Log default accounts, whether you have seen the walkthrough and a request counter tied to your Ledger account to enforce rate limits.',
+      'Quick Log drafts contain the phrase or receipt photo you submitted, the details Ledger extracted and the reason the entry needs review. Posted Quick Log transactions include their source and review status. For captured receipts, Ledger also attaches the photo and may keep the detected payment method in the entry notes. Ledger stores your Quick Log default accounts, walkthrough progress and a request counter to enforce rate limits.',
       'Your settings: default currency, pay cycle, budget deficit setting, rate refresh schedule, Home widget order and which widgets show, number and date format, list views, the large-transaction threshold, whether card reminders are on, and whether you finished or dismissed the setup checklist. Also the card reminders already shown to you, and the income records you picked for 13th Month Pay. Your theme, text size and accent colour stay in your browser.',
       'When something in the app fails while you are signed in, an error report: what failed, with numbers, quoted text and ids taken out; the page’s path; the app version; and your browser’s name and version. It never includes your amounts, names, descriptions or notes. Only the operator can read these reports.',
       'Ledger shows no ads and uses no tools to track app usage for audience measurement.',
@@ -23,7 +23,7 @@ const sections: LegalSection[] = [
   {
     title: '2. How it is used',
     content:
-      'Ledger uses your data to sign you in, store and display your records, calculate balances and reports, and provide reminders. When you use Quick Log, Ledger uses the submitted text to extract transaction details and match your accounts and categories. Your data is not sold, rented or shared for marketing.',
+      'Ledger uses your data to sign you in, store and display your records, calculate balances and reports, and provide reminders. When you use Quick Log or Capture Receipt, Ledger uses the submitted text or photo to extract transaction details and match your accounts and categories. Your data is not sold, rented or shared for marketing.',
   },
   {
     title: '3. Where it is stored',
@@ -63,6 +63,12 @@ const sections: LegalSection[] = [
         current Quick Log form, it also sends your active account names, types and currencies. Ledger uses
         references generated for that request to match accounts and categories and sends no database IDs,
         balances, or transaction history alongside those fields.
+      </>,
+      <>
+        When you choose Capture Receipt, the same service sends the whole photo to OpenAI, along with the
+        local date, number format and account and category details described above. The photo may show other
+        information printed on the receipt. Ledger saves it in its private receipt storage so you can open it
+        from the saved entry or draft.
       </>,
       <>
         Ledger sets the OpenAI API’s response storage option to off. OpenAI may still retain content for abuse

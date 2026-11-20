@@ -8,6 +8,7 @@ import {
   Plus,
   LogOut,
   CalendarDays,
+  ReceiptText,
   Zap,
 } from 'lucide-react'
 import { TopBar } from './TopBar'
@@ -69,10 +70,11 @@ import { X } from 'lucide-react'
 import { useCreditCardNotifications } from '@/hooks/useCreditCardNotifications'
 import { QuickLogForm } from '@/components/transactions/QuickLogForm'
 import { QuickLogIntro } from '@/components/transactions/QuickLogIntro'
+import { ReceiptCaptureForm } from '@/components/transactions/ReceiptCaptureForm'
 import { transactionSchema } from '@/components/transactions/transactionFormSchema'
 import { usePreferences } from '@/hooks/usePreferences'
 import { saveQuickLogDraft, type QuickLogDraft } from '@/hooks/useQuickLogDrafts'
-import type { QuickLogResolution } from '@/lib/quickLog'
+import type { QuickLogResolution, QuickLogSource } from '@/lib/quickLog'
 import type { Transaction } from '@/types'
 
 export type AddTransactionOptions = {
@@ -87,6 +89,7 @@ export type AppLayoutContext = {
   /** `prefill` opens it with an amount and date (Home: Pay now on a loan bill). */
   openAddTransactionModal: (kind: TransactionKind, options?: AddTransactionOptions) => void
   openQuickLog: () => void
+  openReceiptCapture: (accountId?: string) => void
   openQuickLogDraft: (draft: QuickLogDraft) => void
   /** Advisory locks (More's destinations follow the nav's). */
   setupComplete: boolean
@@ -144,7 +147,7 @@ function LayoutShell() {
   const [targetAccountId, setTargetAccountId] = useState<string | undefined>()
   const [prefillCategoryId, setPrefillCategoryId] = useState<string | undefined>()
   const [prefill, setPrefill] = useState<AddTransactionOptions['prefill']>()
-  const [quickLogStep, setQuickLogStep] = useState<'intro' | 'form' | null>(null)
+  const [quickLogStep, setQuickLogStep] = useState<'intro' | 'form' | 'receipt' | null>(null)
   const [manualPhrase, setManualPhrase] = useState<string | null>(null)
   const [quickLogDraft, setQuickLogDraft] = useState<QuickLogDraft | null>(null)
   const [entry, setEntry] = useState<{
@@ -248,6 +251,10 @@ function LayoutShell() {
     openAddTransactionModal('expense')
     setQuickLogStep(prefs.quickLogIntroSeen ? 'form' : 'intro')
   }
+  const openReceiptCapture = (accountId?: string) => {
+    openAddTransactionModal('expense', { targetAccountId: accountId })
+    setQuickLogStep('receipt')
+  }
   const openQuickLogDraft = (draft: QuickLogDraft) => {
     const kind = draft.kind === 'income' || draft.kind === 'transfer'
       || draft.kind === 'card-payment' || draft.kind === 'loan-repayment' ? draft.kind : 'expense'
@@ -290,7 +297,7 @@ function LayoutShell() {
   }, [generateDueRecurring, notify])
   const handleCreate = async (values: TransactionFormValues) => {
     const result = quickLogDraft
-      ? await createWithStatement({ ...values, entry_source: 'ai_phrase', reviewed_at: new Date().toISOString() }, quickLogDraft.id)
+      ? await createWithStatement({ ...values, entry_source: quickLogDraft.entry_source ?? 'ai_phrase', reviewed_at: new Date().toISOString() }, quickLogDraft.id)
       : await createWithStatement(values)
     const { error, errorDetail } = result
     if (error) {
@@ -317,9 +324,9 @@ function LayoutShell() {
       } },
     })
   }
-  const saveQuickLog = async (draft: QuickLogResolution, phrase: string, id: string) => {
+  const saveQuickLog = async (draft: QuickLogResolution, phrase: string, id: string, entrySource: QuickLogSource = 'ai_phrase') => {
     if (!draft.ready) {
-      const error = await saveQuickLogDraft(draft, phrase, id)
+      const error = await saveQuickLogDraft(draft, phrase, id, entrySource)
       if (error) return error
       notify({
         severity: 'success', title: 'Saved for review', body: draft.reason,
@@ -330,7 +337,7 @@ function LayoutShell() {
     const validated = transactionSchema.safeParse(draft.values)
     if (!validated.success) return 'Ledger could not save this transaction.'
     const result = await createTransaction({
-      ...validated.data, entry_source: 'ai_phrase', reviewed_at: null, destination_currency: draft.destinationCurrency,
+      ...validated.data, entry_source: entrySource, reviewed_at: null, destination_currency: draft.destinationCurrency,
     }, id)
     if (result.error) return result.error
     if (!result.id) return 'Ledger could not confirm that the transaction was saved.'
@@ -480,7 +487,7 @@ function LayoutShell() {
               <ErrorBoundary>
                 {/* A page's code arrives on first open (LED-317); the shell stays and the page area waits. */}
                 <Suspense fallback={<PageSkeleton />}>
-                  <Outlet context={{ openAddTransactionModal, openQuickLog, openQuickLogDraft, setupComplete } satisfies AppLayoutContext} />
+                  <Outlet context={{ openAddTransactionModal, openQuickLog, openReceiptCapture, openQuickLogDraft, setupComplete } satisfies AppLayoutContext} />
                 </Suspense>
               </ErrorBoundary>
             </div>
@@ -521,6 +528,10 @@ function LayoutShell() {
           // Same action as the page's Add button: pick a kind, then the entry dialog.
           <TransactionKindMenu
             onQuickLog={() => { openQuickLog(); trigger.current = 'fab' }}
+            onCaptureReceipt={() => {
+              openReceiptCapture(routeAccount?.is_active && routeAccount.type !== 'loan' ? routeAccount.id : undefined)
+              trigger.current = 'fab'
+            }}
             onSelect={(kind) => {
               openAddTransactionModal(kind)
               trigger.current = 'fab'
@@ -620,10 +631,12 @@ function LayoutShell() {
             )}
             {sheet === 'add' && quickLogStep === 'intro' ? (
               <QuickLogIntro onContinue={finishQuickLogIntro} onSettings={openQuickLogSettings} />
-            ) : sheet === 'add' && quickLogStep === 'form' ? (
+            ) : sheet === 'add' && (quickLogStep === 'form' || quickLogStep === 'receipt') ? (
               <DialogHeader className="flex-row items-center gap-3 pr-8">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Zap className="size-5" aria-hidden /></span>
-                <DialogTitle>Quick Log</DialogTitle>
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  {quickLogStep === 'receipt' ? <ReceiptText className="size-5" aria-hidden /> : <Zap className="size-5" aria-hidden />}
+                </span>
+                <DialogTitle>{quickLogStep === 'receipt' ? 'Capture Receipt' : 'Quick Log'}</DialogTitle>
               </DialogHeader>
             ) : sheet === 'add' ? (
               <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
@@ -644,9 +657,18 @@ function LayoutShell() {
                 onSaved={() => setSheet(null)}
               />
             )}
+            {sheet === 'add' && quickLogStep === 'receipt' && (
+              <ReceiptCaptureForm
+                online={isOnline}
+                initialAccountId={targetAccountId}
+                onSave={(draft, label, id) => saveQuickLog(draft, label, id, 'ai_receipt')}
+                onSaved={() => setSheet(null)}
+              />
+            )}
             {sheet === 'add' && quickLogDraft && (
               <p className="break-words rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                <span className="font-medium">Quick Log phrase</span>{' · '}{quickLogDraft.phrase}
+                <span className="font-medium">{quickLogDraft.entry_source === 'ai_receipt' ? 'Captured receipt' : 'Quick Log phrase'}</span>
+                {' · '}{quickLogDraft.entry_source === 'ai_receipt' ? quickLogDraft.reason : quickLogDraft.phrase}
               </p>
             )}
             {sheet === 'add' && quickLogStep === null && (
@@ -665,6 +687,8 @@ function LayoutShell() {
                   date: quickLogDraft.transaction_date ?? '',
                   destination_amount: quickLogDraft.destination_amount,
                   transfer_fee: quickLogDraft.transfer_fee,
+                  notes: quickLogDraft.notes ?? null,
+                  receipt_url: quickLogDraft.receipt_url ?? null,
                 } : (manualPhrase !== null
                   ? { description: manualPhrase }
                   : prefillCategoryId || prefill ? { ...(prefillCategoryId ? { category_id: prefillCategoryId } : {}), ...prefill } : undefined)}

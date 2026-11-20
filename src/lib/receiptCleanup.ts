@@ -25,17 +25,32 @@ export class ReceiptCleanupError extends Error {
 }
 
 const PAGE = 1000
+export const CAPTURED_RECEIPTS_FOLDER = 'captures'
+
+async function listReceiptFiles(bucket: ReceiptBucket, path: string) {
+  const files: NonNullable<Awaited<ReturnType<ReceiptBucket['list']>>['data']> = []
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await bucket.list(path, { limit: PAGE, offset })
+    if (error) throw new ReceiptCleanupError(error)
+    files.push(...(data ?? []))
+    if (!data || data.length < PAGE) return files
+  }
+}
+
+async function listUserReceiptFiles(bucket: ReceiptBucket, userId: string) {
+  const root = await listReceiptFiles(bucket, userId)
+  if (!root.some((file) => file.name === CAPTURED_RECEIPTS_FOLDER)) return root
+  // Older app versions only list the root, so they cannot sweep captured drafts.
+  const captures = await listReceiptFiles(bucket, `${userId}/${CAPTURED_RECEIPTS_FOLDER}`)
+  return [
+    ...root.filter((file) => file.name !== CAPTURED_RECEIPTS_FOLDER),
+    ...captures.map((file) => ({ ...file, name: `${CAPTURED_RECEIPTS_FOLDER}/${file.name}` })),
+  ]
+}
 
 /** Removes every file under `<userId>/` and returns how many there were. */
 export async function removeUserReceipts(bucket: ReceiptBucket, userId: string): Promise<number> {
-  const paths: string[] = []
-  for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await bucket.list(userId, { limit: PAGE, offset })
-    if (error) throw new ReceiptCleanupError(error)
-    const page = data ?? []
-    paths.push(...page.map((file) => `${userId}/${file.name}`))
-    if (page.length < PAGE) break
-  }
+  const paths = (await listUserReceiptFiles(bucket, userId)).map((file) => `${userId}/${file.name}`)
   for (let start = 0; start < paths.length; start += PAGE) {
     const { error } = await bucket.remove(paths.slice(start, start + PAGE))
     if (error) throw new ReceiptCleanupError(error)
@@ -107,7 +122,7 @@ export const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000
  * transaction, removing its receipt or replacing it leaves the file behind, and a split's lines
  * share one file, so a file is only safe to remove once no row refers to it. Files younger than
  * `graceMs` stay, so Undo and a save still in flight find theirs. `references` is every
- * receipt_url of the user's transactions; one that cannot be read stops the sweep. Returns how
+ * receipt_url of the user's transactions and drafts; one that cannot be read stops the sweep. Returns how
  * many files were removed.
  */
 export async function sweepOrphanReceipts(
@@ -125,18 +140,11 @@ export async function sweepOrphanReceipts(
   }
 
   const orphans: string[] = []
-  for (let offset = 0; ; offset += PAGE) {
-    const { data, error } = await bucket.list(userId, { limit: PAGE, offset })
-    if (error) throw new ReceiptCleanupError(error)
-    const page = data ?? []
-    for (const file of page) {
-      const path = `${userId}/${file.name}`
-      const created = file.created_at ? Date.parse(file.created_at) : NaN
-      // A folder, or a file whose age is unknown, is left alone.
-      if (kept.has(path) || !Number.isFinite(created) || now - created < graceMs) continue
-      orphans.push(path)
-    }
-    if (page.length < PAGE) break
+  for (const file of await listUserReceiptFiles(bucket, userId)) {
+    const path = `${userId}/${file.name}`
+    const created = file.created_at ? Date.parse(file.created_at) : NaN
+    if (kept.has(path) || !Number.isFinite(created) || now - created < graceMs) continue
+    orphans.push(path)
   }
   for (let start = 0; start < orphans.length; start += PAGE) {
     const { error } = await bucket.remove(orphans.slice(start, start + PAGE))

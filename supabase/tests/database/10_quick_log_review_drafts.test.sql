@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(13);
+select plan(21);
 
 insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data) values
   ('b9000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'quick-draft-a@ledger.test', '{}', '{}'),
@@ -52,6 +52,39 @@ insert into public.quick_log_drafts (id, phrase, reason)
 values ('b9400000-0000-4000-8000-000000000002', 'Groceries', 'Missing amount');
 delete from public.quick_log_drafts where id = 'b9400000-0000-4000-8000-000000000002';
 select is((select count(*) from public.quick_log_drafts), 0::bigint, 'The owner can discard an incomplete draft');
+
+select throws_ok($$
+  insert into public.quick_log_drafts (id, phrase, reason, entry_source, receipt_url)
+  values ('b9400000-0000-4000-8000-000000000004', 'Captured receipt', 'Check total', 'ai_receipt',
+    'b9000000-0000-4000-8000-000000000002/captures/foreign.jpg')
+$$, '23514', null, 'Receipt drafts reject another user’s attachment path');
+
+select lives_ok($$
+  insert into public.transactions (id, user_id, account_id, type, amount, currency, description, date, entry_source, receipt_url)
+  values ('b9400000-0000-4000-8000-000000000005', auth.uid(), 'b9100000-0000-4000-8000-000000000001',
+    'expense', 10, 'PHP', 'Captured lunch', current_date, 'ai_receipt', auth.uid()::text || '/captures/lunch.jpg')
+$$, 'A receipt can post directly for review');
+select ok((select reviewed_at is null from public.transactions where description = 'Captured lunch'),
+  'A directly posted receipt starts in Needs review');
+select throws_ok($$
+  insert into public.transactions (user_id, account_id, type, amount, currency, description, date, entry_source)
+  values (auth.uid(), 'b9100000-0000-4000-8000-000000000001', 'expense', 10, 'USD', 'Wrong currency', current_date, 'ai_receipt')
+$$, '23514', null, 'A directly posted receipt must match the account currency');
+
+select lives_ok($$
+  insert into public.quick_log_drafts (id, phrase, reason, entry_source, receipt_url, notes)
+  values ('b9400000-0000-4000-8000-000000000004', 'Captured receipt', 'Check total', 'ai_receipt',
+    auth.uid()::text || '/captures/draft.jpg', 'Payment method: Cash.')
+$$, 'A capture draft can keep its photo reference and payment method');
+select is((select balance from public.accounts where name = 'Draft test wallet'), 801::numeric,
+  'The receipt draft leaves the posted balance alone');
+select lives_ok($$
+  insert into public.transactions (id, user_id, account_id, type, amount, currency, description, date, entry_source, reviewed_at, receipt_url)
+  values ('b9400000-0000-4000-8000-000000000004', auth.uid(), 'b9100000-0000-4000-8000-000000000001', 'expense', 5, 'PHP',
+    'Completed capture', current_date, 'ai_receipt', now(), auth.uid()::text || '/captures/draft.jpg')
+$$, 'A completed receipt draft posts under the original receipt source');
+select is((select count(*) from public.quick_log_drafts where entry_source = 'ai_receipt'), 0::bigint,
+  'Posting retires the receipt draft');
 
 select * from finish();
 rollback;

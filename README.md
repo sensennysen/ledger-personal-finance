@@ -160,6 +160,8 @@ With `pnpm dev` running in a second terminal, sign in and open **Add → Quick L
 
 If the browser reports CORS, check the Quick Log request in the Network tab. In local development its URL is `http://127.0.0.1:54321/functions/v1/quick-log-extract`. If it points at hosted Supabase, check the Vite overrides and restart the dev server.
 
+For receipt photos, open **Add → Capture Receipt**, then take or choose a photo and optionally select an account. Ledger reads the final amount, transaction type and visible payment method. It tries a matching account and then the saved expense or income default. Completed transactions and drafts appear under **Activity → Needs review** with the photo attached.
+
 For a hosted Ledger instance, set `OPENAI_API_KEY` as a Supabase Edge Function secret and deploy the migrations and the `quick-log-extract` function. The function accepts `QUICK_LOG_REQUESTS_PER_MINUTE` and `QUICK_LOG_TIMEOUT_MS` overrides. Keep the OpenAI key in the function environment.
 
 ### Sweep script

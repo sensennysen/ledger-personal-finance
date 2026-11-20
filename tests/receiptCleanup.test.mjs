@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ReceiptCleanupError, removeUserReceipts } from '../src/lib/receiptCleanup.ts'
+import { ReceiptCleanupError, removeUserReceipts, sweepOrphanReceipts } from '../src/lib/receiptCleanup.ts'
 
 // A bucket holding `files` under one user folder; it records what it was asked to remove.
 function fakeBucket(files, { listError = null, removeError = null } = {}) {
@@ -29,6 +29,25 @@ test('no receipts: nothing to remove', async () => {
   const bucket = fakeBucket([])
   assert.equal(await removeUserReceipts(bucket, 'u1'), 0)
   assert.deepEqual(bucket.removed, [])
+})
+
+test('draft captures survive a sweep and are removed when the user deletes their receipt files', async () => {
+  const removed = []
+  const old = '2026-11-17T00:00:00Z'
+  const bucket = {
+    async list(path) {
+      const data = path === 'u1'
+        ? [{ name: 'captures' }, { name: 'ordinary.jpg', created_at: old }]
+        : [{ name: 'draft.jpg', created_at: old }, { name: 'orphan.jpg', created_at: old }]
+      return { data, error: null }
+    },
+    async remove(paths) { removed.push(...paths); return { error: null } },
+  }
+  assert.equal(await sweepOrphanReceipts(bucket, 'u1', ['u1/captures/draft.jpg', 'u1/ordinary.jpg'], Date.parse('2026-11-20')), 1)
+  assert.deepEqual(removed, ['u1/captures/orphan.jpg'])
+  removed.length = 0
+  assert.equal(await removeUserReceipts(bucket, 'u1'), 3)
+  assert.deepEqual(removed, ['u1/ordinary.jpg', 'u1/captures/draft.jpg', 'u1/captures/orphan.jpg'])
 })
 
 test('more than one page of files is listed and removed in pages of 1,000', async () => {

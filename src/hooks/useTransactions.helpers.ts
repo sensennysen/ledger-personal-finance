@@ -1,5 +1,6 @@
 import type { Account, Category, Transaction } from '@/types'
 import { paymentCredit } from '@/lib/transferCredit'
+import { isQuickLogSource } from '../lib/quickLog.ts'
 
 export interface TransactionFilters {
   accountId?: string
@@ -76,7 +77,7 @@ export function txMatchesFilters(tx: Transaction, filters: TransactionFilters): 
 }
 
 export function transactionNeedsReview(tx: Pick<Transaction, 'entry_source' | 'reviewed_at'>): boolean {
-  return tx.entry_source === 'ai_phrase' && !tx.reviewed_at
+  return isQuickLogSource(tx.entry_source) && !tx.reviewed_at
 }
 
 export function buildTransactionsCacheKey(userId: string, filters: TransactionFilters): string {

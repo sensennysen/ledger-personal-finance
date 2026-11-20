@@ -165,7 +165,7 @@ function formatMonthLabel(key: string) {
 const NO_BUDGETS: Budget[] = []
 
 export default function DashboardPage() {
-  const { openAddTransactionModal } = useOutletContext<AppLayoutContext>()
+  const { openAddTransactionModal, openReceiptCapture } = useOutletContext<AppLayoutContext>()
   const { profile } = useAuth()
   const currency = profile?.default_currency ?? 'USD'
   const currencySymbol = getCurrencySymbol(currency)
@@ -322,6 +322,7 @@ export default function DashboardPage() {
           {/* The phone's Add is the FAB; this row is already desktop-only. */}
           <TransactionKindMenu
             onSelect={openAddTransactionModal}
+            onCaptureReceipt={openReceiptCapture}
             trigger={
               <Button size="sm" className="gap-2 shrink-0 max-md:hidden">
                 <Plus className="w-4 h-4" />

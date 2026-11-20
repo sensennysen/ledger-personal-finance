@@ -28,6 +28,7 @@ import {
 } from '@/hooks/useTransactions.helpers'
 import { toResult, type MutationResult } from '@/lib/dataErrors'
 import { eitherAccountFilter } from '@/lib/accountFilter'
+import { isQuickLogSource, QUICK_LOG_SOURCES } from '@/lib/quickLog'
 
 // ---------- hook ----------
 
@@ -106,7 +107,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         if (filters.type) query = query.eq('type', filters.type)
         if (filters.startDate) query = query.gte('date', filters.startDate)
         if (filters.endDate) query = query.lte('date', filters.endDate)
-        if (filters.needsReview) query = query.eq('entry_source', 'ai_phrase').is('reviewed_at', null)
+        if (filters.needsReview) query = query.in('entry_source', QUICK_LOG_SOURCES).is('reviewed_at', null)
         return query.abortSignal(signal)
       }
 
@@ -232,7 +233,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         const current = queryClient.getQueryData<Transaction[]>(queryKey) ?? transactions
         updateTransactionCache(limitTransactions([optimistic, ...current], filters.limit))
       }
-      if (optimistic.entry_source === 'ai_phrase') updateQuickLogCaches(queuedId, optimistic)
+      if (isQuickLogSource(optimistic.entry_source)) updateQuickLogCaches(queuedId, optimistic)
       optimisticAccountDelta((accounts) => applyTxDelta(accounts, values))
       return { error: null, queued: true, id: queuedId }
     }
@@ -245,7 +246,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       .single()
     if (submissionId && error?.code === '23505') {
       const existing = await supabase.from('transactions').select('id')
-        .eq('id', submissionId).eq('user_id', userId).eq('entry_source', 'ai_phrase').maybeSingle()
+        .eq('id', submissionId).eq('user_id', userId).eq('entry_source', values.entry_source ?? 'ai_phrase').maybeSingle()
       if (existing.data) {
         await invalidateAfterWrite('transactions')
         return { error: null, id: submissionId }
@@ -288,7 +289,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
         // updated_at stays the server's: it is the revision the queued change is made against (LED-297).
         const merged: Transaction = { ...existing, ...values, queued: true }
         updateTransactionCache(transactions.map((t) => (t.id === id ? merged : t)).filter((row) => txMatchesFilters(row, filters)))
-        if (existing.entry_source === 'ai_phrase') updateQuickLogCaches(id, merged)
+        if (isQuickLogSource(existing.entry_source)) updateQuickLogCaches(id, merged)
 
         // Reverse old effect, apply new effect
         optimisticAccountDelta((accounts) =>
@@ -335,7 +336,7 @@ export function useTransactions(filters: TransactionFilters = {}, { enabled = tr
       if (error) return { error }
       if (existing) {
         updateTransactionCache(current.filter((t) => t.id !== id))
-        if (existing.entry_source === 'ai_phrase') updateQuickLogCaches(id)
+        if (isQuickLogSource(existing.entry_source)) updateQuickLogCaches(id)
         optimisticAccountDelta((accounts) => reverseTxDelta(accounts, existing))
       }
       if (navigator.onLine) void drainQueue().then(() => notifySyncListeners(), () => {})

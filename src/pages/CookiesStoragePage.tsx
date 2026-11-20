@@ -55,7 +55,7 @@ export default function CookiesStoragePage() {
           </dl>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
             When you open Needs review in Activity, the copy of your data can include Quick Log drafts,
-            including the phrases you entered and the details awaiting review.
+            including the phrases you entered, receipt references and the details awaiting review.
           </p>
         </section>
 

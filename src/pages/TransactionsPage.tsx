@@ -779,6 +779,7 @@ export default function TransactionsPage() {
             </Button>
             <TransactionKindMenu
               onQuickLog={layout?.openQuickLog}
+              onCaptureReceipt={layout?.openReceiptCapture}
               onSelect={(kind) => {
                 setTemplateDefaults(undefined)
                 setFormError(null)
@@ -917,6 +918,7 @@ export default function TransactionsPage() {
                 </Button>
                 <TransactionKindMenu
                   onQuickLog={layout?.openQuickLog}
+                  onCaptureReceipt={layout?.openReceiptCapture}
                   onSelect={(kind) => {
                     setTemplateDefaults(undefined)
                     setFormError(null)

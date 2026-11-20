@@ -5,7 +5,7 @@ import { toResult } from '@/lib/dataErrors'
 import { listQueue } from '@/lib/offlineQueue'
 import { readAllPages } from '@/lib/pagedRead'
 import { supabase } from '@/lib/supabase'
-import type { QuickLogResolution } from '@/lib/quickLog'
+import type { QuickLogResolution, QuickLogSource } from '@/lib/quickLog'
 import type { Tables } from '@/types/database'
 
 export type QuickLogDraft = Tables<'quick_log_drafts'>
@@ -37,10 +37,11 @@ export function useQuickLogDrafts(enabled = true) {
   }
 }
 
-export async function saveQuickLogDraft(draft: QuickLogPartial, phrase: string, id: string) {
+export async function saveQuickLogDraft(draft: QuickLogPartial, phrase: string, id: string, entrySource: QuickLogSource) {
   const { values } = draft
   const { error } = await supabase.from('quick_log_drafts').upsert({
-    id, phrase, kind: draft.kind, reason: draft.reason,
+    id, phrase, kind: draft.kind, reason: draft.reason, entry_source: entrySource,
+    notes: values.notes ?? null, receipt_url: values.receipt_url ?? null,
     description: values.description || null, amount: values.amount || null, currency: values.currency ?? null,
     transaction_date: values.date || null, account_id: values.account_id || null,
     to_account_id: values.to_account_id ?? null, category_id: values.category_id ?? null,

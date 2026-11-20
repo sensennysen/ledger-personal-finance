@@ -12,7 +12,7 @@ const dataItems = [
   'Your name, email address and profile picture link, from Google at sign-in.',
   'Your accounts.',
   'Your transactions, with their notes and tags.',
-  'Quick Log drafts with the original phrases, extracted details and review reasons. Posted transactions include their Quick Log source and review status.',
+  'Quick Log drafts with the original phrase or receipt photo, extracted details and review reason. Posted transactions include their Quick Log source and review status.',
   'Receipt images you attached.',
   'Categories, subcategories and budgets.',
   'Savings goals, loans and financed purchases with their payment allocations, and credit card payments.',

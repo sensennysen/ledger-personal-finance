@@ -39,4 +39,4 @@ Updated the disclosure and legal pages to describe account metadata, OpenAI proc
 - Verify on installed iOS and Android PWAs, including a real offline-to-online handoff.
 - Apply the Quick Log migrations and deploy the extraction function to hosted Supabase when deploying the frontend. The OpenAI key is configured as a hosted Edge Function secret.
 - Deploy the CORS fix to the hosted extraction function and repeat the production-origin preflight with all browser headers.
-- Implement receipt capture and daily review reminders in their follow-on milestones.
+- Implement daily review reminders. Receipt capture is documented in the [receipt capture retro](2026-11-20-receipt-capture.md).

@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react'
-import { Check, ChevronRight, Zap } from 'lucide-react'
+import { Check, ChevronRight, ReceiptText, Zap } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +22,7 @@ interface TransactionKindMenuProps {
   trigger: ReactElement
   onSelect: (kind: TransactionKind) => void
   onQuickLog?: () => void
+  onCaptureReceipt?: () => void
   align?: 'start' | 'center' | 'end'
   side?: 'top' | 'bottom' | 'left' | 'right' | 'inline-start' | 'inline-end'
   showLoanRepayment?: boolean
@@ -34,6 +35,7 @@ export function TransactionKindMenu({
   trigger,
   onSelect,
   onQuickLog,
+  onCaptureReceipt,
   align = 'end',
   side = 'bottom',
   showLoanRepayment = true,
@@ -48,6 +50,10 @@ export function TransactionKindMenu({
   const items = useKindMenuItems({ showLoanRepayment, showCardPayment })
   const primary = items.filter((item) => item.group === 'primary')
   const liabilities = items.filter((item) => item.group === 'liabilities')
+  const quickActions = [
+    { label: 'Quick Log', run: onQuickLog, Icon: Zap },
+    { label: 'Capture Receipt', run: onCaptureReceipt, Icon: ReceiptText },
+  ]
 
   const renderItem = (item: (typeof items)[number]) => {
     const { icon: Icon, tile, color } = KIND_VISUALS[item.kind]
@@ -115,21 +121,22 @@ export function TransactionKindMenu({
         <SheetContent
           side="bottom"
           showCloseButton={false}
-          className="gap-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+          className="max-h-[85dvh] gap-0 overflow-y-auto rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
         >
           <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-border" aria-hidden />
           <SheetTitle className="px-4 pt-3 pb-2 text-[17px]">What would you like to record?</SheetTitle>
-          {onQuickLog && (
+          {quickActions.map(({ label, run, Icon }) => run && (
             <button
+              key={label}
               type="button"
               className="flex min-h-16 w-full items-center gap-3 px-4 py-2 text-left outline-none focus-visible:bg-muted active:bg-muted"
-              onClick={() => { setSheetOpen(false); onQuickLog() }}
+              onClick={() => { setSheetOpen(false); run() }}
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"><Zap className="size-5" aria-hidden /></span>
-              <span className="min-w-0 flex-1 font-medium">Quick Log</span>
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"><Icon className="size-5" aria-hidden /></span>
+              <span className="min-w-0 flex-1 font-medium">{label}</span>
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             </button>
-          )}
+          ))}
           <div>{primary.map(renderRow)}</div>
           {liabilities.length > 0 && (
             <>
@@ -165,12 +172,12 @@ export function TransactionKindMenu({
       >
         <DropdownMenuGroup>
           <DropdownMenuLabel className="px-2 py-1.5">What would you like to record?</DropdownMenuLabel>
-          {onQuickLog && (
-            <DropdownMenuItem onClick={onQuickLog} className="items-center gap-3 px-2 py-2">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-foreground"><Zap aria-hidden /></span>
-              <span className="font-medium">Quick Log</span>
+          {quickActions.map(({ label, run, Icon }) => run && (
+            <DropdownMenuItem key={label} onClick={run} className="items-center gap-3 px-2 py-2">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-foreground"><Icon aria-hidden /></span>
+              <span className="font-medium">{label}</span>
             </DropdownMenuItem>
-          )}
+          ))}
           {primary.map(renderItem)}
         </DropdownMenuGroup>
         {liabilities.length > 0 && (

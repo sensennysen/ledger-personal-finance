@@ -14,7 +14,7 @@ const sections: LegalSection[] = [
     title: '2. What Ledger is',
     content: [
       'Ledger is software for tracking your own money: you record accounts, transactions, budgets and loans, and it adds them up. It is not a bank or a regulated financial service. It does not move money or connect to your bank accounts.',
-      'Quick Log is optional and uses OpenAI to extract details from what you submit, as described in the Privacy Policy. Complete entries can post automatically and update your Ledger balances before you review them. Entries that need more information stay as drafts until you finish or discard them.',
+      'Quick Log and Capture Receipt are optional and use OpenAI to extract details from the text or photo you submit, as described in the Privacy Policy. Complete entries can post automatically and update your Ledger balances before you review them. Entries that need more information stay as drafts until you finish or discard them.',
     ],
   },
   {

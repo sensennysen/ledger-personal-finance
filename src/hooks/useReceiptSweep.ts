@@ -24,6 +24,18 @@ export function useReceiptSweep(): void {
     swept.add(userId)
     let cancelled = false
     void (async () => {
+      // Read drafts first. Finishing one moves its receipt to transactions.
+      const drafts = await readAllPages<{ receipt_url: string | null }>(
+        (from, to) => supabase.from('quick_log_drafts').select('receipt_url').eq('user_id', userId)
+          .not('receipt_url', 'is', null).order('id').range(from, to),
+        1000,
+        () => cancelled,
+      )
+      if (cancelled || drafts.error) {
+        swept.delete(userId)
+        if (drafts.error) console.warn('[receipts] sweep skipped:', drafts.error)
+        return
+      }
       const { rows, error } = await readAllPages<{ receipt_url: string | null }>(
         (from, to) =>
           supabase
@@ -42,7 +54,8 @@ export function useReceiptSweep(): void {
         return
       }
       try {
-        const removed = await sweepOrphanReceipts(supabase.storage.from('receipts'), userId, rows.map((row) => row.receipt_url), Date.now())
+        const references = [...drafts.rows, ...rows].map((row) => row.receipt_url)
+        const removed = await sweepOrphanReceipts(supabase.storage.from('receipts'), userId, references, Date.now())
         if (removed > 0) console.info(`[receipts] removed ${removed} unused receipt image${removed === 1 ? '' : 's'}`)
       } catch (err) {
         swept.delete(userId)

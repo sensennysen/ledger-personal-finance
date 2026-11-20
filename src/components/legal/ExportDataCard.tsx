@@ -37,8 +37,8 @@ import { buttonVariants } from '@/components/ui/button-variants'
 import { InlineLoadError } from '@/components/ui/error-state'
 
 // "Rather export first?" beside the deletion instructions (LED-89, LED-143, LED-180). The page
-// is public, so a signed-out visitor is sent to sign in; a signed-in one gets a file for each
-// thing the page says we hold: transactions (with Standing Balance, from the same function
+// is public, so a signed-out visitor is sent to sign in. A signed-in one can export the
+// supported records: transactions (with Standing Balance, from the same function
 // Reports uses), accounts, categories, budgets, savings goals, loan purchases and their
 // allocations, auto-categorisation rules, subcategories, credit card payments and exchange
 // rates. Each file has its own read, so a failed one shows its error and offers no download,
@@ -51,7 +51,7 @@ export function ExportDataCard() {
     <div className="rounded-xl border border-border/60 bg-card p-4">
       <p className="text-sm font-semibold text-foreground">Rather export first?</p>
       <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-        Download your data as CSV before deleting — it can't be recovered afterwards.
+        Download the available CSV files before deleting your account.
       </p>
       <div className="mt-3">
         {loading ? (

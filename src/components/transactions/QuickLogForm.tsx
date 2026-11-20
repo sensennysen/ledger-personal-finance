@@ -101,13 +101,13 @@ export function QuickLogForm({
     <form onSubmit={(event) => void submit(event)} className="space-y-4">
       <div className="space-y-2">
         <div className="flex items-baseline justify-between gap-2">
-          <Label htmlFor="quick-log-phrase">Transaction phrase</Label>
+          <Label htmlFor="quick-log-phrase">Transaction</Label>
           <span className="text-xs tabular-nums text-muted-foreground">Default currency · {profile?.default_currency ?? 'USD'}</span>
         </div>
         <Textarea
           id="quick-log-phrase"
           aria-describedby="quick-log-privacy"
-          placeholder="Jollibee 189"
+          placeholder={'type here your transaction in short phrase e.g. "Jollibee 189"'}
           rows={3}
           maxLength={QUICK_LOG_PHRASE_LIMIT}
           value={phrase}
@@ -118,7 +118,7 @@ export function QuickLogForm({
           }}
           className="min-h-24 resize-y text-base"
         />
-        <p id="quick-log-privacy" className="text-xs text-muted-foreground">Ledger sends this phrase, active account names, types and currencies, and category and subcategory names to OpenAI to match the transaction.</p>
+        <p id="quick-log-privacy" className="text-xs text-muted-foreground">The app sends this transaction text, your active account names, types and currencies, and your category and subcategory names to OpenAI to extract the details.</p>
       </div>
       {!online && <p role="status" className="text-sm text-muted-foreground">Connect to the internet to use Quick Log, or enter the transaction manually.</p>}
       {online && lookupError && (

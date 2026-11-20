@@ -6,7 +6,7 @@ import { LEDGER_ISSUES_URL, legalToc, type LegalSection } from '@/lib/legalSecti
 // to the account (LED-263 to LED-268) were approved by the owner on 2026-10-06. The LED-257 and LED-258
 // additions (saved transaction templates, error reports) are drafts the owner reviews in the epic-22
 // pull request.
-const LAST_UPDATED = 'October 6, 2026'
+const LAST_UPDATED = 'November 20, 2026'
 
 const sections: LegalSection[] = [
   {
@@ -14,15 +14,16 @@ const sections: LegalSection[] = [
     content: [
       'Your name, email address and profile picture link, received from Google when you sign in.',
       'The records you enter: accounts and their balances; transactions, with their notes, tags and receipt images; categories and subcategories; budgets; savings goals; loans and financed purchases; credit card payments; auto-categorisation rules; saved filters; saved transaction templates; and the exchange rates Ledger fetched or you typed.',
+      'Quick Log drafts contain the phrase you entered, the details Ledger extracted and the reason the entry needs review. Posted Quick Log transactions include their source and review status. Ledger also stores your Quick Log default accounts, whether you have seen the walkthrough and a request counter tied to your Ledger account to enforce rate limits.',
       'Your settings: default currency, pay cycle, budget deficit setting, rate refresh schedule, Home widget order and which widgets show, number and date format, list views, the large-transaction threshold, whether card reminders are on, and whether you finished or dismissed the setup checklist. Also the card reminders already shown to you, and the income records you picked for 13th Month Pay. Your theme, text size and accent colour stay in your browser.',
       'When something in the app fails while you are signed in, an error report: what failed, with numbers, quoted text and ids taken out; the page’s path; the app version; and your browser’s name and version. It never includes your amounts, names, descriptions or notes. Only the operator can read these reports.',
-      'Ledger collects no analytics and no usage data, and shows no ads.',
+      'Ledger shows no ads and uses no tools to track app usage for audience measurement.',
     ],
   },
   {
     title: '2. How it is used',
     content:
-      'Only to sign you in, store your records and show them back to you: balances, budgets, reports and reminders. Your data is not sold, rented or shared for marketing.',
+      'Ledger uses your data to sign you in, store and display your records, calculate balances and reports, and provide reminders. When you use Quick Log, Ledger uses the submitted text to extract transaction details and match your accounts and categories. Your data is not sold, rented or shared for marketing.',
   },
   {
     title: '3. Where it is stored',
@@ -30,7 +31,7 @@ const sections: LegalSection[] = [
       'Your records are in the operator’s Supabase project: a PostgreSQL database and a private storage bucket for receipt images. Row-level security lets each signed-in user read and change only their own rows, and everything travels over HTTPS. Ledger does not connect to banks and does not store bank passwords or card numbers.',
   },
   {
-    title: '4. Services your browser contacts',
+    title: '4. Services Ledger uses',
     content: [
       <>
         <strong className="font-medium text-foreground">Supabase</strong> (the operator’s project): everything in
@@ -55,19 +56,32 @@ const sections: LegalSection[] = [
         fonts.gstatic.com): the app’s fonts are loaded from Google, which receives your IP address, browser details and
         this site’s address. The app keeps a copy for a year so they are not fetched on every visit.
       </>,
-      'No other services.',
+      <>
+        <strong className="font-medium text-foreground">OpenAI</strong> (Quick Log). When you submit a Quick Log
+        entry, Ledger’s Supabase Edge Function sends OpenAI your transaction text, your local date and number
+        format, and your category and subcategory names, category types and parent relationships. In the
+        current Quick Log form, it also sends your active account names, types and currencies. Ledger uses
+        references generated for that request to match accounts and categories and sends no database IDs,
+        balances, or transaction history alongside those fields.
+      </>,
+      <>
+        Ledger sets the OpenAI API’s response storage option to off. OpenAI may still retain content for abuse
+        monitoring, generally for up to 30 days under its default settings, with exceptions described in its{' '}
+        <LegalLink href="https://developers.openai.com/api/docs/guides/your-data">API data controls</LegalLink>.
+        OpenAI says it uses API data to train models only if the API customer opts in.
+      </>,
     ],
   },
   {
     title: '5. Your choices',
     content: [
       <>
-        Export: download your data as CSV files, at any time, from the{' '}
+        Download available CSV exports, including posted Quick Log transactions, from the{' '}
         <LegalPageLink to="/data-deletion">Data deletion</LegalPageLink> page.
       </>,
-      'Correct: edit or delete any record in the app.',
+      'Use manual transaction entry if you prefer to enter details yourself. You can edit or delete posted transactions and finish or discard Quick Log drafts in Activity.',
       <>
-        Delete: delete your account and everything in section 1 from Settings. It happens immediately; see{' '}
+        Delete your Ledger account and its stored records from Settings. See{' '}
         <LegalPageLink to="/data-deletion">Data deletion</LegalPageLink>.
       </>,
       'For anything else about your data, ask the operator of this copy. Questions about the Ledger software itself go to the project’s GitHub issues (below).',
@@ -76,7 +90,7 @@ const sections: LegalSection[] = [
   {
     title: '6. How long data is kept',
     content:
-      'Everything is kept until you delete it or the operator removes it. When you delete your account, your records and receipt images are erased at once. Copies in the operator’s hosting backups follow that provider’s backup schedule.',
+      'Ledger keeps your records until you delete them or the operator removes them. Account deletion removes records, Quick Log drafts and receipt images from the live Ledger project. Copies in hosting backups follow the provider’s backup schedule. OpenAI handles any retained API data under the controls described in section 4.',
   },
   {
     title: '7. Cookies and browser storage',
@@ -117,7 +131,7 @@ export default function PrivacyPolicyPage() {
         <p>
           Ledger is open-source personal finance software. Anyone can run their own copy, so each copy has an operator:
           the person or organisation that set it up. This policy explains what the Ledger software stores, which
-          services your browser contacts, and how to take your data out or delete it. The operator of this copy is
+          services it uses, and how to take your data out or delete it. The operator of this copy is
           responsible for how they host it.
         </p>
       }

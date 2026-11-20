@@ -3,7 +3,7 @@ import { LEDGER_ISSUES_URL, LEDGER_REPO_URL } from '@/lib/legalSections'
 
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). The licence text is
 // the LICENSE file at the repository root.
-const LAST_UPDATED = 'October 3, 2026'
+const LAST_UPDATED = 'November 20, 2026'
 
 const COPYRIGHT = 'Copyright (c) 2026 sensennysen and Ledger contributors'
 
@@ -45,7 +45,7 @@ export default function LegalNoticesPage() {
               'applying updates and keeping it secure;',
               'backups;',
               'the privacy and consumer laws where you and your users are;',
-              'making sure these pages describe your copy. If you add services the browser contacts, list them in the Privacy Policy and in the Content Security Policy.',
+              'making sure these pages describe the services your copy uses, including how Quick Log is configured. If you add services the browser contacts, list them in the Privacy Policy and in the Content Security Policy.',
             ].map((item) => (
               <li key={item} className={`flex gap-3 ${body}`}>
                 <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
@@ -71,6 +71,7 @@ export default function LegalNoticesPage() {
           <p className={body}>
             Ledger is built with open-source libraries, including React, Supabase’s JavaScript client, Tailwind CSS and
             Recharts, each under its own licence. Exchange rates come from Frankfurter. Fonts are from Google Fonts.
+            Quick Log uses the OpenAI API to extract transaction details when you submit an entry.
           </p>
         </section>
 

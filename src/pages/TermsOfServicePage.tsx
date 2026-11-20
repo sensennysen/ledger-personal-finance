@@ -3,7 +3,7 @@ import { LEDGER_ISSUES_URL, LEDGER_REPO_URL, legalToc, type LegalSection } from 
 
 // Wording approved by the product owner before commit (LED-189, OD-9; rule OD-5). Ledger is MIT
 // licensed (LICENSE), so nothing here restricts reading, copying or changing the source.
-const LAST_UPDATED = 'October 3, 2026'
+const LAST_UPDATED = 'November 20, 2026'
 
 const sections: LegalSection[] = [
   {
@@ -12,8 +12,10 @@ const sections: LegalSection[] = [
   },
   {
     title: '2. What Ledger is',
-    content:
+    content: [
       'Ledger is software for tracking your own money: you record accounts, transactions, budgets and loans, and it adds them up. It is not a bank or a regulated financial service. It does not move money or connect to your bank accounts.',
+      'Quick Log is optional and uses OpenAI to extract details from what you submit, as described in the Privacy Policy. Complete entries can post automatically and update your Ledger balances before you review them. Entries that need more information stay as drafts until you finish or discard them.',
+    ],
   },
   {
     title: '3. Open-source software and operators',
@@ -32,6 +34,7 @@ const sections: LegalSection[] = [
       'You must be at least 13.',
       'You sign in with Google, so keep your Google account secure.',
       'You are responsible for what you enter and for keeping it accurate.',
+      'Check the transactions Quick Log records in Activity → Needs review. Correct the account, amount, category or other details when needed.',
     ],
   },
   {
@@ -42,7 +45,7 @@ const sections: LegalSection[] = [
   {
     title: '6. Your data',
     content:
-      'Your records are yours. You can export them or delete your account at any time. The Privacy Policy explains what is stored and where.',
+      'Your records are yours. You can download the available CSV exports or delete your account in Settings. The Privacy Policy explains how Ledger uses and stores your data.',
   },
   {
     title: '7. Not financial advice',

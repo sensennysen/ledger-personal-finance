@@ -30,10 +30,13 @@ Verified against the local Edge Function and live model with a disposable user. 
 
 Moved **Needs review** to the top of mobile Activity and gave pending transaction rows a separate status badge. Verified the 48-pixel control and both filter states at 390 pixels, plus the compact control at desktop width.
 
+Updated the Quick Log field label, example placeholder, and disclosure with the requested wording. The extraction payload still includes account types and currencies.
+
+Updated the disclosure and legal pages to describe account metadata, OpenAI processing and retention, posted transactions, drafts, browser caching, and account deletion. The deletion page distinguishes posted transaction CSV exports from unfinished drafts.
+
 ## Backlog
 
 - Verify on installed iOS and Android PWAs, including a real offline-to-online handoff.
 - Apply the Quick Log migrations and deploy the extraction function to hosted Supabase when deploying the frontend. The OpenAI key is configured as a hosted Edge Function secret.
 - Deploy the CORS fix to the hosted extraction function and repeat the production-origin preflight with all browser headers.
-- Review the Privacy Policy wording for OpenAI Quick Log processing with the product owner before releasing account-aware extraction.
 - Implement receipt capture and daily review reminders in their follow-on milestones.

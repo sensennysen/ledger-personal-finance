@@ -42,6 +42,17 @@ test('the Privacy Policy names every host the Content Security Policy lets the b
   }
 })
 
+test('Quick Log discloses OpenAI processing even though the browser only calls Supabase', () => {
+  const privacy = read('src/pages/PrivacyPolicyPage.tsx')
+  const form = read('src/components/transactions/QuickLogForm.tsx')
+  const extraction = read('supabase/functions/quick-log-extract/index.ts')
+  assert.match(extraction, /https:\/\/api\.openai\.com\/v1\/responses/)
+  assert.match(privacy, /Supabase Edge Function sends OpenAI/)
+  assert.match(privacy, /account names, types,? and currencies/)
+  assert.match(privacy, /OpenAI API’s response storage option to off/)
+  assert.match(form, /account names, types,? and currencies[^<]+OpenAI/)
+})
+
 // The keys the code writes to browser storage: named constants passed to localStorage, literal keys,
 // and the static part of the per-user keys, written inline or returned by a key function.
 function storageKeys() {

@@ -1,17 +1,18 @@
 import { AlertTriangle } from 'lucide-react'
-import { LegalPage } from '@/components/legal/LegalPage'
+import { LegalPage, LegalPageLink } from '@/components/legal/LegalPage'
 import { ExportDataCard } from '@/components/legal/ExportDataCard'
 import { cn } from '@/lib/utils'
 
 // Wording approved by the product owner before commit (LED-189, OD-9; step 02 and the reading time,
 // LED-142, 2026-10-05; rule OD-5). The error reports line (LED-258) is a draft the owner reviews in
 // the epic-22 pull request.
-const LAST_UPDATED = 'October 6, 2026'
+const LAST_UPDATED = 'November 20, 2026'
 
 const dataItems = [
   'Your name, email address and profile picture link, from Google at sign-in.',
   'Your accounts.',
   'Your transactions, with their notes and tags.',
+  'Quick Log drafts with the original phrases, extracted details and review reasons. Posted transactions include their Quick Log source and review status.',
   'Receipt images you attached.',
   'Categories, subcategories and budgets.',
   'Savings goals, loans and financed purchases with their payment allocations, and credit card payments.',
@@ -19,6 +20,7 @@ const dataItems = [
   'Exchange rates Ledger fetched or you typed.',
   'Error reports the app sent when something failed for you.',
   'Your settings: default currency, pay cycle, deficit setting, rate schedule, Home layout, preferences and setup checklist progress.',
+  'Your Quick Log default accounts, walkthrough progress and request counter.',
   'The card reminders already shown to you, and your 13th Month picks.',
 ]
 
@@ -41,7 +43,7 @@ const steps = [
   {
     number: '04',
     heading: 'Type DELETE to confirm',
-    body: 'Type DELETE and press “Delete Forever”. Your account, your records and your receipt images are erased at once and cannot be recovered.',
+    body: 'Type DELETE and press “Delete Forever”. When deletion completes, your account, your records and your receipt images are removed from the live Ledger project and cannot be recovered through the app.',
   },
 ]
 
@@ -62,7 +64,8 @@ export default function DataDeletionPage() {
       intro={
         <p>
           You can delete your Ledger account and everything in it yourself, from Settings. No email request is
-          needed. This page lists what is deleted and how. Download a copy first if you want one.
+          needed. The transaction CSV includes posted Quick Log entries. To keep an unfinished Quick Log entry, copy its
+          details from Activity before deleting your account.
         </p>
       }
       toc={TOC}
@@ -131,9 +134,9 @@ export default function DataDeletionPage() {
           <div className="space-y-1">
             <h2 className="text-sm font-semibold text-foreground">There is no grace period</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              The moment you confirm, everything listed above is erased in one step, receipt images included.
-              There is no grace period and no undo. Copies in the operator’s hosting backups follow that
-              provider’s backup schedule.
+              Account deletion is permanent. Copies in the operator’s hosting backups follow the provider’s backup
+              schedule. OpenAI handles any retained Quick Log request data under its own API data controls, described
+              in the <LegalPageLink to="/privacy">Privacy Policy</LegalPageLink>.
             </p>
           </div>
         </section>

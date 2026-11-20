@@ -48,6 +48,31 @@ test('matches a unique cash account and uses the correct marked-for-review defau
   assert.match(refund.values.notes, /Review the default income account/)
 })
 
+test('matches the only active cash account in the receipt currency even without a reliable model reference', () => {
+  const cashPhp = { ...accounts[0], name: 'Pocket Cash' }
+  const cashUsd = { ...cashPhp, id: 'cash-usd', name: 'Travel Cash', currency: 'USD' }
+  const inactivePhp = { ...cashPhp, id: 'cash-inactive', name: 'Old Cash', is_active: false }
+  const options = { accounts: [cashPhp, cashUsd, inactivePhp, ...accounts.slice(1)] }
+
+  assert.equal(resolve({}, options).values.account_id, cashPhp.id)
+  assert.equal(resolve({ account: 'Cash tendered', accountId: cashUsd.id }, options).values.account_id, cashPhp.id)
+  assert.equal(resolve({ account: 'Everyday Wallet', accountId: 'wallet' }, options).values.account_id, cashPhp.id)
+  const noCashInCurrency = resolve({}, { accounts: [cashUsd, ...accounts.slice(1)] })
+  assert.equal(noCashInCurrency.values.account_id, 'wallet')
+  assert.match(noCashInCurrency.values.notes, /Review the default expense account/)
+})
+
+test('leaves the cash account ambiguous when more than one account matches the currency', () => {
+  const namedCash = { ...accounts[0], id: 'other-cash', name: 'Cash on Hand' }
+  const options = { accounts: [...accounts, namedCash] }
+  const entry = resolve({ account: 'Cash on Hand', accountId: namedCash.id }, options)
+  assert.ok(entry.ready)
+  assert.equal(entry.values.account_id, 'wallet')
+  assert.match(entry.values.notes, /Review the default expense account/)
+  const officeCash = { ...namedCash, name: 'Office Cash' }
+  assert.equal(resolve({ account: officeCash.name, accountId: officeCash.id }, { accounts: [...accounts, officeCash] }).values.account_id, 'wallet')
+})
+
 test('matches a printed provider only with a unique supported account and treats generic card labels as insufficient', () => {
   const provider = { id: 'gcash', name: 'GCash Wallet', type: 'digital_wallet', currency: 'PHP', is_active: true }
   const otherWallet = { ...provider, id: 'other-gcash', name: 'GCash Business' }

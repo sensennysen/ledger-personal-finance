@@ -7,6 +7,11 @@ type QuickLogAmbiguity = (typeof QUICK_LOG_AMBIGUITIES)[number]
 export const RECEIPT_PAYMENT_METHODS = ['cash', 'card', 'bank_transfer', 'digital_wallet', 'other'] as const
 export type ReceiptPaymentMethod = (typeof RECEIPT_PAYMENT_METHODS)[number]
 
+export function uniqueCashAccount<T extends { type: string; currency: string }>(activeAccounts: readonly T[], currency: string): T | undefined {
+  const matches = activeAccounts.filter((account) => account.type === 'cash' && account.currency === currency)
+  return matches.length === 1 ? matches[0] : undefined
+}
+
 export interface QuickLogAmount {
   text: string
   decimal: string

@@ -1,4 +1,4 @@
-import { isQuickLogDate, type QuickLogCandidate, type ReceiptPaymentMethod } from '../../supabase/functions/_shared/quickLog.ts'
+import { isQuickLogDate, uniqueCashAccount, type QuickLogCandidate, type ReceiptPaymentMethod } from '../../supabase/functions/_shared/quickLog.ts'
 import { isQuickLogExpenseAccount, isQuickLogReceivingAccount, mentionsLiteral, parseQuickLogAmount, type QuickLogResolution } from './quickLog.ts'
 
 type Account = Parameters<typeof isQuickLogExpenseAccount>[0]
@@ -9,11 +9,12 @@ const paymentLabels: Record<ReceiptPaymentMethod, string> = {
 }
 const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase()
 const genericPaymentNames = new Set([
-  'cash', 'card', 'credit', 'debit', 'credit card', 'debit card', 'visa', 'mastercard', 'jcb', 'amex',
+  'cash', 'cash on hand', 'cash tendered', 'cash payment',
+  'card', 'credit', 'debit', 'credit card', 'debit card', 'visa', 'mastercard', 'jcb', 'amex',
   'american express', 'bank transfer', 'transfer', 'wallet', 'digital wallet', 'e-wallet', 'other',
 ])
 
-function matchReceiptAccount(accounts: Account[], evidence: string | null, suggestion?: string | null, cash = false) {
+function matchReceiptAccount(accounts: Account[], evidence: string | null, suggestion?: string | null) {
   const name = normalize(evidence ?? '')
   if (name && !genericPaymentNames.has(name)) {
     const exact = accounts.filter((account) => normalize(account.name) === name)
@@ -25,8 +26,7 @@ function matchReceiptAccount(accounts: Account[], evidence: string | null, sugge
       if (matches.length === 1 && matches[0].id === suggestion) return matches[0]
     }
   }
-  const matches = cash ? accounts.filter((account) => account.type === 'cash') : []
-  return matches.length === 1 && (!suggestion || matches[0].id === suggestion) ? matches[0] : undefined
+  return undefined
 }
 
 function receiptAmount(candidate: QuickLogCandidate['amount'], locale: string) {
@@ -50,9 +50,10 @@ export function resolveQuickLogReceipt({
   const active = accounts.filter((account) => account.is_active)
   const eligible = type === 'expense' && !isPayment ? isQuickLogExpenseAccount : isQuickLogReceivingAccount
   const picked = active.find((account) => account.id === selectedAccountId)
-  const inferred = selectedAccountId ? undefined : matchReceiptAccount(
-    active, candidate.account, candidate.accountId, candidate.paymentMethod === 'cash' && type !== 'transfer',
-  )
+  const cashPayment = candidate.paymentMethod === 'cash' && (kind === 'expense' || kind === 'income')
+  const inferred = selectedAccountId ? undefined
+    : cashPayment ? uniqueCashAccount(active, currency)
+      : matchReceiptAccount(active, candidate.account, candidate.accountId)
   const useDefault = !selectedAccountId && !inferred && !!kind && !isPayment && type !== 'transfer'
   const fallback = useDefault ? active.find((account) => account.id === (type === 'income' ? incomeAccountId : expenseAccountId)) : undefined
   const source = picked ?? inferred ?? fallback

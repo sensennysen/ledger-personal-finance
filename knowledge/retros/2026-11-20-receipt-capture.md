@@ -9,6 +9,13 @@
 - Passed lint, the production build, all 1,254 app tests, and the redesign checks.
 - Passed database lint, 93 pgTAP assertions, and the existing concurrency checks. Replayed all migrations and seed in an isolated local Supabase project. Generated types matched the repository using CI’s pinned CLI.
 
+## Cash on Hand matching
+
+Receipt requests send the active account name, type, and currency with a request-local reference. The model now explicitly treats positive Cash Tendered as payment evidence and uses the final total for the transaction amount. Ledger resolves cash expenses and income against active Cash on Hand accounts in the receipt currency. An explicit account selection takes priority. If multiple cash accounts match, Ledger uses the saved default with a reason in the entry notes.
+
+- Verified the Harbor Cafe fixture through the live model and local Edge Function. The ₱249.50 cash receipt matched the sole PHP cash account despite a USD cash account. Adding a second PHP cash account left the reference unset and used the reviewable default. An explicit selection still took priority.
+- Passed lint, the production build, all 1,256 app tests, and the redesign checks.
+
 ## Backlog
 
 - Verify camera capture and image selection in installed PWAs on physical iOS and Android devices. Broader testing includes long receipts, glare, and HEIC decoded by the browser.

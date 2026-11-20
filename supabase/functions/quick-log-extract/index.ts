@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.105.1'
 import {
-  isQuickLogDate, isQuickLogExtraction, isReceiptExtraction, QUICK_LOG_PHRASE_LIMIT, quickLogFormatForReferences,
+  isQuickLogDate, isQuickLogExtraction, isReceiptExtraction, QUICK_LOG_PHRASE_LIMIT, quickLogFormatForReferences, uniqueCashAccount,
   type QuickLogCandidate, type QuickLogErrorCode,
 } from '../_shared/quickLog.ts'
 import { receiptImageUrl, RECEIPT_MAX_REQUEST_BYTES } from '../_shared/receiptInput.ts'
@@ -30,7 +30,8 @@ const receiptInstructions = [
   'Determine the transaction type from the document. A purchase or payment to a merchant is an expense. An explicit refund or money received is income. Only classify transfers and debt payments when the document actually shows them.',
   'Use the final amount charged or refunded, including tax and discounts. Never substitute a subtotal, cash tendered, change, balance due, split tender or tip for the final total. If there is no clear final total, set amount to null and ambiguity to amount. Copy its numeric text, omit the currency and any refund sign, and give its positive decimal value without grouping separators.',
   'Use the merchant, payer or payee as the description. Report the currency and date when printed, with date formatted YYYY-MM-DD and dateText copied from the image. Resolve an explicit currency symbol only when it is clear. Leave fee and received fields null unless the image establishes a transfer and explicitly reports those amounts.',
-  'Report paymentMethod only if visible: cash, card, bank_transfer, digital_wallet or other. For account and destination copy a visible payment provider or account name, never a full card number, authorization code, or bank account number. Use only the supplied account references. A provider can match an account if the provider name uniquely identifies it (for example, GCash printed on a receipt can match GCash Wallet). A cash payment can match the sole cash account. A card type or card network alone does not identify an account. Leave references null if there is no unique verified match.',
+  'Identify paymentMethod independently of the final amount: cash, card, bank_transfer, digital_wallet or other. A positive Cash Tendered or Cash Received line showing payment is cash evidence even if no account name is printed. For example, Total PHP 249.50, Cash Tendered 300.00, and Change 50.50 means amount 249.50 and paymentMethod cash. Ignore zero cash fields. If the receipt shows multiple payment methods used for one total, leave paymentMethod and the source account fields null.',
+  'For account and destination copy a visible payment provider or account name, never a full card number, authorization code, or bank account number. Use only the supplied account references. A provider can match an account if the provider name uniquely identifies it (for example, GCash printed on a receipt can match GCash Wallet). For a cash expense or income, leave account and accountRef null so Ledger can match its Cash on Hand accounts by currency. A card type or card network alone does not identify an account. Leave references null if there is no unique verified match.',
   'Use the supplied category and optional subcategory references of the right type. Leave category fields null where there is no appropriate match, including transfers. Use ambiguity for unclear amounts, dates, currencies, transaction types or competing transactions. Let Ledger handle missing account matches and defaults.',
 ].join(' ')
 
@@ -184,14 +185,20 @@ Deno.serve(async (request) => {
     const child = subcategory ? childRefs.get(subcategory) : undefined
     const categoryMatch = category ? categoryRefs.get(category)
       : child ? categories.find((item) => item.id === child.category_id) : undefined
+    const defaultCurrency = profile.data.default_currency
+    const cashPayment = 'paymentMethod' in fields && fields.paymentMethod === 'cash'
+      && (fields.intent === 'expense' || fields.intent === 'income')
+    const source = cashPayment ? uniqueCashAccount(accounts, fields.currency ?? defaultCurrency)
+      : accountRef ? accountRefs.get(accountRef) : undefined
     const candidate: QuickLogCandidate = {
       ...fields,
-      accountId: accountRef ? accountRefs.get(accountRef)?.id ?? null : null,
+      account: cashPayment ? null : fields.account,
+      accountId: source?.id ?? null,
       destinationAccountId: destinationRef ? accountRefs.get(destinationRef)?.id ?? null : null,
       categoryId: categoryMatch && (categoryMatch.type === fields.intent || categoryMatch.type === 'both') ? categoryMatch.id : null,
       subcategoryId: child?.id ?? null,
       subcategoryParentId: child?.category_id ?? null,
-      defaultCurrency: profile.data.default_currency,
+      defaultCurrency,
       numberLocale,
     }
     console.info('quick-log-extract', { requestId, providerRequestId: providerId, durationMs: Date.now() - started })

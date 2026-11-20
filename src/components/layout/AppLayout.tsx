@@ -322,7 +322,7 @@ function LayoutShell() {
       const error = await saveQuickLogDraft(draft, phrase, id)
       if (error) return error
       notify({
-        severity: 'success', title: 'Saved for review', body: 'Finish the entry in Activity when you’re ready.',
+        severity: 'success', title: 'Saved for review', body: draft.reason,
         action: { label: 'Needs review', run: () => navigate('/transactions?review=needed') },
       })
       return null

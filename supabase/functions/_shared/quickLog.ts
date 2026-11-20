@@ -2,6 +2,8 @@ export const QUICK_LOG_PHRASE_LIMIT = 500
 
 export const QUICK_LOG_INTENTS = ['expense', 'income', 'transfer', 'card-payment', 'loan-repayment', 'unclear'] as const
 type QuickLogIntent = (typeof QUICK_LOG_INTENTS)[number]
+export const QUICK_LOG_AMBIGUITIES = ['multiple_transactions', 'transaction_type', 'account', 'amount', 'currency', 'date', 'transfer_details'] as const
+type QuickLogAmbiguity = (typeof QUICK_LOG_AMBIGUITIES)[number]
 
 export interface QuickLogAmount {
   text: string
@@ -12,7 +14,9 @@ export interface QuickLogExtraction {
   intent: QuickLogIntent
   description: string | null
   account: string | null
+  accountRef: string | null
   destination: string | null
+  destinationRef: string | null
   amount: QuickLogAmount | null
   currency: string | null
   date: string | null
@@ -24,9 +28,13 @@ export interface QuickLogExtraction {
   category: string | null
   subcategory: string | null
   ambiguous: boolean
+  ambiguity: QuickLogAmbiguity | null
 }
 
-export interface QuickLogCandidate extends Omit<QuickLogExtraction, 'category' | 'subcategory'> {
+export interface QuickLogCandidate extends Omit<QuickLogExtraction, 'category' | 'subcategory' | 'accountRef' | 'destinationRef' | 'ambiguity'> {
+  accountId?: string | null
+  destinationAccountId?: string | null
+  ambiguity?: QuickLogAmbiguity | null
   categoryId: string | null
   subcategoryId: string | null
   subcategoryParentId: string | null
@@ -54,7 +62,7 @@ const nullableAmount = {
     { type: 'null' },
   ],
 }
-const stringFields = ['description', 'account', 'destination', 'currency', 'date', 'dateText',
+const stringFields = ['description', 'account', 'accountRef', 'destination', 'destinationRef', 'currency', 'date', 'dateText',
   'receivedCurrency', 'feeCurrency', 'category', 'subcategory'] as const
 const amountFields = ['amount', 'received', 'fee'] as const
 const properties = {
@@ -62,6 +70,7 @@ const properties = {
   ...Object.fromEntries(stringFields.map((key) => [key, nullableString])),
   ...Object.fromEntries(amountFields.map((key) => [key, nullableAmount])),
   ambiguous: { type: 'boolean' },
+  ambiguity: { type: ['string', 'null'], enum: [...QUICK_LOG_AMBIGUITIES, null] },
 }
 
 export const quickLogResponseFormat = {
@@ -69,6 +78,27 @@ export const quickLogResponseFormat = {
   name: 'quick_log_transaction',
   strict: true,
   schema: { type: 'object', properties, required: Object.keys(properties), additionalProperties: false },
+}
+
+export function quickLogFormatForReferences(accountRefs: string[], categoryRefs: string[], subcategoryRefs: string[]) {
+  // Structured Outputs limits the total number of enum values. Large account
+  // sets still go through the same reference lookups after extraction.
+  if (2 * accountRefs.length + categoryRefs.length + subcategoryRefs.length > 900) return quickLogResponseFormat
+  const referenceField = (refs: string[]) => refs.length ? { ...nullableString, enum: [...refs, null] } : { type: 'null' }
+  const account = referenceField(accountRefs)
+  return {
+    ...quickLogResponseFormat,
+    schema: {
+      ...quickLogResponseFormat.schema,
+      properties: {
+        ...properties,
+        accountRef: account,
+        destinationRef: account,
+        category: referenceField(categoryRefs),
+        subcategory: referenceField(subcategoryRefs),
+      },
+    },
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -79,6 +109,7 @@ export function isQuickLogExtraction(value: unknown): value is QuickLogExtractio
   if (!isRecord(value) || Object.keys(value).length !== Object.keys(properties).length) return false
   return QUICK_LOG_INTENTS.some((intent) => value.intent === intent)
     && typeof value.ambiguous === 'boolean'
+    && (value.ambiguity === null || QUICK_LOG_AMBIGUITIES.some((reason) => reason === value.ambiguity))
     && stringFields.every((key) => value[key] === null || typeof value[key] === 'string')
     && amountFields.every((key) => {
       const amount = value[key]

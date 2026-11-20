@@ -1,12 +1,14 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { parseQuickLogAmount, resolveQuickLog } from '../src/lib/quickLog.ts'
+import { isQuickLogExtraction, quickLogFormatForReferences } from '../supabase/functions/_shared/quickLog.ts'
 
 const accounts = [
   { id: 'savings', name: 'BPI Savings', currency: 'PHP', type: 'savings', is_active: true },
   { id: 'wallet', name: 'GCash', currency: 'PHP', type: 'digital_wallet', is_active: true },
   { id: 'dollars', name: 'Dollar Savings', currency: 'USD', type: 'savings', is_active: true },
   { id: 'visa', name: 'BPI Visa', currency: 'PHP', type: 'credit_card', is_active: true },
+  { id: 'cash', name: 'Cash', currency: 'PHP', type: 'cash', is_active: true },
 ]
 const categories = [{ id: 'food', type: 'expense' }, { id: 'food-rule', type: 'expense' }, { id: 'salary', type: 'income' }]
 const amount = (text, decimal = text) => ({ text, decimal })
@@ -65,7 +67,65 @@ test('prioritizes a matching category rule and requires the subcategory to match
   assert.equal(result.ready, true)
   assert.equal(result.values.category_id, 'food-rule')
   assert.equal(result.values.subcategory_id, null)
-  assert.equal(resolve('Jollibee 189', { categoryId: 'salary' }).values.category_id, null)
+  const noMatch = resolve('Jollibee 189', { categoryId: 'salary' })
+  assert.equal(noMatch.values.category_id, null)
+  assert.equal(noMatch.reason, 'No matching expense category was found.')
+})
+
+test('posts a named cash expense and uses the expense default when the phrase omits an account', () => {
+  const named = resolve('Jollibee 300 cash', { amount: amount('300'), account: 'cash', accountId: 'cash' })
+  assert.equal(named.ready, true)
+  assert.deepEqual([named.values.account_id, named.values.category_id, named.values.subcategory_id,
+    named.values.amount, named.values.currency, named.values.description], ['cash', 'food', 'fast-food', 300, 'PHP', 'Jollibee'])
+  const fallback = resolve('Jollibee 189', { accountId: 'cash' })
+  assert.equal(fallback.ready, true)
+  assert.equal(fallback.values.account_id, 'wallet')
+  assert.equal(fallback.values.description, 'Jollibee')
+})
+
+test('uses model references for explicit unique shorthand and reviews conflicting or unresolved account mentions', () => {
+  const wallet = { ...accounts[4], name: 'Everyday Wallet' }
+  const options = { accounts: [...accounts.slice(0, 4), wallet] }
+  const shorthand = { amount: amount('300'), account: 'cash', accountId: 'cash' }
+  assert.equal(resolve('Jollibee 300 cash', shorthand, options).values.account_id, 'cash')
+  const duplicate = resolve('Jollibee 300 cash', shorthand, {
+    accounts: [...options.accounts, { ...wallet, id: 'other', name: 'Travel Wallet' }],
+  })
+  assert.equal(duplicate.ready, false)
+  assert.match(duplicate.reason, /more than one active account/)
+  assert.equal(duplicate.values.account_id, '')
+
+  const conflicting = resolve('Jollibee 300 cash', { ...shorthand, accountId: 'wallet' })
+  assert.equal(conflicting.ready, false)
+  assert.match(conflicting.reason, /could not be matched confidently/)
+  const unmatched = resolve('Jollibee 189 via Unknown Bank', { account: 'Unknown Bank' })
+  assert.equal(unmatched.ready, false)
+  assert.match(unmatched.reason, /does not match an active account/)
+  assert.equal(unmatched.values.account_id, '')
+  const omittedByModel = resolve('Jollibee 300 cash', { amount: amount('300') }, options)
+  assert.equal(omittedByModel.ready, false)
+  assert.equal(omittedByModel.values.account_id, '')
+  assert.equal(resolve('Jollibee 189', { account: 'Cash', accountId: 'cash' }).ready, false)
+})
+
+test('validates account references and reports a known ambiguity as a review reason', () => {
+  const schema = quickLogFormatForReferences(['a1'], ['c1'], ['s1']).schema.properties
+  assert.deepEqual(schema.accountRef.enum, ['a1', null])
+  assert.deepEqual(schema.destinationRef.enum, ['a1', null])
+  assert.deepEqual(schema.category.enum, ['c1', null])
+  assert.deepEqual(schema.subcategory.enum, ['s1', null])
+  assert.equal(quickLogFormatForReferences([], ['c1'], []).schema.properties.accountRef.type, 'null')
+  const extraction = {
+    intent: 'expense', description: 'Jollibee', account: 'cash', accountRef: 'a1', destination: null, destinationRef: null,
+    amount: amount('300'), currency: null, date: null, dateText: null, received: null, receivedCurrency: null,
+    fee: null, feeCurrency: null, category: 'c1', subcategory: 's1', ambiguous: false, ambiguity: null,
+  }
+  assert.equal(isQuickLogExtraction(extraction), true)
+  assert.equal(isQuickLogExtraction({ ...extraction, accountRef: 1 }), false)
+  assert.equal(isQuickLogExtraction({ ...extraction, ambiguity: 'free text' }), false)
+  const multiple = resolve('Jollibee 189 and groceries 200', { ambiguous: true, ambiguity: 'multiple_transactions' })
+  assert.equal(multiple.ready, false)
+  assert.match(multiple.reason, /more than one transaction/)
 })
 
 test('records income into the income default or an explicitly named receiving account', () => {

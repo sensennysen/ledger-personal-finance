@@ -64,7 +64,7 @@ export function QuickLogForm({
         setStatus('reading')
         const localDate = getLocalDateString()
         const { data, error } = await supabase.functions.invoke<QuickLogCandidate>('quick-log-extract', {
-          body: { phrase: phrase.trim(), localDate }, signal: controller.signal,
+          body: { phrase: phrase.trim(), localDate, includeAccountContext: true }, signal: controller.signal,
         })
         if (controller.signal.aborted) return
         const code = error ? await extractionErrorCode(error) : undefined
@@ -79,7 +79,7 @@ export function QuickLogForm({
           currencies: CURRENCIES.map(({ code }) => code), categories, rule: matchRule(data.description ?? ''),
         }) : {
           ready: false, kind: null, values: { description: phrase.trim() }, destinationCurrency: null,
-          reason: 'Quick Log could only save the original phrase.',
+          reason: 'Quick Log couldn’t identify the transaction details from the phrase.',
         }
         saveAttempt.current = { draft, id: crypto.randomUUID() }
       }
@@ -118,7 +118,7 @@ export function QuickLogForm({
           }}
           className="min-h-24 resize-y text-base"
         />
-        <p id="quick-log-privacy" className="text-xs text-muted-foreground">Ledger sends this phrase and your category names to OpenAI to extract the transaction details.</p>
+        <p id="quick-log-privacy" className="text-xs text-muted-foreground">Ledger sends this phrase, active account names, types and currencies, and category and subcategory names to OpenAI to match the transaction.</p>
       </div>
       {!online && <p role="status" className="text-sm text-muted-foreground">Connect to the internet to use Quick Log, or enter the transaction manually.</p>}
       {online && lookupError && (

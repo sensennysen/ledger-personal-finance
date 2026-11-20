@@ -3,6 +3,7 @@ import {
 } from '../../supabase/functions/_shared/quickLog.ts'
 
 type Account = { id: string; name: string; currency: string; type: string; is_active: boolean }
+type AccountMatch = { account?: Account; problem?: string }
 type Kind = 'expense' | 'income' | 'transfer' | 'card-payment' | 'loan-repayment'
 type Category = { id: string; type: string }
 type Rule = { category_id: string | null; type_hint: string | null }
@@ -39,17 +40,20 @@ const currencySymbols: Record<string, string> = {
   PHP: '₱', EUR: '€', GBP: '£', KRW: '₩', INR: '₹', USD: 'US$',
   SGD: 'S$', AUD: 'A$', CAD: 'C$', HKD: 'HK$', MXN: 'MX$', BRL: 'R$',
 }
+const ambiguityReasons: Record<NonNullable<QuickLogCandidate['ambiguity']>, string> = {
+  multiple_transactions: 'The phrase appears to describe more than one transaction.',
+  transaction_type: 'The transaction type is unclear.',
+  account: 'The phrase does not identify a single account.',
+  amount: 'The phrase does not identify a single transaction amount.',
+  currency: 'The transaction currency is unclear.',
+  date: 'The transaction date is unclear.',
+  transfer_details: 'The direction, amounts, or fee of the transfer are unclear.',
+}
 
 export const isQuickLogReceivingAccount = (account: Account) =>
   account.is_active && account.type !== 'credit_card' && account.type !== 'loan'
 
 export const isQuickLogExpenseAccount = (account: Account) => account.is_active && account.type !== 'loan'
-
-function resolveAccount(accounts: Account[], mention: string | null, fallback: string | null) {
-  if (mention === null) return accounts.find((account) => account.id === fallback)
-  const matches = accounts.filter((account) => normalize(account.name) === normalize(mention))
-  return matches.length === 1 ? matches[0] : undefined
-}
 
 export function parseQuickLogAmount(value: string, locale: string): number | null {
   const parts = new Intl.NumberFormat(locale).formatToParts(12345.6)
@@ -105,6 +109,21 @@ function mentionsLiteral(phrase: string, mention: string | null) {
   return new RegExp('(?<![\\p{L}\\p{N}])' + escape(normalize(mention)) + '(?![\\p{L}\\p{N}])', 'u').test(phrase)
 }
 
+function matchNamedAccount(accounts: Account[], phrase: string, mention: string, suggestedId: string | null | undefined): AccountMatch {
+  if (!mentionsLiteral(phrase, mention)) return { problem: 'could not be verified in the phrase' }
+  const name = normalize(mention)
+  const exact = accounts.filter((account) => normalize(account.name) === name)
+  const matches = exact.length > 0 ? exact : accounts.filter((account) =>
+    name.length >= 2 && (mentionsLiteral(normalize(account.name), name) || account.type.replaceAll('_', ' ') === name))
+  if (matches.length > 1) return { problem: 'matches more than one active account' }
+  const [account] = matches
+  if (!account) return { problem: 'does not match an active account' }
+  if ((suggestedId && suggestedId !== account.id) || (exact.length === 0 && suggestedId !== account.id)) {
+    return { problem: 'could not be matched confidently' }
+  }
+  return { account }
+}
+
 function deriveDate(candidate: QuickLogCandidate, today: string) {
   if (candidate.date === null && candidate.dateText === null) return { date: today, clear: true }
   const evidence = normalize(candidate.dateText ?? '')
@@ -128,12 +147,23 @@ export function resolveQuickLog({
   rule: Rule | null
 }): QuickLogResolution {
   const raw = normalize(phrase)
-  const source = candidate.account === null || mentionsLiteral(raw, candidate.account)
-    ? resolveAccount(accounts, candidate.account, candidate.intent === 'income' ? incomeAccountId
-      : candidate.intent === 'expense' ? expenseAccountId : null)
-    : undefined
-  const destination = mentionsLiteral(raw, candidate.destination)
-    ? resolveAccount(accounts, candidate.destination, null) : undefined
+  const activeAccounts = accounts.filter((account) => account.is_active)
+  const defaultId = candidate.intent === 'income' ? incomeAccountId : candidate.intent === 'expense' ? expenseAccountId : null
+  const descriptionText = candidate.description && mentionsLiteral(raw, candidate.description) ? candidate.description.trim() : null
+  const accountContext = descriptionText ? raw.replace(normalize(descriptionText), ' ') : raw
+  const usesDefaultAccount = candidate.intent === 'expense' || candidate.intent === 'income'
+  const missedAccount = usesDefaultAccount && candidate.account === null && (
+    /\b(?:via|using|paid with|charged to|debited from|deposited into)\s+\p{L}/u.test(accountContext)
+    || /\bcash[.!?]?\s*$/u.test(accountContext)
+    || activeAccounts.some(({ name }) => !currencies.includes(name.trim().toUpperCase()) && mentionsLiteral(accountContext, name))
+  )
+  const sourceMatch: AccountMatch = candidate.account !== null
+    ? matchNamedAccount(activeAccounts, usesDefaultAccount ? accountContext : raw, candidate.account, candidate.accountId)
+    : { account: missedAccount ? undefined : activeAccounts.find((account) => account.id === defaultId) }
+  const destinationMatch: AccountMatch = candidate.destination !== null
+    ? matchNamedAccount(activeAccounts, raw, candidate.destination, candidate.destinationAccountId) : {}
+  const { account: source } = sourceMatch
+  const { account: destination } = destinationMatch
   let kind: Kind = candidate.intent === 'unclear' ? 'expense' : candidate.intent
   if (kind === 'transfer' && destination?.type === 'credit_card') kind = 'card-payment'
   if (kind === 'transfer' && destination?.type === 'loan') kind = 'loan-repayment'
@@ -160,7 +190,7 @@ export function resolveQuickLog({
     item.id === (rule?.category_id ?? candidate.categoryId) && (item.type === type || item.type === 'both'))
   const preferencesMatch = !rule?.type_hint || rule.type_hint === type
   const description = isTransfer && source && destination ? source.name + ' to ' + destination.name
-    : candidate.description && mentionsLiteral(raw, candidate.description) ? candidate.description.trim() : phrase.trim()
+    : descriptionText ?? phrase.trim()
   const isEligible = type === 'expense' && !hasDestination ? isQuickLogExpenseAccount : isQuickLogReceivingAccount
   const payingAccount = source && source.currency === currency && isEligible(source) ? source : undefined
   const compatibleDestination = destination?.is_active && (!receivedCurrency || receivedCurrency === destination.currency)
@@ -189,17 +219,24 @@ export function resolveQuickLog({
     },
     destinationCurrency: receivedCurrency,
   })
-  if (kind === 'card-payment' || kind === 'loan-repayment') return saveForReview('Payment details need review.')
+  if (candidate.ambiguity === 'multiple_transactions') return saveForReview(ambiguityReasons.multiple_transactions)
+  if (kind === 'card-payment' || kind === 'loan-repayment') return saveForReview('The payment and its statement or loan details need review.')
   if (main.value === null || /\d/.test(fee.remaining) || (isTransfer && hasAmountRole(raw, candidate.amount, currency, 'fee'))) {
     return saveForReview('The transaction amount needs review.')
   }
   if (!validDate) return saveForReview('The transaction date needs review.')
   if (!validCurrency) return saveForReview('The currency needs review.')
-  if (!payingAccount) return saveForReview('An active account in ' + currency + ' is needed.')
-  if (candidate.ambiguous || candidate.intent === 'unclear' || !preferencesMatch) {
-    return saveForReview('Some transaction details need review.')
+  if (candidate.intent === 'unclear') return saveForReview(ambiguityReasons.transaction_type)
+  if (sourceMatch.problem) return saveForReview('The named account ' + sourceMatch.problem + '.')
+  if (missedAccount) return saveForReview('The phrase mentions an account that could not be matched confidently.')
+  if (!payingAccount) {
+    if (source && source.currency !== currency) return saveForReview('The account uses ' + source.currency + ', but the transaction uses ' + currency + '.')
+    if (source) return saveForReview('The selected account cannot be used for this transaction type.')
+    const role = isTransfer ? 'sending' : 'default ' + type
+    return saveForReview('No active ' + role + ' account is selected.')
   }
   if (isTransfer) {
+    if (destinationMatch.problem) return saveForReview('The receiving account ' + destinationMatch.problem + '.')
     const direction = candidate.account && candidate.destination && new RegExp(
       '(?<![\\p{L}\\p{N}])' + escape(normalize(candidate.account)) + '\\s*,?\\s*(?:\\bto\\b|→|->)\\s*'
       + escape(normalize(candidate.destination)) + '(?![\\p{L}\\p{N}])', 'u',
@@ -223,5 +260,10 @@ export function resolveQuickLog({
     || (type === 'expense' && /\b(?:salary|payroll|received|income|wages)\b/.test(raw))) {
     return saveForReview('The transaction type needs review.')
   }
+  if (!preferencesMatch) return saveForReview('A matching category rule uses a different transaction type.')
+  if (candidate.ambiguous || candidate.ambiguity) {
+    return saveForReview(candidate.ambiguity ? ambiguityReasons[candidate.ambiguity] : 'Some transaction details need review.')
+  }
+  if (!isTransfer && !category) return saveForReview('No matching ' + type + ' category was found.')
   return { ready: true, values, destinationCurrency: isTransfer ? compatibleDestination?.currency ?? null : null }
 }

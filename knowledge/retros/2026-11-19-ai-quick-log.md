@@ -22,9 +22,18 @@ Quick Log now saves the original phrase and recognized fields as a draft wheneve
 - Verified the Vite development override on port 5173. Both Supabase endpoints accepted preflight, but the running app had been using the hosted endpoint. With `.env.development.local` pointing to the local stack, a signed-in browser submission saved the extracted phrase and amount in local Supabase.
 - Reproduced the production CORS failure using the full browser preflight. The hosted response omitted Ledger's `X-Client-ID` from its allowed headers. The local gateway echoed the requested headers, which hid the omission during browser testing. The function source now explicitly allows `X-Client-ID`.
 
+## Account-aware matching
+
+Quick Log sends active account names, types, and currencies together with the category tree when the submitting form discloses that data. It uses request-local references and verifies every named match against the original phrase and active accounts. An omitted expense or income account uses the corresponding saved default. An unmatched account, a missing category, or another unresolved detail saves a draft with a specific reason.
+
+Verified against the local Edge Function and live model with a disposable user. The named Cash expense and both default-account cases posted to the expected balances. Both Jollibee entries selected Food & Dining and Fast Food. An unlisted account kept the amount in a draft and left balances alone. A legacy request omitted the account catalog.
+
+Moved **Needs review** to the top of mobile Activity and gave pending transaction rows a separate status badge. Verified the 48-pixel control and both filter states at 390 pixels, plus the compact control at desktop width.
+
 ## Backlog
 
 - Verify on installed iOS and Android PWAs, including a real offline-to-online handoff.
 - Apply the Quick Log migrations and deploy the extraction function to hosted Supabase when deploying the frontend. The OpenAI key is configured as a hosted Edge Function secret.
 - Deploy the CORS fix to the hosted extraction function and repeat the production-origin preflight with all browser headers.
+- Review the Privacy Policy wording for OpenAI Quick Log processing with the product owner before releasing account-aware extraction.
 - Implement receipt capture and daily review reminders in their follow-on milestones.

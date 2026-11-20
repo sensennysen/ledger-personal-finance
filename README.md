@@ -156,7 +156,7 @@ pnpm db:migrate
 supabase functions serve quick-log-extract --env-file .env
 ```
 
-With `pnpm dev` running in a second terminal, sign in and open **Add → Quick Log**. The first-use walkthrough gives examples and links to **Settings → Quick Log**, where you can choose default expense and income accounts. Try `Jollibee 189`, `Salary 45000`, or a transfer using two of your account names. At the end of the day, open **Activity → Needs review** to check auto-saved transactions or finish drafts with missing or unclear details. Drafts retain the original phrase and affect balances only after you finish them.
+With `pnpm dev` running in a second terminal, sign in and open **Add → Quick Log**. The first-use walkthrough gives examples and links to **Settings → Quick Log**, where you can choose default expense and income accounts. Try `Jollibee 300 cash` with an account matching Cash, `Jollibee 189` to use the expense default, or `Salary 45000` to use the income default. Quick Log uses your available category and subcategory names. Open **Activity → Needs review** to check posted transactions or see why a draft requires attention. Drafts retain the original phrase and affect balances only after you finish them.
 
 If the browser reports CORS, check the Quick Log request in the Network tab. In local development its URL is `http://127.0.0.1:54321/functions/v1/quick-log-extract`. If it points at hosted Supabase, check the Vite overrides and restart the dev server.
 

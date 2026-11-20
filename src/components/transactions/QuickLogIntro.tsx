@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const examples = [
-  ['Expense', 'Jollibee 189'],
+  ['Expense', 'Jollibee 300 cash'],
   ['Income', 'Salary 45000'],
   ['Transfer', 'Transfer 1500 from Savings to GCash'],
 ]
@@ -27,7 +27,7 @@ export function QuickLogIntro({ onContinue, onSettings }: { onContinue: () => vo
         ))}
       </dl>
       <div className="space-y-2 text-sm text-muted-foreground">
-        <p>Leave out the currency to use your default. Set expense and income account defaults in Settings.</p>
+        <p>Leave out the currency to use your default. If you skip the account on an expense or income, Ledger uses the default from Settings.</p>
         <p>Ledger saves what it understands. At the end of the day, open <strong className="font-medium text-foreground">Activity → Needs review</strong> to check entries and fill in any missing details.</p>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">

@@ -216,7 +216,6 @@ function TransactionRowImpl({
     const scheduled = !countsYet(tx.date, today)
     const isPayment = tx.type === 'transfer' || isLoanRepayment
     const meta = [
-      needsReview ? 'Needs review' : '',
       showDate ? formatDateShort(tx.date) : '',
       contextAccountId !== undefined
         ? isPayment
@@ -276,15 +275,20 @@ function TransactionRowImpl({
               {scheduled && <CalendarClock role="img" aria-label="Scheduled" className={flag} />}
               {tx.receipt_url && <Paperclip role="img" aria-label="Has receipt" className={flag} />}
             </p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {tx.queued ? (
-                <span className="inline-flex items-center gap-1 text-warning">
-                  <Clock className="size-3" />Not synced yet
-                </span>
-              ) : (
-                meta
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              {needsReview && (
+                <Badge className="h-5 shrink-0 bg-warning-container px-1.5 text-warning">Needs review</Badge>
               )}
-            </p>
+              <span className="min-w-0 truncate">
+                {tx.queued ? (
+                  <span className="inline-flex items-center gap-1 text-warning">
+                    <Clock className="size-3" />Not synced yet
+                  </span>
+                ) : (
+                  meta
+                )}
+              </span>
+            </div>
           </div>
           <div className="shrink-0 text-right">
             <p className={`money text-sm font-medium ${amountColorClass}`}>
@@ -358,7 +362,7 @@ function TransactionRowImpl({
                 )}
               </>
             )}
-            {needsReview && <Badge variant="outline" className="text-xs py-0 px-1.5">Needs review</Badge>}
+            {needsReview && <Badge variant="outline" className="px-1.5 py-0 text-xs max-md:border-transparent max-md:bg-warning-container max-md:text-warning">Needs review</Badge>}
             {tx.category && (
               <Badge variant="secondary" className="text-xs py-0 px-1.5">{tx.category.name}</Badge>
             )}

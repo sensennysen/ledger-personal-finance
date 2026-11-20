@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { Plus, Search, ArrowLeftRight, ChevronDown, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
+import { Plus, Search, ArrowLeftRight, ChevronDown, ChevronRight, Check, ListChecks, Upload, CheckSquare, Square, Tag, Trash2, Bookmark, X, Keyboard, LayoutList, AlignJustify, SlidersHorizontal } from 'lucide-react'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useCardPayment } from '@/hooks/useCardPayment'
 import { useAuth } from '@/contexts/AuthContext'
@@ -590,6 +590,19 @@ export default function TransactionsPage() {
   return (
     <div className="mx-auto flex w-full max-w-6xl gap-6 p-4 md:p-6">
       <div ref={pageTopRef} className="min-w-0 flex-1 space-y-4">
+        <Button
+          type="button"
+          variant={needsReview ? 'default' : 'outline'}
+          className={`h-12 w-full justify-start gap-3 rounded-xl px-4 text-sm font-semibold md:hidden ${
+            needsReview ? '' : 'border-primary/35 bg-primary/10 text-foreground hover:bg-primary/15 dark:border-primary/35 dark:bg-primary/10 dark:hover:bg-primary/15'
+          }`}
+          aria-pressed={needsReview}
+          onClick={() => setReviewMode(!needsReview)}
+        >
+          <ListChecks className={needsReview ? 'size-5' : 'size-5 text-primary'} aria-hidden />
+          Needs review
+          {needsReview ? <Check className="ml-auto size-4" aria-hidden /> : <ChevronRight className="ml-auto size-4 text-primary" aria-hidden />}
+        </Button>
         <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) { setTemplateDefaults(undefined); setFormError(null) } }}>
           <DialogContent className={`max-h-[calc(var(--vv-height,100dvh)-0.75rem)] ${entryDialogWidthClass(transactionKind)} overflow-y-auto p-3 sm:max-h-[90vh] sm:p-4`}>
             <TransactionEntryHeader kind={transactionKind} onChangeKind={setTransactionKind} />
@@ -781,7 +794,7 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        <div>
+        <div className="hidden md:block">
           <Button type="button" variant={needsReview ? 'secondary' : 'outline'} size="sm"
             aria-pressed={needsReview} onClick={() => setReviewMode(!needsReview)}>
             Needs review
